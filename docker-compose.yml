@@ -1,11 +1,12 @@
 version: '3'
 services:
 
-  server:
+  openrsc:
+    container_name: openrsc
     build:
       context: .
       dockerfile: Dockerfile
-    command: ant runserver
+    command: ant -f server/build.xml runserver
     ports:
       - "43594:43594"
       - "43595:43595"
@@ -14,6 +15,6 @@ services:
       - "43598:43598"
       - "43599:43599"
     volumes:
-      - ./avatars:/usr/server/avatars
-      - ./logs:/usr/server/logs
+      - ./server/avatars:/usr/server/avatars
+      - ./console:/usr/server/logs
     network_mode: host
