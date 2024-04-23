@@ -366,7 +366,12 @@ public class Npc extends Mob {
 			logNpcKill(owner);
 		}
 
-		ActionSender.sendNpcKills(owner);
+		try {
+			ActionSender.sendNpcKills(owner);
+		} catch (Exception e) {
+			LOGGER.error("Error sending NPC kills for {}: ", owner.getUsername());
+			LOGGER.catching(e);
+		}
 
 		/** Item Drops **/
 		dropItems(owner);
