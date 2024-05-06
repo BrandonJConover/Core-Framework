@@ -276,8 +276,8 @@ public class Skills {
 					player.message("@gre@You just advanced " + levelDiff + " " + skillName + " level"
 						/*+ (levelDiff > 1 ? "s" : "")*/ + "!");
 					boolean justGainedAbilityToGlobalChat = (getWorld().getServer().getConfig().WANT_GLOBAL_CHAT || getWorld().getServer().getConfig().WANT_GLOBAL_FRIEND) &&
-						player.getTotalLevel() >= getWorld().getServer().getConfig().GLOBAL_MESSAGE_TOTAL_LEVEL_REQ &&
-						player.getTotalLevel() - levelDiff < getWorld().getServer().getConfig().GLOBAL_MESSAGE_TOTAL_LEVEL_REQ &&
+						player.getTotalLevel() >= getWorld().getServer().getConfig().GLOBAL_MESSAGE_READING_TOTAL_LEVEL_REQ &&
+						player.getTotalLevel() - levelDiff < getWorld().getServer().getConfig().GLOBAL_MESSAGE_READING_TOTAL_LEVEL_REQ &&
 						!player.isMuted() &&
 						!player.isGlobalMuted();
 					if (justGainedAbilityToGlobalChat) {

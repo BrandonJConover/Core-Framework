@@ -907,3 +907,7 @@ Regular Player Commands
   - This command is not yet implemented.
   - This command would allow users to rename themselves after having had their previous name freed or marked as inappropriate.
   - Does not work for Moderators or above.
+- globalchat
+  - Usage `::globalchat`
+  - Alias: `::gc`
+  - Informs the user of the functionality of Global Chat on the server, including any total level restrictions.
