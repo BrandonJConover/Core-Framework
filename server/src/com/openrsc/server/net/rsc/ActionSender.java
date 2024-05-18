@@ -63,6 +63,16 @@ public class ActionSender {
 			generator = new Payload235Generator();
 		} else if (player.isUsing203CompatibleClient()) {
 			generator = new Payload203Generator();
+		} else if (player.isUsing202CompatibleClient()) {
+			generator = new Payload202Generator();
+		} else if (player.isUsing201CompatibleClient()) {
+			generator = new Payload201Generator();
+		} else if (player.isUsing199CompatibleClient()) {
+			generator = new Payload199Generator();
+		} else if (player.isUsing198CompatibleClient()) {
+			generator = new Payload198Generator();
+		} else if (player.isUsing196CompatibleClient()) {
+			generator = new Payload196Generator();
 		} else if (player.isUsing177CompatibleClient()) {
 			generator = new Payload177Generator();
 		} else if (player.isUsing140CompatibleClient()) {

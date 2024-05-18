@@ -2473,6 +2473,16 @@ public final class Player extends Mob {
 								parser = new Payload235Parser();
 							} else if (isUsing203CompatibleClient()) {
 								parser = new Payload203Parser();
+							} else if (isUsing202CompatibleClient()) {
+								parser = new Payload202Parser();
+							} else if (isUsing201CompatibleClient()) {
+								parser = new Payload201Parser();
+							} else if (isUsing199CompatibleClient()) {
+								parser = new Payload199Parser();
+							} else if (isUsing198CompatibleClient()) {
+								parser = new Payload198Parser();
+							} else if (isUsing196CompatibleClient()) {
+								parser = new Payload196Parser();
 							} else if (isUsing177CompatibleClient()) {
 								parser = new Payload177Parser();
 							} else if (isUsing140CompatibleClient()) {
@@ -3912,6 +3922,28 @@ public final class Player extends Mob {
 
 	public boolean isUsing177CompatibleClient() {
 		return this.clientVersion == 177;
+	}
+
+	public boolean isUsing196CompatibleClient() {
+		return this.clientVersion == 196;
+	}
+
+	public boolean isUsing198CompatibleClient() {
+		// 197 and 198 are identical protocol-wise.
+		return this.clientVersion > 196 && this.clientVersion < 199;
+	}
+
+	public boolean isUsing199CompatibleClient() {
+		return this.clientVersion == 199;
+	}
+
+	public boolean isUsing201CompatibleClient() {
+		// 200 and 201 are identical protocol-wise.
+		return this.clientVersion > 199 && this.clientVersion < 202;
+	}
+
+	public boolean isUsing202CompatibleClient() {
+		return this.clientVersion == 202;
 	}
 
 	public boolean isUsing203CompatibleClient() {
