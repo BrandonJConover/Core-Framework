@@ -13,6 +13,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.net.InetSocketAddress;
 
+import static com.openrsc.server.util.rsc.StringUtil.rot13;
+
 /**
  * Used to create a Character on the Login thread
  */
@@ -310,19 +312,6 @@ public class CharacterCreateRequest extends LoginExecutorProcess{
 			System.out.println("Register was successful!");
 		}
 		return (byte) RegisterLoginResponse.REGISTER_SUCCESSFUL;
-	}
-
-	private String rot13(String word) {
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < word.length(); i++) {
-			char c = word.charAt(i);
-			if       (c >= 'a' && c <= 'm') c += 13;
-			else if  (c >= 'A' && c <= 'M') c += 13;
-			else if  (c >= 'n' && c <= 'z') c -= 13;
-			else if  (c >= 'N' && c <= 'Z') c -= 13;
-			sb.append(c);
-		}
-		return sb.toString();
 	}
 
 	private boolean isDisallowedUsername(String username) {
