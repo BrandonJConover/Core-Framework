@@ -63,7 +63,7 @@ Feel free to submit bug reports in the repository issues section! If you would l
 
 ## In-Game Commands<a name="commands"></a>
 
-#### <a href="https://gitlab.com/open-runescape-classic/core/-/blob/master/Commands.md">Click here for in-game command documentation.</a>
+#### <a href="https://gitlab.com/open-runescape-classic/core/-/blob/develop/Commands.md">Click here for in-game command documentation.</a>
 
 
 ## Thank You<a name="thankyou"></a>
