@@ -170,10 +170,8 @@ public sealed class Equipment
 
     private void UpdateCombatBonuses()
     {
-        // TODO: Notify client of stat changes
-        var bonuses = GetTotalBonuses();
-        Console.WriteLine($"[{_player.Username}] Equipment bonuses updated: " +
-            $"Str={bonuses.StrengthBonus}, Atk={bonuses.AttackSlash}");
+        // TODO: Notify client of stat changes via ActionSender
+        // Combat bonuses are recalculated when needed by GetTotalBonuses()
     }
 
     /// <summary>

@@ -15,7 +15,7 @@ public sealed class Region
     private readonly List<Npc> _npcs = new();
     private readonly List<GameObject> _objects = new();
     private readonly List<GroundItem> _groundItems = new();
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>
     /// Region X coordinate (region units, not tiles).

@@ -138,8 +138,7 @@ public sealed class PlayerInventory
     private void OnContentsChanged(ContainerChangedEventArgs args)
     {
         // TODO: Send inventory update packets to client
-        // For now, just log
-        Console.WriteLine($"[{_player.Username}] Inventory changed: {args.ChangeType} at slot {args.Slot}");
+        // Inventory change tracking handled by event system
     }
 }
 
