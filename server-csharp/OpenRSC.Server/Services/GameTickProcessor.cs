@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenRSC.Server.Configuration;
@@ -7,7 +8,7 @@ namespace OpenRSC.Server.Services;
 
 /// <summary>
 /// Processes game ticks and updates world state.
-/// Modern equivalent of Java's GameStateUpdater.
+/// Optimized for minimal allocations and overhead.
 /// </summary>
 public sealed class GameTickProcessor
 {
@@ -32,9 +33,9 @@ public sealed class GameTickProcessor
     public long CurrentTick => _currentTick;
 
     /// <summary>
-    /// Processes a single game tick.
+    /// Processes a single game tick (synchronous for performance).
     /// </summary>
-    public async Task ProcessTickAsync(CancellationToken cancellationToken = default)
+    public void ProcessTick(CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _currentTick);
 
@@ -46,7 +47,7 @@ public sealed class GameTickProcessor
                 if (cancellationToken.IsCancellationRequested)
                     break;
 
-                await ProcessPlayerTickAsync(player);
+                ProcessPlayerTick(player);
             }
 
             // Process all NPCs
@@ -59,7 +60,7 @@ public sealed class GameTickProcessor
             }
 
             // Cleanup after all updates
-            await CleanupAfterUpdateAsync();
+            CleanupAfterUpdate();
         }
         catch (Exception ex)
         {
@@ -68,9 +69,19 @@ public sealed class GameTickProcessor
     }
 
     /// <summary>
+    /// Processes a single game tick (async wrapper for compatibility).
+    /// </summary>
+    public Task ProcessTickAsync(CancellationToken cancellationToken = default)
+    {
+        ProcessTick(cancellationToken);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Processes a single player's tick.
     /// </summary>
-    private async Task ProcessPlayerTickAsync(Player player)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ProcessPlayerTick(Player player)
     {
         // Update player position
         player.UpdatePosition();
@@ -79,8 +90,6 @@ public sealed class GameTickProcessor
         ExecuteWalkToActions(player);
 
         // TODO: Process other player events (combat, skilling, etc.)
-
-        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -146,7 +155,8 @@ public sealed class GameTickProcessor
     /// <summary>
     /// Cleanup after all entities have been updated.
     /// </summary>
-    private async Task CleanupAfterUpdateAsync()
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void CleanupAfterUpdate()
     {
         foreach (var player in _worldService.GetPlayers())
         {
@@ -157,8 +167,6 @@ public sealed class GameTickProcessor
         {
             npc.ResetAfterUpdate();
         }
-
-        await Task.CompletedTask;
     }
 
     /// <summary>

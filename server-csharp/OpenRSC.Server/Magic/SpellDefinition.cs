@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using OpenRSC.Server.Skills;
 
 namespace OpenRSC.Server.Magic;
@@ -90,11 +91,11 @@ public sealed record SpellDefinition
     public bool IsMembersOnly { get; init; }
 
     /// <summary>
-    /// All spell definitions.
+    /// All spell definitions (frozen for optimal lookup performance).
     /// </summary>
-    public static readonly IReadOnlyDictionary<int, SpellDefinition> All = CreateSpells();
+    public static readonly FrozenDictionary<int, SpellDefinition> All = CreateSpells();
 
-    private static Dictionary<int, SpellDefinition> CreateSpells()
+    private static FrozenDictionary<int, SpellDefinition> CreateSpells()
     {
         var spells = new Dictionary<int, SpellDefinition>();
 
@@ -184,7 +185,7 @@ public sealed record SpellDefinition
             new[] { new RuneRequirement(RuneType.Fire, 4), new RuneRequirement(RuneType.Nature, 1) },
             target: SpellTarget.Item);
 
-        return spells;
+        return spells.ToFrozenDictionary();
     }
 
     private static void AddSpell(Dictionary<int, SpellDefinition> spells, int id, string name,

@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using OpenRSC.Server.Entities;
 using OpenRSC.Server.Items;
 using OpenRSC.Server.Skills;
@@ -16,7 +17,7 @@ public sealed record OreDefinition
     public required int RespawnTicks { get; init; }
     public double SuccessRate { get; init; } = 0.5;
 
-    public static readonly IReadOnlyDictionary<int, OreDefinition> All = new Dictionary<int, OreDefinition>
+    public static readonly FrozenDictionary<int, OreDefinition> All = new Dictionary<int, OreDefinition>
     {
         [150] = new() { OreId = 150, Name = "Clay", RequiredLevel = 1, Experience = 5, RespawnTicks = 2, SuccessRate = 0.9 },
         [202] = new() { OreId = 202, Name = "Copper ore", RequiredLevel = 1, Experience = 17, RespawnTicks = 4, SuccessRate = 0.8 },
@@ -26,10 +27,9 @@ public sealed record OreDefinition
         [153] = new() { OreId = 153, Name = "Coal", RequiredLevel = 30, Experience = 50, RespawnTicks = 50, SuccessRate = 0.45 },
         [154] = new() { OreId = 154, Name = "Gold ore", RequiredLevel = 40, Experience = 65, RespawnTicks = 100, SuccessRate = 0.4 },
         [152] = new() { OreId = 152, Name = "Mithril ore", RequiredLevel = 55, Experience = 80, RespawnTicks = 200, SuccessRate = 0.3 },
-        [150] = new() { OreId = 409, Name = "Adamantite ore", RequiredLevel = 70, Experience = 95, RespawnTicks = 400, SuccessRate = 0.2 },
         [409] = new() { OreId = 409, Name = "Adamantite ore", RequiredLevel = 70, Experience = 95, RespawnTicks = 400, SuccessRate = 0.2 },
         [410] = new() { OreId = 410, Name = "Runite ore", RequiredLevel = 85, Experience = 125, RespawnTicks = 1200, SuccessRate = 0.1 }
-    };
+    }.ToFrozenDictionary();
 }
 
 /// <summary>
