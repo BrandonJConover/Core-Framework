@@ -15,7 +15,7 @@ public class CombatFormulaTests
         player.Skills.SetLevel(Skill.Attack, attack, 0);
         player.Skills.SetLevel(Skill.Strength, strength, 0);
         player.Skills.SetLevel(Skill.Defense, defense, 0);
-        player.Skills.SetLevel(Skill.Hitpoints, hitpoints, 0);
+        player.Skills.SetLevel(Skill.Hits, hitpoints, 0);
         player.CurrentHitpoints = hitpoints;
         return player;
     }

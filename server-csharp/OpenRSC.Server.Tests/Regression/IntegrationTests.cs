@@ -24,29 +24,29 @@ public class IntegrationTests
     {
         var player = new Player("Test", new Point(0, 0));
         var initialAttackXp = player.Skills.GetExperience(Skill.Attack);
-        var initialHpXp = player.Skills.GetExperience(Skill.Hitpoints);
+        var initialHpXp = player.Skills.GetExperience(Skill.Hits);
 
         // Simulate combat XP distribution
         var damage = 10;
         var (attackXp, _, _, hpXp) = Combat.CombatFormulas.CalculateMeleeXpGain(damage, Combat.CombatStyle.Accurate);
         player.Skills.AddExperience(Skill.Attack, attackXp);
-        player.Skills.AddExperience(Skill.Hitpoints, hpXp);
+        player.Skills.AddExperience(Skill.Hits, hpXp);
 
         player.Skills.GetExperience(Skill.Attack).Should().BeGreaterThan(initialAttackXp);
-        player.Skills.GetExperience(Skill.Hitpoints).Should().BeGreaterThan(initialHpXp);
+        player.Skills.GetExperience(Skill.Hits).Should().BeGreaterThan(initialHpXp);
     }
 
     [Fact]
     public void Combat_TakingDamage_ReducesHitpointsButNotMaxLevel()
     {
         var player = new Player("Test", new Point(0, 0));
-        player.Skills.SetLevel(Skill.Hitpoints, 50, 100000);
+        player.Skills.SetLevel(Skill.Hits, 50, 100000);
         player.CurrentHitpoints = 50;
 
         player.ApplyDamage(20, null);
 
         player.CurrentHitpoints.Should().Be(30);
-        player.Skills.GetMaxLevel(Skill.Hitpoints).Should().Be(50);
+        player.Skills.GetMaxLevel(Skill.Hits).Should().Be(50);
     }
 
     #endregion
@@ -210,7 +210,7 @@ public class IntegrationTests
     public void PlayerWorkflow_Combat_Death_Respawn()
     {
         var player = new Player("Test", new Point(100, 100));
-        player.Skills.SetLevel(Skill.Hitpoints, 50, 100000);
+        player.Skills.SetLevel(Skill.Hits, 50, 100000);
         player.CurrentHitpoints = 50;
         player.MaxHitpoints = 50;
 
@@ -229,7 +229,7 @@ public class IntegrationTests
         player.InCombat.Should().BeFalse();
 
         // Respawn (simulated)
-        player.CurrentHitpoints = player.Skills.GetMaxLevel(Skill.Hitpoints);
+        player.CurrentHitpoints = player.Skills.GetMaxLevel(Skill.Hits);
         player.CurrentHitpoints.Should().Be(50);
     }
 

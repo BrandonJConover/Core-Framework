@@ -203,8 +203,8 @@ public class SkillSystemTests
     {
         var player = new Player("Test", new Point(0, 0));
 
-        player.Skills.GetMaxLevel(Skill.Hitpoints).Should().Be(10);
-        player.Skills.GetCurrentLevel(Skill.Hitpoints).Should().Be(10);
+        player.Skills.GetMaxLevel(Skill.Hits).Should().Be(10);
+        player.Skills.GetCurrentLevel(Skill.Hits).Should().Be(10);
     }
 
     [Fact]
@@ -212,9 +212,9 @@ public class SkillSystemTests
     {
         var player = new Player("Test", new Point(0, 0));
 
-        player.Skills.AddExperience(Skill.Hitpoints, 1200); // Enough for level 11
+        player.Skills.AddExperience(Skill.Hits, 1200); // Enough for level 11
 
-        player.Skills.GetMaxLevel(Skill.Hitpoints).Should().Be(11);
+        player.Skills.GetMaxLevel(Skill.Hits).Should().Be(11);
     }
 
     #endregion

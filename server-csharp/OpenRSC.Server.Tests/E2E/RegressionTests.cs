@@ -81,7 +81,7 @@ public class RegressionTests
 
             // Combat XP should be gained
             var combatXP = stats.TotalExperienceGained
-                .Where(kv => kv.Key is Skill.Attack or Skill.Strength or Skill.Defense or Skill.Hitpoints)
+                .Where(kv => kv.Key is Skill.Attack or Skill.Strength or Skill.Defense or Skill.Hits)
                 .Sum(kv => kv.Value);
 
             if (attackActions > 10)

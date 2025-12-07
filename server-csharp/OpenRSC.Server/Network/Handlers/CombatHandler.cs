@@ -326,7 +326,7 @@ public sealed class EatFoodHandler : IPacketHandler
 
         // Heal
         var currentHp = player.CurrentHitpoints;
-        var maxHp = player.Skills.GetMaxLevel(Skills.Skill.Hitpoints);
+        var maxHp = player.Skills.GetMaxLevel(Skills.Skill.Hits);
         player.CurrentHitpoints = Math.Min(maxHp, currentHp + healAmount);
 
         player.Message($"You eat the {item.Definition.Name.ToLower()}.");

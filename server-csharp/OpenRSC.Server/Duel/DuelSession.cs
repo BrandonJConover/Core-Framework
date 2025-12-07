@@ -313,7 +313,7 @@ public sealed class DuelSession
         loser.EndCombat();
 
         // Restore loser hitpoints (duels don't kill)
-        loser.CurrentHitpoints = loser.Skills.GetMaxLevel(Skills.Skill.Hitpoints);
+        loser.CurrentHitpoints = loser.Skills.GetMaxLevel(Skills.Skill.Hits);
     }
 
     /// <summary>

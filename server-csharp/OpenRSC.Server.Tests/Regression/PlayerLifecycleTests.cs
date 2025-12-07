@@ -44,7 +44,7 @@ public class PlayerLifecycleTests
         player.Skills.GetCurrentLevel(Skill.Attack).Should().Be(1);
         player.Skills.GetCurrentLevel(Skill.Defense).Should().Be(1);
         player.Skills.GetCurrentLevel(Skill.Strength).Should().Be(1);
-        player.Skills.GetCurrentLevel(Skill.Hitpoints).Should().Be(10);
+        player.Skills.GetCurrentLevel(Skill.Hits).Should().Be(10);
         player.Skills.GetCurrentLevel(Skill.Prayer).Should().Be(1);
         player.Skills.GetCurrentLevel(Skill.Magic).Should().Be(1);
         player.Skills.GetCurrentLevel(Skill.Cooking).Should().Be(1);

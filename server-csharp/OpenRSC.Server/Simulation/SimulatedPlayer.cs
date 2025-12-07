@@ -78,7 +78,7 @@ public sealed class BotProfile
     {
         Name = "Warrior",
         PrimaryFocus = Skill.Attack,
-        SecondaryFocus = { Skill.Strength, Skill.Defense, Skill.Hitpoints },
+        SecondaryFocus = { Skill.Strength, Skill.Defense, Skill.Hits },
         Aggression = 0.8,
         Caution = 0.3,
         Exploration = 0.4
@@ -88,7 +88,7 @@ public sealed class BotProfile
     {
         Name = "Mage",
         PrimaryFocus = Skill.Magic,
-        SecondaryFocus = { Skill.Runecraft },
+        SecondaryFocus = { Skill.Prayer },
         Aggression = 0.6,
         Caution = 0.7,
         Exploration = 0.3
@@ -325,7 +325,7 @@ public sealed class SimulatedPlayer
             xpGained = damage * 4;
             var oldLevel = Player.Skills.GetMaxLevel(Skill.Attack);
             Player.Skills.AddExperience(Skill.Attack, xpGained);
-            Player.Skills.AddExperience(Skill.Hitpoints, xpGained / 3);
+            Player.Skills.AddExperience(Skill.Hits, xpGained / 3);
             leveledUp = Player.Skills.GetMaxLevel(Skill.Attack) > oldLevel;
 
             if (npc.IsDead)
@@ -481,7 +481,7 @@ public sealed class SimulatedPlayer
         }
 
         // Combat skills
-        if (skill is Skill.Attack or Skill.Strength or Skill.Defense or Skill.Hitpoints)
+        if (skill is Skill.Attack or Skill.Strength or Skill.Defense or Skill.Hits)
         {
             var npc = _world.GetNearbyNpcs(Player.Location, 20)
                 .Where(n => n.CombatLevel <= Player.CombatLevel + 5)
