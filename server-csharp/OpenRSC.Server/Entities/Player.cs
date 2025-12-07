@@ -1,11 +1,13 @@
 using Microsoft.Extensions.Options;
 using OpenRSC.Server.Actions;
+using OpenRSC.Server.Combat;
 using OpenRSC.Server.Configuration;
 using OpenRSC.Server.Fatigue;
 using OpenRSC.Server.Inventory;
 using OpenRSC.Server.Models;
 using OpenRSC.Server.Prayer;
 using OpenRSC.Server.Skills;
+using OpenRSC.Server.Skilling;
 using OpenRSC.Server.Social;
 
 namespace OpenRSC.Server.Entities;
@@ -98,6 +100,31 @@ public class Player : Mob
     /// Player's fatigue level (RSC-specific).
     /// </summary>
     public PlayerFatigue Fatigue { get; }
+
+    /// <summary>
+    /// Player's current prayer points.
+    /// </summary>
+    public int CurrentPrayerPoints { get; set; }
+
+    /// <summary>
+    /// Player's current skill action being performed.
+    /// </summary>
+    public SkillAction? CurrentAction { get; set; }
+
+    /// <summary>
+    /// Player's combat settings.
+    /// </summary>
+    public PlayerCombatSettings CombatSettings { get; } = new();
+
+    /// <summary>
+    /// Whether the player has admin privileges.
+    /// </summary>
+    public bool IsAdmin { get; set; }
+
+    /// <summary>
+    /// Last time the player ate food (for combat delays).
+    /// </summary>
+    public DateTime LastFoodTick { get; set; }
 
     /// <summary>
     /// Timestamp of last player activity.
@@ -271,6 +298,16 @@ public class Player : Mob
             IsSkulled = false;
             SkullExpiry = null;
         }
+    }
+
+    /// <summary>
+    /// Teleports the player to a new location.
+    /// </summary>
+    public void Teleport(Point destination)
+    {
+        WalkingQueue.Reset();
+        Location = destination;
+        HasMoved = true;
     }
 
     /// <summary>
