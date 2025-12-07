@@ -1,6 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenRSC.Server.Configuration;
+using OpenRSC.Server.Database;
+using OpenRSC.Server.Events;
+using OpenRSC.Server.Network;
 using OpenRSC.Server.Services;
 using Serilog;
 
@@ -33,15 +36,28 @@ try
     builder.Services.Configure<DatabaseSettings>(
         builder.Configuration.GetSection(DatabaseSettings.SectionName));
 
-    // Register services
+    // Register core services
     builder.Services.AddSingleton<IWorldService, WorldService>();
     builder.Services.AddSingleton<GameTickProcessor>();
+    builder.Services.AddSingleton<EventManager>();
 
-    // Register the game server as a hosted service
+    // Register database services
+    builder.Services.AddSingleton<IPlayerRepository, MySqlPlayerRepository>();
+
+    // Register network services
+    builder.Services.AddSingleton<IPacketHandler, PacketDispatcher>();
+
+    // Register hosted services (order matters - network before game loop)
+    builder.Services.AddHostedService<NetworkServer>();
     builder.Services.AddHostedService<GameServerHost>();
 
     // Build and run
     var host = builder.Build();
+
+    // Initialize packet handlers
+    var packetDispatcher = host.Services.GetRequiredService<IPacketHandler>() as PacketDispatcher;
+    packetDispatcher?.RegisterHandlers(typeof(Program).Assembly);
+
     await host.RunAsync();
 }
 catch (Exception ex)

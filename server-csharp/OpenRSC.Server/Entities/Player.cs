@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using OpenRSC.Server.Actions;
 using OpenRSC.Server.Configuration;
 using OpenRSC.Server.Models;
+using OpenRSC.Server.Skills;
 
 namespace OpenRSC.Server.Entities;
 
@@ -44,6 +45,11 @@ public class Player : Mob
     public WalkingQueue WalkingQueue { get; }
 
     /// <summary>
+    /// Player's skills and experience.
+    /// </summary>
+    public PlayerSkills Skills { get; }
+
+    /// <summary>
     /// Timestamp of last player activity.
     /// </summary>
     public DateTime LastActivity { get; private set; }
@@ -77,9 +83,18 @@ public class Player : Mob
         _serverSettings = serverSettings.Value;
         _actionRetrySettings = actionRetrySettings.Value;
         WalkingQueue = new WalkingQueue(this);
+        Skills = new PlayerSkills(this);
         LastActivity = DateTime.UtcNow;
         LastMoved = DateTime.UtcNow;
         LastSaveTime = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Sets the player's combat level.
+    /// </summary>
+    public void SetCombatLevel(int level)
+    {
+        CombatLevel = level;
     }
 
     /// <summary>
