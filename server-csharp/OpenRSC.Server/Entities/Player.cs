@@ -1,8 +1,11 @@
 using Microsoft.Extensions.Options;
 using OpenRSC.Server.Actions;
 using OpenRSC.Server.Configuration;
+using OpenRSC.Server.Inventory;
 using OpenRSC.Server.Models;
+using OpenRSC.Server.Prayer;
 using OpenRSC.Server.Skills;
+using OpenRSC.Server.Social;
 
 namespace OpenRSC.Server.Entities;
 
@@ -11,8 +14,8 @@ namespace OpenRSC.Server.Entities;
 /// </summary>
 public class Player : Mob
 {
-    private readonly ServerSettings _serverSettings;
-    private readonly ActionRetrySettings _actionRetrySettings;
+    private readonly ServerSettings? _serverSettings;
+    private readonly ActionRetrySettings? _actionRetrySettings;
 
     /// <summary>
     /// Player's username.
@@ -28,6 +31,16 @@ public class Player : Mob
     /// Whether the player is currently logged in.
     /// </summary>
     public bool IsLoggedIn { get; private set; }
+
+    /// <summary>
+    /// Whether the player is skulled (PvP penalty).
+    /// </summary>
+    public bool IsSkulled { get; set; }
+
+    /// <summary>
+    /// When the skull expires.
+    /// </summary>
+    public DateTime? SkullExpiry { get; set; }
 
     /// <summary>
     /// The current walk-to action being executed.
@@ -50,6 +63,37 @@ public class Player : Mob
     public PlayerSkills Skills { get; }
 
     /// <summary>
+    /// Player's inventory.
+    /// </summary>
+    public PlayerInventory Inventory { get; }
+
+    /// <summary>
+    /// Player's bank.
+    /// </summary>
+    public PlayerBank Bank { get; }
+
+    /// <summary>
+    /// Player's equipped items.
+    /// </summary>
+    public Equipment Equipment { get; }
+
+    /// <summary>
+    /// Player's active prayers.
+    /// </summary>
+    public PlayerPrayers Prayers { get; }
+
+    /// <summary>
+    /// Player's privacy settings.
+    /// </summary>
+    public PrivacySettings PrivacySettings { get; } = new();
+
+    /// <summary>
+    /// Player's social manager (friends/ignores).
+    /// Initialized when WorldService is available.
+    /// </summary>
+    public SocialManager? Social { get; set; }
+
+    /// <summary>
     /// Timestamp of last player activity.
     /// </summary>
     public DateTime LastActivity { get; private set; }
@@ -67,10 +111,14 @@ public class Player : Mob
     /// <summary>
     /// Gets the action retry settings for this player.
     /// </summary>
-    public ActionRetrySettings ActionRetryConfig => _actionRetrySettings;
+    public ActionRetrySettings ActionRetryConfig => _actionRetrySettings ?? new ActionRetrySettings();
 
     public override bool IsPlayer => true;
+    public override bool IsNpc => false;
 
+    /// <summary>
+    /// Creates a player with full configuration (for DI).
+    /// </summary>
     public Player(
         string username,
         Point location,
@@ -84,6 +132,29 @@ public class Player : Mob
         _actionRetrySettings = actionRetrySettings.Value;
         WalkingQueue = new WalkingQueue(this);
         Skills = new PlayerSkills(this);
+        Inventory = new PlayerInventory(this);
+        Bank = new PlayerBank(this);
+        Equipment = new Equipment(this);
+        Prayers = new PlayerPrayers(this);
+        LastActivity = DateTime.UtcNow;
+        LastMoved = DateTime.UtcNow;
+        LastSaveTime = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Creates a player without DI (for testing).
+    /// </summary>
+    public Player(string username, Point location)
+        : base(location)
+    {
+        Username = username;
+        UsernameHash = ComputeUsernameHash(username);
+        WalkingQueue = new WalkingQueue(this);
+        Skills = new PlayerSkills(this);
+        Inventory = new PlayerInventory(this);
+        Bank = new PlayerBank(this);
+        Equipment = new Equipment(this);
+        Prayers = new PlayerPrayers(this);
         LastActivity = DateTime.UtcNow;
         LastMoved = DateTime.UtcNow;
         LastSaveTime = DateTime.UtcNow;
@@ -123,12 +194,22 @@ public class Player : Mob
     }
 
     /// <summary>
+    /// Receives a private message from another player.
+    /// </summary>
+    public void ReceivePrivateMessage(long senderHash, int messageId, string message)
+    {
+        // TODO: Send private message packet to client
+        Console.WriteLine($"[PM to {Username}] Message {messageId}: {message}");
+    }
+
+    /// <summary>
     /// Marks the player as logged in.
     /// </summary>
     public void Login()
     {
         IsLoggedIn = true;
         LastActivity = DateTime.UtcNow;
+        Social?.OnLogin();
     }
 
     /// <summary>
@@ -137,6 +218,7 @@ public class Player : Mob
     public void Logout()
     {
         IsLoggedIn = false;
+        Social?.OnLogout();
     }
 
     /// <summary>
@@ -163,12 +245,34 @@ public class Player : Mob
     }
 
     /// <summary>
+    /// Applies a skull to the player.
+    /// </summary>
+    public void ApplySkull(TimeSpan duration)
+    {
+        IsSkulled = true;
+        SkullExpiry = DateTime.UtcNow + duration;
+    }
+
+    /// <summary>
+    /// Removes the skull if expired.
+    /// </summary>
+    public void UpdateSkull()
+    {
+        if (IsSkulled && SkullExpiry.HasValue && DateTime.UtcNow >= SkullExpiry.Value)
+        {
+            IsSkulled = false;
+            SkullExpiry = null;
+        }
+    }
+
+    /// <summary>
     /// Resets player state after update cycle.
     /// </summary>
     public override void ResetAfterUpdate()
     {
         base.ResetAfterUpdate();
-        // Additional player-specific reset logic
+        UpdateSkull();
+        Prayers.ProcessDrain();
     }
 
     private static long ComputeUsernameHash(string username)
