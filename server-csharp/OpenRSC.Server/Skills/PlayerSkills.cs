@@ -8,9 +8,10 @@ namespace OpenRSC.Server.Skills;
 public sealed class PlayerSkills
 {
     private readonly Player _player;
-    private readonly int[] _currentLevels = new int[18];
-    private readonly int[] _maxLevels = new int[18];
-    private readonly int[] _experience = new int[18];
+    private const int SkillCount = 19;
+    private readonly int[] _currentLevels = new int[SkillCount];
+    private readonly int[] _maxLevels = new int[SkillCount];
+    private readonly int[] _experience = new int[SkillCount];
 
     /// <summary>
     /// Event raised when experience is gained.
@@ -27,7 +28,7 @@ public sealed class PlayerSkills
         _player = player;
 
         // Initialize with default levels
-        for (var i = 0; i < 18; i++)
+        for (var i = 0; i < SkillCount; i++)
         {
             _currentLevels[i] = 1;
             _maxLevels[i] = 1;
@@ -184,7 +185,7 @@ public sealed class PlayerSkills
     /// </summary>
     public void RestoreAll()
     {
-        for (var i = 0; i < 18; i++)
+        for (var i = 0; i < SkillCount; i++)
         {
             _currentLevels[i] = _maxLevels[i];
         }
@@ -222,7 +223,7 @@ public sealed class PlayerSkills
     public int GetTotalLevel()
     {
         var total = 0;
-        for (var i = 0; i < 18; i++)
+        for (var i = 0; i < SkillCount; i++)
         {
             total += _maxLevels[i];
         }
@@ -242,7 +243,7 @@ public sealed class PlayerSkills
         get
         {
             long total = 0;
-            for (var i = 0; i < 18; i++)
+            for (var i = 0; i < SkillCount; i++)
             {
                 total += _experience[i];
             }
@@ -255,9 +256,9 @@ public sealed class PlayerSkills
     /// </summary>
     public void Load(int[] currentLevels, int[] maxLevels, int[] experience)
     {
-        Array.Copy(currentLevels, _currentLevels, Math.Min(currentLevels.Length, 18));
-        Array.Copy(maxLevels, _maxLevels, Math.Min(maxLevels.Length, 18));
-        Array.Copy(experience, _experience, Math.Min(experience.Length, 18));
+        Array.Copy(currentLevels, _currentLevels, Math.Min(currentLevels.Length, SkillCount));
+        Array.Copy(maxLevels, _maxLevels, Math.Min(maxLevels.Length, SkillCount));
+        Array.Copy(experience, _experience, Math.Min(experience.Length, SkillCount));
 
         UpdateCombatLevel();
     }
