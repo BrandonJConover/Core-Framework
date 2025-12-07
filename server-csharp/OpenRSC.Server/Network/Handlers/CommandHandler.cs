@@ -120,7 +120,7 @@ public sealed class CommandHandler : IPacketHandler
             case "restore":
                 if (player.IsAdmin)
                 {
-                    player.CurrentHitpoints = player.Skills.GetMaxLevel(Skills.Skill.Hitpoints);
+                    player.CurrentHitpoints = player.Skills.GetMaxLevel(Skills.Skill.Hits);
                     player.Message("Health restored.");
                 }
                 break;
@@ -173,9 +173,9 @@ public sealed class CommandHandler : IPacketHandler
     {
         var skills = player.Skills;
         player.Message($"Attack: {skills.GetMaxLevel(Skills.Skill.Attack)} " +
-                      $"Defence: {skills.GetMaxLevel(Skills.Skill.Defence)} " +
+                      $"Defence: {skills.GetMaxLevel(Skills.Skill.Defense)} " +
                       $"Strength: {skills.GetMaxLevel(Skills.Skill.Strength)}");
-        player.Message($"Hitpoints: {skills.GetMaxLevel(Skills.Skill.Hitpoints)} " +
+        player.Message($"Hitpoints: {skills.GetMaxLevel(Skills.Skill.Hits)} " +
                       $"Ranged: {skills.GetMaxLevel(Skills.Skill.Ranged)} " +
                       $"Prayer: {skills.GetMaxLevel(Skills.Skill.Prayer)}");
         player.Message($"Magic: {skills.GetMaxLevel(Skills.Skill.Magic)} " +

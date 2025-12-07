@@ -119,7 +119,7 @@ public sealed class DeathManager
     private void ResetPlayer(Player player)
     {
         // Restore hitpoints
-        player.CurrentHitpoints = player.Skills.GetMaxLevel(Skills.Skill.Hitpoints);
+        player.CurrentHitpoints = player.Skills.GetMaxLevel(Skills.Skill.Hits);
 
         // Clear combat
         player.EndCombat();
@@ -194,7 +194,7 @@ public sealed class DeathManager
         // Simplified - real implementation would track damage dealt
         var hitpointsXp = combatXp / 3;
 
-        player.Skills.AddExperience(Skills.Skill.Hitpoints, hitpointsXp);
+        player.Skills.AddExperience(Skills.Skill.Hits, hitpointsXp);
 
         // Rest to primary combat skill (would depend on style)
         player.Skills.AddExperience(Skills.Skill.Attack, combatXp / 4);

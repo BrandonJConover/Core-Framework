@@ -122,6 +122,23 @@ public sealed class PlayerSkills
     }
 
     /// <summary>
+    /// Sets both the level and experience for a skill directly.
+    /// Used primarily for testing and character loading.
+    /// </summary>
+    public void SetLevel(Skill skill, int level, int experience)
+    {
+        var index = (int)skill;
+        _maxLevels[index] = Math.Clamp(level, 1, 99);
+        _currentLevels[index] = _maxLevels[index];
+        _experience[index] = experience;
+
+        if (skill.IsCombatSkill())
+        {
+            UpdateCombatLevel();
+        }
+    }
+
+    /// <summary>
     /// Boosts a skill by a flat amount.
     /// </summary>
     public void Boost(Skill skill, int amount)
@@ -129,6 +146,11 @@ public sealed class PlayerSkills
         var index = (int)skill;
         _currentLevels[index] = Math.Min(_maxLevels[index] + amount, _currentLevels[index] + amount);
     }
+
+    /// <summary>
+    /// Boosts a skill by a flat amount (alias for Boost).
+    /// </summary>
+    public void BoostLevel(Skill skill, int amount) => Boost(skill, amount);
 
     /// <summary>
     /// Drains a skill by a flat amount.
@@ -140,12 +162,22 @@ public sealed class PlayerSkills
     }
 
     /// <summary>
+    /// Drains a skill by a flat amount (alias for Drain).
+    /// </summary>
+    public void DrainLevel(Skill skill, int amount) => Drain(skill, amount);
+
+    /// <summary>
     /// Restores a skill to its max level.
     /// </summary>
     public void Restore(Skill skill)
     {
         _currentLevels[(int)skill] = _maxLevels[(int)skill];
     }
+
+    /// <summary>
+    /// Restores a skill to its max level (alias for Restore).
+    /// </summary>
+    public void RestoreToMax(Skill skill) => Restore(skill);
 
     /// <summary>
     /// Restores all skills to their max levels.
@@ -195,6 +227,27 @@ public sealed class PlayerSkills
             total += _maxLevels[i];
         }
         return total;
+    }
+
+    /// <summary>
+    /// Total level property for convenience.
+    /// </summary>
+    public int TotalLevel => GetTotalLevel();
+
+    /// <summary>
+    /// Gets the total experience across all skills.
+    /// </summary>
+    public long TotalExperience
+    {
+        get
+        {
+            long total = 0;
+            for (var i = 0; i < 18; i++)
+            {
+                total += _experience[i];
+            }
+            return total;
+        }
     }
 
     /// <summary>
