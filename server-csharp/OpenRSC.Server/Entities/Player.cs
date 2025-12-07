@@ -225,7 +225,7 @@ public class Player : Mob
     public void Message(string text)
     {
         // TODO: Implement actual message sending via ActionSender
-        Console.WriteLine($"[{Username}] {text}");
+        // Message will be sent to client when ActionSender is connected
     }
 
     /// <summary>
@@ -233,8 +233,7 @@ public class Player : Mob
     /// </summary>
     public void ReceivePrivateMessage(long senderHash, int messageId, string message)
     {
-        // TODO: Send private message packet to client
-        Console.WriteLine($"[PM to {Username}] Message {messageId}: {message}");
+        // TODO: Send private message packet to client via ActionSender
     }
 
     /// <summary>
@@ -322,7 +321,7 @@ public class Player : Mob
 
     private static long ComputeUsernameHash(string username)
     {
-        // Simple hash implementation - matches Java version
+        // Simple hash using polynomial rolling hash (base 37)
         var hash = 0L;
         foreach (var c in username.ToLowerInvariant())
         {

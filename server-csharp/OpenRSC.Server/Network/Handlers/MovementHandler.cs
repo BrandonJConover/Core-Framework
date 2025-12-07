@@ -160,9 +160,8 @@ public sealed class ChatHandler : IPacketHandler
 
     private async Task BroadcastChatAsync(Player speaker, string message)
     {
-        // TODO: Send chat packet to all nearby players
-        // For now just log
-        Console.WriteLine($"[Chat] {speaker.Username}: {message}");
+        // TODO: Send chat packet to all nearby players via ActionSender
+        _logger.LogDebug("[Chat] {Username}: {Message}", speaker.Username, message);
         await Task.CompletedTask;
     }
 }
