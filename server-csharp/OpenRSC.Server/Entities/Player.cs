@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using OpenRSC.Server.Actions;
 using OpenRSC.Server.Configuration;
+using OpenRSC.Server.Fatigue;
 using OpenRSC.Server.Inventory;
 using OpenRSC.Server.Models;
 using OpenRSC.Server.Prayer;
@@ -94,6 +95,11 @@ public class Player : Mob
     public SocialManager? Social { get; set; }
 
     /// <summary>
+    /// Player's fatigue level (RSC-specific).
+    /// </summary>
+    public PlayerFatigue Fatigue { get; }
+
+    /// <summary>
     /// Timestamp of last player activity.
     /// </summary>
     public DateTime LastActivity { get; private set; }
@@ -136,6 +142,7 @@ public class Player : Mob
         Bank = new PlayerBank(this);
         Equipment = new Equipment(this);
         Prayers = new PlayerPrayers(this);
+        Fatigue = new PlayerFatigue(this);
         LastActivity = DateTime.UtcNow;
         LastMoved = DateTime.UtcNow;
         LastSaveTime = DateTime.UtcNow;
@@ -155,6 +162,7 @@ public class Player : Mob
         Bank = new PlayerBank(this);
         Equipment = new Equipment(this);
         Prayers = new PlayerPrayers(this);
+        Fatigue = new PlayerFatigue(this);
         LastActivity = DateTime.UtcNow;
         LastMoved = DateTime.UtcNow;
         LastSaveTime = DateTime.UtcNow;
