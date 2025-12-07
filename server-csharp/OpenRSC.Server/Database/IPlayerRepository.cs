@@ -48,10 +48,10 @@ public sealed class PlayerData
     public int CombatLevel { get; set; }
     public int TotalLevel { get; set; }
 
-    // Stats
-    public int[] CurrentStats { get; set; } = new int[18];
-    public int[] MaxStats { get; set; } = new int[18];
-    public int[] Experience { get; set; } = new int[18];
+    // Stats (19 skills including Runecraft)
+    public int[] CurrentStats { get; set; } = new int[19];
+    public int[] MaxStats { get; set; } = new int[19];
+    public int[] Experience { get; set; } = new int[19];
 
     // Combat
     public int Hitpoints { get; set; }

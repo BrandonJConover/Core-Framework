@@ -22,7 +22,8 @@ public enum Skill
     Mining = 14,
     Herblaw = 15,
     Agility = 16,
-    Thieving = 17
+    Thieving = 17,
+    Runecraft = 18
 }
 
 /// <summary>
