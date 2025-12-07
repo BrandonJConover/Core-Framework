@@ -15,12 +15,17 @@ public abstract class Mob : Entity
     /// <summary>
     /// Current hitpoints.
     /// </summary>
-    public int CurrentHitpoints { get; protected set; }
+    public virtual int CurrentHitpoints { get; set; }
 
     /// <summary>
     /// Maximum hitpoints.
     /// </summary>
-    public int MaxHitpoints { get; protected set; }
+    public int MaxHitpoints { get; set; }
+
+    /// <summary>
+    /// Whether this mob is dead.
+    /// </summary>
+    public bool IsDead => CurrentHitpoints <= 0;
 
     /// <summary>
     /// Combat level of this mob.

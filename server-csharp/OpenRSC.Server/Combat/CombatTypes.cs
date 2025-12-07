@@ -68,3 +68,24 @@ public readonly record struct CombatBonuses(
     public int TotalAttack => AttackStab + AttackSlash + AttackCrush;
     public int TotalDefense => DefenseStab + DefenseSlash + DefenseCrush;
 }
+
+/// <summary>
+/// Player combat settings and preferences.
+/// </summary>
+public sealed class PlayerCombatSettings
+{
+    /// <summary>
+    /// The current combat style.
+    /// </summary>
+    public CombatStyle Style { get; set; } = CombatStyle.Controlled;
+
+    /// <summary>
+    /// Whether auto-retaliate is enabled.
+    /// </summary>
+    public bool AutoRetaliate { get; set; } = true;
+
+    /// <summary>
+    /// Whether skull is visible.
+    /// </summary>
+    public bool ShowSkull { get; set; } = true;
+}
