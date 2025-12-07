@@ -1,14 +1,23 @@
+using System.Runtime.CompilerServices;
 using OpenRSC.Server.Models;
 
 namespace OpenRSC.Server.World;
 
 /// <summary>
 /// A* pathfinding algorithm for the game world.
+/// Optimized for minimal allocations in hot paths.
 /// </summary>
 public sealed class Pathfinder
 {
     private readonly WorldMap _worldMap;
     private readonly int _maxSearchDistance;
+
+    // Pre-allocated neighbor offsets (8-directional movement)
+    private static readonly (int dx, int dy)[] NeighborOffsets =
+    [
+        (0, 1), (0, -1), (1, 0), (-1, 0),  // Cardinal
+        (1, 1), (-1, 1), (1, -1), (-1, -1) // Diagonal
+    ];
 
     public Pathfinder(WorldMap worldMap, int maxSearchDistance = 100)
     {
@@ -52,7 +61,11 @@ public sealed class Pathfinder
             if (current.GScore > _maxSearchDistance)
                 continue;
 
-            foreach (var neighbor in GetNeighbors(current.Position))
+            // Use stack-allocated array for neighbors (avoids iterator allocation)
+            Span<Point> neighbors = stackalloc Point[8];
+            GetNeighbors(current.Position, neighbors);
+
+            foreach (var neighbor in neighbors)
             {
                 if (closedSet.Contains(neighbor))
                     continue;
@@ -111,25 +124,27 @@ public sealed class Pathfinder
         return new List<Point>();
     }
 
-    private static IEnumerable<Point> GetNeighbors(Point point)
+    /// <summary>
+    /// Gets neighbors using pre-allocated offsets (avoids iterator allocation).
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void GetNeighbors(Point point, Span<Point> neighbors)
     {
-        // 8-directional movement
-        yield return new Point(point.X, point.Y + 1);     // North
-        yield return new Point(point.X, point.Y - 1);     // South
-        yield return new Point(point.X + 1, point.Y);     // East
-        yield return new Point(point.X - 1, point.Y);     // West
-        yield return new Point(point.X + 1, point.Y + 1); // NE
-        yield return new Point(point.X - 1, point.Y + 1); // NW
-        yield return new Point(point.X + 1, point.Y - 1); // SE
-        yield return new Point(point.X - 1, point.Y - 1); // SW
+        for (var i = 0; i < NeighborOffsets.Length; i++)
+        {
+            var (dx, dy) = NeighborOffsets[i];
+            neighbors[i] = new Point(point.X + dx, point.Y + dy);
+        }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int Heuristic(Point a, Point b)
     {
         // Chebyshev distance (allows diagonal movement)
         return Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int MovementCost(Point from, Point to)
     {
         // Diagonal movement costs slightly more (approximation of sqrt(2))
