@@ -43,11 +43,25 @@ public abstract class WalkToMobAction extends WalkToAction {
 		Point checkedPoint = ignoreProjectileAllowed ? getPlayer().getWalkingQueue().getNextMovement() : getPlayer().getLocation();
 		boolean pathingCheckPassed = PathValidation.checkAdjacentDistance(getPlayer().getWorld(), checkedPoint, mob.getLocation(), ignoreProjectileAllowed, !ignoreProjectileAllowed);
 		boolean actionExecutedThisTick = checkedPoint.withinRange(mob.getLocation(), radius) && pathingCheckPassed;
+
+		// Magic attack handling - only clear immediately if retry is disabled
+		// Otherwise, let the retry mechanism handle the failure
 		if (actionType == ActionType.ATTACKMAGIC && getPlayer().inCombat() && !actionExecutedThisTick) {
-			//If the player attempted to cast magic, is in combat, and was not able to cast it, we should clear it since it was unsuccessful.
-			getPlayer().setWalkToAction(null);
+			if (!isRetryEnabled()) {
+				// Legacy behavior: clear action immediately if retry is disabled
+				getPlayer().setWalkToAction(null);
+			}
+			// If retry is enabled, let GameStateUpdater handle the retry logic
 		}
 		return actionExecutedThisTick;
+	}
+
+	@Override
+	public String getFailureMessage() {
+		if (actionType == ActionType.ATTACK || actionType == ActionType.ATTACKMAGIC) {
+			return "You are unable to reach your target to attack.";
+		}
+		return "You are unable to reach the " + (mob.isPlayer() ? "player" : "NPC") + ".";
 	}
 
 	@Override
