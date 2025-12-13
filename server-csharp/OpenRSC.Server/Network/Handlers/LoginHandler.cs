@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenRSC.Server.Configuration;
 using OpenRSC.Server.Entities;
+using OpenRSC.Server.Security;
 using OpenRSC.Server.Services;
 
 namespace OpenRSC.Server.Network.Handlers;
@@ -19,13 +20,15 @@ public sealed class LoginHandler
     private readonly ActionRetrySettings _actionRetrySettings;
     private readonly IOptions<ServerSettings> _serverSettingsOptions;
     private readonly IOptions<ActionRetrySettings> _actionRetryOptions;
+    private readonly AccountLockoutManager _lockoutManager;
 
     public LoginHandler(
         ILogger<LoginHandler> logger,
         IWorldService worldService,
         IPlayerRepository playerRepository,
         IOptions<ServerSettings> serverSettings,
-        IOptions<ActionRetrySettings> actionRetrySettings)
+        IOptions<ActionRetrySettings> actionRetrySettings,
+        AccountLockoutManager lockoutManager)
     {
         _logger = logger;
         _worldService = worldService;
@@ -34,6 +37,7 @@ public sealed class LoginHandler
         _actionRetrySettings = actionRetrySettings.Value;
         _serverSettingsOptions = serverSettings;
         _actionRetryOptions = actionRetrySettings;
+        _lockoutManager = lockoutManager;
     }
 
     [PacketHandler(OpcodeIn.Login)]
@@ -48,10 +52,20 @@ public sealed class LoginHandler
         _logger.LogInformation("Login attempt: {Username} (v{Version}, reconnect={Reconnect})",
             username, clientVersion, reconnecting);
 
-        // Validate username
+        // Validate username format
         if (string.IsNullOrEmpty(username) || username.Length < 2 || username.Length > 12)
         {
             await SendLoginResponse(client, LoginResponse.InvalidCredentials);
+            return;
+        }
+
+        // Check for account lockout (brute-force protection)
+        if (_lockoutManager.IsLockedOut(username))
+        {
+            var remaining = _lockoutManager.GetRemainingLockoutTime(username);
+            _logger.LogWarning("Login blocked for locked account: {Username} (remaining: {Remaining})",
+                username, remaining);
+            await SendLoginResponse(client, LoginResponse.AccountLocked);
             return;
         }
 
@@ -65,20 +79,47 @@ public sealed class LoginHandler
 
         // Load or create player
         var playerData = await _playerRepository.LoadPlayerAsync(username);
-        if (playerData == null)
+        var isNewPlayer = playerData == null;
+
+        if (isNewPlayer)
         {
-            // For now, auto-create new players (in production, validate password)
+            // Create new player with hashed password
             playerData = new PlayerData
             {
                 Username = username,
+                PasswordHash = PasswordHasher.HashPassword(password),
                 X = 120,
                 Y = 648, // Lumbridge spawn
                 CombatLevel = 3
             };
+            await _playerRepository.SavePlayerAsync(playerData);
+            _logger.LogInformation("Created new player account: {Username}", username);
+        }
+        else
+        {
+            // Verify password against stored hash
+            if (!string.IsNullOrEmpty(playerData.PasswordHash) &&
+                !PasswordHasher.VerifyPassword(password, playerData.PasswordHash))
+            {
+                var isLockedOut = _lockoutManager.RecordFailedAttempt(username);
+                _logger.LogWarning("Failed login attempt for: {Username} (locked: {Locked})",
+                    username, isLockedOut);
+                await SendLoginResponse(client, LoginResponse.InvalidCredentials);
+                return;
+            }
+
+            // Check if password hash needs upgrade (e.g., iterations increased)
+            if (!string.IsNullOrEmpty(playerData.PasswordHash) &&
+                PasswordHasher.NeedsRehash(playerData.PasswordHash))
+            {
+                playerData.PasswordHash = PasswordHasher.HashPassword(password);
+                await _playerRepository.SavePlayerAsync(playerData);
+                _logger.LogInformation("Upgraded password hash for: {Username}", username);
+            }
         }
 
-        // Verify password (simplified - use proper hashing in production!)
-        // if (!VerifyPassword(password, playerData.PasswordHash)) { ... }
+        // Clear any previous lockout on successful login
+        _lockoutManager.ClearLockout(username);
 
         // Create player entity
         var player = new Player(

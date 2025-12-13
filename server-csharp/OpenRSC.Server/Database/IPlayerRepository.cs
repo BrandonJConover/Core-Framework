@@ -43,6 +43,7 @@ public sealed class PlayerData
 {
     public int Id { get; set; }
     public string Username { get; set; } = string.Empty;
+    public string PasswordHash { get; set; } = string.Empty;
     public int X { get; set; }
     public int Y { get; set; }
     public int CombatLevel { get; set; }
