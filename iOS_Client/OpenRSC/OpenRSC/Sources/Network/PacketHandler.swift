@@ -1,65 +1,62 @@
 import Foundation
 
 /// Handles incoming packets from the server.
-/// Equivalent to Java's PacketHandler.
+/// Complete implementation matching server OpcodeOut.
 actor PacketHandler {
     weak var gameClient: GameClient?
+    private let soundManager = SoundManager.shared
 
-    // Opcodes (matching server)
+    // Server to Client opcodes (matching server OpcodeOut)
     enum Opcode: UInt8 {
-        // Login
-        case loginResponse = 0
-        case logout = 4
-
-        // Player updates
-        case playerUpdate = 191
-        case playerMovement = 145
-        case playerAppearance = 234
-
-        // NPC updates
-        case npcUpdate = 79
-        case npcMovement = 104
-
-        // Ground items
-        case groundItemAdd = 99
-        case groundItemRemove = 156
-
-        // Inventory
-        case inventoryItems = 53
-        case inventoryUpdate = 90
-
-        // Equipment
-        case equipmentUpdate = 177
-
-        // Skills
-        case skillUpdate = 33
-        case experienceGain = 159
-
-        // Chat
-        case chatMessage = 131
-        case serverMessage = 48
-
         // World updates
-        case objectAdd = 48
-        case objectRemove = 101
-        case wallObjectAdd = 95
-        case wallObjectRemove = 220
+        case playerCoords = 191
+        case npcCoords = 79
+        case updatePlayers = 234
+        case updateNpcs = 104
+        case sceneryHandler = 48
+        case boundaryHandler = 91
+        case groundItemHandler = 99
+        case clearLocations = 211
 
-        // Interface
-        case openShop = 101
-        case closeShop = 137
-        case openBank = 42
-        case closeBank = 171
+        // Player state
+        case playerStats = 156
+        case playerStatEquipmentBonus = 153
+        case playerStatFatigue = 114
+        case playerStatFatigueAsleep = 244
+        case playerStatExperience = 33
+        case playerQuestList = 5
+        case playerInventory = 53
 
         // Combat
-        case combatUpdate = 203
-        case deathScreen = 83
+        case playerDied = 83
 
-        // Sound
+        // Interface
+        case showBank = 42
+        case hideBank = 171
+        case updateBankItem = 249
+        case showShop = 101
+        case hideShop = 137
+        case showDialogue = 245
+        case hideDialogue = 252
+
+        // Chat
+        case message = 131
+        case privateMessageSent = 87
+        case privateMessageReceived = 120
+        case friendList = 71
+        case friendUpdate = 149
+        case ignoreList = 109
+
+        // System
+        case logout = 4
+        case logoutDeny = 183
+        case worldInfo = 25
+
+        // Misc
         case playSound = 204
-
-        // Settings
-        case settings = 240
+        case teleport = 145
+        case showSleepScreen = 117
+        case wakeUp = 84
     }
 
     init(gameClient: GameClient) {
@@ -76,178 +73,584 @@ actor PacketHandler {
         var reader = PacketReader(packet)
 
         switch opcode {
-        case .loginResponse:
-            await handleLoginResponse(&reader)
+        // World updates
+        case .playerCoords:
+            await handlePlayerCoords(&reader)
+        case .npcCoords:
+            await handleNpcCoords(&reader)
+        case .updatePlayers:
+            await handleUpdatePlayers(&reader)
+        case .updateNpcs:
+            await handleUpdateNpcs(&reader)
+        case .sceneryHandler:
+            await handleSceneryUpdate(&reader)
+        case .boundaryHandler:
+            await handleBoundaryUpdate(&reader)
+        case .groundItemHandler:
+            await handleGroundItems(&reader)
+        case .clearLocations:
+            await handleClearLocations()
 
-        case .playerUpdate:
-            await handlePlayerUpdate(&reader)
+        // Player state
+        case .playerStats:
+            await handlePlayerStats(&reader)
+        case .playerStatEquipmentBonus:
+            await handleEquipmentBonus(&reader)
+        case .playerStatFatigue:
+            await handleFatigue(&reader)
+        case .playerStatFatigueAsleep:
+            await handleFatigueAsleep(&reader)
+        case .playerStatExperience:
+            await handleExperience(&reader)
+        case .playerQuestList:
+            await handleQuestList(&reader)
+        case .playerInventory:
+            await handleInventory(&reader)
 
-        case .npcUpdate:
-            await handleNpcUpdate(&reader)
+        // Combat
+        case .playerDied:
+            await handlePlayerDied()
 
-        case .inventoryItems:
-            await handleInventoryItems(&reader)
+        // Interface
+        case .showBank:
+            await handleShowBank(&reader)
+        case .hideBank:
+            await handleHideBank()
+        case .updateBankItem:
+            await handleUpdateBankItem(&reader)
+        case .showShop:
+            await handleShowShop(&reader)
+        case .hideShop:
+            await handleHideShop()
+        case .showDialogue:
+            await handleShowDialogue(&reader)
+        case .hideDialogue:
+            await handleHideDialogue()
 
-        case .skillUpdate:
-            await handleSkillUpdate(&reader)
-
-        case .chatMessage:
+        // Chat
+        case .message:
             await handleChatMessage(&reader)
+        case .privateMessageSent:
+            await handlePrivateMessageSent(&reader)
+        case .privateMessageReceived:
+            await handlePrivateMessageReceived(&reader)
+        case .friendList:
+            await handleFriendList(&reader)
+        case .friendUpdate:
+            await handleFriendUpdate(&reader)
+        case .ignoreList:
+            await handleIgnoreList(&reader)
 
-        case .serverMessage:
-            await handleServerMessage(&reader)
+        // System
+        case .logout:
+            await handleLogout()
+        case .logoutDeny:
+            await handleLogoutDeny()
+        case .worldInfo:
+            await handleWorldInfo(&reader)
 
-        case .groundItemAdd:
-            await handleGroundItemAdd(&reader)
-
-        case .groundItemRemove:
-            await handleGroundItemRemove(&reader)
-
+        // Misc
         case .playSound:
             await handlePlaySound(&reader)
-
-        default:
-            print("Unhandled opcode: \(opcode)")
+        case .teleport:
+            await handleTeleport(&reader)
+        case .showSleepScreen:
+            await handleShowSleepScreen(&reader)
+        case .wakeUp:
+            await handleWakeUp()
         }
     }
 
-    private func handleLoginResponse(_ reader: inout PacketReader) async {
-        guard let responseCode = reader.readByte() else { return }
+    // MARK: - World Updates
 
-        switch responseCode {
-        case 0:
-            print("Login successful")
-            await gameClient?.onLoginSuccess()
-        case 1:
-            await gameClient?.onLoginFailed("Invalid username or password")
-        case 2:
-            await gameClient?.onLoginFailed("Account is already logged in")
-        case 3:
-            await gameClient?.onLoginFailed("Account is banned")
-        default:
-            await gameClient?.onLoginFailed("Unknown error: \(responseCode)")
-        }
-    }
-
-    private func handlePlayerUpdate(_ reader: inout PacketReader) async {
-        // Parse player position and appearance updates
+    private func handlePlayerCoords(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        // Read player count
-        guard let count = reader.readShort() else { return }
+        // Read local player update first
+        guard let localX = reader.readShort(),
+              let localY = reader.readShort() else { return }
 
-        for _ in 0..<count {
+        await gameClient.updateLocalPlayerPosition(x: Int(localX), y: Int(localY))
+
+        // Read other players
+        while reader.hasMoreData {
             guard let serverIndex = reader.readShort(),
                   let x = reader.readShort(),
-                  let y = reader.readShort() else { continue }
+                  let y = reader.readShort(),
+                  let direction = reader.readByte() else { break }
 
             await gameClient.updatePlayerPosition(
                 index: Int(serverIndex),
                 x: Int(x),
-                y: Int(y)
+                y: Int(y),
+                direction: Int(direction)
             )
         }
     }
 
-    private func handleNpcUpdate(_ reader: inout PacketReader) async {
+    private func handleNpcCoords(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        guard let count = reader.readShort() else { return }
-
-        for _ in 0..<count {
+        while reader.hasMoreData {
             guard let serverIndex = reader.readShort(),
                   let npcId = reader.readShort(),
                   let x = reader.readShort(),
-                  let y = reader.readShort() else { continue }
+                  let y = reader.readShort(),
+                  let direction = reader.readByte() else { break }
 
             await gameClient.updateNpc(
                 index: Int(serverIndex),
                 npcId: Int(npcId),
                 x: Int(x),
-                y: Int(y)
+                y: Int(y),
+                direction: Int(direction)
             )
         }
     }
 
-    private func handleInventoryItems(_ reader: inout PacketReader) async {
+    private func handleUpdatePlayers(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        guard let count = reader.readShort() else { return }
+
+        for _ in 0..<count {
+            guard let serverIndex = reader.readShort(),
+                  let appearanceId = reader.readShort(),
+                  let combatLevel = reader.readByte() else { continue }
+
+            // Read appearance data
+            let headSprite = reader.readByte() ?? 0
+            let bodySprite = reader.readByte() ?? 0
+            let legSprite = reader.readByte() ?? 0
+            let hairColor = reader.readByte() ?? 0
+            let topColor = reader.readByte() ?? 0
+            let bottomColor = reader.readByte() ?? 0
+            let skinColor = reader.readByte() ?? 0
+
+            await gameClient.updatePlayerAppearance(
+                index: Int(serverIndex),
+                combatLevel: Int(combatLevel),
+                appearance: PlayerAppearance(
+                    headSprite: Int(headSprite),
+                    bodySprite: Int(bodySprite),
+                    legSprite: Int(legSprite),
+                    hairColor: Int(hairColor),
+                    topColor: Int(topColor),
+                    bottomColor: Int(bottomColor),
+                    skinColor: Int(skinColor)
+                )
+            )
+        }
+    }
+
+    private func handleUpdateNpcs(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        while reader.hasMoreData {
+            guard let serverIndex = reader.readShort(),
+                  let animation = reader.readByte() else { break }
+
+            await gameClient.updateNpcAnimation(
+                index: Int(serverIndex),
+                animation: Int(animation)
+            )
+        }
+    }
+
+    private func handleSceneryUpdate(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        while reader.hasMoreData {
+            guard let objectId = reader.readShort(),
+                  let x = reader.readShort(),
+                  let y = reader.readShort() else { break }
+
+            if objectId == 60000 {
+                await gameClient.removeSceneryObject(x: Int(x), y: Int(y))
+            } else {
+                await gameClient.addSceneryObject(id: Int(objectId), x: Int(x), y: Int(y))
+            }
+        }
+    }
+
+    private func handleBoundaryUpdate(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        while reader.hasMoreData {
+            guard let boundaryId = reader.readShort(),
+                  let x = reader.readShort(),
+                  let y = reader.readShort(),
+                  let direction = reader.readByte() else { break }
+
+            if boundaryId == 60000 {
+                await gameClient.removeBoundary(x: Int(x), y: Int(y))
+            } else {
+                await gameClient.addBoundary(
+                    id: Int(boundaryId),
+                    x: Int(x),
+                    y: Int(y),
+                    direction: Int(direction)
+                )
+            }
+        }
+    }
+
+    private func handleGroundItems(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        while reader.hasMoreData {
+            guard let itemId = reader.readShort(),
+                  let x = reader.readShort(),
+                  let y = reader.readShort() else { break }
+
+            if itemId == 60000 {
+                await gameClient.clearGroundItemsAt(x: Int(x), y: Int(y))
+            } else {
+                await gameClient.addGroundItem(itemId: Int(itemId), x: Int(x), y: Int(y))
+            }
+        }
+    }
+
+    private func handleClearLocations() async {
+        await gameClient?.clearAllLocations()
+    }
+
+    // MARK: - Player State
+
+    private func handlePlayerStats(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        // Read all 19 skills (including Runecraft)
+        for skillId in 0..<19 {
+            guard let current = reader.readByte(),
+                  let max = reader.readByte(),
+                  let experience = reader.readInt() else { return }
+
+            await gameClient.updateSkill(
+                skillId: skillId,
+                current: Int(current),
+                max: Int(max),
+                experience: Int(experience)
+            )
+        }
+
+        // Read quest points
+        if let questPoints = reader.readShort() {
+            await gameClient.setQuestPoints(Int(questPoints))
+        }
+    }
+
+    private func handleEquipmentBonus(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        guard let armour = reader.readByte(),
+              let weaponAim = reader.readByte(),
+              let weaponPower = reader.readByte(),
+              let magic = reader.readByte(),
+              let prayer = reader.readByte() else { return }
+
+        await gameClient.setEquipmentBonuses(
+            armour: Int(armour),
+            weaponAim: Int(weaponAim),
+            weaponPower: Int(weaponPower),
+            magic: Int(magic),
+            prayer: Int(prayer)
+        )
+    }
+
+    private func handleFatigue(_ reader: inout PacketReader) async {
+        guard let fatigue = reader.readShort() else { return }
+        await gameClient?.setFatigue(Int(fatigue))
+    }
+
+    private func handleFatigueAsleep(_ reader: inout PacketReader) async {
+        guard let fatigue = reader.readShort() else { return }
+        await gameClient?.setFatigueAsleep(Int(fatigue))
+    }
+
+    private func handleExperience(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        guard let skillId = reader.readByte(),
+              let experience = reader.readInt() else { return }
+
+        await gameClient.updateExperience(skillId: Int(skillId), experience: Int(experience))
+
+        // Play level up sound if level increased
+        await soundManager.play(.levelUp)
+    }
+
+    private func handleQuestList(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        var quests: [Int: Int] = [:]
+        while reader.hasMoreData {
+            guard let questId = reader.readByte(),
+                  let status = reader.readByte() else { break }
+            quests[Int(questId)] = Int(status)
+        }
+
+        await gameClient.setQuestList(quests)
+    }
+
+    private func handleInventory(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
         guard let count = reader.readByte() else { return }
 
-        var items: [(Int, Int)] = []
+        var items: [(id: Int, amount: Int, equipped: Bool)] = []
         for _ in 0..<count {
-            guard let itemId = reader.readShort(),
-                  let amount = reader.readInt() else { continue }
-            items.append((Int(itemId), Int(amount)))
+            guard let itemIdWithFlag = reader.readShort() else { continue }
+
+            let equipped = (itemIdWithFlag & 0x8000) != 0
+            let itemId = Int(itemIdWithFlag & 0x7FFF)
+
+            var amount = 1
+            if let stackAmount = reader.readInt(), stackAmount > 0 {
+                amount = Int(stackAmount)
+            }
+
+            items.append((id: itemId, amount: amount, equipped: equipped))
         }
 
-        await gameClient.setInventory(items)
+        await gameClient.setFullInventory(items)
     }
 
-    private func handleSkillUpdate(_ reader: inout PacketReader) async {
+    // MARK: - Combat
+
+    private func handlePlayerDied() async {
+        await soundManager.play(.death)
+        await gameClient?.onPlayerDied()
+    }
+
+    // MARK: - Interface
+
+    private func handleShowBank(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        guard let skillId = reader.readByte(),
-              let currentLevel = reader.readByte(),
-              let maxLevel = reader.readByte(),
-              let experience = reader.readInt() else { return }
+        guard let itemCount = reader.readByte(),
+              let maxBankSize = reader.readShort() else { return }
 
-        await gameClient.updateSkill(
-            skillId: Int(skillId),
-            current: Int(currentLevel),
-            max: Int(maxLevel),
-            experience: Int(experience)
+        var bankItems: [(id: Int, amount: Int)] = []
+        for _ in 0..<itemCount {
+            guard let itemId = reader.readShort(),
+                  let amount = reader.readInt() else { continue }
+            bankItems.append((id: Int(itemId), amount: Int(amount)))
+        }
+
+        await gameClient.showBank(items: bankItems, maxSize: Int(maxBankSize))
+    }
+
+    private func handleHideBank() async {
+        await gameClient?.hideBank()
+    }
+
+    private func handleUpdateBankItem(_ reader: inout PacketReader) async {
+        guard let slot = reader.readByte(),
+              let itemId = reader.readShort(),
+              let amount = reader.readInt() else { return }
+
+        await gameClient?.updateBankSlot(
+            slot: Int(slot),
+            itemId: Int(itemId),
+            amount: Int(amount)
         )
     }
 
-    private func handleChatMessage(_ reader: inout PacketReader) async {
+    private func handleShowShop(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        guard let sender = reader.readString(),
-              let message = reader.readString() else { return }
+        guard let itemCount = reader.readByte(),
+              let generalStore = reader.readByte(),
+              let sellMultiplier = reader.readByte(),
+              let buyMultiplier = reader.readByte() else { return }
 
-        await gameClient.addChatMessage(sender: sender, message: message)
+        var shopItems: [(id: Int, amount: Int, price: Int)] = []
+        for _ in 0..<itemCount {
+            guard let itemId = reader.readShort(),
+                  let amount = reader.readShort(),
+                  let price = reader.readInt() else { continue }
+            shopItems.append((id: Int(itemId), amount: Int(amount), price: Int(price)))
+        }
+
+        await gameClient.showShop(
+            items: shopItems,
+            isGeneralStore: generalStore == 1,
+            sellMultiplier: Int(sellMultiplier),
+            buyMultiplier: Int(buyMultiplier)
+        )
     }
 
-    private func handleServerMessage(_ reader: inout PacketReader) async {
+    private func handleHideShop() async {
+        await gameClient?.hideShop()
+    }
+
+    private func handleShowDialogue(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
+        guard let optionCount = reader.readByte() else { return }
+
+        var options: [String] = []
+        for _ in 0..<optionCount {
+            if let option = reader.readString() {
+                options.append(option)
+            }
+        }
+
+        await gameClient.showDialogue(options: options)
+    }
+
+    private func handleHideDialogue() async {
+        await gameClient?.hideDialogue()
+    }
+
+    // MARK: - Chat
+
+    private func handleChatMessage(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
         guard let message = reader.readString() else { return }
+
+        if message.contains(":") {
+            let parts = message.split(separator: ":", maxSplits: 1)
+            if parts.count == 2 {
+                await gameClient.addChatMessage(
+                    sender: String(parts[0]),
+                    message: String(parts[1]).trimmingCharacters(in: .whitespaces)
+                )
+                return
+            }
+        }
 
         await gameClient.addServerMessage(message)
     }
 
-    private func handleGroundItemAdd(_ reader: inout PacketReader) async {
-        guard let gameClient = gameClient else { return }
+    private func handlePrivateMessageSent(_ reader: inout PacketReader) async {
+        guard let recipient = reader.readString(),
+              let message = reader.readString() else { return }
 
-        guard let itemId = reader.readShort(),
-              let x = reader.readShort(),
-              let y = reader.readShort() else { return }
-
-        await gameClient.addGroundItem(
-            itemId: Int(itemId),
-            x: Int(x),
-            y: Int(y)
-        )
+        await gameClient?.onPrivateMessageSent(to: recipient, message: message)
     }
 
-    private func handleGroundItemRemove(_ reader: inout PacketReader) async {
-        guard let gameClient = gameClient else { return }
+    private func handlePrivateMessageReceived(_ reader: inout PacketReader) async {
+        guard let sender = reader.readString(),
+              let message = reader.readString() else { return }
 
-        guard let itemId = reader.readShort(),
-              let x = reader.readShort(),
-              let y = reader.readShort() else { return }
-
-        await gameClient.removeGroundItem(
-            itemId: Int(itemId),
-            x: Int(x),
-            y: Int(y)
-        )
+        await soundManager.play(.privateMessage)
+        await gameClient?.onPrivateMessageReceived(from: sender, message: message)
     }
+
+    private func handleFriendList(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+        guard let count = reader.readByte() else { return }
+
+        var friends: [(name: String, online: Bool)] = []
+        for _ in 0..<count {
+            guard let name = reader.readString(),
+                  let worldId = reader.readByte() else { continue }
+            friends.append((name: name, online: worldId > 0))
+        }
+
+        await gameClient.setFriendList(friends)
+    }
+
+    private func handleFriendUpdate(_ reader: inout PacketReader) async {
+        guard let name = reader.readString(),
+              let worldId = reader.readByte() else { return }
+
+        await gameClient?.updateFriendStatus(name: name, online: worldId > 0)
+    }
+
+    private func handleIgnoreList(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+        guard let count = reader.readByte() else { return }
+
+        var ignoreList: [String] = []
+        for _ in 0..<count {
+            if let name = reader.readString() {
+                ignoreList.append(name)
+            }
+        }
+
+        await gameClient.setIgnoreList(ignoreList)
+    }
+
+    // MARK: - System
+
+    private func handleLogout() async {
+        await gameClient?.onLogout()
+    }
+
+    private func handleLogoutDeny() async {
+        await gameClient?.onLogoutDenied()
+    }
+
+    private func handleWorldInfo(_ reader: inout PacketReader) async {
+        guard let responseCode = reader.readByte() else { return }
+
+        switch responseCode {
+        case 0:
+            let playerIndex = reader.readShort() ?? 0
+            let isMembersWorld = (reader.readByte() ?? 0) == 1
+            await gameClient?.onLoginSuccess(
+                playerIndex: Int(playerIndex),
+                membersWorld: isMembersWorld
+            )
+        case 1:
+            await gameClient?.onLoginFailed("Invalid username or password")
+        case 2:
+            await gameClient?.onLoginFailed("Account is already logged in")
+        case 3:
+            await gameClient?.onLoginFailed("Client version outdated")
+        case 4:
+            await gameClient?.onLoginFailed("Server is full")
+        case 5:
+            await gameClient?.onLoginFailed("Login server offline")
+        case 6:
+            await gameClient?.onLoginFailed("Account is banned")
+        case 7:
+            await gameClient?.onLoginFailed("Account is locked")
+        default:
+            await gameClient?.onLoginFailed("Unknown error: \(responseCode)")
+        }
+    }
+
+    // MARK: - Misc
 
     private func handlePlaySound(_ reader: inout PacketReader) async {
         guard let soundId = reader.readShort() else { return }
-        // TODO: Play sound effect
-        print("Play sound: \(soundId)")
+        await soundManager.playById(Int(soundId))
+    }
+
+    private func handleTeleport(_ reader: inout PacketReader) async {
+        guard let x = reader.readShort(),
+              let y = reader.readShort() else { return }
+
+        await soundManager.play(.teleport)
+        await gameClient?.onTeleport(x: Int(x), y: Int(y))
+    }
+
+    private func handleShowSleepScreen(_ reader: inout PacketReader) async {
+        guard let imageLength = reader.readShort() else { return }
+
+        var imageData = Data()
+        for _ in 0..<imageLength {
+            if let byte = reader.readByte() {
+                imageData.append(byte)
+            }
+        }
+
+        await gameClient?.showSleepScreen(captchaImage: imageData)
+    }
+
+    private func handleWakeUp() async {
+        await gameClient?.hideSleepScreen()
+    }
+}
+
+// MARK: - Packet Reader Extension
+
+extension PacketReader {
+    var hasMoreData: Bool {
+        return position < data.count
     }
 }
