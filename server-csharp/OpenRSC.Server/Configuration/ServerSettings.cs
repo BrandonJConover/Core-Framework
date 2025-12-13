@@ -71,6 +71,46 @@ public sealed class ServerSettings
     /// Enable debug logging.
     /// </summary>
     public bool Debug { get; set; }
+
+    /// <summary>
+    /// Enable TLS encryption for client connections.
+    /// </summary>
+    public bool EnableTls { get; set; }
+
+    /// <summary>
+    /// Path to TLS certificate file (PFX format).
+    /// </summary>
+    public string TlsCertificatePath { get; set; } = "";
+
+    /// <summary>
+    /// Password for TLS certificate.
+    /// </summary>
+    public string TlsCertificatePassword { get; set; } = "";
+
+    /// <summary>
+    /// Enable packet compression for large packets.
+    /// </summary>
+    public bool EnableCompression { get; set; } = true;
+
+    /// <summary>
+    /// Minimum packet size for compression (bytes).
+    /// </summary>
+    public int CompressionThreshold { get; set; } = 128;
+
+    /// <summary>
+    /// Enable rate limiting for packet spam protection.
+    /// </summary>
+    public bool EnableRateLimiting { get; set; } = true;
+
+    /// <summary>
+    /// Maximum packets per second per client.
+    /// </summary>
+    public int RateLimitPacketsPerSecond { get; set; } = 100;
+
+    /// <summary>
+    /// Heartbeat interval in milliseconds.
+    /// </summary>
+    public int HeartbeatIntervalMs { get; set; } = 30000;
 }
 
 /// <summary>
