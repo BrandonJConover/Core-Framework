@@ -273,7 +273,7 @@ public class MessageFilter {
 			if (sender.getWorld().getServer().getDiscordService() != null) {
 				sender.getWorld().getServer().getDiscordService().reportNaughtyWordToDiscord(sender, originalMessage, "Cabbage", stringProblems, context);
 			}
-			e.printStackTrace();
+			LOGGER.catching(e);
 			return "Cabbage";
 		}
 
