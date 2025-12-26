@@ -142,6 +142,19 @@ public enum OpcodeOut : byte
     LogoutDeny = 183,
     WorldInfo = 25,
 
+    // Trading
+    TradeOpen = 92,
+    TradeOwnOffer = 90,
+    TradeOtherOffer = 97,
+    TradeConfirmation = 93,
+    TradeClose = 94,
+
+    // Dueling
+    DuelOpen = 163,
+    DuelUpdate = 160,
+    DuelConfirmation = 172,
+    DuelClose = 225,
+
     // Misc
     PlaySound = 204,
     Teleport = 145,

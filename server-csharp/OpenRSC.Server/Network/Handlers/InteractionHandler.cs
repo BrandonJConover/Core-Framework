@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Logging;
 using OpenRSC.Server.Actions;
 using OpenRSC.Server.Combat;
+using OpenRSC.Server.Duel;
 using OpenRSC.Server.Entities;
 using OpenRSC.Server.Models;
 using OpenRSC.Server.Npc;
 using OpenRSC.Server.Services;
+using OpenRSC.Server.Trading;
 
 namespace OpenRSC.Server.Network.Handlers;
 
@@ -281,17 +283,23 @@ public sealed class PlayerInteractionHandler : IPacketHandler
     private readonly ILogger<PlayerInteractionHandler> _logger;
     private readonly WorldService _worldService;
     private readonly CombatManager _combatManager;
+    private readonly TradeManager _tradeManager;
+    private readonly DuelManager _duelManager;
 
     public int[] Opcodes => new[] { OpAttackPlayer, OpFollowPlayer, OpTradePlayer, OpDuelPlayer };
 
     public PlayerInteractionHandler(
         ILogger<PlayerInteractionHandler> logger,
         WorldService worldService,
-        CombatManager combatManager)
+        CombatManager combatManager,
+        TradeManager tradeManager,
+        DuelManager duelManager)
     {
         _logger = logger;
         _worldService = worldService;
         _combatManager = combatManager;
+        _tradeManager = tradeManager;
+        _duelManager = duelManager;
     }
 
     public async Task HandleAsync(GameClient client, Packet packet)
@@ -361,17 +369,78 @@ public sealed class PlayerInteractionHandler : IPacketHandler
 
     private async Task HandleTradeAsync(Player player, Player target)
     {
-        _logger.LogDebug("{Username} requesting trade with {Target}", player.Username, target.Username);
-        target.Message($"{player.Username} wishes to trade with you.");
-        // TODO: Implement trading
+        if (player.InCombat)
+        {
+            player.Message("You can't trade while in combat.");
+            return;
+        }
+
+        if (target.InCombat)
+        {
+            player.Message("That player is busy.");
+            return;
+        }
+
+        // Create walk-to action for trading
+        var action = new WalkToMobAction(player, target)
+        {
+            ExecuteAction = () =>
+            {
+                var result = _tradeManager.RequestTrade(player, target);
+                if (!result.Success)
+                {
+                    player.Message(result.Message ?? "Unable to trade.");
+                    return;
+                }
+
+                _logger.LogDebug("{Username} requested trade with {Target}",
+                    player.Username, target.Username);
+            }
+        };
+
+        player.SetWalkToAction(action);
         await Task.CompletedTask;
     }
 
     private async Task HandleDuelAsync(Player player, Player target)
     {
-        _logger.LogDebug("{Username} requesting duel with {Target}", player.Username, target.Username);
-        target.Message($"{player.Username} wishes to duel with you.");
-        // TODO: Implement dueling
+        if (player.InCombat)
+        {
+            player.Message("You can't duel while in combat.");
+            return;
+        }
+
+        if (target.InCombat)
+        {
+            player.Message("That player is busy.");
+            return;
+        }
+
+        // Check wilderness
+        if (player.Location.Y >= 352)
+        {
+            player.Message("You can't duel in the wilderness.");
+            return;
+        }
+
+        // Create walk-to action for dueling
+        var action = new WalkToMobAction(player, target)
+        {
+            ExecuteAction = () =>
+            {
+                var result = _duelManager.RequestDuel(player, target);
+                if (!result.Success)
+                {
+                    player.Message(result.Message ?? "Unable to duel.");
+                    return;
+                }
+
+                _logger.LogDebug("{Username} requested duel with {Target}",
+                    player.Username, target.Username);
+            }
+        };
+
+        player.SetWalkToAction(action);
         await Task.CompletedTask;
     }
 }
