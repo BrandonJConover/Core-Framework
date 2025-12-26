@@ -59,11 +59,10 @@ public class JContentFile {
 
     public void dump(String fname) {
         File f = new File(fname);
-        try {
-            DataOutputStream out = new DataOutputStream(new FileOutputStream(f));
+        try (DataOutputStream out = new DataOutputStream(new FileOutputStream(f))) {
             out.write(m_data, 0, m_data.length);
-            out.close();
         } catch (Exception e) {
+            LOGGER.catching(e);
         }
     }
 
