@@ -135,14 +135,15 @@ public sealed class LoginHandler
             return;
         }
 
-        // Associate player with client
+        // Associate player with client and set up ActionSender
         client.Player = player;
+        player.SetClient(client);
         player.Login();
 
         // Send success response
         await SendLoginResponse(client, LoginResponse.Success);
 
-        // Send initial state
+        // Send initial state (stats, inventory, etc.)
         await SendInitialState(client, player);
 
         _logger.LogInformation("Player {Username} logged in successfully", username);
@@ -173,6 +174,7 @@ public sealed class LoginHandler
         // Unregister from world
         _worldService.UnregisterPlayer(player);
         player.Logout();
+        player.ClearClient();
         client.Player = null;
 
         // Send logout confirmation
@@ -197,11 +199,23 @@ public sealed class LoginHandler
 
     private async Task SendInitialState(GameClient client, Player player)
     {
-        // Send player stats, inventory, etc.
-        // This is simplified - full implementation would send all player state
+        var actionSender = player.ActionSender;
+        if (actionSender is null)
+            return;
+
+        // Send all player state
+        await actionSender.SendStatsAsync();
+        await actionSender.SendInventoryAsync();
+        await actionSender.SendEquipmentBonusesAsync();
+        await actionSender.SendFatigueAsync();
+        await actionSender.SendFriendListAsync();
+        await actionSender.SendIgnoreListAsync();
 
         // Send welcome message
-        await client.SendAsync(PacketBuilder.ServerMessage(_serverSettings.WelcomeText));
+        await actionSender.SendMessageAsync(_serverSettings.WelcomeText);
+
+        // Send current location (teleport packet)
+        await actionSender.SendTeleportAsync();
     }
 
     private async Task SavePlayerAsync(Player player)

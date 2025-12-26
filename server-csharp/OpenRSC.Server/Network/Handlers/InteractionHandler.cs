@@ -7,6 +7,7 @@ using OpenRSC.Server.Items;
 using OpenRSC.Server.Models;
 using OpenRSC.Server.Npc;
 using OpenRSC.Server.Services;
+using OpenRSC.Server.Shop;
 using OpenRSC.Server.Trading;
 using OpenRSC.Server.World;
 
@@ -25,6 +26,7 @@ public sealed class NpcInteractionHandler : IPacketHandler
     private readonly WorldService _worldService;
     private readonly NpcManager _npcManager;
     private readonly CombatManager _combatManager;
+    private readonly ShopManager _shopManager;
 
     public int[] Opcodes => new[] { OpNpcTalk, OpNpcAttack, OpNpcCommand };
 
@@ -32,12 +34,14 @@ public sealed class NpcInteractionHandler : IPacketHandler
         ILogger<NpcInteractionHandler> logger,
         WorldService worldService,
         NpcManager npcManager,
-        CombatManager combatManager)
+        CombatManager combatManager,
+        ShopManager shopManager)
     {
         _logger = logger;
         _worldService = worldService;
         _npcManager = npcManager;
         _combatManager = combatManager;
+        _shopManager = shopManager;
     }
 
     public async Task HandleAsync(GameClient client, Packet packet)
@@ -133,12 +137,13 @@ public sealed class NpcInteractionHandler : IPacketHandler
                 switch (command.ToLowerInvariant())
                 {
                     case "shop":
-                        // TODO: Open shop interface
-                        player.Message($"The {npc.Name}'s shop is currently closed.");
+                        HandleShop(player, npc);
                         break;
                     case "pickpocket":
-                        // TODO: Thieving skill check
-                        player.Message($"You attempt to pickpocket the {npc.Name}...");
+                        HandlePickpocket(player, npc);
+                        break;
+                    case "bank":
+                        HandleBank(player, npc);
                         break;
                     default:
                         player.Message($"Nothing interesting happens.");
@@ -149,6 +154,65 @@ public sealed class NpcInteractionHandler : IPacketHandler
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
+    }
+
+    private void HandleShop(Player player, Entities.Npc npc)
+    {
+        var shopId = npc.Definition?.ShopId;
+        if (shopId is null)
+        {
+            player.Message($"The {npc.Name} doesn't have anything to sell.");
+            return;
+        }
+
+        if (!_shopManager.OpenShop(player, shopId.Value))
+        {
+            player.Message($"The {npc.Name}'s shop is currently closed.");
+        }
+    }
+
+    private void HandlePickpocket(Player player, Entities.Npc npc)
+    {
+        var thievingLevel = player.Skills.GetCurrentLevel(Skills.Skill.Thieving);
+        var requiredLevel = npc.Definition?.ThievingLevel ?? 1;
+
+        if (thievingLevel < requiredLevel)
+        {
+            player.Message($"You need level {requiredLevel} Thieving to pickpocket this NPC.");
+            return;
+        }
+
+        // Calculate success chance based on level difference
+        var levelDiff = thievingLevel - requiredLevel;
+        var successChance = Math.Min(0.95, 0.5 + (levelDiff * 0.03));
+
+        if (Random.Shared.NextDouble() < successChance)
+        {
+            // Successful pickpocket
+            var coinsAmount = Random.Shared.Next(1, 20 + (requiredLevel * 2));
+            player.Message($"You pick the {npc.Name}'s pocket for {coinsAmount} coins.");
+
+            // Add experience
+            var xp = requiredLevel * 8;
+            player.Skills.AddExperience(Skills.Skill.Thieving, xp);
+
+            // TODO: Add coins to inventory
+        }
+        else
+        {
+            // Failed pickpocket - NPC becomes aggressive
+            player.Message($"You fail to pick the {npc.Name}'s pocket. They catch you!");
+
+            // Stun player briefly
+            player.Message("You have been stunned!");
+        }
+    }
+
+    private void HandleBank(Player player, Entities.Npc npc)
+    {
+        // Open bank interface
+        _ = player.ActionSender?.SendOpenBankAsync();
+        _logger.LogDebug("{Username} opened bank via {Npc}", player.Username, npc.Name);
     }
 }
 

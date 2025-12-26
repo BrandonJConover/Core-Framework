@@ -79,6 +79,21 @@ public sealed record NpcDefinition
     /// Items dropped on death.
     /// </summary>
     public IReadOnlyList<NpcDrop> Drops { get; init; } = Array.Empty<NpcDrop>();
+
+    /// <summary>
+    /// Shop ID this NPC operates, if any.
+    /// </summary>
+    public int? ShopId { get; init; }
+
+    /// <summary>
+    /// Thieving level required to pickpocket this NPC.
+    /// </summary>
+    public int? ThievingLevel { get; init; }
+
+    /// <summary>
+    /// Defense bonus for combat calculations.
+    /// </summary>
+    public int DefenseBonus { get; init; }
 }
 
 /// <summary>
