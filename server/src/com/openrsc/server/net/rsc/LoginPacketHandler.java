@@ -163,7 +163,7 @@ public class LoginPacketHandler {
 							password = new String(loginBlock, 17, 20, "UTF8").trim();
 						} catch (Exception e) {
 							LOGGER.info("error parsing password in login block");
-							e.printStackTrace();
+							LOGGER.catching(e);
 						}
 
 						for (int i = 0; i < 5; i++) {
@@ -187,7 +187,7 @@ public class LoginPacketHandler {
 							username = new String(xteaBlock, 25, xteaBlock.length - 25, "UTF8");
 						} catch (Exception e) {
 							LOGGER.info("error parsing username in xtea block");
-							e.printStackTrace();
+							LOGGER.catching(e);
 						}
 
 						ClientLimitations cl = new ClientLimitations(clientVersion.get());
@@ -351,7 +351,7 @@ public class LoginPacketHandler {
 						} catch (Exception e) {
 							LOGGER.info("error parsing password in login block");
 							errored = true;
-							e.printStackTrace();
+							LOGGER.catching(e);
 						}
 
 						packet.readInt(); // hashed random.dat associated to user request
@@ -625,7 +625,7 @@ public class LoginPacketHandler {
 							} catch (Exception e) {
 								LOGGER.info("error parsing password in login block");
 								errored = true;
-								e.printStackTrace();
+								LOGGER.catching(e);
 							}
 
 							packet.readInt(); // hashed random.dat associated to user request
@@ -679,7 +679,7 @@ public class LoginPacketHandler {
 							} catch (Exception e) {
 								LOGGER.info("error parsing password in login block");
 								errored = true;
-								e.printStackTrace();
+								LOGGER.catching(e);
 							}
 
 							packet.readInt(); // hashed random.dat associated to user request
@@ -871,7 +871,7 @@ public class LoginPacketHandler {
 					} catch (Exception e) {
 						LOGGER.info("error parsing passwords in recovery block");
 						errored = true;
-						e.printStackTrace();
+						LOGGER.catching(e);
 					}
 
 					// Get the 5 recovery answers
@@ -903,7 +903,7 @@ public class LoginPacketHandler {
 						} catch (Exception e) {
 							LOGGER.info("error parsing answer " + i + " in recover block");
 							errored = true;
-							e.printStackTrace();
+							LOGGER.catching(e);
 						}
 					}
 
