@@ -134,6 +134,16 @@ public class Player : Mob
     public bool IsAdmin { get; set; }
 
     /// <summary>
+    /// Whether the player is muted from chat.
+    /// </summary>
+    public bool IsMuted { get; set; }
+
+    /// <summary>
+    /// When the mute expires.
+    /// </summary>
+    public DateTime? MuteExpiry { get; set; }
+
+    /// <summary>
     /// Last time the player ate food (for combat delays).
     /// </summary>
     public DateTime LastFoodTick { get; set; }
@@ -157,6 +167,11 @@ public class Player : Mob
     /// Timestamp of last save.
     /// </summary>
     public DateTime LastSaveTime { get; set; }
+
+    /// <summary>
+    /// Whether the player's appearance has changed this tick (equipment change).
+    /// </summary>
+    public bool HasChangedAppearance { get; private set; }
 
     /// <summary>
     /// Gets the action retry settings for this player.
@@ -428,8 +443,17 @@ public class Player : Mob
     public override void ResetAfterUpdate()
     {
         base.ResetAfterUpdate();
+        HasChangedAppearance = false;
         UpdateSkull();
         Prayers.ProcessDrain();
+    }
+
+    /// <summary>
+    /// Marks the player's appearance as changed (e.g., after equipping/unequipping).
+    /// </summary>
+    public void MarkAppearanceChanged()
+    {
+        HasChangedAppearance = true;
     }
 
     private static long ComputeUsernameHash(string username)

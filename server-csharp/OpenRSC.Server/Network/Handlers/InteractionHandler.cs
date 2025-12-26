@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using OpenRSC.Server.Actions;
 using OpenRSC.Server.Combat;
+using OpenRSC.Server.Dialogue;
 using OpenRSC.Server.Duel;
 using OpenRSC.Server.Entities;
 using OpenRSC.Server.Items;
@@ -27,6 +28,7 @@ public sealed class NpcInteractionHandler : IPacketHandler
     private readonly NpcManager _npcManager;
     private readonly CombatManager _combatManager;
     private readonly ShopManager _shopManager;
+    private readonly DialogueManager _dialogueManager;
 
     public int[] Opcodes => new[] { OpNpcTalk, OpNpcAttack, OpNpcCommand };
 
@@ -35,13 +37,15 @@ public sealed class NpcInteractionHandler : IPacketHandler
         WorldService worldService,
         NpcManager npcManager,
         CombatManager combatManager,
-        ShopManager shopManager)
+        ShopManager shopManager,
+        DialogueManager dialogueManager)
     {
         _logger = logger;
         _worldService = worldService;
         _npcManager = npcManager;
         _combatManager = combatManager;
         _shopManager = shopManager;
+        _dialogueManager = dialogueManager;
     }
 
     public async Task HandleAsync(GameClient client, Packet packet)
@@ -82,8 +86,9 @@ public sealed class NpcInteractionHandler : IPacketHandler
             ExecuteAction = () =>
             {
                 _logger.LogDebug("{Username} talking to {Npc}", player.Username, npc.Name);
-                // TODO: Start dialogue
-                player.Message($"The {npc.Name} doesn't want to talk right now.");
+
+                // Start dialogue with the NPC
+                _dialogueManager.StartDialogue(player, npc);
             }
         };
 

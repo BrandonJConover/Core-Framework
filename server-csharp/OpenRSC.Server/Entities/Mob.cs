@@ -53,12 +53,28 @@ public abstract class Mob : Entity
     public bool HasMoved { get; protected set; }
 
     /// <summary>
+    /// The previous location before the most recent move.
+    /// </summary>
+    public Point PreviousLocation { get; protected set; }
+
+    /// <summary>
     /// Whether the mob's sprite has changed this tick.
     /// </summary>
     public bool SpriteChanged { get; protected set; }
 
     protected Mob(Point location) : base(location)
     {
+        PreviousLocation = location;
+    }
+
+    /// <summary>
+    /// Moves the mob to a new location, tracking the previous position.
+    /// </summary>
+    public virtual void MoveTo(Point newLocation)
+    {
+        PreviousLocation = Location;
+        Location = newLocation;
+        HasMoved = true;
     }
 
     /// <summary>
