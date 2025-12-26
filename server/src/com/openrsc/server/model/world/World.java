@@ -719,7 +719,7 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 		}
 		for (final MiniGameInterface m : getMiniGames()) {
 			if (m.getMiniGameId() == minigame.getMiniGameId()) {
-				System.out.println(minigame.getMiniGameId());
+				LOGGER.error("Duplicate MiniGame ID: {}", minigame.getMiniGameId());
 				throw new IllegalArgumentException("MiniGame ID must be unique");
 			}
 		}

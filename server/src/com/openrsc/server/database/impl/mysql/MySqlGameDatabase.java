@@ -25,6 +25,8 @@ import com.openrsc.server.model.entity.player.Player;
 import com.openrsc.server.util.checked.CheckedRunnable;
 import com.openrsc.server.util.checked.CheckedSupplier;
 import com.openrsc.server.util.rsc.DataConversions;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,6 +35,7 @@ import java.sql.*;
 import java.util.*;
 
 public class MySqlGameDatabase extends JDBCDatabase {
+	private static final Logger LOGGER = LogManager.getLogger();
 
 	private final QueriesManager queriesManager;
 	private final Queries queries;
@@ -2545,7 +2548,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 			return itemId;
 		}
 		catch (GameDatabaseException e) {
-			System.out.println(e);
+			LOGGER.catching(e);
 		}
 		return Item.ITEM_ID_UNASSIGNED;
 	}
