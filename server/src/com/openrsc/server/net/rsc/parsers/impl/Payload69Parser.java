@@ -11,11 +11,14 @@ import com.openrsc.server.net.rsc.struct.AbstractStruct;
 import com.openrsc.server.net.rsc.struct.incoming.*;
 import com.openrsc.server.util.rsc.DataConversions;
 import com.openrsc.server.util.rsc.StringUtil;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * RSC Protocol-69 Parser of Incoming Packets to respective Protocol Independent Structs
  * **/
 public class Payload69Parser implements PayloadParser<OpcodeIn> {
+	private static final Logger LOGGER = LogManager.getLogger();
 	@Override
 	public OpcodeIn toOpcodeEnum(Packet packet, Player player) {
 		OpcodeIn opcode = null;
@@ -711,7 +714,7 @@ public class Payload69Parser implements PayloadParser<OpcodeIn> {
 
 			// Unknown OPCODE
 			default:
-				System.out.println(String.format("Received inauthentic opcode %d from authentic claiming client", opcode));
+				LOGGER.warn("Received inauthentic opcode {} from authentic claiming client", opcode);
 				return false;
 		}
 	}

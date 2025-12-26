@@ -1299,7 +1299,7 @@ public final class AvatarGenerator {
 	private static void loadSprite(ZipFile spritesArchive, int id) throws IOException {
 		ZipEntry e = spritesArchive.getEntry(String.valueOf(id));
 		if (e == null) {
-			System.err.println("Missing sprite: " + id);
+			LOGGER.error("Missing sprite: {}", id);
 		}
 		InputStream bis = new BufferedInputStream(spritesArchive.getInputStream(e));
 		byte[] buffer = new byte[bis.available()];
