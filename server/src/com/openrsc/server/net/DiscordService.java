@@ -630,8 +630,8 @@ public class DiscordService implements Runnable{
 	public int discordToDBId(final long discord) {
 		try {
 			getServer().getDatabase().playerIdFromDiscordId(discord);
-		} catch (GameDatabaseException a) {
-			a.printStackTrace();
+		} catch (GameDatabaseException e) {
+			LOGGER.catching(e);
 		}
 		return 0;
 	}

@@ -23,7 +23,7 @@ public final class MySqlGameLogger extends GameLogger {
 	 */
 	private static final Logger LOGGER = LogManager.getLogger();
 
-	private volatile AtomicBoolean running;
+	private final AtomicBoolean running = new AtomicBoolean(false);
 	private final BlockingQueue<Query> queries;
 	private final Server server;
 	private ScheduledExecutorService scheduledExecutor;
@@ -32,7 +32,6 @@ public final class MySqlGameLogger extends GameLogger {
 	public MySqlGameLogger(final Server server, final MySqlGameDatabase database) {
 		this.server = server;
 
-		running = new AtomicBoolean(false);
 		queries = new ArrayBlockingQueue<>(10000);
 		// TODO: Implement GameLogger into the database driver.
 		if (database == null) {
