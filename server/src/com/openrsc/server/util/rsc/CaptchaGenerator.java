@@ -245,7 +245,7 @@ public class CaptchaGenerator {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.catching(e);
         }
         return imageArray;
     }
