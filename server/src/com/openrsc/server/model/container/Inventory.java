@@ -334,7 +334,7 @@ public class Inventory {
 				// could not satisfy removal
 				return -1;
 			}
-			System.out.println("Item not found: " + item.getItemId() + " for player " + player.getUsername());
+			LOGGER.warn("Item not found: {} for player {}", item.getItemId(), player.getUsername());
 		}
 		return -1;
 	}
