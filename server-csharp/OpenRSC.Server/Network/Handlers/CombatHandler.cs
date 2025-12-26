@@ -51,7 +51,7 @@ public sealed class AttackNpcHandler : IPacketHandler
 
         _logger.LogDebug("Player {Username} attacking NPC {NpcId}", player.Username, npc.NpcId);
 
-        _combatManager.InitiateCombat(player, npc);
+        _combatManager.StartCombat(player, npc);
 
         await ValueTask.CompletedTask;
     }
@@ -116,7 +116,7 @@ public sealed class AttackPlayerHandler : IPacketHandler
         // Apply skull if attacking first
         _wildernessManager.ApplySkull(player, target);
 
-        _combatManager.InitiateCombat(player, target);
+        _combatManager.StartCombat(player, target);
 
         await ValueTask.CompletedTask;
     }
@@ -257,35 +257,70 @@ public sealed class CastSpellHandler : IPacketHandler
     private void CastOnSelf(Player player, int spellId)
     {
         _logger.LogDebug("Player {Username} casting spell {SpellId} on self", player.Username, spellId);
-        // Would use spell casting system
+
+        var result = player.SpellCaster.Cast(spellId);
+        if (!result.Success && result.Message is not null)
+        {
+            player.Message(result.Message);
+        }
     }
 
     private void CastOnNpc(Player player, int spellId, Npc target)
     {
         _logger.LogDebug("Player {Username} casting spell {SpellId} on NPC {NpcId}",
             player.Username, spellId, target.NpcId);
-        // Would use spell casting system
+
+        var result = player.SpellCaster.Cast(spellId, target);
+        if (!result.Success && result.Message is not null)
+        {
+            player.Message(result.Message);
+        }
     }
 
     private void CastOnPlayer(Player player, int spellId, Player target)
     {
         _logger.LogDebug("Player {Username} casting spell {SpellId} on player {Target}",
             player.Username, spellId, target.Username);
-        // Would check wilderness rules for combat spells
+
+        // Check wilderness rules for PvP magic
+        var wildernessCheck = Wilderness.WildernessManager.CanAttack(player, target);
+        if (!wildernessCheck.Success)
+        {
+            player.Message(wildernessCheck.Message!);
+            return;
+        }
+
+        var result = player.SpellCaster.Cast(spellId, target);
+        if (!result.Success && result.Message is not null)
+        {
+            player.Message(result.Message);
+        }
     }
 
     private void CastOnGround(Player player, int spellId, int x, int y)
     {
         _logger.LogDebug("Player {Username} casting spell {SpellId} at ({X}, {Y})",
             player.Username, spellId, x, y);
-        // Would use spell casting system
+
+        // Ground-targeted spells (e.g., telegrab)
+        var result = player.SpellCaster.Cast(spellId);
+        if (!result.Success && result.Message is not null)
+        {
+            player.Message(result.Message);
+        }
     }
 
     private void CastOnItem(Player player, int spellId, int slot)
     {
         _logger.LogDebug("Player {Username} casting spell {SpellId} on item slot {Slot}",
             player.Username, spellId, slot);
-        // High alchemy, enchanting, etc.
+
+        // Alchemy, enchanting, superheat, etc.
+        var result = player.SpellCaster.CastAlchemy(spellId, slot);
+        if (!result.Success && result.Message is not null)
+        {
+            player.Message(result.Message);
+        }
     }
 }
 

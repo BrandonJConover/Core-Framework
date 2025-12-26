@@ -299,15 +299,32 @@ public sealed class ActionSender
     }
 
     /// <summary>
-    /// Sends a combat hit splat.
+    /// Sends damage update to the player (for their own damage display).
+    /// The actual visual hit splat is sent via WorldUpdateService as part of player updates.
     /// </summary>
     public async Task SendDamageAsync(int damage, int currentHp, int maxHp)
     {
         if (!_client.IsConnected) return;
 
-        // Damage is typically sent as part of player update packets
-        // This is a placeholder for the hit splat display
-        await SendMessageAsync($"You take {damage} damage. ({currentHp}/{maxHp})");
+        // Send stat update for hits (index 3 in RSC)
+        using var packet = new Packet((byte)OpcodeOut.PlayerStatExperience);
+        packet.WriteByte(3); // Hits skill index
+        packet.WriteByte((byte)currentHp);
+        packet.WriteByte((byte)maxHp);
+        packet.WriteInt(0); // Experience unchanged
+
+        await _client.SendAsync(packet);
+    }
+
+    /// <summary>
+    /// Sends a self-damage notification with visual feedback.
+    /// </summary>
+    public async Task SendSelfDamageAsync(int damage)
+    {
+        if (!_client.IsConnected) return;
+
+        // Use player stats packet to update health display
+        await SendDamageAsync(damage, _player.CurrentHitpoints, _player.MaxHitpoints);
     }
 
     /// <summary>

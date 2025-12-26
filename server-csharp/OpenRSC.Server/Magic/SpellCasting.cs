@@ -153,7 +153,7 @@ public sealed class SpellCaster
         // Calculate magic hit
         var hit = CalculateMagicHit(spell, target);
 
-        if (hit.Hit)
+        if (hit.IsHit)
         {
             target.ApplyDamage(hit.Damage, _player);
             _player.Message($"You hit {hit.Damage} damage with {spell.Name}.");
@@ -191,7 +191,7 @@ public sealed class SpellCaster
         var maxDamage = spell.BaseDamage + (int)(magicBonus * 0.1);
         var damage = Random.Shared.Next(1, maxDamage + 1);
 
-        return new HitResult(true, damage, DamageType.Magic);
+        return new HitResult(damage, DamageType.Magic);
     }
 
     private SpellResult CastTeleport(SpellDefinition spell)
