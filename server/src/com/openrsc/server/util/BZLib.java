@@ -1,6 +1,10 @@
 package com.openrsc.server.util;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 public class BZLib {
+    private static final Logger LOGGER = LogManager.getLogger();
     static final int js = 1;
     static final int ks = 2;
     static final int ls = 10;
@@ -200,7 +204,7 @@ public class BZLib {
             else
                 b1.fb = false;
             if (b1.fb)
-                System.out.println("PANIC! RANDOMISED BLOCK!");
+                LOGGER.error("PANIC! RANDOMISED BLOCK!");
             b1.kb = 0;
             byte0 = tj(b1);
             b1.kb = b1.kb << 8 | byte0 & 0xff;

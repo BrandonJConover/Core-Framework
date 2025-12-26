@@ -78,7 +78,7 @@ public class DiscordService implements Runnable{
 					final byte[] encoded = Files.readAllBytes(Paths.get(tokenFile.getPath()));
 					startPlayerBot(new String(encoded, StandardCharsets.UTF_8));
 				} catch (final IOException a) {
-					a.printStackTrace();
+					LOGGER.catching(a);
 				}
 			} else {
 				LOGGER.info(server.getConfig().SERVER_NAME + ".tok not found. Cannot start bot.");
@@ -91,7 +91,7 @@ public class DiscordService implements Runnable{
 					byte[] encoded = Files.readAllBytes(Paths.get(tokenFile.getPath()));
 					//gitLabApi = new GitLabApi("http://gitlab.openrsc.com", new String(encoded, StandardCharsets.UTF_8));
 				} catch (final IOException a) {
-					a.printStackTrace();
+					LOGGER.catching(a);
 				}
 			} else {
 				LOGGER.info("gitlab.pat not found. Cannot start gitlab API.");
@@ -107,7 +107,7 @@ public class DiscordService implements Runnable{
 		try {
 			this.jda = this.builder.build();
 		} catch (final LoginException a) {
-			a.printStackTrace();
+			LOGGER.catching(a);
 		}
 	}
 
@@ -151,7 +151,7 @@ public class DiscordService implements Runnable{
 								reply = "Invalid pair token.";
 							}
 						} catch (GameDatabaseException a) {
-							a.printStackTrace();
+							LOGGER.catching(a);
 						}
 					}
 				} else if (message.getContentRaw().startsWith("!auctions")) {
@@ -199,7 +199,7 @@ public class DiscordService implements Runnable{
 								reply = "Error 2250";
 							}
 						} catch (GameDatabaseException a) {
-							a.printStackTrace();
+							LOGGER.catching(a);
 						}
 
 
@@ -219,7 +219,7 @@ public class DiscordService implements Runnable{
 							try {
 								gitLabApi.getIssuesApi().createIssue(2, title, desc);
 							} catch (GitLabApiException a) {
-								a.printStackTrace();
+								LOGGER.catching(a);
 							}
 						} else
 							reply = "Usage: !bug -t TITLE -d DESCRIPTION";
@@ -242,7 +242,7 @@ public class DiscordService implements Runnable{
 											} else
 												reply = reply + "ERROR (ID " + itemID + ")\n";
 										} catch (NumberFormatException a) {
-											a.printStackTrace();
+											LOGGER.catching(a);
 										}
 									}
 									reply = reply + "`";
@@ -322,7 +322,7 @@ public class DiscordService implements Runnable{
 								reply = "Usage: !watch [list add del help]";
 
 						} catch (GameDatabaseException a) {
-							a.printStackTrace();
+							LOGGER.catching(a);
 						}
 					} else
 						reply = "Usage: !watch [list add del help]";
@@ -401,12 +401,12 @@ public class DiscordService implements Runnable{
 							sendPM(discordID, message);
 						}
 					} catch (final NumberFormatException a) {
-						a.printStackTrace();
+						LOGGER.catching(a);
 					}
 				}
 			}
 		} catch (final GameDatabaseException a) {
-			a.printStackTrace();
+			LOGGER.catching(a);
 		}
 	}
 
@@ -640,7 +640,7 @@ public class DiscordService implements Runnable{
 		try {
 			return getServer().getDatabase().usernameFromId(dbId);
 		} catch (GameDatabaseException a) {
-			a.printStackTrace();
+			LOGGER.catching(a);
 		}
 		return "";
 	}

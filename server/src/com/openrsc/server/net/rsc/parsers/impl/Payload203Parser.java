@@ -496,7 +496,7 @@ public class Payload203Parser implements PayloadParser<OpcodeIn> {
 		int payloadLength = length - 1; // subtract off opcode length.
 		OpcodeIn op = opcodes.get(opcode);
 		if (op == null) {
-			System.out.println(String.format("Received unknown opcode %d from authentic claiming client", opcode));
+			LOGGER.warn("Received unknown opcode {} from authentic claiming client", opcode);
 			return false;
 		}
 		switch (op) {
@@ -653,7 +653,7 @@ public class Payload203Parser implements PayloadParser<OpcodeIn> {
 			case KNOWN_PLAYERS:
 				return payloadLength >= 2;
 		}
-		System.out.println(String.format("Received UNHANDLED opcode %d from authentic claiming client", opcode));
+		LOGGER.warn("Received UNHANDLED opcode {} from authentic claiming client", opcode);
 		return false;
 	}
 
