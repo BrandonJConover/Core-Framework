@@ -215,6 +215,28 @@ public sealed class WorldMap
     }
 
     /// <summary>
+    /// Attempts to pick up a ground item.
+    /// </summary>
+    /// <returns>The picked up item if successful, null otherwise.</returns>
+    public GroundItem? TryPickupItem(int itemId, Point location, Player player)
+    {
+        return GetRegion(location).TryRemoveGroundItem(itemId, location, player);
+    }
+
+    /// <summary>
+    /// Gets ground items at a specific location visible to a player.
+    /// </summary>
+    public IEnumerable<GroundItem> GetGroundItems(Point location, Player? player = null)
+    {
+        var items = GetRegion(location).GetGroundItems(location);
+        if (player is null)
+        {
+            return items.Where(i => i.IsVisibleToAll);
+        }
+        return items.Where(i => i.IsVisibleToAll || i.DroppedBy?.UsernameHash == player.UsernameHash);
+    }
+
+    /// <summary>
     /// Gets loaded region count for monitoring.
     /// </summary>
     public int LoadedRegionCount => _regions.Count;
