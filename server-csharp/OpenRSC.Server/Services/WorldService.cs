@@ -46,6 +46,11 @@ public sealed class WorldService : IWorldService
         return _playersByHash.TryGetValue(usernameHash, out var player) ? player : null;
     }
 
+    public Player? GetPlayer(int index)
+    {
+        return _players.TryGetValue(index, out var player) ? player : null;
+    }
+
     public bool RegisterPlayer(Player player)
     {
         if (_players.Count >= _settings.MaxPlayers)

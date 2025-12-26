@@ -29,6 +29,11 @@ public interface IWorldService
     Player? GetPlayer(long usernameHash);
 
     /// <summary>
+    /// Gets a player by index.
+    /// </summary>
+    Player? GetPlayer(int index);
+
+    /// <summary>
     /// Registers a player in the world.
     /// </summary>
     bool RegisterPlayer(Player player);
