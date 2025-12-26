@@ -4,6 +4,7 @@ using OpenRSC.Server.Combat;
 using OpenRSC.Server.Configuration;
 using OpenRSC.Server.Fatigue;
 using OpenRSC.Server.Inventory;
+using OpenRSC.Server.Magic;
 using OpenRSC.Server.Models;
 using OpenRSC.Server.Network;
 using OpenRSC.Server.Prayer;
@@ -81,6 +82,11 @@ public class Player : Mob
     /// Player's equipped items.
     /// </summary>
     public Equipment Equipment { get; }
+
+    /// <summary>
+    /// Player's spell casting system.
+    /// </summary>
+    public SpellCaster SpellCaster { get; }
 
     /// <summary>
     /// Player's active prayers.
@@ -201,6 +207,7 @@ public class Player : Mob
         Bank = new PlayerBank(this);
         Equipment = new Equipment(this);
         Prayers = new PlayerPrayers(this);
+        SpellCaster = new SpellCaster(this);
         Fatigue = new PlayerFatigue(this);
         LastActivity = DateTime.UtcNow;
         LastMoved = DateTime.UtcNow;
@@ -221,6 +228,7 @@ public class Player : Mob
         Bank = new PlayerBank(this);
         Equipment = new Equipment(this);
         Prayers = new PlayerPrayers(this);
+        SpellCaster = new SpellCaster(this);
         Fatigue = new PlayerFatigue(this);
         LastActivity = DateTime.UtcNow;
         LastMoved = DateTime.UtcNow;
@@ -425,6 +433,15 @@ public class Player : Mob
             IsSkulled = false;
             SkullExpiry = null;
         }
+    }
+
+    /// <summary>
+    /// Clears the skull immediately (e.g., on death).
+    /// </summary>
+    public void ClearSkull()
+    {
+        IsSkulled = false;
+        SkullExpiry = null;
     }
 
     /// <summary>

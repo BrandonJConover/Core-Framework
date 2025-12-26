@@ -62,6 +62,16 @@ public abstract class Mob : Entity
     /// </summary>
     public bool SpriteChanged { get; protected set; }
 
+    /// <summary>
+    /// Damage taken this tick (for hit splat display).
+    /// </summary>
+    public int LastDamage { get; protected set; }
+
+    /// <summary>
+    /// Whether this mob took damage this tick.
+    /// </summary>
+    public bool HasTakenDamage { get; protected set; }
+
     protected Mob(Point location) : base(location)
     {
         PreviousLocation = location;
@@ -103,6 +113,17 @@ public abstract class Mob : Entity
     public virtual void TakeDamage(int damage)
     {
         CurrentHitpoints = Math.Max(0, CurrentHitpoints - damage);
+        LastDamage = damage;
+        HasTakenDamage = true;
+    }
+
+    /// <summary>
+    /// Applies damage from a specific attacker (for combat tracking).
+    /// </summary>
+    public virtual void ApplyDamage(int damage, Mob? attacker)
+    {
+        TakeDamage(damage);
+        // Could track damage sources for multi-combat, etc.
     }
 
     /// <summary>
@@ -120,5 +141,7 @@ public abstract class Mob : Entity
     {
         HasMoved = false;
         SpriteChanged = false;
+        HasTakenDamage = false;
+        LastDamage = 0;
     }
 }

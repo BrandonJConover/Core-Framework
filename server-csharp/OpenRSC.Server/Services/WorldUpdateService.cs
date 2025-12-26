@@ -139,6 +139,8 @@ public sealed class WorldUpdateService
                 updateFlags |= 0x04;
             if (nearbyPlayer.IsSkulled)
                 updateFlags |= 0x08;
+            if (nearbyPlayer.HasTakenDamage)
+                updateFlags |= 0x10;
 
             packet.WriteByte(updateFlags);
 
@@ -146,6 +148,14 @@ public sealed class WorldUpdateService
             if (nearbyPlayer.HasChangedAppearance)
             {
                 WritePlayerAppearance(packet, nearbyPlayer);
+            }
+
+            // If took damage, include hit splat data
+            if (nearbyPlayer.HasTakenDamage)
+            {
+                packet.WriteByte((byte)nearbyPlayer.LastDamage);
+                packet.WriteByte((byte)nearbyPlayer.CurrentHitpoints);
+                packet.WriteByte((byte)nearbyPlayer.MaxHitpoints);
             }
 
             // Combat level
@@ -191,14 +201,22 @@ public sealed class WorldUpdateService
                 updateFlags |= 0x01;
             if (npc.HasMoved)
                 updateFlags |= 0x02;
+            if (npc.HasTakenDamage)
+                updateFlags |= 0x04;
 
             packet.WriteByte(updateFlags);
 
-            // Combat info if in combat
-            if (npc.InCombat)
+            // Combat info if in combat or took damage
+            if (npc.InCombat || npc.HasTakenDamage)
             {
                 packet.WriteByte((byte)npc.CurrentHitpoints);
                 packet.WriteByte((byte)(npc.Definition?.Hitpoints ?? 1));
+            }
+
+            // If took damage, include hit splat
+            if (npc.HasTakenDamage)
+            {
+                packet.WriteByte((byte)npc.LastDamage);
             }
         }
 

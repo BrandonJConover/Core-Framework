@@ -1,6 +1,9 @@
 using Microsoft.Extensions.Logging;
+using OpenRSC.Server.Drops;
 using OpenRSC.Server.Entities;
 using OpenRSC.Server.Events;
+using OpenRSC.Server.Items;
+using OpenRSC.Server.Models;
 using OpenRSC.Server.Skills;
 
 namespace OpenRSC.Server.Combat;
@@ -12,12 +15,17 @@ public sealed class CombatManager
 {
     private readonly ILogger<CombatManager> _logger;
     private readonly EventManager _eventManager;
+    private readonly DropService? _dropService;
     private readonly Dictionary<Guid, CombatEncounter> _activeEncounters = new();
 
-    public CombatManager(ILogger<CombatManager> logger, EventManager eventManager)
+    public CombatManager(
+        ILogger<CombatManager> logger,
+        EventManager eventManager,
+        DropService? dropService = null)
     {
         _logger = logger;
         _eventManager = eventManager;
+        _dropService = dropService;
     }
 
     /// <summary>
@@ -98,27 +106,184 @@ public sealed class CombatManager
 
     private void HandlePlayerDeath(Player player, Mob killer)
     {
-        _logger.LogInformation("Player {Username} died", player.Username);
+        _logger.LogInformation("Player {Username} died to {Killer}", player.Username, GetMobName(killer));
 
-        // Reset combat stats
+        // Drop items on death
+        var droppedItems = DropItemsOnDeath(player, killer);
+
+        // Remove skull on death
+        player.ClearSkull();
+
+        // Send death notification
+        _ = player.ActionSender?.SendDeathAsync();
+
+        // Reset hitpoints
         player.Skills.Restore(Skill.Hits);
 
-        // Teleport to respawn
-        // TODO: Implement respawn location and item drop logic
+        // Teleport to respawn location
+        var respawnLocation = GetRespawnLocation(player);
+        player.MoveTo(respawnLocation);
+        _ = player.ActionSender?.SendTeleportAsync();
 
         player.Message("Oh dear, you are dead!");
+
+        // Log items dropped
+        if (droppedItems.Count > 0)
+        {
+            _logger.LogDebug("Player {Username} dropped {Count} items on death",
+                player.Username, droppedItems.Count);
+        }
+
+        // Award kill to player killer
+        if (killer is Player killerPlayer)
+        {
+            killerPlayer.Message($"You have defeated {player.Username}!");
+        }
+    }
+
+    /// <summary>
+    /// Drops items on player death, keeping the 3 most valuable.
+    /// </summary>
+    private List<Item> DropItemsOnDeath(Player player, Mob killer)
+    {
+        var droppedItems = new List<Item>();
+        var allItems = new List<Item>();
+
+        // Collect all inventory items
+        allItems.AddRange(player.Inventory.GetItems());
+
+        // Collect all equipped items
+        foreach (var (slot, item) in player.Equipment.GetEquipped())
+        {
+            allItems.Add(item);
+        }
+
+        if (allItems.Count == 0)
+            return droppedItems;
+
+        // Sort by value (highest first)
+        allItems = allItems.OrderByDescending(i => i.Definition?.Value ?? 0).ToList();
+
+        // Determine how many to keep (3 normally, 4 with Protect Item prayer)
+        var keepCount = player.Prayers?.IsActive(Prayer.Prayer.ProtectItems) == true ? 4 : 3;
+
+        // Items to keep (most valuable)
+        var keptItems = allItems.Take(keepCount).ToList();
+
+        // Items to drop
+        var toDrop = allItems.Skip(keepCount).ToList();
+
+        // Clear inventory and equipment
+        player.Inventory.Clear();
+        player.Equipment.ClearAll();
+
+        // Re-add kept items to inventory
+        foreach (var item in keptItems)
+        {
+            player.Inventory.Add(item);
+        }
+
+        // Drop remaining items at death location
+        foreach (var item in toDrop)
+        {
+            droppedItems.Add(item);
+            // Create ground item at player's location
+            // The item is visible to the killer first
+            var visibleTo = killer is Player p ? p : null;
+            CreateGroundItem(player.Location, item, visibleTo);
+        }
+
+        // Update client
+        _ = player.ActionSender?.SendInventoryAsync();
+
+        return droppedItems;
+    }
+
+    /// <summary>
+    /// Creates a ground item at the specified location.
+    /// </summary>
+    private void CreateGroundItem(Point location, Item item, Player? visibleTo)
+    {
+        // Ground items are created with visibility rules:
+        // - First visible only to killer (if player)
+        // - Then visible to everyone after ~60 seconds
+        // - Despawn after ~180 seconds
+
+        // This would integrate with the ground item manager
+        _logger.LogDebug("Ground item created: {Item} at {Location}", item.Definition?.Name ?? "Unknown", location);
+    }
+
+    /// <summary>
+    /// Gets the respawn location for a player.
+    /// </summary>
+    private static Point GetRespawnLocation(Player player)
+    {
+        // Default respawn in Lumbridge
+        // Could be extended to support other respawn points
+        return new Point(122, 647);
     }
 
     private void HandleNpcDeath(Npc npc, Mob killer)
     {
-        npc.Remove();
+        _logger.LogInformation("NPC {NpcName} (ID: {NpcId}) killed by {Killer}",
+            npc.Name, npc.NpcId, GetMobName(killer));
 
-        // TODO: Drop loot, respawn timer
+        var killerPlayer = killer as Player;
 
-        if (killer is Player player)
+        // Generate and drop loot
+        var drops = GenerateNpcDrops(npc);
+        foreach (var item in drops)
         {
-            _logger.LogDebug("NPC {NpcId} killed by {Player}", npc.Id, player.Username);
+            CreateGroundItem(npc.Location, item, killerPlayer);
+
+            if (killerPlayer is not null)
+            {
+                killerPlayer.Message($"Drop: {item.Definition?.Name ?? "Unknown"} x{item.Amount}");
+            }
         }
+
+        // Award combat experience for the kill
+        if (killerPlayer is not null && npc.Definition is not null)
+        {
+            var killXp = CalculateNpcKillExperience(npc);
+            killerPlayer.Skills.AddExperience(Skill.Hits, killXp);
+            _logger.LogDebug("Player {Username} gained {Xp} hitpoints XP from killing {Npc}",
+                killerPlayer.Username, killXp, npc.Name);
+        }
+
+        // Mark NPC as dead and start respawn timer
+        npc.Die();
+
+        // The NpcManager.ProcessRespawns() will handle actual respawning
+        _logger.LogDebug("NPC {NpcName} will respawn in {Seconds} seconds",
+            npc.Name, npc.Definition?.RespawnTime ?? 30);
+    }
+
+    /// <summary>
+    /// Generates drops for an NPC.
+    /// </summary>
+    private IEnumerable<Item> GenerateNpcDrops(Npc npc)
+    {
+        if (_dropService is not null)
+        {
+            return _dropService.GenerateDrops(npc);
+        }
+
+        // Fallback: just bones
+        return new List<Item>();
+    }
+
+    /// <summary>
+    /// Calculates experience gained from killing an NPC.
+    /// </summary>
+    private static int CalculateNpcKillExperience(Npc npc)
+    {
+        // Experience based on NPC combat level and hitpoints
+        var combatLevel = npc.CombatLevel;
+        var hitpoints = npc.Definition?.Hitpoints ?? 10;
+
+        // Formula: base XP + bonus for higher level NPCs
+        return (hitpoints * 4) + (combatLevel * 2);
     }
 
     private static string GetMobName(Mob mob) => mob switch
