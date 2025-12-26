@@ -227,6 +227,29 @@ public sealed class Region
     }
 
     /// <summary>
+    /// Attempts to remove a specific ground item.
+    /// </summary>
+    /// <returns>The removed item if found, null otherwise.</returns>
+    public GroundItem? TryRemoveGroundItem(int itemId, Point location, Player player)
+    {
+        lock (_lock)
+        {
+            var item = _groundItems.FirstOrDefault(i =>
+                i.ItemId == itemId &&
+                i.Location == location &&
+                !i.IsExpired &&
+                (i.IsVisibleToAll || i.DroppedBy?.UsernameHash == player.UsernameHash));
+
+            if (item is not null)
+            {
+                _groundItems.Remove(item);
+                return item;
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Gets players within view distance of a point.
     /// </summary>
     public IEnumerable<Player> GetPlayersInView(Point center, int viewDistance = 16)

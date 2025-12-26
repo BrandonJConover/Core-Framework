@@ -1,4 +1,7 @@
 using OpenRSC.Server.Entities;
+using OpenRSC.Server.Inventory;
+using OpenRSC.Server.Items;
+using OpenRSC.Server.Npc;
 using OpenRSC.Server.Skills;
 
 namespace OpenRSC.Server.Combat;
@@ -16,7 +19,10 @@ public static class CombatFormulas
     public static int CalculateMeleeMaxHit(Player player, CombatStyle style)
     {
         var strengthLevel = player.Skills.GetCurrentLevel(Skill.Strength);
-        var strengthBonus = 0; // TODO: Get from equipment
+        var strengthBonus = GetStrengthBonus(player);
+
+        // Prayer bonus
+        var prayerMultiplier = GetStrengthPrayerMultiplier(player);
 
         // Style bonus
         var styleBonus = style switch
@@ -27,7 +33,7 @@ public static class CombatFormulas
         };
 
         // RSC formula: (strength + styleBonus) * (strengthBonus + 64) / 640
-        var effectiveStrength = strengthLevel + styleBonus;
+        var effectiveStrength = (int)((strengthLevel * prayerMultiplier) + styleBonus);
         var maxHit = (int)((effectiveStrength * (strengthBonus + 64.0)) / 640.0) + 1;
 
         return Math.Max(1, maxHit);
@@ -39,7 +45,10 @@ public static class CombatFormulas
     public static int CalculateAttackRoll(Player player, CombatStyle style)
     {
         var attackLevel = player.Skills.GetCurrentLevel(Skill.Attack);
-        var attackBonus = 0; // TODO: Get from equipment
+        var attackBonus = GetAttackBonus(player, style);
+
+        // Prayer bonus
+        var prayerMultiplier = GetAttackPrayerMultiplier(player);
 
         var styleBonus = style switch
         {
@@ -48,39 +57,40 @@ public static class CombatFormulas
             _ => 0
         };
 
-        var effectiveAttack = attackLevel + styleBonus;
+        var effectiveAttack = (int)((attackLevel * prayerMultiplier) + styleBonus);
         return (int)(effectiveAttack * (attackBonus + 64.0));
     }
 
     /// <summary>
     /// Calculates defense roll.
     /// </summary>
-    public static int CalculateDefenseRoll(Mob defender, CombatStyle style)
+    public static int CalculateDefenseRoll(Mob defender, CombatStyle attackStyle)
     {
         int defenseLevel;
-        int defenseBonus = 0;
+        int defenseBonus;
 
         if (defender is Player player)
         {
             defenseLevel = player.Skills.GetCurrentLevel(Skill.Defense);
-            // TODO: Get defense bonus from equipment
+            defenseBonus = GetDefenseBonus(player, attackStyle);
+
+            // Prayer bonus
+            var prayerMultiplier = GetDefensePrayerMultiplier(player);
+            defenseLevel = (int)(defenseLevel * prayerMultiplier);
         }
-        else if (defender is Npc npc)
+        else if (defender is Entities.Npc npc)
         {
-            defenseLevel = GetNpcDefenseLevel(npc.Id);
-            defenseBonus = GetNpcDefenseBonus(npc.Id);
+            defenseLevel = GetNpcDefenseLevel(npc);
+            defenseBonus = GetNpcDefenseBonus(npc, attackStyle);
         }
         else
         {
             defenseLevel = 1;
+            defenseBonus = 0;
         }
 
-        var styleBonus = style switch
-        {
-            CombatStyle.Defensive => 3,
-            CombatStyle.Controlled => 1,
-            _ => 0
-        };
+        // Defender style bonus (assume defensive)
+        var styleBonus = 3;
 
         var effectiveDefense = defenseLevel + styleBonus;
         return (int)(effectiveDefense * (defenseBonus + 64.0));
@@ -143,9 +153,11 @@ public static class CombatFormulas
     public static int CalculateRangedMaxHit(Player player, int arrowStrength)
     {
         var rangedLevel = player.Skills.GetCurrentLevel(Skill.Ranged);
+        var rangedBonus = player.Equipment.GetTotalBonuses().AttackRanged;
 
         // RSC ranged formula
-        var maxHit = (int)((rangedLevel * (arrowStrength + 64.0)) / 640.0) + 1;
+        var effectiveRanged = rangedLevel + rangedBonus;
+        var maxHit = (int)((effectiveRanged * (arrowStrength + 64.0)) / 640.0) + 1;
 
         return Math.Max(1, maxHit);
     }
@@ -194,7 +206,99 @@ public static class CombatFormulas
         };
     }
 
-    // NPC stat lookups - would normally come from definition files
-    private static int GetNpcDefenseLevel(int npcId) => 1; // TODO: Load from definitions
-    private static int GetNpcDefenseBonus(int npcId) => 0; // TODO: Load from definitions
+    #region Equipment Bonus Helpers
+
+    /// <summary>
+    /// Gets the strength bonus from equipment.
+    /// </summary>
+    private static int GetStrengthBonus(Player player)
+    {
+        return player.Equipment.GetTotalBonuses().Strength;
+    }
+
+    /// <summary>
+    /// Gets the attack bonus based on weapon style.
+    /// </summary>
+    private static int GetAttackBonus(Player player, CombatStyle style)
+    {
+        var bonuses = player.Equipment.GetTotalBonuses();
+        var weaponStyle = player.Equipment.GetWeaponStyle();
+
+        return weaponStyle switch
+        {
+            AttackStyle.Stab => bonuses.AttackStab,
+            AttackStyle.Slash => bonuses.AttackSlash,
+            AttackStyle.Crush => bonuses.AttackCrush,
+            AttackStyle.Magic => bonuses.AttackMagic,
+            AttackStyle.Ranged => bonuses.AttackRanged,
+            _ => bonuses.AttackSlash
+        };
+    }
+
+    /// <summary>
+    /// Gets the defense bonus based on attack style.
+    /// </summary>
+    private static int GetDefenseBonus(Player player, CombatStyle attackStyle)
+    {
+        var bonuses = player.Equipment.GetTotalBonuses();
+
+        // Average of all defense bonuses for simplicity
+        // In RSC, specific defense type depends on attacker's weapon
+        return (bonuses.DefenseStab + bonuses.DefenseSlash + bonuses.DefenseCrush) / 3;
+    }
+
+    #endregion
+
+    #region Prayer Multipliers
+
+    private static double GetAttackPrayerMultiplier(Player player)
+    {
+        var prayers = player.Prayers;
+        if (prayers.IsActive(Prayer.Prayer.IncredibleReflexes)) return 1.15;
+        if (prayers.IsActive(Prayer.Prayer.ImprovedReflexes)) return 1.10;
+        if (prayers.IsActive(Prayer.Prayer.ClarityOfThought)) return 1.05;
+        return 1.0;
+    }
+
+    private static double GetStrengthPrayerMultiplier(Player player)
+    {
+        var prayers = player.Prayers;
+        if (prayers.IsActive(Prayer.Prayer.UltimateStrength)) return 1.15;
+        if (prayers.IsActive(Prayer.Prayer.SuperhumanStrength)) return 1.10;
+        if (prayers.IsActive(Prayer.Prayer.BurstOfStrength)) return 1.05;
+        return 1.0;
+    }
+
+    private static double GetDefensePrayerMultiplier(Player player)
+    {
+        var prayers = player.Prayers;
+        if (prayers.IsActive(Prayer.Prayer.SteelSkin)) return 1.15;
+        if (prayers.IsActive(Prayer.Prayer.RockSkin)) return 1.10;
+        if (prayers.IsActive(Prayer.Prayer.ThickSkin)) return 1.05;
+        return 1.0;
+    }
+
+    #endregion
+
+    #region NPC Stats
+
+    /// <summary>
+    /// Gets NPC defense level from definition.
+    /// </summary>
+    private static int GetNpcDefenseLevel(Entities.Npc npc)
+    {
+        // Use NPC's combat level as a base for defense
+        return npc.Definition?.DefenseLevel ?? npc.CombatLevel;
+    }
+
+    /// <summary>
+    /// Gets NPC defense bonus based on attack type.
+    /// </summary>
+    private static int GetNpcDefenseBonus(Entities.Npc npc, CombatStyle attackStyle)
+    {
+        // NPCs typically have lower defense bonuses than players
+        return npc.Definition?.DefenseBonus ?? 0;
+    }
+
+    #endregion
 }

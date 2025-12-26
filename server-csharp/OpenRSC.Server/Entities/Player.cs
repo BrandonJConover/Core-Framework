@@ -5,7 +5,9 @@ using OpenRSC.Server.Configuration;
 using OpenRSC.Server.Fatigue;
 using OpenRSC.Server.Inventory;
 using OpenRSC.Server.Models;
+using OpenRSC.Server.Network;
 using OpenRSC.Server.Prayer;
+using OpenRSC.Server.Services;
 using OpenRSC.Server.Skills;
 using OpenRSC.Server.Skilling;
 using OpenRSC.Server.Social;
@@ -97,6 +99,16 @@ public class Player : Mob
     public SocialManager? Social { get; set; }
 
     /// <summary>
+    /// The GameClient associated with this player.
+    /// </summary>
+    public GameClient? Client { get; private set; }
+
+    /// <summary>
+    /// Action sender for client packet communication.
+    /// </summary>
+    public ActionSender? ActionSender { get; private set; }
+
+    /// <summary>
     /// Player's fatigue level (RSC-specific).
     /// </summary>
     public PlayerFatigue Fatigue { get; }
@@ -135,6 +147,11 @@ public class Player : Mob
     /// Timestamp of last movement.
     /// </summary>
     public DateTime LastMoved { get; private set; }
+
+    /// <summary>
+    /// The player being followed, if any.
+    /// </summary>
+    public Player? FollowingTarget { get; private set; }
 
     /// <summary>
     /// Timestamp of last save.
@@ -220,12 +237,29 @@ public class Player : Mob
     }
 
     /// <summary>
+    /// Associates a GameClient with this player and creates the ActionSender.
+    /// </summary>
+    public void SetClient(GameClient client)
+    {
+        Client = client;
+        ActionSender = new ActionSender(client, this);
+    }
+
+    /// <summary>
+    /// Disconnects the client from this player.
+    /// </summary>
+    public void ClearClient()
+    {
+        Client = null;
+        ActionSender = null;
+    }
+
+    /// <summary>
     /// Sends a message to the player's chat.
     /// </summary>
     public void Message(string text)
     {
-        // TODO: Implement actual message sending via ActionSender
-        // Message will be sent to client when ActionSender is connected
+        _ = ActionSender?.SendMessageAsync(text);
     }
 
     /// <summary>
@@ -233,7 +267,86 @@ public class Player : Mob
     /// </summary>
     public void ReceivePrivateMessage(long senderHash, int messageId, string message)
     {
-        // TODO: Send private message packet to client via ActionSender
+        _ = ActionSender?.SendPrivateMessageAsync(senderHash, message);
+    }
+
+    /// <summary>
+    /// Sends the player's inventory to the client.
+    /// </summary>
+    public void SendInventory()
+    {
+        _ = ActionSender?.SendInventoryAsync();
+    }
+
+    /// <summary>
+    /// Sends the player's stats to the client.
+    /// </summary>
+    public void SendStats()
+    {
+        _ = ActionSender?.SendStatsAsync();
+    }
+
+    /// <summary>
+    /// Sends equipment bonuses to the client.
+    /// </summary>
+    public void SendEquipmentBonuses()
+    {
+        _ = ActionSender?.SendEquipmentBonusesAsync();
+    }
+
+    /// <summary>
+    /// Starts following another player.
+    /// </summary>
+    public void StartFollowing(Player target)
+    {
+        FollowingTarget = target;
+        // Clear any current walk-to action
+        SetWalkToAction(null);
+    }
+
+    /// <summary>
+    /// Stops following any player.
+    /// </summary>
+    public void StopFollowing()
+    {
+        FollowingTarget = null;
+    }
+
+    /// <summary>
+    /// Processes following logic during the tick.
+    /// </summary>
+    public void ProcessFollowing()
+    {
+        if (FollowingTarget is null || FollowingTarget.IsRemoved || !FollowingTarget.IsLoggedIn)
+        {
+            StopFollowing();
+            return;
+        }
+
+        // Check if target is still in range
+        var distance = Location.DistanceTo(FollowingTarget.Location);
+        if (distance > 16)
+        {
+            Message("You've lost sight of your target.");
+            StopFollowing();
+            return;
+        }
+
+        // If already adjacent, don't move
+        if (distance <= 1)
+        {
+            return;
+        }
+
+        // Add path to target's location
+        WalkingQueue.Reset();
+
+        // Simple pathfinding - move one step towards target
+        var dx = Math.Sign(FollowingTarget.Location.X - Location.X);
+        var dy = Math.Sign(FollowingTarget.Location.Y - Location.Y);
+
+        var nextStep = new Point(Location.X + dx, Location.Y + dy);
+        WalkingQueue.AddStep(nextStep);
     }
 
     /// <summary>

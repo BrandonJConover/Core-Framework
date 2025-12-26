@@ -72,7 +72,10 @@ public sealed class DeathManager
 
         // Teleport to respawn point
         var respawnPoint = GetRespawnPoint(player);
-        player.Location = respawnPoint;
+        player.Teleport(respawnPoint);
+
+        // Send death packets to client
+        SendDeathPackets(player, respawnPoint);
 
         player.Message("Oh dear, you are dead!");
 
@@ -137,6 +140,32 @@ public sealed class DeathManager
         {
             player.Skills.RestoreToMax(skill);
         }
+
+        // Clear walking queue and current action
+        player.WalkingQueue.Reset();
+        player.CurrentAction = null;
+        player.SetWalkToAction(null);
+    }
+
+    /// <summary>
+    /// Sends death-related packets to the client.
+    /// </summary>
+    private void SendDeathPackets(Player player, Point respawnPoint)
+    {
+        // Send death notification
+        _ = player.ActionSender?.SendDeathAsync();
+
+        // Send teleport to respawn point
+        _ = player.ActionSender?.SendTeleportAsync();
+
+        // Send updated stats
+        player.SendStats();
+
+        // Send updated inventory
+        player.SendInventory();
+
+        // Send equipment bonuses
+        player.SendEquipmentBonuses();
     }
 
     private Point GetRespawnPoint(Player player)
