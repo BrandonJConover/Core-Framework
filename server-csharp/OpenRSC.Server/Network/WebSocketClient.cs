@@ -526,6 +526,99 @@ public sealed class WebSocketMessage
     [JsonPropertyName("platform")]
     public string? Platform { get; set; }
 
+    // Device fingerprinting fields
+    /// <summary>Operating system version.</summary>
+    [JsonPropertyName("osVersion")]
+    public string? OsVersion { get; set; }
+
+    /// <summary>Device model (iPhone14,2, Pixel 7, etc.).</summary>
+    [JsonPropertyName("deviceModel")]
+    public string? DeviceModel { get; set; }
+
+    /// <summary>Device manufacturer.</summary>
+    [JsonPropertyName("manufacturer")]
+    public string? Manufacturer { get; set; }
+
+    /// <summary>Browser name (for web).</summary>
+    [JsonPropertyName("browser")]
+    public string? Browser { get; set; }
+
+    /// <summary>Browser version.</summary>
+    [JsonPropertyName("browserVersion")]
+    public string? BrowserVersion { get; set; }
+
+    /// <summary>User agent string.</summary>
+    [JsonPropertyName("userAgent")]
+    public string? UserAgent { get; set; }
+
+    /// <summary>Screen width.</summary>
+    [JsonPropertyName("screenWidth")]
+    public int? ScreenWidth { get; set; }
+
+    /// <summary>Screen height.</summary>
+    [JsonPropertyName("screenHeight")]
+    public int? ScreenHeight { get; set; }
+
+    /// <summary>Screen pixel density.</summary>
+    [JsonPropertyName("pixelRatio")]
+    public float? PixelRatio { get; set; }
+
+    /// <summary>Device timezone.</summary>
+    [JsonPropertyName("timezone")]
+    public string? Timezone { get; set; }
+
+    /// <summary>Device language.</summary>
+    [JsonPropertyName("language")]
+    public string? Language { get; set; }
+
+    /// <summary>Number of CPU cores.</summary>
+    [JsonPropertyName("cpuCores")]
+    public int? CpuCores { get; set; }
+
+    /// <summary>Device memory in GB.</summary>
+    [JsonPropertyName("deviceMemory")]
+    public int? DeviceMemory { get; set; }
+
+    /// <summary>WebGL renderer (for web).</summary>
+    [JsonPropertyName("webglRenderer")]
+    public string? WebGLRenderer { get; set; }
+
+    /// <summary>WebGL vendor (for web).</summary>
+    [JsonPropertyName("webglVendor")]
+    public string? WebGLVendor { get; set; }
+
+    /// <summary>Canvas fingerprint hash (for web).</summary>
+    [JsonPropertyName("canvasHash")]
+    public string? CanvasHash { get; set; }
+
+    /// <summary>Audio context fingerprint (for web).</summary>
+    [JsonPropertyName("audioHash")]
+    public string? AudioHash { get; set; }
+
+    /// <summary>Installed fonts hash (for web).</summary>
+    [JsonPropertyName("fontsHash")]
+    public string? FontsHash { get; set; }
+
+    /// <summary>iOS Vendor ID or Android ID.</summary>
+    [JsonPropertyName("vendorId")]
+    public string? VendorId { get; set; }
+
+    /// <summary>App version.</summary>
+    [JsonPropertyName("appVersion")]
+    public string? AppVersion { get; set; }
+
+    /// <summary>App build number.</summary>
+    [JsonPropertyName("appBuild")]
+    public string? AppBuild { get; set; }
+
+    /// <summary>Whether device is jailbroken/rooted.</summary>
+    [JsonPropertyName("isCompromised")]
+    public bool? IsCompromised { get; set; }
+
+    /// <summary>Whether running in emulator/simulator.</summary>
+    [JsonPropertyName("isEmulator")]
+    public bool? IsEmulator { get; set; }
+
     [JsonPropertyName("version")]
     public int? Version { get; set; }
 
@@ -579,6 +672,27 @@ public sealed class WebSocketMessage
     /// <summary>Error description.</summary>
     [JsonPropertyName("errorDescription")]
     public string? ErrorDescription { get; set; }
+
+    // Device verification response fields
+    /// <summary>Whether the device is recognized.</summary>
+    [JsonPropertyName("isKnownDevice")]
+    public bool? IsKnownDevice { get; set; }
+
+    /// <summary>Whether the device is trusted.</summary>
+    [JsonPropertyName("isTrustedDevice")]
+    public bool? IsTrustedDevice { get; set; }
+
+    /// <summary>Whether additional verification is required.</summary>
+    [JsonPropertyName("requiresVerification")]
+    public bool? RequiresVerification { get; set; }
+
+    /// <summary>Device risk score (0-100).</summary>
+    [JsonPropertyName("riskScore")]
+    public int? RiskScore { get; set; }
+
+    /// <summary>Registered device ID.</summary>
+    [JsonPropertyName("registeredDeviceId")]
+    public string? RegisteredDeviceId { get; set; }
 
     [JsonPropertyName("stats")]
     public Dictionary<string, int[]>? Stats { get; set; }
