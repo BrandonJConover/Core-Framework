@@ -219,6 +219,76 @@ public static partial class SecurityUtils
 
     #endregion
 
+    #region Path and Identifier Validation
+
+    /// <summary>
+    /// Validates a file path to prevent path traversal attacks.
+    /// Ensures the resolved path is within the allowed base directory.
+    /// </summary>
+    /// <param name="basePath">The allowed base directory</param>
+    /// <param name="filePath">The relative file path to validate</param>
+    /// <returns>The validated canonical path</returns>
+    /// <exception cref="IOException">If path traversal is detected</exception>
+    public static string ValidatePath(string basePath, string filePath)
+    {
+        var baseDir = Path.GetFullPath(basePath);
+        var targetPath = Path.GetFullPath(Path.Combine(baseDir, filePath));
+
+        if (!targetPath.StartsWith(baseDir, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new IOException($"Path traversal attempt detected: {filePath}");
+        }
+
+        return targetPath;
+    }
+
+    /// <summary>
+    /// Validates and sanitizes a SQL identifier (table name, column name, prefix).
+    /// Only allows alphanumeric characters and underscores.
+    /// </summary>
+    /// <param name="identifier">The identifier to validate</param>
+    /// <returns>The validated identifier</returns>
+    /// <exception cref="ArgumentException">If the identifier is invalid</exception>
+    public static string ValidateSqlIdentifier(string identifier)
+    {
+        if (string.IsNullOrEmpty(identifier))
+        {
+            return string.Empty;
+        }
+
+        if (identifier.Length > 64)
+        {
+            throw new ArgumentException("Identifier too long: max 64 characters");
+        }
+
+        if (!SqlIdentifierRegex().IsMatch(identifier))
+        {
+            throw new ArgumentException($"Invalid SQL identifier: {identifier}. Only alphanumeric characters and underscores are allowed.");
+        }
+
+        return identifier;
+    }
+
+    /// <summary>
+    /// Safely validates a table prefix for use in SQL queries.
+    /// </summary>
+    public static string SafeTablePrefix(string prefix)
+    {
+        if (string.IsNullOrEmpty(prefix))
+        {
+            return string.Empty;
+        }
+
+        var basePrefix = prefix.EndsWith("_") ? prefix[..^1] : prefix;
+        ValidateSqlIdentifier(basePrefix);
+        return prefix;
+    }
+
+    [GeneratedRegex("^[a-zA-Z_][a-zA-Z0-9_]*$")]
+    private static partial Regex SqlIdentifierRegex();
+
+    #endregion
+
     #region Rate Limiting Helpers
 
     /// <summary>

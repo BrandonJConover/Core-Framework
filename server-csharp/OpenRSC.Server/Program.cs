@@ -3,28 +3,32 @@ using Microsoft.Extensions.Hosting;
 using OpenRSC.Server.Configuration;
 using OpenRSC.Server.Database;
 using OpenRSC.Server.Events;
+using OpenRSC.Server.Infrastructure;
+using OpenRSC.Server.Infrastructure.Configuration;
+using OpenRSC.Server.Infrastructure.Http;
+using OpenRSC.Server.Infrastructure.Observability;
 using OpenRSC.Server.Network;
 using OpenRSC.Server.Services;
 using Serilog;
 
-// Configure Serilog
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .WriteTo.Console(
-        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-    .WriteTo.File("logs/server-.log",
-        rollingInterval: RollingInterval.Day,
-        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
-    .CreateLogger();
-
 try
 {
-    Log.Information("Starting OpenRSC Server...");
+    // Create web application builder (for Kestrel support)
+    var builder = WebApplication.CreateBuilder(args);
 
-    var builder = Host.CreateApplicationBuilder(args);
+    // Add Azure App Configuration (must be done early for configuration refresh)
+    var azureAppConfigSettings = new AzureAppConfigurationSettings();
+    builder.Configuration.GetSection(AzureAppConfigurationSettings.SectionName).Bind(azureAppConfigSettings);
 
-    // Configure services
-    builder.Services.AddSerilog();
+    if (azureAppConfigSettings.Enabled)
+    {
+        builder.Configuration.AddAzureAppConfiguration(azureAppConfigSettings);
+    }
+
+    // Add all modern infrastructure services (Serilog, serialization, QUIC, service discovery, etc.)
+    builder.AddInfrastructureServices();
+
+    Log.Information("Starting OpenRSC Server with modern infrastructure...");
 
     // Bind configuration sections
     builder.Services.Configure<ServerSettings>(
@@ -35,6 +39,18 @@ try
         builder.Configuration.GetSection(ActionRetrySettings.SectionName));
     builder.Services.Configure<DatabaseSettings>(
         builder.Configuration.GetSection(DatabaseSettings.SectionName));
+    builder.Services.Configure<SecuritySettings>(
+        builder.Configuration.GetSection(SecuritySettings.SectionName));
+    builder.Services.Configure<OAuthSettings>(
+        builder.Configuration.GetSection(OAuthSettings.SectionName));
+    builder.Services.Configure<AuthTokenSettings>(
+        builder.Configuration.GetSection(AuthTokenSettings.SectionName));
+    builder.Services.Configure<RedisSettings>(
+        builder.Configuration.GetSection(RedisSettings.SectionName));
+    builder.Services.Configure<DDoSProtectionSettings>(
+        builder.Configuration.GetSection(DDoSProtectionSettings.SectionName));
+    builder.Services.Configure<DeviceSettings>(
+        builder.Configuration.GetSection(DeviceSettings.SectionName));
 
     // Register core services
     builder.Services.AddSingleton<IWorldService, WorldService>();
@@ -52,22 +68,55 @@ try
     builder.Services.AddHostedService<WebSocketServer>(); // WebSocket support for web/mobile clients
     builder.Services.AddHostedService<GameServerHost>();
 
-    // Build and run
-    var host = builder.Build();
+    // Build the application
+    var app = builder.Build();
+
+    // Configure the HTTP pipeline with infrastructure middleware
+    app.UseInfrastructure();
 
     // Initialize packet handlers
-    var packetDispatcher = host.Services.GetRequiredService<PacketDispatcher>();
+    var packetDispatcher = app.Services.GetRequiredService<PacketDispatcher>();
     packetDispatcher.RegisterHandlers(typeof(Program).Assembly);
 
-    Log.Information("Server initialized - TCP port {TcpPort}, WebSocket port {WsPort}",
-        host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ServerSettings>>().Value.ServerPort,
-        host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ServerSettings>>().Value.WebSocketPort);
+    // Log startup information
+    var serverSettings = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ServerSettings>>().Value;
+    var httpSettings = new HttpServerSettings();
+    app.Configuration.GetSection(HttpServerSettings.SectionName).Bind(httpSettings);
 
-    await host.RunAsync();
+    Log.Information("Server initialized:");
+    Log.Information("  - Game TCP port: {TcpPort}", serverSettings.ServerPort);
+    Log.Information("  - WebSocket port: {WsPort}", serverSettings.WebSocketPort);
+
+    if (httpSettings.Enabled)
+    {
+        Log.Information("  - HTTP API port: {HttpPort}", httpSettings.HttpPort);
+        if (httpSettings.EnableHttps)
+        {
+            Log.Information("  - HTTPS API port: {HttpsPort} (HTTP/2, HTTP/3 enabled)", httpSettings.HttpsPort);
+        }
+    }
+
+    var otelSettings = new OpenTelemetrySettings();
+    app.Configuration.GetSection(OpenTelemetrySettings.SectionName).Bind(otelSettings);
+    if (otelSettings.Enabled)
+    {
+        Log.Information("  - OpenTelemetry: Enabled (OTLP endpoint: {Endpoint})", otelSettings.OtlpEndpoint);
+    }
+
+    var prometheusSettings = new PrometheusSettings();
+    app.Configuration.GetSection(PrometheusSettings.SectionName).Bind(prometheusSettings);
+    if (prometheusSettings.Enabled)
+    {
+        Log.Information("  - Prometheus metrics: {Endpoint}", prometheusSettings.Endpoint);
+    }
+
+    // Run the application
+    await app.RunAsync();
 }
 catch (Exception ex)
 {
     Log.Fatal(ex, "Server terminated unexpectedly");
+    throw;
 }
 finally
 {
