@@ -111,6 +111,31 @@ public sealed class ServerSettings
     /// Heartbeat interval in milliseconds.
     /// </summary>
     public int HeartbeatIntervalMs { get; set; } = 30000;
+
+    /// <summary>
+    /// Allowed origins for WebSocket CORS (comma-separated, or * for all).
+    /// </summary>
+    public string WebSocketAllowedOrigins { get; set; } = "*";
+
+    /// <summary>
+    /// Maximum WebSocket message size in bytes (default 64KB).
+    /// </summary>
+    public int WebSocketMaxMessageSize { get; set; } = 65536;
+
+    /// <summary>
+    /// WebSocket connection timeout in seconds.
+    /// </summary>
+    public int WebSocketConnectionTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Maximum WebSocket connections per IP address.
+    /// </summary>
+    public int WebSocketMaxConnectionsPerIp { get; set; } = 5;
+
+    /// <summary>
+    /// Enable WebSocket Secure (WSS) - requires TLS certificate.
+    /// </summary>
+    public bool EnableSecureWebSockets { get; set; }
 }
 
 /// <summary>

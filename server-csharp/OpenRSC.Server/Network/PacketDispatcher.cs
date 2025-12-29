@@ -7,10 +7,10 @@ namespace OpenRSC.Server.Network;
 /// Dispatches incoming packets to registered handlers.
 /// Uses reflection to discover handlers at startup for clean architecture.
 /// </summary>
-public sealed class PacketDispatcher : IPacketHandler
+public sealed class PacketDispatcher
 {
     private readonly ILogger<PacketDispatcher> _logger;
-    private readonly Dictionary<OpcodeIn, Func<GameClient, Packet, Task>> _handlers = new();
+    private readonly Dictionary<OpcodeIn, Func<IGameClient, Packet, Task>> _handlers = new();
     private readonly IServiceProvider _serviceProvider;
 
     public PacketDispatcher(
@@ -64,7 +64,7 @@ public sealed class PacketDispatcher : IPacketHandler
         }
     }
 
-    private static Func<GameClient, Packet, Task> CreateHandler(object instance, MethodInfo method)
+    private static Func<IGameClient, Packet, Task> CreateHandler(object instance, MethodInfo method)
     {
         return (client, packet) =>
         {
@@ -76,12 +76,15 @@ public sealed class PacketDispatcher : IPacketHandler
     /// <summary>
     /// Registers a handler delegate directly.
     /// </summary>
-    public void RegisterHandler(OpcodeIn opcode, Func<GameClient, Packet, Task> handler)
+    public void RegisterHandler(OpcodeIn opcode, Func<IGameClient, Packet, Task> handler)
     {
         _handlers[opcode] = handler;
     }
 
-    public async Task HandlePacketAsync(GameClient client, Packet packet)
+    /// <summary>
+    /// Handles an incoming packet from a client.
+    /// </summary>
+    public async Task HandlePacketAsync(IGameClient client, Packet packet)
     {
         var opcode = (OpcodeIn)packet.Opcode;
 
