@@ -13,7 +13,7 @@ import java.util.*;
  * MessagePack serialization adapter for game packets.
  * Provides compact binary serialization with cross-platform support.
  */
-public class MessagePackSerializer {
+public class MessagePackSerializer implements ISerializer {
     private static final Logger LOGGER = LogManager.getLogger(MessagePackSerializer.class);
 
     private static final byte MSGPACK_MAGIC = (byte) 0xC1;
@@ -199,4 +199,52 @@ public class MessagePackSerializer {
      * Game packet record.
      */
     public record GamePacket(int opcode, byte[] payload) {}
+
+    // ISerializer interface implementation
+
+    @Override
+    public SerializationFormat getFormat() {
+        return SerializationFormat.MESSAGE_PACK;
+    }
+
+    @Override
+    public <T> byte[] serialize(T obj, Class<T> type) {
+        try {
+            return serialize(obj);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to serialize object of type " + type.getSimpleName(), e);
+        }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T deserialize(byte[] data, Class<T> type) {
+        try {
+            if (type == Map.class) {
+                return (T) deserialize(data);
+            }
+            // For other types, deserialize to map and convert
+            Map<String, Object> map = deserialize(data);
+            return convertMapToType(map, type);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to deserialize to type " + type.getSimpleName(), e);
+        }
+    }
+
+    @Override
+    public boolean canSerialize(Class<?> type) {
+        // MessagePack can serialize most common types
+        return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T convertMapToType(Map<String, Object> map, Class<T> type) {
+        // Simple conversion - in production, use a proper object mapper
+        if (type == Map.class) {
+            return (T) map;
+        }
+        // For records and POJOs, would need reflection or code generation
+        throw new UnsupportedOperationException(
+            "Direct deserialization to " + type.getSimpleName() + " not supported. Use Map.class instead.");
+    }
 }
