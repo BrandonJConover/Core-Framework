@@ -48,36 +48,27 @@ public class NpcBehavior {
 			&& npc.getLoc().startX() >= 208 && npc.getLoc().startX() <= 211
 			&& npc.getLoc().startY() >= 545 && npc.getLoc().startY() <= 546;
 
-		switch (NpcId.getById(npc.getID())) {
-			case BANDIT_AGGRESSIVE:
-				aggroRadius = 2;
-				break;
-			case BLACK_KNIGHT:
-				aggroRadius = 10;
-				break;
-			case UNDEADONE:
-				aggroRadius = 3;
-				break;
-			default:
-				aggroRadius = npc.getWorld().getServer().getConfig().AGGRO_RANGE;
-		}
+		aggroRadius = switch (NpcId.getById(npc.getID())) {
+			case BANDIT_AGGRESSIVE -> 2;
+			case BLACK_KNIGHT -> 10;
+			case UNDEADONE -> 3;
+			default -> npc.getWorld().getServer().getConfig().AGGRO_RANGE;
+		};
 	}
 
 	public void tick() {
-		if (state == State.ROAM) {
-			handleRoam();
-		} else if (state == State.AGGRO) {
-			handleAggro();
-		} else if (state == State.COMBAT) {
-			handleCombat();
-		} else if (state == State.TACKLE) {
-			handleTackle();
-		} else if (state == State.RETREAT || state == State.TACKLE_RETREAT) {
-			//NPCs only stop "retreating" after ~10 seconds authentically, even if their path is finished.
-			//We can also cast and range at retreating enemies without them responding, so we need to clear that so they respond appropriately.
-			if (npc.finishedPath() && checkCombatTimer(npc.getCombatTimer(), 15 * tickFactor)) {
-				npc.setLastCombatState(CombatState.WAITING);
-				setRoaming();
+		switch (state) {
+			case ROAM -> handleRoam();
+			case AGGRO -> handleAggro();
+			case COMBAT -> handleCombat();
+			case TACKLE -> handleTackle();
+			case RETREAT, TACKLE_RETREAT -> {
+				//NPCs only stop "retreating" after ~10 seconds authentically, even if their path is finished.
+				//We can also cast and range at retreating enemies without them responding, so we need to clear that so they respond appropriately.
+				if (npc.finishedPath() && checkCombatTimer(npc.getCombatTimer(), 15 * tickFactor)) {
+					npc.setLastCombatState(CombatState.WAITING);
+					setRoaming();
+				}
 			}
 		}
 	}
@@ -222,13 +213,13 @@ public class NpcBehavior {
 			if (checkedPoint.withinRange(target.getLocation(), 1)
 				&& PathValidation.checkAdjacentDistance(npc.getWorld(), checkedPoint, target.getLocation(), true, false)
 				&& !target.inCombat()) {
-				if (target.isPlayer() && EnchantedCrowns.shouldActivate((Player)target, ItemId.CROWN_OF_MIMICRY)
-					&& ((Player)target).getBatch() != null && !((Player)target).getBatch().isComplete()) {
-					((Player)target).playerServerMessage(MessageType.QUEST, "Your crown shines and you dodge an attack!");
+				if (target instanceof Player targetPlayer && EnchantedCrowns.shouldActivate(targetPlayer, ItemId.CROWN_OF_MIMICRY)
+					&& targetPlayer.getBatch() != null && !targetPlayer.getBatch().isComplete()) {
+					targetPlayer.playerServerMessage(MessageType.QUEST, "Your crown shines and you dodge an attack!");
 					npc.setLastCombatState(CombatState.RUNNING);
 					target.setCombatTimer(target.getConfig().GAME_TICK * 5);
 					walk_retreat(-3);
-					EnchantedCrowns.useCharge(((Player)target), ItemId.CROWN_OF_MIMICRY);
+					EnchantedCrowns.useCharge(targetPlayer, ItemId.CROWN_OF_MIMICRY);
 				} else {
 					setFighting(target);
 				}
@@ -266,13 +257,11 @@ public class NpcBehavior {
 
 			// If there is a valid target and NPC is aggressive, set AGGRO and target.
 			if (canAggro(target) && target == npc.getLastOpponent()) {
-				if (target.isPlayer()) {
-					setChasing((Player)target);
+				if (target instanceof Player player) {
+					setChasing(player);
+				} else if (target instanceof Npc npcTarget) {
+					setChasing(npcTarget);
 				}
-				else {
-					setChasing((Npc)target);
-				}
-
 			// Otherwise, set roaming if NPC is not already following something
 			} else {
 				if (!npc.isFollowing())	setRoaming();
@@ -290,8 +279,8 @@ public class NpcBehavior {
 			|| target.getY() < (npc.getLoc().minY() - 4) || target.getY() > (npc.getLoc().maxY() + 4)) {
 			setRoaming();
 		}
-		if (target.isPlayer()) {
-			attemptTackle(npc, (Player) target);
+		if (target instanceof Player player) {
+			attemptTackle(npc, player);
 			tackle_retreat();
 		}
 	}
@@ -337,8 +326,7 @@ public class NpcBehavior {
 		opponent.setLastOpponent(npc);
 		npc.setLastOpponent(opponent);
 		npc.setCombatTimer();
-		if (opponent.isPlayer()) {
-			Player victimPlayer = ((Player) opponent);
+		if (opponent instanceof Player victimPlayer) {
 			victimPlayer.resetAll();
 			victimPlayer.message("Your opponent is retreating");
 			ActionSender.sendSound(victimPlayer, "retreat");
@@ -389,9 +377,7 @@ public class NpcBehavior {
 
 		boolean targetInCombat = target.inCombat();
 
-		boolean isPlayer = target instanceof Player;
-
-		boolean lastLogin = isPlayer && checkCombatTimer(((Player)target).getLastLogin(), 5);
+		boolean lastLogin = target instanceof Player player && checkCombatTimer(player.getLastLogin(), 5);
 
 		int numTicks = target.getCombatState() == CombatState.RUNNING ? 5 : (int)(Math.ceil(640.0 / target.getConfig().GAME_TICK) - 1);
 
@@ -399,8 +385,8 @@ public class NpcBehavior {
 
 		boolean isAggressive = aggressiveCheck(target);
 
-		boolean impervious = isPlayer
-			&& (((Player) target).isInvulnerableTo(npc) || ((Player) target).isInvisibleTo(npc));
+		boolean impervious = target instanceof Player p
+			&& (p.isInvulnerableTo(npc) || p.isInvisibleTo(npc));
 
 		return isAggressive
 			&& !impervious
@@ -434,15 +420,11 @@ public class NpcBehavior {
 	}
 
 	Player getChasedPlayer() {
-		if (target != null && target.isPlayer())
-			return (Player) target;
-		return null;
+		return target instanceof Player player ? player : null;
 	}
 
 	Npc getChasedNpc() {
-		if (target != null && target.isNpc())
-			return (Npc) target;
-		return null;
+		return target instanceof Npc npcTarget ? npcTarget : null;
 	}
 
 	// Returns true if appropriate tick count has passed.
