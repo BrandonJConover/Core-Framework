@@ -250,6 +250,137 @@ public sealed class SecuritySettings
 }
 
 /// <summary>
+/// OAuth and external authentication settings.
+/// </summary>
+public sealed class OAuthSettings
+{
+    public const string SectionName = "OAuth";
+
+    /// <summary>
+    /// Enable OAuth authentication.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Enable Google Sign-In.
+    /// </summary>
+    public bool EnableGoogle { get; set; } = true;
+
+    /// <summary>
+    /// Google OAuth Client ID.
+    /// </summary>
+    public string GoogleClientId { get; set; } = "";
+
+    /// <summary>
+    /// Google OAuth Client Secret.
+    /// </summary>
+    public string GoogleClientSecret { get; set; } = "";
+
+    /// <summary>
+    /// Enable Apple Sign-In.
+    /// </summary>
+    public bool EnableApple { get; set; } = false;
+
+    /// <summary>
+    /// Apple Services ID.
+    /// </summary>
+    public string AppleServicesId { get; set; } = "";
+
+    /// <summary>
+    /// Apple Team ID.
+    /// </summary>
+    public string AppleTeamId { get; set; } = "";
+
+    /// <summary>
+    /// Apple Key ID.
+    /// </summary>
+    public string AppleKeyId { get; set; } = "";
+
+    /// <summary>
+    /// Path to Apple private key file.
+    /// </summary>
+    public string ApplePrivateKeyPath { get; set; } = "";
+
+    /// <summary>
+    /// Enable Discord login.
+    /// </summary>
+    public bool EnableDiscord { get; set; } = false;
+
+    /// <summary>
+    /// Discord OAuth Client ID.
+    /// </summary>
+    public string DiscordClientId { get; set; } = "";
+
+    /// <summary>
+    /// Discord OAuth Client Secret.
+    /// </summary>
+    public string DiscordClientSecret { get; set; } = "";
+
+    /// <summary>
+    /// OAuth callback URL base (e.g., https://game.example.com/auth).
+    /// </summary>
+    public string CallbackUrlBase { get; set; } = "";
+
+    /// <summary>
+    /// Allow account linking (connect OAuth to existing username/password account).
+    /// </summary>
+    public bool AllowAccountLinking { get; set; } = true;
+
+    /// <summary>
+    /// Require email verification for new OAuth accounts.
+    /// </summary>
+    public bool RequireEmailVerification { get; set; } = false;
+
+    /// <summary>
+    /// Auto-generate username from OAuth profile if not provided.
+    /// </summary>
+    public bool AutoGenerateUsername { get; set; } = true;
+}
+
+/// <summary>
+/// Authentication token settings for mobile/keychain support.
+/// </summary>
+public sealed class AuthTokenSettings
+{
+    public const string SectionName = "AuthToken";
+
+    /// <summary>
+    /// Enable refresh tokens for persistent login.
+    /// </summary>
+    public bool EnableRefreshTokens { get; set; } = true;
+
+    /// <summary>
+    /// Access token lifetime in minutes.
+    /// </summary>
+    public int AccessTokenLifetimeMinutes { get; set; } = 60;
+
+    /// <summary>
+    /// Refresh token lifetime in days.
+    /// </summary>
+    public int RefreshTokenLifetimeDays { get; set; } = 30;
+
+    /// <summary>
+    /// Maximum refresh tokens per user (revokes oldest when exceeded).
+    /// </summary>
+    public int MaxRefreshTokensPerUser { get; set; } = 5;
+
+    /// <summary>
+    /// Rotate refresh token on use (more secure, but breaks concurrent sessions).
+    /// </summary>
+    public bool RotateRefreshTokens { get; set; } = true;
+
+    /// <summary>
+    /// Revoke all tokens on password change.
+    /// </summary>
+    public bool RevokeTokensOnPasswordChange { get; set; } = true;
+
+    /// <summary>
+    /// Bind refresh tokens to device fingerprint.
+    /// </summary>
+    public bool BindToDevice { get; set; } = false;
+}
+
+/// <summary>
 /// Combat-related settings.
 /// </summary>
 public sealed class CombatSettings

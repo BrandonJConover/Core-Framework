@@ -488,12 +488,43 @@ public sealed class WebSocketMessage
     [JsonPropertyName("op")]
     public int Op { get; set; }
 
-    // Input fields
+    // Authentication fields
     [JsonPropertyName("username")]
     public string? Username { get; set; }
 
     [JsonPropertyName("password")]
     public string? Password { get; set; }
+
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    /// <summary>Authentication method: "password", "token", "google", "apple", "discord".</summary>
+    [JsonPropertyName("authMethod")]
+    public string? AuthMethod { get; set; }
+
+    /// <summary>OAuth ID token (for Google/Apple Sign-In from mobile).</summary>
+    [JsonPropertyName("idToken")]
+    public string? IdToken { get; set; }
+
+    /// <summary>OAuth authorization code (for web OAuth flow).</summary>
+    [JsonPropertyName("authCode")]
+    public string? AuthCode { get; set; }
+
+    /// <summary>Refresh token for persistent login.</summary>
+    [JsonPropertyName("refreshToken")]
+    public string? RefreshToken { get; set; }
+
+    /// <summary>Device ID for token binding (from keychain).</summary>
+    [JsonPropertyName("deviceId")]
+    public string? DeviceId { get; set; }
+
+    /// <summary>Device name for session display.</summary>
+    [JsonPropertyName("deviceName")]
+    public string? DeviceName { get; set; }
+
+    /// <summary>Platform: "ios", "android", "web".</summary>
+    [JsonPropertyName("platform")]
+    public string? Platform { get; set; }
 
     [JsonPropertyName("version")]
     public int? Version { get; set; }
@@ -528,6 +559,26 @@ public sealed class WebSocketMessage
     // Output fields
     [JsonPropertyName("loginResult")]
     public int? LoginResult { get; set; }
+
+    /// <summary>Access token for subsequent requests.</summary>
+    [JsonPropertyName("accessToken")]
+    public string? AccessToken { get; set; }
+
+    /// <summary>New refresh token (when rotated).</summary>
+    [JsonPropertyName("newRefreshToken")]
+    public string? NewRefreshToken { get; set; }
+
+    /// <summary>Token expiration in seconds.</summary>
+    [JsonPropertyName("expiresIn")]
+    public int? ExpiresIn { get; set; }
+
+    /// <summary>Error message for failed operations.</summary>
+    [JsonPropertyName("error")]
+    public string? Error { get; set; }
+
+    /// <summary>Error description.</summary>
+    [JsonPropertyName("errorDescription")]
+    public string? ErrorDescription { get; set; }
 
     [JsonPropertyName("stats")]
     public Dictionary<string, int[]>? Stats { get; set; }
