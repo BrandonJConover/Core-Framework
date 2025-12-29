@@ -155,6 +155,7 @@ public sealed class PlayerBank
     public Container Container => _container;
     public int UsedSlots => _container.UsedSlots;
     public int FreeSlots => _container.FreeSlots;
+    public int MaxSize => MaxSlots;
 
     public PlayerBank(Player player)
     {
@@ -214,4 +215,30 @@ public sealed class PlayerBank
     /// Gets all banked items.
     /// </summary>
     public IEnumerable<Item> GetItems() => _container.GetItems();
+
+    /// <summary>
+    /// Finds the slot containing an item by catalog ID.
+    /// </summary>
+    public int FindSlot(int catalogId)
+    {
+        for (var i = 0; i < MaxSlots; i++)
+        {
+            var item = _container.GetSlot(i);
+            if (item?.CatalogId == catalogId)
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Withdraws an item by catalog ID (for presets).
+    /// </summary>
+    public Item? WithdrawByItemId(int catalogId, int amount, PlayerInventory inventory)
+    {
+        var slot = FindSlot(catalogId);
+        if (slot < 0)
+            return null;
+
+        return Withdraw(slot, amount, inventory);
+    }
 }

@@ -311,7 +311,15 @@ public sealed class TradeManager
         player1.Message($"Trading with {player2.Username}.");
         player2.Message($"Trading with {player1.Username}.");
 
-        // TODO: Send trade interface packets
+        // Send trade interface packets
+        _ = player1.ActionSender?.SendTradeOpenAsync(player2);
+        _ = player2.ActionSender?.SendTradeOpenAsync(player1);
+
+        // Send empty initial offers
+        _ = player1.ActionSender?.SendTradeOwnOfferAsync(Array.Empty<Items.Item>());
+        _ = player1.ActionSender?.SendTradeOtherOfferAsync(Array.Empty<Items.Item>());
+        _ = player2.ActionSender?.SendTradeOwnOfferAsync(Array.Empty<Items.Item>());
+        _ = player2.ActionSender?.SendTradeOtherOfferAsync(Array.Empty<Items.Item>());
 
         return TradeResult.Success;
     }
@@ -338,6 +346,10 @@ public sealed class TradeManager
         _activeTrades.Remove(partner);
 
         session.Decline(player);
+
+        // Close trade interface for both players
+        _ = player.ActionSender?.SendTradeCloseAsync();
+        _ = partner.ActionSender?.SendTradeCloseAsync();
     }
 
     /// <summary>

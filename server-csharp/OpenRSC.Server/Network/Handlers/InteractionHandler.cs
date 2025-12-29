@@ -232,14 +232,16 @@ public sealed class ObjectInteractionHandler : IPacketHandler
     private const int OpBoundaryAction2 = 127;
 
     private readonly ILogger<ObjectInteractionHandler> _logger;
-    private readonly WorldService _worldService;
+    private readonly ObjectInteractionService _objectInteractionService;
 
     public int[] Opcodes => new[] { OpObjectAction1, OpObjectAction2, OpBoundaryAction1, OpBoundaryAction2 };
 
-    public ObjectInteractionHandler(ILogger<ObjectInteractionHandler> logger, WorldService worldService)
+    public ObjectInteractionHandler(
+        ILogger<ObjectInteractionHandler> logger,
+        ObjectInteractionService objectInteractionService)
     {
         _logger = logger;
-        _worldService = worldService;
+        _objectInteractionService = objectInteractionService;
     }
 
     public async Task HandleAsync(GameClient client, Packet packet)
@@ -262,29 +264,15 @@ public sealed class ObjectInteractionHandler : IPacketHandler
             isSecondAction ? 2 : 1);
 
         // Create walk-to-object action
-        var gameObject = new GameObject(0, location); // TODO: Look up actual object
+        var gameObject = new GameObject(0, location); // Placeholder for walk distance
         var action = new WalkToObjectAction(player, gameObject)
         {
-            ExecuteAction = () => HandleObjectAction(player, location, isBoundary, isSecondAction)
+            ExecuteAction = async () => await _objectInteractionService.HandleObjectInteractionAsync(
+                player, location, isBoundary, isSecondAction)
         };
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
-    }
-
-    private void HandleObjectAction(Player player, Point location, bool isBoundary, bool isSecondAction)
-    {
-        // TODO: Look up object definition and execute appropriate action
-        if (isBoundary)
-        {
-            // Door/gate interactions
-            player.Message("The door is locked.");
-        }
-        else
-        {
-            // Regular object interactions
-            player.Message("Nothing interesting happens.");
-        }
     }
 }
 

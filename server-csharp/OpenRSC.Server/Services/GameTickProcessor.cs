@@ -113,6 +113,15 @@ public sealed class GameTickProcessor
         {
             ProcessPlayerCombat(player);
         }
+
+        // Process prayer drain (every tick while prayers are active)
+        player.Prayers?.ProcessDrain();
+
+        // Process fatigue recovery if not in combat
+        if (!player.InCombat)
+        {
+            player.Fatigue?.ProcessRecovery();
+        }
     }
 
     /// <summary>
