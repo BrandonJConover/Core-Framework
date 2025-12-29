@@ -173,7 +173,7 @@ public sealed class BankPresetManager
         // Withdraw preset items
         foreach (var presetItem in preset.InventoryItems)
         {
-            var item = _player.Bank.Withdraw(presetItem.ItemId, presetItem.Amount);
+            var item = _player.Bank.WithdrawByItemId(presetItem.ItemId, presetItem.Amount, _player.Inventory);
             if (item is not null)
             {
                 _player.Inventory.Add(item);
@@ -183,7 +183,7 @@ public sealed class BankPresetManager
         // Withdraw and equip preset equipment
         foreach (var presetEquip in preset.EquipmentItems)
         {
-            var item = _player.Bank.Withdraw(presetEquip.ItemId, 1);
+            var item = _player.Bank.WithdrawByItemId(presetEquip.ItemId, 1, _player.Inventory);
             if (item is not null)
             {
                 _player.Equipment.Equip(item, _player.Inventory);

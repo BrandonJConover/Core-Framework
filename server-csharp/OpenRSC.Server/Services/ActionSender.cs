@@ -335,4 +335,101 @@ public sealed class ActionSender
         if (!_client.IsConnected) return;
         await _client.SendAsync(packet);
     }
+
+    /// <summary>
+    /// Opens the trade interface with a partner.
+    /// </summary>
+    public async Task SendTradeOpenAsync(Player partner)
+    {
+        if (!_client.IsConnected) return;
+
+        using var packet = new Packet((byte)OpcodeOut.TradeOpen);
+        packet.WriteShort((short)partner.Index);
+
+        await _client.SendAsync(packet);
+    }
+
+    /// <summary>
+    /// Sends the player's own trade offer.
+    /// </summary>
+    public async Task SendTradeOwnOfferAsync(IEnumerable<Items.Item> items)
+    {
+        if (!_client.IsConnected) return;
+
+        using var packet = new Packet((byte)OpcodeOut.TradeOwnOffer);
+
+        var itemList = items.ToList();
+        packet.WriteByte((byte)itemList.Count);
+
+        foreach (var item in itemList)
+        {
+            packet.WriteShort((short)item.CatalogId);
+            packet.WriteInt(item.Amount);
+        }
+
+        await _client.SendAsync(packet);
+    }
+
+    /// <summary>
+    /// Sends the partner's trade offer.
+    /// </summary>
+    public async Task SendTradeOtherOfferAsync(IEnumerable<Items.Item> items)
+    {
+        if (!_client.IsConnected) return;
+
+        using var packet = new Packet((byte)OpcodeOut.TradeOtherOffer);
+
+        var itemList = items.ToList();
+        packet.WriteByte((byte)itemList.Count);
+
+        foreach (var item in itemList)
+        {
+            packet.WriteShort((short)item.CatalogId);
+            packet.WriteInt(item.Amount);
+        }
+
+        await _client.SendAsync(packet);
+    }
+
+    /// <summary>
+    /// Sends the trade confirmation screen.
+    /// </summary>
+    public async Task SendTradeConfirmationAsync(Player partner, IEnumerable<Items.Item> ourOffer, IEnumerable<Items.Item> theirOffer)
+    {
+        if (!_client.IsConnected) return;
+
+        using var packet = new Packet((byte)OpcodeOut.TradeConfirmation);
+        packet.WriteLong(partner.UsernameHash);
+
+        // Our offer
+        var ourItems = ourOffer.ToList();
+        packet.WriteByte((byte)ourItems.Count);
+        foreach (var item in ourItems)
+        {
+            packet.WriteShort((short)item.CatalogId);
+            packet.WriteInt(item.Amount);
+        }
+
+        // Their offer
+        var theirItems = theirOffer.ToList();
+        packet.WriteByte((byte)theirItems.Count);
+        foreach (var item in theirItems)
+        {
+            packet.WriteShort((short)item.CatalogId);
+            packet.WriteInt(item.Amount);
+        }
+
+        await _client.SendAsync(packet);
+    }
+
+    /// <summary>
+    /// Closes the trade interface.
+    /// </summary>
+    public async Task SendTradeCloseAsync()
+    {
+        if (!_client.IsConnected) return;
+
+        using var packet = new Packet((byte)OpcodeOut.TradeClose);
+        await _client.SendAsync(packet);
+    }
 }
