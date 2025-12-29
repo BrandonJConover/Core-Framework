@@ -30,12 +30,12 @@ public sealed class NetworkServer : BackgroundService
     /// <summary>
     /// Event raised when a client connects.
     /// </summary>
-    public event Func<GameClient, Task>? ClientConnected;
+    public event Func<IGameClient, Task>? ClientConnected;
 
     /// <summary>
     /// Event raised when a client disconnects.
     /// </summary>
-    public event Func<GameClient, Task>? ClientDisconnected;
+    public event Func<IGameClient, Task>? ClientDisconnected;
 
     public NetworkServer(
         ILogger<NetworkServer> logger,
@@ -119,9 +119,12 @@ public sealed class NetworkServer : BackgroundService
         await client.StartReceivingAsync();
     }
 
-    private async Task OnClientDisconnectedAsync(GameClient client)
+    private async Task OnClientDisconnectedAsync(IGameClient client)
     {
-        _clients.TryRemove(client.Id, out _);
+        if (client is GameClient gameClient)
+        {
+            _clients.TryRemove(gameClient.Id, out _);
+        }
         _logger.LogInformation("Client disconnected: {Id}", client.Id);
 
         if (ClientDisconnected != null)

@@ -45,18 +45,23 @@ try
     builder.Services.AddSingleton<IPlayerRepository, MySqlPlayerRepository>();
 
     // Register network services
-    builder.Services.AddSingleton<IPacketHandler, PacketDispatcher>();
+    builder.Services.AddSingleton<PacketDispatcher>();
 
     // Register hosted services (order matters - network before game loop)
     builder.Services.AddHostedService<NetworkServer>();
+    builder.Services.AddHostedService<WebSocketServer>(); // WebSocket support for web/mobile clients
     builder.Services.AddHostedService<GameServerHost>();
 
     // Build and run
     var host = builder.Build();
 
     // Initialize packet handlers
-    var packetDispatcher = host.Services.GetRequiredService<IPacketHandler>() as PacketDispatcher;
-    packetDispatcher?.RegisterHandlers(typeof(Program).Assembly);
+    var packetDispatcher = host.Services.GetRequiredService<PacketDispatcher>();
+    packetDispatcher.RegisterHandlers(typeof(Program).Assembly);
+
+    Log.Information("Server initialized - TCP port {TcpPort}, WebSocket port {WsPort}",
+        host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ServerSettings>>().Value.ServerPort,
+        host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ServerSettings>>().Value.WebSocketPort);
 
     await host.RunAsync();
 }

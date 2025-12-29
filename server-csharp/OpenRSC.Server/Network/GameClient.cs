@@ -10,7 +10,7 @@ namespace OpenRSC.Server.Network;
 /// Represents a connected game client.
 /// Uses System.IO.Pipelines for high-performance async I/O.
 /// </summary>
-public sealed class GameClient : IAsyncDisposable
+public sealed class GameClient : IGameClient
 {
     private readonly Socket _socket;
     private readonly ILogger<GameClient> _logger;
@@ -20,45 +20,32 @@ public sealed class GameClient : IAsyncDisposable
 
     private bool _disposed;
 
-    /// <summary>
-    /// Unique client ID.
-    /// </summary>
+    /// <inheritdoc />
     public Guid Id { get; } = Guid.NewGuid();
 
-    /// <summary>
-    /// Remote endpoint address.
-    /// </summary>
+    /// <inheritdoc />
     public string RemoteAddress { get; }
 
-    /// <summary>
-    /// The player associated with this client (null if not logged in).
-    /// </summary>
+    /// <inheritdoc />
     public Player? Player { get; set; }
 
-    /// <summary>
-    /// Whether the client is currently connected.
-    /// </summary>
+    /// <inheritdoc />
     public bool IsConnected => _socket.Connected && !_disposed;
 
-    /// <summary>
-    /// Time of connection.
-    /// </summary>
+    /// <inheritdoc />
     public DateTime ConnectedAt { get; } = DateTime.UtcNow;
 
-    /// <summary>
-    /// Last activity timestamp.
-    /// </summary>
+    /// <inheritdoc />
     public DateTime LastActivity { get; private set; } = DateTime.UtcNow;
 
-    /// <summary>
-    /// Event raised when a packet is received.
-    /// </summary>
-    public event Func<GameClient, Packet, Task>? PacketReceived;
+    /// <inheritdoc />
+    public bool IsWebClient => false;
 
-    /// <summary>
-    /// Event raised when the client disconnects.
-    /// </summary>
-    public event Func<GameClient, Task>? Disconnected;
+    /// <inheritdoc />
+    public event Func<IGameClient, Packet, Task>? PacketReceived;
+
+    /// <inheritdoc />
+    public event Func<IGameClient, Task>? Disconnected;
 
     public GameClient(Socket socket, ILogger<GameClient> logger)
     {
