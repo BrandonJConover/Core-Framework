@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenRSC.Server.Configuration;
+using OpenRSC.Server.Security;
 
 namespace OpenRSC.Server.Network;
 
@@ -19,6 +20,7 @@ public sealed class WebSocketServer : BackgroundService
     private readonly ILoggerFactory _loggerFactory;
     private readonly ServerSettings _settings;
     private readonly PacketDispatcher _packetDispatcher;
+    private readonly DDoSProtectionService? _ddosProtection;
 
     private readonly ConcurrentDictionary<Guid, WebSocketClient> _clients = new();
     private readonly ConcurrentDictionary<string, int> _connectionsPerIp = new();
@@ -45,12 +47,14 @@ public sealed class WebSocketServer : BackgroundService
         ILogger<WebSocketServer> logger,
         ILoggerFactory loggerFactory,
         IOptions<ServerSettings> settings,
-        PacketDispatcher packetDispatcher)
+        PacketDispatcher packetDispatcher,
+        DDoSProtectionService? ddosProtection = null)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _settings = settings.Value;
         _packetDispatcher = packetDispatcher;
+        _ddosProtection = ddosProtection;
 
         // Parse allowed origins and trusted proxy IPs
         ParseAllowedOrigins();
@@ -226,6 +230,26 @@ ws.onmessage = (event) => {{
         var remoteIp = GetClientIp(context);
         var origin = context.Request.Headers["Origin"] ?? "";
 
+        // DDoS Protection: Check if IP is allowed to connect
+        if (_ddosProtection is not null)
+        {
+            var ddosCheck = await _ddosProtection.CheckConnectionAsync(remoteIp);
+            if (!ddosCheck.IsAllowed)
+            {
+                _logger.LogWarning("DDoS protection blocked connection from {IP}: {Reason}",
+                    remoteIp, ddosCheck.BlockReason);
+
+                context.Response.StatusCode = ddosCheck.IsBanned ? 403 : 429;
+                if (ddosCheck.RetryAfter.HasValue)
+                {
+                    context.Response.Headers.Add("Retry-After",
+                        ((int)ddosCheck.RetryAfter.Value.TotalSeconds).ToString());
+                }
+                context.Response.Close();
+                return;
+            }
+        }
+
         // Security: Validate origin
         if (!ValidateOrigin(origin))
         {
@@ -292,6 +316,7 @@ ws.onmessage = (event) => {{
         client.Disconnected += async (c) =>
         {
             DecrementConnectionCount(remoteIp);
+            _ddosProtection?.RecordDisconnect(remoteIp);
             await OnClientDisconnectedAsync(c);
         };
 
@@ -407,6 +432,12 @@ ws.onmessage = (event) => {{
     /// Gets all connected WebSocket clients.
     /// </summary>
     public IEnumerable<WebSocketClient> GetClients() => _clients.Values;
+
+    /// <summary>
+    /// Gets DDoS protection statistics.
+    /// </summary>
+    public (long ConnectionsBlocked, long RequestsBlocked, long IpsBanned, int ActiveTrackers, int ActiveBans)? GetProtectionStats()
+        => _ddosProtection?.GetStatistics();
 
     /// <summary>
     /// Broadcasts a packet to all connected WebSocket clients.
