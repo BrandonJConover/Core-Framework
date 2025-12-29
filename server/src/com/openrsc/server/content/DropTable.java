@@ -297,17 +297,11 @@ public class DropTable {
 		TABLE;
 	}
 
-	public static class Accessor {
-		int id;
-		int numerator;
-		int denominator;
-
-		public Accessor(int id, int numerator, int denominator) {
-			this.id = id;
-			this.numerator = numerator;
-			this.denominator = denominator;
-		}
-	}
+	/**
+	 * Accessor record for drop table access rules.
+	 * Modernized to Java 16+ record.
+	 */
+	public record Accessor(int id, int numerator, int denominator) {}
 
 	public boolean rollAccess(int id, boolean ringOfWealth) {
 		int numerator, denominator;

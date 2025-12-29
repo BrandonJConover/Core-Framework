@@ -2,49 +2,29 @@ package com.openrsc.server.content.achievement;
 
 import com.openrsc.server.content.achievement.Achievement.TaskType;
 
-public class AchievementTask {
-
-	private TaskType task;
-
-	private int id;
-	private int amount;
-
-	public AchievementTask(TaskType task, int id, int amount) {
-		this.task = task;
-		this.id = id;
-		this.amount = amount;
+/**
+ * Represents a task within an achievement.
+ * Modernized to Java 16+ record for immutability.
+ */
+public record AchievementTask(
+	TaskType task,
+	int id,
+	int amount
+) {
+	/**
+	 * Factory method for backwards compatibility.
+	 */
+	public static AchievementTask of(TaskType task, int id, int amount) {
+		return new AchievementTask(task, id, amount);
 	}
 
-	public TaskType getTask() {
-		return task;
-	}
-
-	public void setTask(TaskType task) {
-		this.task = task;
-	}
-
-	public int getId() {
-		return id;
-	}
-
-	public void setId(int id) {
-		this.id = id;
-	}
-
-	public int getAmount() {
-		return amount;
-	}
-
-	public void setAmount(int amount) {
-		this.amount = amount;
-	}
-
-	//public setAchievementStatus(Player player, int status) {
-
-	//}
+	// Legacy getter aliases for backwards compatibility
+	public TaskType getTask() { return task; }
+	public int getId() { return id; }
+	public int getAmount() { return amount; }
 
 	@Override
 	public String toString() {
-		return task.name() + "_id:" + id + "_amount:" + amount;
+		return "%s_id:%d_amount:%d".formatted(task.name(), id, amount);
 	}
 }
