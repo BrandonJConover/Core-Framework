@@ -4,6 +4,7 @@ mod infrastructure;
 mod network;
 mod protocol;
 mod security;
+mod session;
 
 use anyhow::Result;
 use tracing::{info, Level};

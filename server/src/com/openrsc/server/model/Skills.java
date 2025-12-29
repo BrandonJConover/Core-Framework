@@ -116,8 +116,8 @@ public class Skills {
 			&& !fromRestoreEvent) {
 			mob.tryResyncStatEvent();
 		} else if (skill == Skill.PRAYER.id()
-			&& mob.isPlayer()) {
-			((Player)mob).setPrayerStatePoints(level * 120);
+			&& mob instanceof Player player) {
+			player.setPrayerStatePoints(level * 120);
 		}
 	}
 
@@ -233,8 +233,7 @@ public class Skills {
 		}
 		int levelDiff = newLevel - oldLevel;
 
-		if (getMob().isPlayer()) {
-			Player player = (Player) getMob();
+		if (getMob() instanceof Player player) {
 			if (player.isUsingCustomClient()) {
 				sendUpdate(skill);
 			} else {
@@ -246,8 +245,7 @@ public class Skills {
 			levels[skill] += levelDiff;
 			maxStats[skill] += levelDiff;
 			// TODO: Maybe a level up listener?
-			if (getMob().isPlayer()) {
-				Player player = (Player) getMob();
+			if (getMob() instanceof Player player) {
 				try {
 					getWorld().getServer().getPlayerService().savePlayerMaxSkill(player.getDatabaseID(), skill, maxStats[skill]);
 				} catch (GameDatabaseException e) {
@@ -297,8 +295,7 @@ public class Skills {
 	}
 
 	private void sendUpdate(int skill) {
-		if (getMob().isPlayer()) {
-			Player player = (Player) getMob();
+		if (getMob() instanceof Player player) {
 			if (player.getClientLimitations().supportsSkillUpdate) {
 				ActionSender.sendStat(player, skill);
 			} else {
@@ -308,15 +305,14 @@ public class Skills {
 	}
 
 	private void sendExperience(int skill) {
-		if (getMob().isPlayer()) {
-			Player player = (Player) getMob();
+		if (getMob() instanceof Player player) {
 			ActionSender.sendExperience(player, skill);
 		}
 	}
 
 	public void sendUpdateAll() {
-		if (getMob().isPlayer())
-			ActionSender.sendStats((Player) getMob());
+		if (getMob() instanceof Player player)
+			ActionSender.sendStats(player);
 	}
 
 	public int[] getMaxStats() {
@@ -328,16 +324,7 @@ public class Skills {
 	}
 
 	public int getMaxStat(int skill) {
-		if (getMob() instanceof Player) {
-			return maxStats[skill];
-			// int level = getLevelForExperience(getExperience(skill), getWorld().getServer().getConfig().PLAYER_LEVEL_LIMIT);
-			// if (skill == HITS) {
-			//	return Math.max(level, 10);
-			// }
-			// return level;
-		} else {
-			return maxStatsMob[skill];
-		}
+		return getMob() instanceof Player ? maxStats[skill] : maxStatsMob[skill];
 	}
 
 	public void normalize(int skill) {
@@ -348,8 +335,8 @@ public class Skills {
 		levels[skill] = getMaxStat(skill);
 		if (sendUpdate)
 			sendUpdate(skill);
-		if (skill == Skill.PRAYER.id() && mob.isPlayer()) {
-			((Player) getMob()).setPrayerStatePoints(levels[skill] * 120);
+		if (skill == Skill.PRAYER.id() && mob instanceof Player player) {
+			player.setPrayerStatePoints(levels[skill] * 120);
 		}
 	}
 
@@ -366,11 +353,11 @@ public class Skills {
 	}
 
 	public void setLevelTo(int skill, int level) {
-		if (getMob() instanceof Player) {
+		if (getMob() instanceof Player player) {
 			exps[skill] = experienceForLevel(level);
 			maxStats[skill] = level;
 			try {
-				getWorld().getServer().getPlayerService().savePlayerMaxSkill(((Player) getMob()).getDatabaseID(), skill, level);
+				getWorld().getServer().getPlayerService().savePlayerMaxSkill(player.getDatabaseID(), skill, level);
 			} catch (GameDatabaseException e) {
 				LOGGER.catching(e);
 			}
