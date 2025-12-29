@@ -19,6 +19,7 @@ public sealed class WebSocketClient : IGameClient
     private readonly ILogger<WebSocketClient> _logger;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly CancellationTokenSource _cts = new();
+    private readonly int _maxMessageSize;
 
     // Cached serializer options with source generation for performance
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -57,10 +58,11 @@ public sealed class WebSocketClient : IGameClient
     /// <inheritdoc />
     public event Func<IGameClient, Task>? Disconnected;
 
-    public WebSocketClient(WebSocket webSocket, string remoteAddress, ILogger<WebSocketClient> logger)
+    public WebSocketClient(WebSocket webSocket, string remoteAddress, ILogger<WebSocketClient> logger, int maxMessageSize = 65536)
     {
         _webSocket = webSocket;
         _logger = logger;
+        _maxMessageSize = maxMessageSize;
         RemoteAddress = remoteAddress;
     }
 
@@ -68,6 +70,7 @@ public sealed class WebSocketClient : IGameClient
     public async Task StartReceivingAsync()
     {
         var buffer = ArrayPool<byte>.Shared.Rent(4096);
+        var messageBuffer = new MemoryStream();
         try
         {
             while (!_cts.Token.IsCancellationRequested && _webSocket.State == WebSocketState.Open)
@@ -84,13 +87,31 @@ public sealed class WebSocketClient : IGameClient
 
                 LastActivity = DateTime.UtcNow;
 
-                if (result.MessageType == WebSocketMessageType.Text)
+                // Accumulate message fragments
+                messageBuffer.Write(buffer, 0, result.Count);
+
+                // Check message size limit
+                if (messageBuffer.Length > _maxMessageSize)
                 {
-                    await ProcessJsonMessageAsync(buffer.AsSpan(0, result.Count));
+                    _logger.LogWarning("WebSocket client {Id} exceeded max message size ({Size} > {Max})",
+                        Id, messageBuffer.Length, _maxMessageSize);
+                    break;
                 }
-                else if (result.MessageType == WebSocketMessageType.Binary)
+
+                // Process complete message
+                if (result.EndOfMessage)
                 {
-                    await ProcessBinaryMessageAsync(buffer.AsSpan(0, result.Count));
+                    var messageData = messageBuffer.ToArray();
+                    messageBuffer.SetLength(0); // Reset for next message
+
+                    if (result.MessageType == WebSocketMessageType.Text)
+                    {
+                        await ProcessJsonMessageAsync(messageData);
+                    }
+                    else if (result.MessageType == WebSocketMessageType.Binary)
+                    {
+                        await ProcessBinaryMessageAsync(messageData);
+                    }
                 }
             }
         }
@@ -109,6 +130,7 @@ public sealed class WebSocketClient : IGameClient
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
+            messageBuffer.Dispose();
             await OnDisconnectedAsync();
         }
     }
@@ -116,7 +138,7 @@ public sealed class WebSocketClient : IGameClient
     /// <summary>
     /// Processes a JSON message from the web client.
     /// </summary>
-    private async Task ProcessJsonMessageAsync(ReadOnlySpan<byte> data)
+    private async Task ProcessJsonMessageAsync(byte[] data)
     {
         try
         {
@@ -146,12 +168,12 @@ public sealed class WebSocketClient : IGameClient
     /// <summary>
     /// Processes a binary message (standard RSC protocol).
     /// </summary>
-    private async Task ProcessBinaryMessageAsync(ReadOnlySpan<byte> data)
+    private async Task ProcessBinaryMessageAsync(byte[] data)
     {
         if (data.Length < 1) return;
 
         var opcode = data[0];
-        var payload = data.Length > 1 ? data[1..] : ReadOnlySpan<byte>.Empty;
+        ReadOnlySpan<byte> payload = data.Length > 1 ? data.AsSpan(1) : ReadOnlySpan<byte>.Empty;
 
         using var packet = new Packet(opcode, payload);
         if (PacketReceived is not null)
@@ -466,12 +488,136 @@ public sealed class WebSocketMessage
     [JsonPropertyName("op")]
     public int Op { get; set; }
 
-    // Input fields
+    // Authentication fields
     [JsonPropertyName("username")]
     public string? Username { get; set; }
 
     [JsonPropertyName("password")]
     public string? Password { get; set; }
+
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    /// <summary>Authentication method: "password", "token", "google", "apple", "discord".</summary>
+    [JsonPropertyName("authMethod")]
+    public string? AuthMethod { get; set; }
+
+    /// <summary>OAuth ID token (for Google/Apple Sign-In from mobile).</summary>
+    [JsonPropertyName("idToken")]
+    public string? IdToken { get; set; }
+
+    /// <summary>OAuth authorization code (for web OAuth flow).</summary>
+    [JsonPropertyName("authCode")]
+    public string? AuthCode { get; set; }
+
+    /// <summary>Refresh token for persistent login.</summary>
+    [JsonPropertyName("refreshToken")]
+    public string? RefreshToken { get; set; }
+
+    /// <summary>Device ID for token binding (from keychain).</summary>
+    [JsonPropertyName("deviceId")]
+    public string? DeviceId { get; set; }
+
+    /// <summary>Device name for session display.</summary>
+    [JsonPropertyName("deviceName")]
+    public string? DeviceName { get; set; }
+
+    /// <summary>Platform: "ios", "android", "web".</summary>
+    [JsonPropertyName("platform")]
+    public string? Platform { get; set; }
+
+    // Device fingerprinting fields
+    /// <summary>Operating system version.</summary>
+    [JsonPropertyName("osVersion")]
+    public string? OsVersion { get; set; }
+
+    /// <summary>Device model (iPhone14,2, Pixel 7, etc.).</summary>
+    [JsonPropertyName("deviceModel")]
+    public string? DeviceModel { get; set; }
+
+    /// <summary>Device manufacturer.</summary>
+    [JsonPropertyName("manufacturer")]
+    public string? Manufacturer { get; set; }
+
+    /// <summary>Browser name (for web).</summary>
+    [JsonPropertyName("browser")]
+    public string? Browser { get; set; }
+
+    /// <summary>Browser version.</summary>
+    [JsonPropertyName("browserVersion")]
+    public string? BrowserVersion { get; set; }
+
+    /// <summary>User agent string.</summary>
+    [JsonPropertyName("userAgent")]
+    public string? UserAgent { get; set; }
+
+    /// <summary>Screen width.</summary>
+    [JsonPropertyName("screenWidth")]
+    public int? ScreenWidth { get; set; }
+
+    /// <summary>Screen height.</summary>
+    [JsonPropertyName("screenHeight")]
+    public int? ScreenHeight { get; set; }
+
+    /// <summary>Screen pixel density.</summary>
+    [JsonPropertyName("pixelRatio")]
+    public float? PixelRatio { get; set; }
+
+    /// <summary>Device timezone.</summary>
+    [JsonPropertyName("timezone")]
+    public string? Timezone { get; set; }
+
+    /// <summary>Device language.</summary>
+    [JsonPropertyName("language")]
+    public string? Language { get; set; }
+
+    /// <summary>Number of CPU cores.</summary>
+    [JsonPropertyName("cpuCores")]
+    public int? CpuCores { get; set; }
+
+    /// <summary>Device memory in GB.</summary>
+    [JsonPropertyName("deviceMemory")]
+    public int? DeviceMemory { get; set; }
+
+    /// <summary>WebGL renderer (for web).</summary>
+    [JsonPropertyName("webglRenderer")]
+    public string? WebGLRenderer { get; set; }
+
+    /// <summary>WebGL vendor (for web).</summary>
+    [JsonPropertyName("webglVendor")]
+    public string? WebGLVendor { get; set; }
+
+    /// <summary>Canvas fingerprint hash (for web).</summary>
+    [JsonPropertyName("canvasHash")]
+    public string? CanvasHash { get; set; }
+
+    /// <summary>Audio context fingerprint (for web).</summary>
+    [JsonPropertyName("audioHash")]
+    public string? AudioHash { get; set; }
+
+    /// <summary>Installed fonts hash (for web).</summary>
+    [JsonPropertyName("fontsHash")]
+    public string? FontsHash { get; set; }
+
+    /// <summary>iOS Vendor ID or Android ID.</summary>
+    [JsonPropertyName("vendorId")]
+    public string? VendorId { get; set; }
+
+    /// <summary>App version.</summary>
+    [JsonPropertyName("appVersion")]
+    public string? AppVersion { get; set; }
+
+    /// <summary>App build number.</summary>
+    [JsonPropertyName("appBuild")]
+    public string? AppBuild { get; set; }
+
+    /// <summary>Whether device is jailbroken/rooted.</summary>
+    [JsonPropertyName("isCompromised")]
+    public bool? IsCompromised { get; set; }
+
+    /// <summary>Whether running in emulator/simulator.</summary>
+    [JsonPropertyName("isEmulator")]
+    public bool? IsEmulator { get; set; }
 
     [JsonPropertyName("version")]
     public int? Version { get; set; }
@@ -506,6 +652,47 @@ public sealed class WebSocketMessage
     // Output fields
     [JsonPropertyName("loginResult")]
     public int? LoginResult { get; set; }
+
+    /// <summary>Access token for subsequent requests.</summary>
+    [JsonPropertyName("accessToken")]
+    public string? AccessToken { get; set; }
+
+    /// <summary>New refresh token (when rotated).</summary>
+    [JsonPropertyName("newRefreshToken")]
+    public string? NewRefreshToken { get; set; }
+
+    /// <summary>Token expiration in seconds.</summary>
+    [JsonPropertyName("expiresIn")]
+    public int? ExpiresIn { get; set; }
+
+    /// <summary>Error message for failed operations.</summary>
+    [JsonPropertyName("error")]
+    public string? Error { get; set; }
+
+    /// <summary>Error description.</summary>
+    [JsonPropertyName("errorDescription")]
+    public string? ErrorDescription { get; set; }
+
+    // Device verification response fields
+    /// <summary>Whether the device is recognized.</summary>
+    [JsonPropertyName("isKnownDevice")]
+    public bool? IsKnownDevice { get; set; }
+
+    /// <summary>Whether the device is trusted.</summary>
+    [JsonPropertyName("isTrustedDevice")]
+    public bool? IsTrustedDevice { get; set; }
+
+    /// <summary>Whether additional verification is required.</summary>
+    [JsonPropertyName("requiresVerification")]
+    public bool? RequiresVerification { get; set; }
+
+    /// <summary>Device risk score (0-100).</summary>
+    [JsonPropertyName("riskScore")]
+    public int? RiskScore { get; set; }
+
+    /// <summary>Registered device ID.</summary>
+    [JsonPropertyName("registeredDeviceId")]
+    public string? RegisteredDeviceId { get; set; }
 
     [JsonPropertyName("stats")]
     public Dictionary<string, int[]>? Stats { get; set; }
