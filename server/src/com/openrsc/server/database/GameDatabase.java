@@ -41,7 +41,7 @@ public abstract class GameDatabase {
 	private static final Logger LOGGER = LogManager.getLogger();
 
 	public final Server server;
-	private volatile AtomicBoolean open = new AtomicBoolean(false);
+	private final AtomicBoolean open = new AtomicBoolean(false);
 
 	public GameDatabase(final Server server) {
 		this.server = server;

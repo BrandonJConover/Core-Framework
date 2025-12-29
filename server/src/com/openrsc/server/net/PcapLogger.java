@@ -1,10 +1,14 @@
 package com.openrsc.server.net;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.*;
 import java.util.LinkedList;
 import java.util.zip.GZIPOutputStream;
 
 public class PcapLogger {
+	private static final Logger LOGGER = LogManager.getLogger();
 
 	public String fname;
 	final private LinkedList<ReplayPacket> m_packets = new LinkedList<ReplayPacket>();
@@ -124,7 +128,7 @@ public class PcapLogger {
 
 			pcap.close();
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOGGER.catching(e);
 		}
 	}
 }

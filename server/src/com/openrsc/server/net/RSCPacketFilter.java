@@ -89,11 +89,12 @@ public class RSCPacketFilter {
 					LOGGER.info("Created new IP bans file at " + ipBansFile.getAbsolutePath());
 					return;
 				}
-				BufferedReader reader = new BufferedReader(new FileReader(BAN_FILE_PATH));
-				String line;
-				while ((line = reader.readLine()) != null) {
-					counter++;
-					ipBans.put(line.trim(), -1L);
+				try (BufferedReader reader = new BufferedReader(new FileReader(BAN_FILE_PATH))) {
+					String line;
+					while ((line = reader.readLine()) != null) {
+						counter++;
+						ipBans.put(line.trim(), -1L);
+					}
 				}
 				LOGGER.info("Loaded " + counter + " banned IPs.");
 			} catch (IOException ex) {

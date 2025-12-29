@@ -1328,7 +1328,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 			if (isInPkZone && !player.canBeReattacked()) {
 				player.resetPath();
 				// TODO: ...? should probably display a message here instead of dying silently...?
-				System.out.println("Killed pvp cast silently because they shot too fast");
+				LOGGER.debug("Killed pvp cast silently because they shot too fast");
 				return;
 			}
 		}
