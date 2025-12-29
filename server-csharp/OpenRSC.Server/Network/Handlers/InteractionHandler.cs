@@ -81,16 +81,13 @@ public sealed class NpcInteractionHandler : IPacketHandler
     private async Task HandleTalkAsync(Player player, Entities.Npc npc)
     {
         // Create walk-to action for talking
-        var action = new WalkToMobAction(player, npc)
+        var action = new GenericWalkToMobAction(player, npc, () =>
         {
-            ExecuteAction = () =>
-            {
-                _logger.LogDebug("{Username} talking to {Npc}", player.Username, npc.Name);
+            _logger.LogDebug("{Username} talking to {Npc}", player.Username, npc.Name);
 
-                // Start dialogue with the NPC
-                _dialogueManager.StartDialogue(player, npc);
-            }
-        };
+            // Start dialogue with the NPC
+            _dialogueManager.StartDialogue(player, npc);
+        });
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
@@ -111,17 +108,14 @@ public sealed class NpcInteractionHandler : IPacketHandler
         }
 
         // Create walk-to action for attacking
-        var action = new WalkToMobAction(player, npc)
+        var action = new GenericWalkToMobAction(player, npc, () =>
         {
-            ExecuteAction = () =>
+            var encounter = _combatManager.StartCombat(player, npc);
+            if (encounter is null)
             {
-                var encounter = _combatManager.StartCombat(player, npc);
-                if (encounter is null)
-                {
-                    player.Message("You can't attack right now.");
-                }
+                player.Message("You can't attack right now.");
             }
-        };
+        }, actionType: ActionType.Attack);
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
@@ -131,31 +125,28 @@ public sealed class NpcInteractionHandler : IPacketHandler
     {
         var command = npc.Definition?.Command ?? "Talk";
 
-        var action = new WalkToMobAction(player, npc)
+        var action = new GenericWalkToMobAction(player, npc, () =>
         {
-            ExecuteAction = () =>
-            {
-                _logger.LogDebug("{Username} using {Command} on {Npc}",
-                    player.Username, command, npc.Name);
+            _logger.LogDebug("{Username} using {Command} on {Npc}",
+                player.Username, command, npc.Name);
 
-                // Handle different commands
-                switch (command.ToLowerInvariant())
-                {
-                    case "shop":
-                        HandleShop(player, npc);
-                        break;
-                    case "pickpocket":
-                        HandlePickpocket(player, npc);
-                        break;
-                    case "bank":
-                        HandleBank(player, npc);
-                        break;
-                    default:
-                        player.Message($"Nothing interesting happens.");
-                        break;
-                }
+            // Handle different commands
+            switch (command.ToLowerInvariant())
+            {
+                case "shop":
+                    HandleShop(player, npc);
+                    break;
+                case "pickpocket":
+                    HandlePickpocket(player, npc);
+                    break;
+                case "bank":
+                    HandleBank(player, npc);
+                    break;
+                default:
+                    player.Message($"Nothing interesting happens.");
+                    break;
             }
-        };
+        });
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
@@ -265,11 +256,12 @@ public sealed class ObjectInteractionHandler : IPacketHandler
 
         // Create walk-to-object action
         var gameObject = new GameObject(0, location); // Placeholder for walk distance
-        var action = new WalkToObjectAction(player, gameObject)
+        var action = new GenericWalkToObjectAction(player, gameObject, () =>
         {
-            ExecuteAction = async () => await _objectInteractionService.HandleObjectInteractionAsync(
-                player, location, isBoundary, isSecondAction)
-        };
+            // Execute interaction synchronously (the service handles async internally if needed)
+            _ = _objectInteractionService.HandleObjectInteractionAsync(
+                player, location, isBoundary, isSecondAction);
+        });
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
@@ -318,10 +310,8 @@ public sealed class GroundItemHandler : IPacketHandler
         }
 
         // Pickup action - walk to item location first
-        var action = new WalkToPointAction(player, location)
-        {
-            ExecuteAction = () => HandlePickup(player, itemId, location)
-        };
+        var action = new GenericWalkToPointAction(player, location,
+            () => HandlePickup(player, itemId, location));
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
@@ -466,17 +456,14 @@ public sealed class PlayerInteractionHandler : IPacketHandler
             return;
         }
 
-        var action = new WalkToMobAction(player, target)
+        var action = new GenericWalkToMobAction(player, target, () =>
         {
-            ExecuteAction = () =>
+            var encounter = _combatManager.StartCombat(player, target);
+            if (encounter is null)
             {
-                var encounter = _combatManager.StartCombat(player, target);
-                if (encounter is null)
-                {
-                    player.Message("You can't attack that player.");
-                }
+                player.Message("You can't attack that player.");
             }
-        };
+        }, actionType: ActionType.Attack);
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
@@ -529,21 +516,18 @@ public sealed class PlayerInteractionHandler : IPacketHandler
         }
 
         // Create walk-to action for trading
-        var action = new WalkToMobAction(player, target)
+        var action = new GenericWalkToMobAction(player, target, () =>
         {
-            ExecuteAction = () =>
+            var result = _tradeManager.RequestTrade(player, target);
+            if (!result.Success)
             {
-                var result = _tradeManager.RequestTrade(player, target);
-                if (!result.Success)
-                {
-                    player.Message(result.Message ?? "Unable to trade.");
-                    return;
-                }
-
-                _logger.LogDebug("{Username} requested trade with {Target}",
-                    player.Username, target.Username);
+                player.Message(result.Message ?? "Unable to trade.");
+                return;
             }
-        };
+
+            _logger.LogDebug("{Username} requested trade with {Target}",
+                player.Username, target.Username);
+        });
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
@@ -571,21 +555,18 @@ public sealed class PlayerInteractionHandler : IPacketHandler
         }
 
         // Create walk-to action for dueling
-        var action = new WalkToMobAction(player, target)
+        var action = new GenericWalkToMobAction(player, target, () =>
         {
-            ExecuteAction = () =>
+            var result = _duelManager.RequestDuel(player, target);
+            if (!result.Success)
             {
-                var result = _duelManager.RequestDuel(player, target);
-                if (!result.Success)
-                {
-                    player.Message(result.Message ?? "Unable to duel.");
-                    return;
-                }
-
-                _logger.LogDebug("{Username} requested duel with {Target}",
-                    player.Username, target.Username);
+                player.Message(result.Message ?? "Unable to duel.");
+                return;
             }
-        };
+
+            _logger.LogDebug("{Username} requested duel with {Target}",
+                player.Username, target.Username);
+        });
 
         player.SetWalkToAction(action);
         await Task.CompletedTask;
