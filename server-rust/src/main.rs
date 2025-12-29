@@ -1,6 +1,8 @@
+mod database;
+mod game;
 mod infrastructure;
 mod network;
-mod game;
+mod protocol;
 mod security;
 
 use anyhow::Result;
