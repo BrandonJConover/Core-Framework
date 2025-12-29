@@ -299,7 +299,7 @@ public final class PluginHandler implements IPluginHandler {
                 // there is no action listener defined in Default plugin
             }
         } catch (final Exception e) {
-            System.err.println("Exception at plugin handling: ");
+            LOGGER.error("Exception at plugin handling:");
             LOGGER.catching(e);
         }
     }

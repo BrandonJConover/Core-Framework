@@ -5,8 +5,11 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class HttpRequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+	private static final Logger LOGGER = LogManager.getLogger();
 
 	private final String websocketUri;
 
@@ -31,7 +34,7 @@ public class HttpRequestHandler extends SimpleChannelInboundHandler<FullHttpRequ
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
 		throws Exception {
-		cause.printStackTrace();
+		LOGGER.catching(cause);
 		ctx.close();
 	}
 }

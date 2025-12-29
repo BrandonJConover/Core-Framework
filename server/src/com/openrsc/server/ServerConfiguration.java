@@ -859,10 +859,8 @@ public class ServerConfiguration {
 	private void readGlobalRules(final String fileName) {
 		File file = new File(fileName);
 
-		try {
+		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
 			ArrayList<String> globalRules = new ArrayList<String>();
-
-			BufferedReader reader = new BufferedReader(new FileReader(file));
 
 			String line = reader.readLine();
 			while (line != null) {

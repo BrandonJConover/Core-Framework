@@ -1051,12 +1051,12 @@ public final class AvatarGenerator {
 							destColumnSkewPerRow, destFirstColumn, 1603920392, 0, colorMask2, scaleY, scaleX, srcStartX,
 							skipEveryOther, srcStartY, spriteWidth, colorMask, height, destRowHead, colourTransform, blueMask, e);
 					}
-				} catch (Exception var24) {
-					var24.printStackTrace();
+				} catch (Exception e) {
+					LOGGER.catching(e);
 				}
 
-			} catch (RuntimeException var25) {
-				var25.printStackTrace();
+			} catch (RuntimeException e) {
+				LOGGER.catching(e);
 			}
 		}
 
@@ -1157,12 +1157,12 @@ public final class AvatarGenerator {
 						destRowHead += e.getSomething1();
 						destFirstColumn += destColumnSkewPerRow;
 					}
-				} catch (Exception var33) {
-					var33.printStackTrace();
+				} catch (Exception e) {
+					LOGGER.catching(e);
 				}
 
-			} catch (RuntimeException var34) {
-				var34.printStackTrace();
+			} catch (RuntimeException e) {
+				LOGGER.catching(e);
 			}
 		}
 
@@ -1249,12 +1249,12 @@ public final class AvatarGenerator {
 						destFirstColumn += destColumnSkewPerRow;
 						destRowHead += e.getSomething1();
 					}
-				} catch (Exception var29) {
-					var29.printStackTrace();
+				} catch (Exception e) {
+					LOGGER.catching(e);
 				}
 
-			} catch (RuntimeException var30) {
-				var30.printStackTrace();
+			} catch (RuntimeException e) {
+				LOGGER.catching(e);
 			}
 		}
 
@@ -1285,8 +1285,8 @@ public final class AvatarGenerator {
 					}
 				}
 
-			} catch (RuntimeException a) {
-				a.printStackTrace();
+			} catch (RuntimeException e) {
+				LOGGER.catching(e);
 			}
 		}
 
@@ -1299,7 +1299,7 @@ public final class AvatarGenerator {
 	private static void loadSprite(ZipFile spritesArchive, int id) throws IOException {
 		ZipEntry e = spritesArchive.getEntry(String.valueOf(id));
 		if (e == null) {
-			System.err.println("Missing sprite: " + id);
+			LOGGER.error("Missing sprite: {}", id);
 		}
 		InputStream bis = new BufferedInputStream(spritesArchive.getInputStream(e));
 		byte[] buffer = new byte[bis.available()];
