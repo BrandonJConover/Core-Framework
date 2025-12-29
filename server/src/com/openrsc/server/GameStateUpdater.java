@@ -1303,9 +1303,42 @@ public final class GameStateUpdater {
 			if (player.getWalkToAction() != null) {
 				if (player.getWalkToAction().shouldExecute()) {
 					player.getWalkToAction().execute();
+				} else if (player.getWalkToAction().isRetryEnabled()) {
+					// Action not ready to execute - handle retry logic
+					handleActionRetry(player);
 				}
 			}
 		});
+	}
+
+	/**
+	 * Handles the retry logic for walk-to actions that fail to execute.
+	 * If the action has exceeded its retry limit, it will be cleared and the player notified.
+	 *
+	 * @param player The player whose action is being retried
+	 */
+	private void handleActionRetry(final Player player) {
+		final var action = player.getWalkToAction();
+		if (action == null || action.isExecuted()) {
+			return;
+		}
+
+		final long currentTick = getServer().getCurrentTick();
+		final boolean shouldContinue = action.onAttemptFailed(currentTick);
+
+		if (!shouldContinue) {
+			// Max retries exceeded - notify player and clear the action
+			final String failureMessage = action.getFailureMessage();
+			if (failureMessage != null && !failureMessage.isEmpty()) {
+				player.message(failureMessage);
+			}
+			player.setWalkToAction(null);
+
+			if (getServer().getConfig().DEBUG) {
+				LOGGER.info("Action retry limit exceeded for player {} after {} attempts",
+					player.getUsername(), action.getRetryAttempts());
+			}
+		}
 	}
 
 	public final long processNpcs() {

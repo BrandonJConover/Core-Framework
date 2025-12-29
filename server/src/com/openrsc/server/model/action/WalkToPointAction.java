@@ -12,8 +12,17 @@ public abstract class WalkToPointAction extends WalkToAction {
 		this.radius = radius;
 	}
 
+	public int getRadius() {
+		return radius;
+	}
+
 	@Override
 	public boolean shouldExecuteInternal() {
 		return getPlayer().getLocation().getDistancePythagoras(getLocation()) <= radius;
+	}
+
+	@Override
+	public String getFailureMessage() {
+		return "You are unable to reach that location.";
 	}
 }
