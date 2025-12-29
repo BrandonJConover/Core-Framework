@@ -23,6 +23,7 @@ public sealed class WebSocketServer : BackgroundService
     private readonly ConcurrentDictionary<Guid, WebSocketClient> _clients = new();
     private readonly ConcurrentDictionary<string, int> _connectionsPerIp = new();
     private readonly HashSet<string> _allowedOrigins = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _trustedProxyIps = new(StringComparer.OrdinalIgnoreCase);
     private HttpListener? _listener;
 
     /// <summary>
@@ -51,8 +52,9 @@ public sealed class WebSocketServer : BackgroundService
         _settings = settings.Value;
         _packetDispatcher = packetDispatcher;
 
-        // Parse allowed origins
+        // Parse allowed origins and trusted proxy IPs
         ParseAllowedOrigins();
+        ParseTrustedProxyIps();
     }
 
     private void ParseAllowedOrigins()
@@ -72,6 +74,28 @@ public sealed class WebSocketServer : BackgroundService
 
         _logger.LogInformation("WebSocket allowed origins: {Origins}",
             string.Join(", ", _allowedOrigins));
+    }
+
+    private void ParseTrustedProxyIps()
+    {
+        var proxyIps = _settings.TrustedProxyIps?.Trim() ?? "";
+        if (string.IsNullOrEmpty(proxyIps))
+            return;
+
+        foreach (var ip in proxyIps.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmedIp = ip.Trim();
+            if (IPAddress.TryParse(trimmedIp, out _))
+            {
+                _trustedProxyIps.Add(trimmedIp);
+            }
+        }
+
+        if (_trustedProxyIps.Count > 0)
+        {
+            _logger.LogInformation("Trusted proxy IPs: {Proxies}",
+                string.Join(", ", _trustedProxyIps));
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -250,7 +274,7 @@ ws.onmessage = (event) => {{
         }
 
         var clientLogger = _loggerFactory.CreateLogger<WebSocketClient>();
-        var client = new WebSocketClient(wsContext.WebSocket, remoteIp, clientLogger);
+        var client = new WebSocketClient(wsContext.WebSocket, remoteIp, clientLogger, _settings.WebSocketMaxMessageSize);
 
         // Register client
         if (!_clients.TryAdd(client.Id, client))
@@ -286,6 +310,16 @@ ws.onmessage = (event) => {{
 
     private string GetClientIp(HttpListenerContext context)
     {
+        var directIp = context.Request.RemoteEndPoint?.Address.ToString() ?? "unknown";
+
+        // Only trust proxy headers if enabled and from trusted source
+        if (!_settings.TrustProxyHeaders)
+            return directIp;
+
+        // If trusted proxy IPs are configured, verify the request comes from one
+        if (_trustedProxyIps.Count > 0 && !_trustedProxyIps.Contains(directIp))
+            return directIp;
+
         // Check for proxy headers (X-Forwarded-For, X-Real-IP)
         var forwardedFor = context.Request.Headers["X-Forwarded-For"];
         if (!string.IsNullOrEmpty(forwardedFor))
@@ -304,7 +338,7 @@ ws.onmessage = (event) => {{
             return realIp;
         }
 
-        return context.Request.RemoteEndPoint?.Address.ToString() ?? "unknown";
+        return directIp;
     }
 
     private bool ValidateOrigin(string origin)

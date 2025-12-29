@@ -19,6 +19,7 @@ public sealed class WebSocketClient : IGameClient
     private readonly ILogger<WebSocketClient> _logger;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly CancellationTokenSource _cts = new();
+    private readonly int _maxMessageSize;
 
     // Cached serializer options with source generation for performance
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -57,10 +58,11 @@ public sealed class WebSocketClient : IGameClient
     /// <inheritdoc />
     public event Func<IGameClient, Task>? Disconnected;
 
-    public WebSocketClient(WebSocket webSocket, string remoteAddress, ILogger<WebSocketClient> logger)
+    public WebSocketClient(WebSocket webSocket, string remoteAddress, ILogger<WebSocketClient> logger, int maxMessageSize = 65536)
     {
         _webSocket = webSocket;
         _logger = logger;
+        _maxMessageSize = maxMessageSize;
         RemoteAddress = remoteAddress;
     }
 
@@ -68,6 +70,7 @@ public sealed class WebSocketClient : IGameClient
     public async Task StartReceivingAsync()
     {
         var buffer = ArrayPool<byte>.Shared.Rent(4096);
+        var messageBuffer = new MemoryStream();
         try
         {
             while (!_cts.Token.IsCancellationRequested && _webSocket.State == WebSocketState.Open)
@@ -84,13 +87,31 @@ public sealed class WebSocketClient : IGameClient
 
                 LastActivity = DateTime.UtcNow;
 
-                if (result.MessageType == WebSocketMessageType.Text)
+                // Accumulate message fragments
+                messageBuffer.Write(buffer, 0, result.Count);
+
+                // Check message size limit
+                if (messageBuffer.Length > _maxMessageSize)
                 {
-                    await ProcessJsonMessageAsync(buffer.AsSpan(0, result.Count));
+                    _logger.LogWarning("WebSocket client {Id} exceeded max message size ({Size} > {Max})",
+                        Id, messageBuffer.Length, _maxMessageSize);
+                    break;
                 }
-                else if (result.MessageType == WebSocketMessageType.Binary)
+
+                // Process complete message
+                if (result.EndOfMessage)
                 {
-                    await ProcessBinaryMessageAsync(buffer.AsSpan(0, result.Count));
+                    var messageData = messageBuffer.ToArray();
+                    messageBuffer.SetLength(0); // Reset for next message
+
+                    if (result.MessageType == WebSocketMessageType.Text)
+                    {
+                        await ProcessJsonMessageAsync(messageData);
+                    }
+                    else if (result.MessageType == WebSocketMessageType.Binary)
+                    {
+                        await ProcessBinaryMessageAsync(messageData);
+                    }
                 }
             }
         }
@@ -109,6 +130,7 @@ public sealed class WebSocketClient : IGameClient
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
+            messageBuffer.Dispose();
             await OnDisconnectedAsync();
         }
     }
@@ -116,7 +138,7 @@ public sealed class WebSocketClient : IGameClient
     /// <summary>
     /// Processes a JSON message from the web client.
     /// </summary>
-    private async Task ProcessJsonMessageAsync(ReadOnlySpan<byte> data)
+    private async Task ProcessJsonMessageAsync(byte[] data)
     {
         try
         {
@@ -146,12 +168,12 @@ public sealed class WebSocketClient : IGameClient
     /// <summary>
     /// Processes a binary message (standard RSC protocol).
     /// </summary>
-    private async Task ProcessBinaryMessageAsync(ReadOnlySpan<byte> data)
+    private async Task ProcessBinaryMessageAsync(byte[] data)
     {
         if (data.Length < 1) return;
 
         var opcode = data[0];
-        var payload = data.Length > 1 ? data[1..] : ReadOnlySpan<byte>.Empty;
+        ReadOnlySpan<byte> payload = data.Length > 1 ? data.AsSpan(1) : ReadOnlySpan<byte>.Empty;
 
         using var packet = new Packet(opcode, payload);
         if (PacketReceived is not null)

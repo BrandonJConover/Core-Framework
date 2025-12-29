@@ -12,6 +12,7 @@ public static class PasswordHasher
     private const int SaltSize = 16;
     private const int HashSize = 32;
     private const int Iterations = 100_000; // OWASP recommendation for PBKDF2-SHA512
+    private const int MinIterations = 10_000; // Minimum allowed iterations for security
 
     /// <summary>
     /// Hashes a password with a random salt.
@@ -52,6 +53,11 @@ public static class PasswordHasher
                 return false;
 
             var iterations = int.Parse(parts[1]);
+
+            // Security: Reject hashes with too few iterations (potential tampering)
+            if (iterations < MinIterations)
+                return false;
+
             var salt = Convert.FromBase64String(parts[2]);
             var expectedHash = Convert.FromBase64String(parts[3]);
 

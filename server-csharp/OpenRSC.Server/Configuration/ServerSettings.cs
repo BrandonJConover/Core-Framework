@@ -136,6 +136,18 @@ public sealed class ServerSettings
     /// Enable WebSocket Secure (WSS) - requires TLS certificate.
     /// </summary>
     public bool EnableSecureWebSockets { get; set; }
+
+    /// <summary>
+    /// Trust proxy headers (X-Forwarded-For, X-Real-IP) for client IP detection.
+    /// Only enable when behind a trusted reverse proxy.
+    /// </summary>
+    public bool TrustProxyHeaders { get; set; }
+
+    /// <summary>
+    /// Trusted proxy IP addresses (comma-separated).
+    /// When set, proxy headers are only trusted from these IPs.
+    /// </summary>
+    public string TrustedProxyIps { get; set; } = "";
 }
 
 /// <summary>
