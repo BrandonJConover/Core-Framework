@@ -318,12 +318,85 @@ public sealed class DatabaseSettings
     public const string SectionName = "Database";
 
     /// <summary>
+    /// Database provider: PostgreSQL, MySQL, SQLite.
+    /// </summary>
+    public string Provider { get; set; } = "PostgreSQL";
+
+    /// <summary>
     /// Database connection string.
     /// </summary>
-    public string ConnectionString { get; set; } = "Server=localhost;Database=openrsc;User=root;Password=;";
+    public string ConnectionString { get; set; } = "Host=localhost;Database=openrsc;Username=openrsc;Password=openrsc";
 
     /// <summary>
     /// Table prefix for all database tables.
     /// </summary>
     public string TablePrefix { get; set; } = "";
+
+    /// <summary>
+    /// Connection pool minimum size.
+    /// </summary>
+    public int MinPoolSize { get; set; } = 5;
+
+    /// <summary>
+    /// Connection pool maximum size.
+    /// </summary>
+    public int MaxPoolSize { get; set; } = 100;
+
+    /// <summary>
+    /// Command timeout in seconds.
+    /// </summary>
+    public int CommandTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Enable query logging for debugging.
+    /// </summary>
+    public bool EnableQueryLogging { get; set; } = false;
+}
+
+/// <summary>
+/// Redis cache settings.
+/// </summary>
+public sealed class RedisSettings
+{
+    public const string SectionName = "Redis";
+
+    /// <summary>
+    /// Enable Redis caching.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Redis connection string.
+    /// </summary>
+    public string ConnectionString { get; set; } = "localhost:6379";
+
+    /// <summary>
+    /// Redis password (if required).
+    /// </summary>
+    public string? Password { get; set; }
+
+    /// <summary>
+    /// Default database index (0-15).
+    /// </summary>
+    public int Database { get; set; } = 0;
+
+    /// <summary>
+    /// Key prefix for all keys.
+    /// </summary>
+    public string KeyPrefix { get; set; } = "openrsc:";
+
+    /// <summary>
+    /// Default cache expiration in seconds.
+    /// </summary>
+    public int DefaultExpirationSeconds { get; set; } = 300;
+
+    /// <summary>
+    /// Session cache expiration in seconds.
+    /// </summary>
+    public int SessionExpirationSeconds { get; set; } = 86400; // 24 hours
+
+    /// <summary>
+    /// Enable connection pooling.
+    /// </summary>
+    public bool UseConnectionPooling { get; set; } = true;
 }
