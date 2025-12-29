@@ -584,3 +584,113 @@ public sealed class RedisSettings
     /// </summary>
     public bool UseConnectionPooling { get; set; } = true;
 }
+
+/// <summary>
+/// DDoS protection and rate limiting settings.
+/// </summary>
+public sealed class DDoSProtectionSettings
+{
+    public const string SectionName = "DDoSProtection";
+
+    /// <summary>
+    /// Enable DDoS protection.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    // Connection rate limiting
+    /// <summary>
+    /// Maximum new connections per IP within the connection window.
+    /// </summary>
+    public int MaxConnectionsPerIp { get; set; } = 10;
+
+    /// <summary>
+    /// Time window in seconds for connection rate limiting.
+    /// </summary>
+    public int ConnectionWindowSeconds { get; set; } = 60;
+
+    // Request rate limiting
+    /// <summary>
+    /// Maximum requests per second per IP.
+    /// </summary>
+    public int MaxRequestsPerSecond { get; set; } = 100;
+
+    /// <summary>
+    /// Maximum bytes per second per IP (0 = unlimited).
+    /// </summary>
+    public long MaxBytesPerSecond { get; set; } = 102400; // 100 KB/s
+
+    // Authentication protection
+    /// <summary>
+    /// Maximum failed authentication attempts before temp ban.
+    /// </summary>
+    public int MaxFailedAuthAttempts { get; set; } = 5;
+
+    /// <summary>
+    /// Duration of auth failure ban in minutes.
+    /// </summary>
+    public int AuthBanDurationMinutes { get; set; } = 15;
+
+    // Penalty system
+    /// <summary>
+    /// Penalty points added per connection violation.
+    /// </summary>
+    public int ConnectionViolationPenalty { get; set; } = 10;
+
+    /// <summary>
+    /// Penalty points added per request violation.
+    /// </summary>
+    public int RequestViolationPenalty { get; set; } = 5;
+
+    /// <summary>
+    /// Penalty points added per bandwidth violation.
+    /// </summary>
+    public int BandwidthViolationPenalty { get; set; } = 15;
+
+    /// <summary>
+    /// Penalty points added per failed auth attempt.
+    /// </summary>
+    public int FailedAuthPenalty { get; set; } = 20;
+
+    /// <summary>
+    /// Penalty points removed on successful auth.
+    /// </summary>
+    public int SuccessfulAuthBonus { get; set; } = 10;
+
+    /// <summary>
+    /// Penalty threshold that triggers automatic ban.
+    /// </summary>
+    public int PenaltyThresholdForBan { get; set; } = 100;
+
+    /// <summary>
+    /// Number of violations before automatic ban.
+    /// </summary>
+    public int ViolationsBeforeBan { get; set; } = 3;
+
+    // Ban durations
+    /// <summary>
+    /// Duration of automatic bans in minutes.
+    /// </summary>
+    public int AutoBanDurationMinutes { get; set; } = 30;
+
+    // Maintenance
+    /// <summary>
+    /// Minutes before inactive IP trackers are cleaned up.
+    /// </summary>
+    public int TrackerExpirationMinutes { get; set; } = 30;
+
+    /// <summary>
+    /// Comma-separated list of whitelisted IPs or CIDR ranges.
+    /// </summary>
+    public string WhitelistedIps { get; set; } = "";
+
+    // SYN flood protection
+    /// <summary>
+    /// Maximum pending (half-open) connections per IP.
+    /// </summary>
+    public int MaxPendingConnectionsPerIp { get; set; } = 5;
+
+    /// <summary>
+    /// Timeout for pending connections in seconds.
+    /// </summary>
+    public int PendingConnectionTimeoutSeconds { get; set; } = 10;
+}
