@@ -2,11 +2,16 @@ package com.openrsc.server.infrastructure;
 
 import com.openrsc.server.infrastructure.cache.RedisCache;
 import com.openrsc.server.infrastructure.cache.SessionStore;
+import com.openrsc.server.infrastructure.discovery.EtcdServiceDiscovery;
 import com.openrsc.server.infrastructure.discovery.ServiceDiscovery;
 import com.openrsc.server.infrastructure.http.HealthCheckServer;
+import com.openrsc.server.infrastructure.logging.EnhancedLogging;
 import com.openrsc.server.infrastructure.metrics.GameMetrics;
+import com.openrsc.server.infrastructure.network.ProtocolAdapter;
 import com.openrsc.server.infrastructure.serialization.MessagePackSerializer;
+import com.openrsc.server.infrastructure.serialization.SerializerFactory;
 import com.openrsc.server.infrastructure.tracing.OpenTelemetryConfig;
+import com.openrsc.server.infrastructure.transport.QuicTransport;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -27,8 +32,12 @@ public class InfrastructureManager implements AutoCloseable {
     private GameMetrics metrics;
     private OpenTelemetryConfig tracing;
     private ServiceDiscovery serviceDiscovery;
+    private EtcdServiceDiscovery etcdServiceDiscovery;
     private HealthCheckServer healthServer;
-    private MessagePackSerializer messagePackSerializer;
+    private SerializerFactory serializerFactory;
+    private ProtocolAdapter protocolAdapter;
+    private QuicTransport quicTransport;
+    private EnhancedLogging enhancedLogging;
 
     private volatile boolean initialized = false;
 
@@ -83,9 +92,41 @@ public class InfrastructureManager implements AutoCloseable {
             }
         }
 
-        // Initialize MessagePack serializer
-        messagePackSerializer = new MessagePackSerializer();
-        LOGGER.info("✓ MessagePack serializer initialized");
+        // Initialize serialization factory and protocol adapter
+        serializerFactory = new SerializerFactory();
+        protocolAdapter = new ProtocolAdapter();
+        LOGGER.info("✓ Serialization and protocol adapter initialized");
+
+        // Initialize enhanced logging
+        if (config.enhancedLoggingEnabled()) {
+            try {
+                enhancedLogging = new EnhancedLogging(config.enhancedLoggingSettings());
+                enhancedLogging.initialize();
+                LOGGER.info("✓ Enhanced logging initialized");
+            } catch (Exception e) {
+                LOGGER.error("✗ Failed to initialize enhanced logging: {}", e.getMessage());
+            }
+        }
+
+        // Initialize QUIC transport (optional)
+        if (config.quicEnabled()) {
+            try {
+                quicTransport = new QuicTransport(config.quicSettings());
+                LOGGER.info("✓ QUIC transport initialized");
+            } catch (Exception e) {
+                LOGGER.error("✗ Failed to initialize QUIC transport: {}", e.getMessage());
+            }
+        }
+
+        // Initialize etcd service discovery (alternative to Consul)
+        if (config.etcdEnabled()) {
+            try {
+                etcdServiceDiscovery = new EtcdServiceDiscovery(config.etcdSettings());
+                LOGGER.info("✓ etcd service discovery initialized");
+            } catch (Exception e) {
+                LOGGER.error("✗ Failed to initialize etcd: {}", e.getMessage());
+            }
+        }
 
         // Initialize health check server (should be last)
         if (config.healthServerEnabled()) {
@@ -158,8 +199,24 @@ public class InfrastructureManager implements AutoCloseable {
         return healthServer;
     }
 
-    public MessagePackSerializer getMessagePackSerializer() {
-        return messagePackSerializer;
+    public SerializerFactory getSerializerFactory() {
+        return serializerFactory;
+    }
+
+    public ProtocolAdapter getProtocolAdapter() {
+        return protocolAdapter;
+    }
+
+    public QuicTransport getQuicTransport() {
+        return quicTransport;
+    }
+
+    public EtcdServiceDiscovery getEtcdServiceDiscovery() {
+        return etcdServiceDiscovery;
+    }
+
+    public EnhancedLogging getEnhancedLogging() {
+        return enhancedLogging;
     }
 
     public boolean isInitialized() {
@@ -170,12 +227,30 @@ public class InfrastructureManager implements AutoCloseable {
     public void close() {
         LOGGER.info("Shutting down infrastructure components...");
 
+        // Close QUIC transport
+        if (quicTransport != null) {
+            try {
+                quicTransport.close();
+            } catch (Exception e) {
+                LOGGER.warn("Error closing QUIC transport: {}", e.getMessage());
+            }
+        }
+
         // Deregister from service discovery first
         if (serviceDiscovery != null) {
             try {
                 serviceDiscovery.close();
             } catch (Exception e) {
                 LOGGER.warn("Error closing service discovery: {}", e.getMessage());
+            }
+        }
+
+        // Close etcd service discovery
+        if (etcdServiceDiscovery != null) {
+            try {
+                etcdServiceDiscovery.close();
+            } catch (Exception e) {
+                LOGGER.warn("Error closing etcd: {}", e.getMessage());
             }
         }
 

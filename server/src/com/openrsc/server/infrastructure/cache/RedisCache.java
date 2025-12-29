@@ -256,6 +256,206 @@ public class RedisCache implements AutoCloseable {
         }
     }
 
+    // ==================== LEADERBOARD OPERATIONS ====================
+
+    /**
+     * Updates a player's score in a leaderboard.
+     */
+    public boolean updateLeaderboard(String leaderboard, String member, double score) {
+        if (!connected) return false;
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            jedis.zadd(prefixKey("leaderboard:" + leaderboard), score, member);
+            return true;
+        } catch (Exception e) {
+            LOGGER.warn("Redis ZADD failed for leaderboard {}: {}", leaderboard, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Gets the top N players from a leaderboard.
+     */
+    public java.util.List<LeaderboardEntry> getLeaderboardTop(String leaderboard, int count) {
+        if (!connected) return java.util.List.of();
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            var entries = jedis.zrevrangeWithScores(prefixKey("leaderboard:" + leaderboard), 0, count - 1);
+            java.util.List<LeaderboardEntry> result = new java.util.ArrayList<>();
+            int rank = 1;
+            for (var entry : entries) {
+                result.add(new LeaderboardEntry(entry.getElement(), entry.getScore(), rank++));
+            }
+            return result;
+        } catch (Exception e) {
+            LOGGER.warn("Redis ZREVRANGE failed for leaderboard {}: {}", leaderboard, e.getMessage());
+            return java.util.List.of();
+        }
+    }
+
+    /**
+     * Gets a player's rank in a leaderboard (1-indexed).
+     */
+    public Optional<Long> getLeaderboardRank(String leaderboard, String member) {
+        if (!connected) return Optional.empty();
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            Long rank = jedis.zrevrank(prefixKey("leaderboard:" + leaderboard), member);
+            return rank != null ? Optional.of(rank + 1) : Optional.empty();
+        } catch (Exception e) {
+            LOGGER.warn("Redis ZREVRANK failed for leaderboard {}: {}", leaderboard, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Gets a player's score in a leaderboard.
+     */
+    public Optional<Double> getLeaderboardScore(String leaderboard, String member) {
+        if (!connected) return Optional.empty();
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            Double score = jedis.zscore(prefixKey("leaderboard:" + leaderboard), member);
+            return Optional.ofNullable(score);
+        } catch (Exception e) {
+            LOGGER.warn("Redis ZSCORE failed for leaderboard {}: {}", leaderboard, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Increments a player's score in a leaderboard.
+     */
+    public double incrementLeaderboardScore(String leaderboard, String member, double increment) {
+        if (!connected) return 0;
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            return jedis.zincrby(prefixKey("leaderboard:" + leaderboard), increment, member);
+        } catch (Exception e) {
+            LOGGER.warn("Redis ZINCRBY failed for leaderboard {}: {}", leaderboard, e.getMessage());
+            return 0;
+        }
+    }
+
+    // ==================== RATE LIMITING ====================
+
+    /**
+     * Checks and increments a rate limit counter.
+     * Returns true if under limit, false if rate limited.
+     */
+    public boolean checkRateLimit(String key, int maxRequests, int windowSeconds) {
+        if (!connected) return true; // Allow if Redis unavailable
+
+        String fullKey = prefixKey("ratelimit:" + key);
+        try (Jedis jedis = jedisPool.getResource()) {
+            long current = jedis.incr(fullKey);
+            if (current == 1) {
+                jedis.expire(fullKey, windowSeconds);
+            }
+            return current <= maxRequests;
+        } catch (Exception e) {
+            LOGGER.warn("Redis rate limit check failed for {}: {}", key, e.getMessage());
+            return true; // Allow on error
+        }
+    }
+
+    /**
+     * Gets the remaining rate limit quota.
+     */
+    public int getRateLimitRemaining(String key, int maxRequests) {
+        if (!connected) return maxRequests;
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            String value = jedis.get(prefixKey("ratelimit:" + key));
+            if (value == null) return maxRequests;
+            int current = Integer.parseInt(value);
+            return Math.max(0, maxRequests - current);
+        } catch (Exception e) {
+            return maxRequests;
+        }
+    }
+
+    /**
+     * Resets a rate limit counter.
+     */
+    public boolean resetRateLimit(String key) {
+        return delete("ratelimit:" + key);
+    }
+
+    // ==================== ONLINE PLAYER TRACKING ====================
+
+    /**
+     * Sets a player as online on a specific server.
+     */
+    public boolean setPlayerOnline(String username, String serverId) {
+        if (!connected) return false;
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            jedis.sadd(prefixKey("online:all"), username);
+            jedis.hset(prefixKey("online:servers"), username, serverId);
+            return true;
+        } catch (Exception e) {
+            LOGGER.warn("Redis failed to set player online: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Sets a player as offline.
+     */
+    public boolean setPlayerOffline(String username) {
+        if (!connected) return false;
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            jedis.srem(prefixKey("online:all"), username);
+            jedis.hdel(prefixKey("online:servers"), username);
+            return true;
+        } catch (Exception e) {
+            LOGGER.warn("Redis failed to set player offline: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Checks if a player is online.
+     */
+    public boolean isPlayerOnline(String username) {
+        if (!connected) return false;
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            return jedis.sismember(prefixKey("online:all"), username);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Gets the count of online players.
+     */
+    public long getOnlinePlayerCount() {
+        if (!connected) return 0;
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            return jedis.scard(prefixKey("online:all"));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Gets which server a player is on.
+     */
+    public Optional<String> getPlayerServer(String username) {
+        if (!connected) return Optional.empty();
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            String server = jedis.hget(prefixKey("online:servers"), username);
+            return Optional.ofNullable(server);
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
     /**
      * Checks if connected to Redis.
      */
@@ -286,6 +486,11 @@ public class RedisCache implements AutoCloseable {
             LOGGER.info("Redis connection pool closed");
         }
     }
+
+    /**
+     * Leaderboard entry record.
+     */
+    public record LeaderboardEntry(String member, double score, int rank) {}
 
     /**
      * Redis configuration record.
