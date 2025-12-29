@@ -151,6 +151,105 @@ public sealed class ServerSettings
 }
 
 /// <summary>
+/// Security-related settings for encryption, authentication, and auditing.
+/// </summary>
+public sealed class SecuritySettings
+{
+    public const string SectionName = "Security";
+
+    /// <summary>
+    /// Master encryption key for data at rest (base64, 256-bit).
+    /// Generate with: DataEncryption.GenerateKey()
+    /// </summary>
+    public string MasterEncryptionKey { get; set; } = "";
+
+    /// <summary>
+    /// Enable encryption for sensitive player data at rest.
+    /// </summary>
+    public bool EncryptSensitiveData { get; set; } = true;
+
+    /// <summary>
+    /// Password hashing algorithm to use (Argon2id or Pbkdf2Sha512).
+    /// </summary>
+    public string PasswordHashAlgorithm { get; set; } = "Argon2id";
+
+    /// <summary>
+    /// Enforce strong password requirements for new accounts.
+    /// </summary>
+    public bool EnforceStrongPasswords { get; set; } = true;
+
+    /// <summary>
+    /// Minimum password length.
+    /// </summary>
+    public int MinPasswordLength { get; set; } = 8;
+
+    /// <summary>
+    /// Require uppercase letters in passwords.
+    /// </summary>
+    public bool RequirePasswordUppercase { get; set; } = true;
+
+    /// <summary>
+    /// Require lowercase letters in passwords.
+    /// </summary>
+    public bool RequirePasswordLowercase { get; set; } = true;
+
+    /// <summary>
+    /// Require digits in passwords.
+    /// </summary>
+    public bool RequirePasswordDigit { get; set; } = true;
+
+    /// <summary>
+    /// Require special characters in passwords.
+    /// </summary>
+    public bool RequirePasswordSpecialChar { get; set; } = true;
+
+    /// <summary>
+    /// Reject common/weak passwords.
+    /// </summary>
+    public bool RejectCommonPasswords { get; set; } = true;
+
+    /// <summary>
+    /// Maximum failed login attempts before account lockout.
+    /// </summary>
+    public int MaxFailedLoginAttempts { get; set; } = 5;
+
+    /// <summary>
+    /// Account lockout duration in minutes.
+    /// </summary>
+    public int AccountLockoutMinutes { get; set; } = 15;
+
+    /// <summary>
+    /// Enable security audit logging.
+    /// </summary>
+    public bool EnableSecurityAuditLog { get; set; } = true;
+
+    /// <summary>
+    /// Path to security audit log file.
+    /// </summary>
+    public string SecurityAuditLogPath { get; set; } = "logs/security-audit.log";
+
+    /// <summary>
+    /// Session token expiration in hours.
+    /// </summary>
+    public int SessionTokenExpirationHours { get; set; } = 24;
+
+    /// <summary>
+    /// Enable session token refresh.
+    /// </summary>
+    public bool EnableSessionTokenRefresh { get; set; } = true;
+
+    /// <summary>
+    /// Require re-authentication for sensitive operations.
+    /// </summary>
+    public bool RequireReauthForSensitiveOps { get; set; } = true;
+
+    /// <summary>
+    /// Enable IP-based session binding (more secure but may cause issues with dynamic IPs).
+    /// </summary>
+    public bool BindSessionToIp { get; set; } = false;
+}
+
+/// <summary>
 /// Combat-related settings.
 /// </summary>
 public sealed class CombatSettings
