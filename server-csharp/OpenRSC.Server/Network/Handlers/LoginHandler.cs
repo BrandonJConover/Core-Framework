@@ -41,7 +41,7 @@ public sealed class LoginHandler
     }
 
     [PacketHandler(OpcodeIn.Login)]
-    public async Task HandleLogin(GameClient client, Packet packet)
+    public async Task HandleLogin(IGameClient client, Packet packet)
     {
         // Read login data
         var reconnecting = packet.ReadByte() == 1;
@@ -150,7 +150,7 @@ public sealed class LoginHandler
     }
 
     [PacketHandler(OpcodeIn.Logout)]
-    public async Task HandleLogout(GameClient client, Packet packet)
+    public async Task HandleLogout(IGameClient client, Packet packet)
     {
         if (client.Player == null)
         {
@@ -183,7 +183,7 @@ public sealed class LoginHandler
         _logger.LogInformation("Player {Username} logged out", player.Username);
     }
 
-    private async Task SendLoginResponse(GameClient client, LoginResponse response)
+    private async Task SendLoginResponse(IGameClient client, LoginResponse response)
     {
         using var packet = new Packet((byte)OpcodeOut.WorldInfo);
         packet.WriteByte((byte)response);
@@ -197,7 +197,7 @@ public sealed class LoginHandler
         await client.SendAsync(packet);
     }
 
-    private async Task SendInitialState(GameClient client, Player player)
+    private async Task SendInitialState(IGameClient client, Player player)
     {
         var actionSender = player.ActionSender;
         if (actionSender is null)

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenRSC.Server.Configuration;
+using OpenRSC.Server.Security;
 
 namespace OpenRSC.Server.Network;
 
@@ -19,10 +20,12 @@ public sealed class WebSocketServer : BackgroundService
     private readonly ILoggerFactory _loggerFactory;
     private readonly ServerSettings _settings;
     private readonly PacketDispatcher _packetDispatcher;
+    private readonly DDoSProtectionService? _ddosProtection;
 
     private readonly ConcurrentDictionary<Guid, WebSocketClient> _clients = new();
     private readonly ConcurrentDictionary<string, int> _connectionsPerIp = new();
     private readonly HashSet<string> _allowedOrigins = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _trustedProxyIps = new(StringComparer.OrdinalIgnoreCase);
     private HttpListener? _listener;
 
     /// <summary>
@@ -44,15 +47,18 @@ public sealed class WebSocketServer : BackgroundService
         ILogger<WebSocketServer> logger,
         ILoggerFactory loggerFactory,
         IOptions<ServerSettings> settings,
-        PacketDispatcher packetDispatcher)
+        PacketDispatcher packetDispatcher,
+        DDoSProtectionService? ddosProtection = null)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _settings = settings.Value;
         _packetDispatcher = packetDispatcher;
+        _ddosProtection = ddosProtection;
 
-        // Parse allowed origins
+        // Parse allowed origins and trusted proxy IPs
         ParseAllowedOrigins();
+        ParseTrustedProxyIps();
     }
 
     private void ParseAllowedOrigins()
@@ -72,6 +78,28 @@ public sealed class WebSocketServer : BackgroundService
 
         _logger.LogInformation("WebSocket allowed origins: {Origins}",
             string.Join(", ", _allowedOrigins));
+    }
+
+    private void ParseTrustedProxyIps()
+    {
+        var proxyIps = _settings.TrustedProxyIps?.Trim() ?? "";
+        if (string.IsNullOrEmpty(proxyIps))
+            return;
+
+        foreach (var ip in proxyIps.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmedIp = ip.Trim();
+            if (IPAddress.TryParse(trimmedIp, out _))
+            {
+                _trustedProxyIps.Add(trimmedIp);
+            }
+        }
+
+        if (_trustedProxyIps.Count > 0)
+        {
+            _logger.LogInformation("Trusted proxy IPs: {Proxies}",
+                string.Join(", ", _trustedProxyIps));
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -202,6 +230,26 @@ ws.onmessage = (event) => {{
         var remoteIp = GetClientIp(context);
         var origin = context.Request.Headers["Origin"] ?? "";
 
+        // DDoS Protection: Check if IP is allowed to connect
+        if (_ddosProtection is not null)
+        {
+            var ddosCheck = await _ddosProtection.CheckConnectionAsync(remoteIp);
+            if (!ddosCheck.IsAllowed)
+            {
+                _logger.LogWarning("DDoS protection blocked connection from {IP}: {Reason}",
+                    remoteIp, ddosCheck.BlockReason);
+
+                context.Response.StatusCode = ddosCheck.IsBanned ? 403 : 429;
+                if (ddosCheck.RetryAfter.HasValue)
+                {
+                    context.Response.Headers.Add("Retry-After",
+                        ((int)ddosCheck.RetryAfter.Value.TotalSeconds).ToString());
+                }
+                context.Response.Close();
+                return;
+            }
+        }
+
         // Security: Validate origin
         if (!ValidateOrigin(origin))
         {
@@ -250,7 +298,7 @@ ws.onmessage = (event) => {{
         }
 
         var clientLogger = _loggerFactory.CreateLogger<WebSocketClient>();
-        var client = new WebSocketClient(wsContext.WebSocket, remoteIp, clientLogger);
+        var client = new WebSocketClient(wsContext.WebSocket, remoteIp, clientLogger, _settings.WebSocketMaxMessageSize);
 
         // Register client
         if (!_clients.TryAdd(client.Id, client))
@@ -268,6 +316,7 @@ ws.onmessage = (event) => {{
         client.Disconnected += async (c) =>
         {
             DecrementConnectionCount(remoteIp);
+            _ddosProtection?.RecordDisconnect(remoteIp);
             await OnClientDisconnectedAsync(c);
         };
 
@@ -286,6 +335,16 @@ ws.onmessage = (event) => {{
 
     private string GetClientIp(HttpListenerContext context)
     {
+        var directIp = context.Request.RemoteEndPoint?.Address.ToString() ?? "unknown";
+
+        // Only trust proxy headers if enabled and from trusted source
+        if (!_settings.TrustProxyHeaders)
+            return directIp;
+
+        // If trusted proxy IPs are configured, verify the request comes from one
+        if (_trustedProxyIps.Count > 0 && !_trustedProxyIps.Contains(directIp))
+            return directIp;
+
         // Check for proxy headers (X-Forwarded-For, X-Real-IP)
         var forwardedFor = context.Request.Headers["X-Forwarded-For"];
         if (!string.IsNullOrEmpty(forwardedFor))
@@ -304,7 +363,7 @@ ws.onmessage = (event) => {{
             return realIp;
         }
 
-        return context.Request.RemoteEndPoint?.Address.ToString() ?? "unknown";
+        return directIp;
     }
 
     private bool ValidateOrigin(string origin)
@@ -373,6 +432,12 @@ ws.onmessage = (event) => {{
     /// Gets all connected WebSocket clients.
     /// </summary>
     public IEnumerable<WebSocketClient> GetClients() => _clients.Values;
+
+    /// <summary>
+    /// Gets DDoS protection statistics.
+    /// </summary>
+    public (long ConnectionsBlocked, long RequestsBlocked, long IpsBanned, int ActiveTrackers, int ActiveBans)? GetProtectionStats()
+        => _ddosProtection?.GetStatistics();
 
     /// <summary>
     /// Broadcasts a packet to all connected WebSocket clients.
