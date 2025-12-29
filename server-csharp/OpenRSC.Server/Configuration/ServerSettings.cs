@@ -485,6 +485,59 @@ public sealed class DatabaseSettings
 }
 
 /// <summary>
+/// Device fingerprinting and management settings.
+/// </summary>
+public sealed class DeviceSettings
+{
+    public const string SectionName = "Device";
+
+    /// <summary>
+    /// Enable device fingerprinting.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Maximum devices per user account.
+    /// </summary>
+    public int MaxDevicesPerUser { get; set; } = 10;
+
+    /// <summary>
+    /// Risk score added for new/unrecognized devices.
+    /// </summary>
+    public int NewDeviceRiskScore { get; set; } = 25;
+
+    /// <summary>
+    /// Risk score threshold requiring additional verification.
+    /// </summary>
+    public int VerificationThreshold { get; set; } = 50;
+
+    /// <summary>
+    /// Automatically register new devices on successful login.
+    /// </summary>
+    public bool AutoRegisterDevices { get; set; } = true;
+
+    /// <summary>
+    /// Block logins from jailbroken/rooted devices.
+    /// </summary>
+    public bool BlockCompromisedDevices { get; set; } = false;
+
+    /// <summary>
+    /// Block logins from emulators/simulators.
+    /// </summary>
+    public bool BlockEmulators { get; set; } = false;
+
+    /// <summary>
+    /// Notify user via email when new device logs in.
+    /// </summary>
+    public bool NotifyNewDevice { get; set; } = true;
+
+    /// <summary>
+    /// Days to retain inactive device records.
+    /// </summary>
+    public int DeviceRetentionDays { get; set; } = 365;
+}
+
+/// <summary>
 /// Redis cache settings.
 /// </summary>
 public sealed class RedisSettings
