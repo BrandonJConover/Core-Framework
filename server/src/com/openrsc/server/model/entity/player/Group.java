@@ -2,9 +2,13 @@ package com.openrsc.server.model.entity.player;
 
 import com.openrsc.server.model.world.World;
 
-import java.util.HashMap;
+import java.util.Map;
 
-public class Group {
+/**
+ * Player group/rank definitions.
+ * Modernized to use Java 9+ Map.of() and Java 14+ switch expressions.
+ */
+public final class Group {
 	public static final int OWNER = 0;
 	public static final int ADMIN = 1;
 	public static final int SUPER_MOD = 2;
@@ -17,86 +21,50 @@ public class Group {
 
 	public static final int DEFAULT_GROUP = Group.USER;
 
-	public static final HashMap<Integer, String> GROUP_NAMES = new HashMap<Integer, String>();
+	public static final Map<Integer, String> GROUP_NAMES = Map.ofEntries(
+		Map.entry(OWNER, "Owner"),
+		Map.entry(ADMIN, "Admin"),
+		Map.entry(SUPER_MOD, "Super Moderator"),
+		Map.entry(MOD, "Moderator"),
+		Map.entry(DEV, "Developer"),
+		Map.entry(EVENT, "Event"),
+		Map.entry(PLAYER_MOD, "Player Moderator"),
+		Map.entry(TESTER, "Tester"),
+		Map.entry(USER, "User")
+	);
 
-	static {
-		GROUP_NAMES.put(OWNER, "Owner");
-		GROUP_NAMES.put(ADMIN, "Admin");
-		GROUP_NAMES.put(SUPER_MOD, "Super Moderator");
-		GROUP_NAMES.put(MOD, "Moderator");
-		GROUP_NAMES.put(DEV, "Developer");
-		GROUP_NAMES.put(EVENT, "Event");
-		GROUP_NAMES.put(PLAYER_MOD, "Player Moderator");
-		GROUP_NAMES.put(TESTER, "Tester");
-		GROUP_NAMES.put(USER, "User");
-	}
+	private Group() {} // Prevent instantiation
 
 	public static String getGlobalMessageName(int groupID) {
-		switch (groupID) {
-			case OWNER:
-			case ADMIN:
-				return "Admin";
-			case SUPER_MOD:
-			case MOD:
-				return "Mod";
-			case DEV:
-			case EVENT:
-				return "Event";
-			case PLAYER_MOD:
-				return "Pmod";
-			case TESTER:
-			case USER:
-			default:
-				return "";
-		}
+		return switch (groupID) {
+			case OWNER, ADMIN -> "Admin";
+			case SUPER_MOD, MOD -> "Mod";
+			case DEV, EVENT -> "Event";
+			case PLAYER_MOD -> "Pmod";
+			case TESTER, USER -> "";
+			default -> "";
+		};
 	}
 
 	public static String getNameColour(World world, int groupID) {
-		if (!world.getServer().getConfig().WANT_CUSTOM_RANK_DISPLAY)
+		if (!world.getServer().getConfig().WANT_CUSTOM_RANK_DISPLAY) {
 			return "";
-
-		switch (groupID) {
-			case OWNER:
-				return "@dcy@";
-			case ADMIN:
-				return "@gre@";
-			case SUPER_MOD:
-				return "@blu@";
-			case MOD:
-				return "@bl1@";
-			case DEV:
-				return "@red@";
-			case EVENT:
-				return "@eve@";
-			case PLAYER_MOD:
-			case TESTER:
-			case USER:
-			default:
-				return "";
 		}
+
+		return switch (groupID) {
+			case OWNER -> "@dcy@";
+			case ADMIN -> "@gre@";
+			case SUPER_MOD -> "@blu@";
+			case MOD -> "@bl1@";
+			case DEV -> "@red@";
+			case EVENT -> "@eve@";
+			case PLAYER_MOD, TESTER, USER -> "";
+			default -> "";
+		};
 	}
 
 	public static String getNameSprite(int groupID) {
 		return "";
-
-		/*if (!getServer().getConfig().WANT_CUSTOM_RANK_DISPLAY)
-			return "";
-
-		switch (groupID) {
-			case OWNER:
-			case ADMIN:
-				return "#adm#";
-			case SUPER_MOD:
-			case MOD:
-				return "#mod#";
-			case DEV:
-				return "#dev#";
-			case EVENT:
-				return "#eve#";
-			case USER:
-			default:
-				return "";
-		}*/
 	}
 
 	public static String getStaffPrefix(World world, int groupID) {

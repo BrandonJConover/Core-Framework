@@ -1,6 +1,7 @@
 pub mod cache;
 pub mod config;
 pub mod discovery;
+pub mod http;
 pub mod metrics;
 pub mod serialization;
 pub mod tracing_config;
