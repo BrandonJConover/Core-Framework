@@ -25,3 +25,22 @@ public abstract class WalkToObjectAction : WalkToAction
 
     public override string FailureMessage => "You are unable to reach the object.";
 }
+
+/// <summary>
+/// Concrete implementation of WalkToObjectAction that executes a delegate when the player reaches the object.
+/// </summary>
+public sealed class GenericWalkToObjectAction : WalkToObjectAction
+{
+    private readonly Action _action;
+
+    public GenericWalkToObjectAction(Player player, GameObject gameObject, Action action)
+        : base(player, gameObject)
+    {
+        _action = action ?? throw new ArgumentNullException(nameof(action));
+    }
+
+    protected override void ExecuteInternal()
+    {
+        _action();
+    }
+}

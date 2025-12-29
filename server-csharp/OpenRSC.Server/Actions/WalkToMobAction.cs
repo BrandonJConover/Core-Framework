@@ -81,3 +81,28 @@ public abstract class WalkToMobAction : WalkToAction
         _ => $"You are unable to reach the {(TargetMob.IsPlayer ? "player" : "NPC")}."
     };
 }
+
+/// <summary>
+/// Concrete implementation of WalkToMobAction that executes a delegate when the player reaches the mob.
+/// </summary>
+public sealed class GenericWalkToMobAction : WalkToMobAction
+{
+    private readonly Action _action;
+
+    public GenericWalkToMobAction(
+        Player player,
+        Mob mob,
+        Action action,
+        int radius = 1,
+        bool ignoreProjectileAllowed = true,
+        ActionType actionType = ActionType.Other)
+        : base(player, mob, radius, ignoreProjectileAllowed, actionType)
+    {
+        _action = action ?? throw new ArgumentNullException(nameof(action));
+    }
+
+    protected override void ExecuteInternal()
+    {
+        _action();
+    }
+}

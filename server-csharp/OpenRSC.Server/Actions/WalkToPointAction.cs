@@ -26,3 +26,22 @@ public abstract class WalkToPointAction : WalkToAction
 
     public override string FailureMessage => "You are unable to reach that location.";
 }
+
+/// <summary>
+/// Concrete implementation of WalkToPointAction that executes a delegate when the player reaches the location.
+/// </summary>
+public sealed class GenericWalkToPointAction : WalkToPointAction
+{
+    private readonly Action _action;
+
+    public GenericWalkToPointAction(Player player, Point location, Action action, int radius = 0)
+        : base(player, location, radius)
+    {
+        _action = action ?? throw new ArgumentNullException(nameof(action));
+    }
+
+    protected override void ExecuteInternal()
+    {
+        _action();
+    }
+}
