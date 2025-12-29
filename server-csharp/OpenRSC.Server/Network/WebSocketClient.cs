@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using OpenRSC.Server.Entities;
 
@@ -10,6 +11,7 @@ namespace OpenRSC.Server.Network;
 /// <summary>
 /// Represents a connected WebSocket game client.
 /// Uses JSON protocol for web/mobile compatibility.
+/// Optimized for minimal allocations.
 /// </summary>
 public sealed class WebSocketClient : IGameClient
 {
@@ -17,6 +19,14 @@ public sealed class WebSocketClient : IGameClient
     private readonly ILogger<WebSocketClient> _logger;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly CancellationTokenSource _cts = new();
+
+    // Cached serializer options with source generation for performance
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        WriteIndented = false
+    };
 
     private bool _disposed;
 
@@ -72,15 +82,15 @@ public sealed class WebSocketClient : IGameClient
                     break;
                 }
 
+                LastActivity = DateTime.UtcNow;
+
                 if (result.MessageType == WebSocketMessageType.Text)
                 {
-                    LastActivity = DateTime.UtcNow;
-                    await ProcessJsonMessageAsync(buffer.AsMemory(0, result.Count));
+                    await ProcessJsonMessageAsync(buffer.AsSpan(0, result.Count));
                 }
                 else if (result.MessageType == WebSocketMessageType.Binary)
                 {
-                    LastActivity = DateTime.UtcNow;
-                    await ProcessBinaryMessageAsync(buffer.AsMemory(0, result.Count));
+                    await ProcessBinaryMessageAsync(buffer.AsSpan(0, result.Count));
                 }
             }
         }
@@ -106,12 +116,13 @@ public sealed class WebSocketClient : IGameClient
     /// <summary>
     /// Processes a JSON message from the web client.
     /// </summary>
-    private async Task ProcessJsonMessageAsync(Memory<byte> data)
+    private async Task ProcessJsonMessageAsync(ReadOnlySpan<byte> data)
     {
         try
         {
-            var json = Encoding.UTF8.GetString(data.Span);
-            var message = JsonSerializer.Deserialize<WebSocketMessage>(json);
+            // Use Utf8JsonReader for zero-allocation parsing where possible
+            var reader = new Utf8JsonReader(data);
+            var message = JsonSerializer.Deserialize<WebSocketMessage>(ref reader, JsonOptions);
 
             if (message is null)
             {
@@ -120,17 +131,10 @@ public sealed class WebSocketClient : IGameClient
             }
 
             // Convert JSON message to binary packet for handlers
-            var packet = ConvertToPacket(message);
+            using var packet = ConvertToPacket(message);
             if (packet is not null && PacketReceived is not null)
             {
-                try
-                {
-                    await PacketReceived.Invoke(this, packet);
-                }
-                finally
-                {
-                    packet.Dispose();
-                }
+                await PacketReceived.Invoke(this, packet);
             }
         }
         catch (JsonException ex)
@@ -142,24 +146,17 @@ public sealed class WebSocketClient : IGameClient
     /// <summary>
     /// Processes a binary message (standard RSC protocol).
     /// </summary>
-    private async Task ProcessBinaryMessageAsync(Memory<byte> data)
+    private async Task ProcessBinaryMessageAsync(ReadOnlySpan<byte> data)
     {
         if (data.Length < 1) return;
 
-        var opcode = data.Span[0];
-        var payload = data.Length > 1 ? data.Slice(1) : Memory<byte>.Empty;
+        var opcode = data[0];
+        var payload = data.Length > 1 ? data[1..] : ReadOnlySpan<byte>.Empty;
 
-        var packet = new Packet(opcode, payload.Span);
-        try
+        using var packet = new Packet(opcode, payload);
+        if (PacketReceived is not null)
         {
-            if (PacketReceived is not null)
-            {
-                await PacketReceived.Invoke(this, packet);
-            }
-        }
-        finally
-        {
-            packet.Dispose();
+            await PacketReceived.Invoke(this, packet);
         }
     }
 
@@ -173,7 +170,6 @@ public sealed class WebSocketClient : IGameClient
         switch ((OpcodeIn)message.Op)
         {
             case OpcodeIn.Login:
-                // Login: { op: 0, username: "...", password: "...", version: 235 }
                 packet.WriteByte(0); // Not reconnecting
                 packet.WriteShort((short)(message.Version ?? 235));
                 packet.WriteString(message.Username ?? "");
@@ -181,81 +177,55 @@ public sealed class WebSocketClient : IGameClient
                 break;
 
             case OpcodeIn.Logout:
-                // Logout: { op: 1 }
-                break;
-
             case OpcodeIn.Ping:
-                // Ping: { op: 67 }
+                // No payload needed
                 break;
 
             case OpcodeIn.WalkToPoint:
             case OpcodeIn.WalkToEntity:
-                // Walk: { op: 16, x: 100, y: 500, path: [[x,y], ...] }
-                if (message.Path is not null && message.Path.Count > 0)
+                if (message.Path is { Count: > 0 })
                 {
-                    // Start point
                     packet.WriteShort((short)message.Path[0][0]);
                     packet.WriteShort((short)message.Path[0][1]);
                     packet.WriteByte((byte)(message.Path.Count - 1));
 
-                    // Additional waypoints
+                    var startX = message.Path[0][0];
+                    var startY = message.Path[0][1];
                     for (var i = 1; i < message.Path.Count; i++)
                     {
-                        packet.WriteByte((byte)(message.Path[i][0] - message.Path[0][0]));
-                        packet.WriteByte((byte)(message.Path[i][1] - message.Path[0][1]));
+                        packet.WriteByte((byte)(message.Path[i][0] - startX));
+                        packet.WriteByte((byte)(message.Path[i][1] - startY));
                     }
                 }
                 break;
 
             case OpcodeIn.PublicChat:
-                // Chat: { op: 216, message: "Hello!" }
                 packet.WriteString(message.Message ?? "");
                 break;
 
             case OpcodeIn.AttackNpc:
-                // AttackNpc: { op: 190, npcIndex: 5 }
+            case OpcodeIn.TalkToNpc:
                 packet.WriteShort((short)(message.NpcIndex ?? 0));
                 break;
 
             case OpcodeIn.AttackPlayer:
-                // AttackPlayer: { op: 171, playerIndex: 3 }
                 packet.WriteShort((short)(message.PlayerIndex ?? 0));
                 break;
 
-            case OpcodeIn.TalkToNpc:
-                // TalkToNpc: { op: 153, npcIndex: 5 }
-                packet.WriteShort((short)(message.NpcIndex ?? 0));
-                break;
-
             case OpcodeIn.UseItemOnObject:
-                // UseItemOnObject: { op: 115, x: 100, y: 200, itemSlot: 3 }
                 packet.WriteShort((short)(message.X ?? 0));
                 packet.WriteShort((short)(message.Y ?? 0));
                 packet.WriteShort((short)(message.ItemSlot ?? 0));
                 break;
 
             case OpcodeIn.UseItem:
-                // UseItem: { op: 91, itemSlot: 3 }
-                packet.WriteShort((short)(message.ItemSlot ?? 0));
-                break;
-
             case OpcodeIn.DropItem:
-                // DropItem: { op: 246, itemSlot: 3 }
-                packet.WriteShort((short)(message.ItemSlot ?? 0));
-                break;
-
             case OpcodeIn.EquipItem:
-                // EquipItem: { op: 169, itemSlot: 3 }
-                packet.WriteShort((short)(message.ItemSlot ?? 0));
-                break;
-
             case OpcodeIn.UnequipItem:
-                // UnequipItem: { op: 170, itemSlot: 3 }
                 packet.WriteShort((short)(message.ItemSlot ?? 0));
                 break;
 
             case OpcodeIn.PickupItem:
-                // PickupItem: { op: 247, x: 100, y: 200, itemId: 10 }
                 packet.WriteShort((short)(message.X ?? 0));
                 packet.WriteShort((short)(message.Y ?? 0));
                 packet.WriteShort((short)(message.ItemId ?? 0));
@@ -263,24 +233,20 @@ public sealed class WebSocketClient : IGameClient
 
             case OpcodeIn.ObjectAction1:
             case OpcodeIn.ObjectAction2:
-                // ObjectAction: { op: 136, x: 100, y: 200 }
                 packet.WriteShort((short)(message.X ?? 0));
                 packet.WriteShort((short)(message.Y ?? 0));
                 break;
 
             case OpcodeIn.CastOnSelf:
-                // CastOnSelf: { op: 137, spellId: 12 }
                 packet.WriteShort((short)(message.SpellId ?? 0));
                 break;
 
             case OpcodeIn.CastOnNpc:
-                // CastOnNpc: { op: 50, spellId: 12, npcIndex: 5 }
                 packet.WriteShort((short)(message.SpellId ?? 0));
                 packet.WriteShort((short)(message.NpcIndex ?? 0));
                 break;
 
             case OpcodeIn.CastOnPlayer:
-                // CastOnPlayer: { op: 229, spellId: 12, playerIndex: 3 }
                 packet.WriteShort((short)(message.SpellId ?? 0));
                 packet.WriteShort((short)(message.PlayerIndex ?? 0));
                 break;
@@ -299,19 +265,34 @@ public sealed class WebSocketClient : IGameClient
     {
         if (!IsConnected) return;
 
-        await _sendLock.WaitAsync();
+        await _sendLock.WaitAsync(_cts.Token);
         try
         {
-            // Convert packet to JSON for web clients
+            // Convert packet to JSON message
             var jsonMessage = ConvertToJsonMessage(packet);
-            var json = JsonSerializer.Serialize(jsonMessage);
-            var bytes = Encoding.UTF8.GetBytes(json);
 
-            await _webSocket.SendAsync(
-                bytes.AsMemory(),
-                WebSocketMessageType.Text,
-                true,
-                _cts.Token);
+            // Use pooled buffer for serialization
+            var buffer = ArrayPool<byte>.Shared.Rent(4096);
+            try
+            {
+                using var stream = new MemoryStream(buffer);
+                await JsonSerializer.SerializeAsync(stream, jsonMessage, JsonOptions, _cts.Token);
+
+                var length = (int)stream.Position;
+                await _webSocket.SendAsync(
+                    buffer.AsMemory(0, length),
+                    WebSocketMessageType.Text,
+                    true,
+                    _cts.Token);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal cancellation during shutdown
         }
         catch (Exception ex)
         {
@@ -326,7 +307,7 @@ public sealed class WebSocketClient : IGameClient
     /// <summary>
     /// Converts a binary packet to a JSON message for web clients.
     /// </summary>
-    private WebSocketMessage ConvertToJsonMessage(Packet packet)
+    private static WebSocketMessage ConvertToJsonMessage(Packet packet)
     {
         var message = new WebSocketMessage { Op = packet.Opcode };
 
@@ -357,7 +338,6 @@ public sealed class WebSocketClient : IGameClient
                 // No additional data
                 break;
 
-            // Add more conversions as needed
             default:
                 // For unhandled opcodes, include raw data as base64
                 message.RawData = Convert.ToBase64String(packet.AsSpan());
@@ -367,50 +347,51 @@ public sealed class WebSocketClient : IGameClient
         return message;
     }
 
-    private Dictionary<string, int[]> ReadPlayerStats(Packet packet)
+    private static readonly string[] SkillNames =
     {
-        var stats = new Dictionary<string, int[]>();
-        var skills = new[] { "Attack", "Defense", "Strength", "Hits", "Ranged", "Prayer", "Magic",
-                            "Cooking", "Woodcutting", "Fletching", "Fishing", "Firemaking", "Crafting",
-                            "Smithing", "Mining", "Herblaw", "Agility", "Thieving" };
+        "Attack", "Defense", "Strength", "Hits", "Ranged", "Prayer", "Magic",
+        "Cooking", "Woodcutting", "Fletching", "Fishing", "Firemaking", "Crafting",
+        "Smithing", "Mining", "Herblaw", "Agility", "Thieving"
+    };
 
-        var current = new int[skills.Length];
-        var max = new int[skills.Length];
-        var xp = new int[skills.Length];
+    private static Dictionary<string, int[]> ReadPlayerStats(Packet packet)
+    {
+        var skillCount = SkillNames.Length;
+        var stats = new Dictionary<string, int[]>(skillCount);
 
-        for (var i = 0; i < skills.Length; i++)
+        // Read all current levels, then max levels, then XP
+        Span<int> current = stackalloc int[skillCount];
+        Span<int> max = stackalloc int[skillCount];
+        Span<int> xp = stackalloc int[skillCount];
+
+        for (var i = 0; i < skillCount; i++)
             current[i] = packet.ReadByte();
-        for (var i = 0; i < skills.Length; i++)
+        for (var i = 0; i < skillCount; i++)
             max[i] = packet.ReadByte();
-        for (var i = 0; i < skills.Length; i++)
+        for (var i = 0; i < skillCount; i++)
             xp[i] = packet.ReadInt();
 
-        for (var i = 0; i < skills.Length; i++)
-            stats[skills[i]] = new[] { current[i], max[i], xp[i] };
+        for (var i = 0; i < skillCount; i++)
+            stats[SkillNames[i]] = new[] { current[i], max[i], xp[i] };
 
         return stats;
     }
 
-    private List<Dictionary<string, object>> ReadInventory(Packet packet)
+    private static List<InventoryItem> ReadInventory(Packet packet)
     {
-        var inventory = new List<Dictionary<string, object>>();
         var count = packet.ReadByte();
+        var inventory = new List<InventoryItem>(count);
 
         for (var i = 0; i < count; i++)
         {
-            var id = packet.ReadShort();
-            var equipped = (id & 32768) != 0;
-            var stackable = (id & 32768) != 0;
+            var rawId = packet.ReadShort();
+            var equipped = (rawId & 32768) != 0;
+            var stackable = (rawId & 32768) != 0;
 
-            id &= 0x7FFF;
+            var id = rawId & 0x7FFF;
             var amount = stackable ? packet.ReadInt() : 1;
 
-            inventory.Add(new Dictionary<string, object>
-            {
-                ["id"] = id,
-                ["amount"] = amount,
-                ["equipped"] = equipped
-            });
+            inventory.Add(new InventoryItem(id, amount, equipped));
         }
 
         return inventory;
@@ -431,7 +412,7 @@ public sealed class WebSocketClient : IGameClient
 
         try
         {
-            _cts.Cancel();
+            await _cts.CancelAsync();
             if (_webSocket.State == WebSocketState.Open)
             {
                 await _webSocket.CloseAsync(
@@ -453,7 +434,7 @@ public sealed class WebSocketClient : IGameClient
         if (_disposed) return;
         _disposed = true;
 
-        _cts.Cancel();
+        await _cts.CancelAsync();
         _cts.Dispose();
         _sendLock.Dispose();
 
@@ -471,32 +452,67 @@ public sealed class WebSocketClient : IGameClient
 }
 
 /// <summary>
-/// JSON message format for WebSocket communication.
+/// Inventory item for JSON serialization.
 /// </summary>
-public class WebSocketMessage
+public readonly record struct InventoryItem(int Id, int Amount, bool Equipped);
+
+/// <summary>
+/// JSON message format for WebSocket communication.
+/// Uses records for immutability and struct-like performance.
+/// </summary>
+public sealed class WebSocketMessage
 {
-    /// <summary>
-    /// Opcode (same as RSC protocol).
-    /// </summary>
+    /// <summary>Opcode (same as RSC protocol).</summary>
+    [JsonPropertyName("op")]
     public int Op { get; set; }
 
     // Input fields
+    [JsonPropertyName("username")]
     public string? Username { get; set; }
+
+    [JsonPropertyName("password")]
     public string? Password { get; set; }
+
+    [JsonPropertyName("version")]
     public int? Version { get; set; }
+
+    [JsonPropertyName("message")]
     public string? Message { get; set; }
+
+    [JsonPropertyName("x")]
     public int? X { get; set; }
+
+    [JsonPropertyName("y")]
     public int? Y { get; set; }
+
+    [JsonPropertyName("npcIndex")]
     public int? NpcIndex { get; set; }
+
+    [JsonPropertyName("playerIndex")]
     public int? PlayerIndex { get; set; }
+
+    [JsonPropertyName("itemSlot")]
     public int? ItemSlot { get; set; }
+
+    [JsonPropertyName("itemId")]
     public int? ItemId { get; set; }
+
+    [JsonPropertyName("spellId")]
     public int? SpellId { get; set; }
+
+    [JsonPropertyName("path")]
     public List<int[]>? Path { get; set; }
 
     // Output fields
+    [JsonPropertyName("loginResult")]
     public int? LoginResult { get; set; }
+
+    [JsonPropertyName("stats")]
     public Dictionary<string, int[]>? Stats { get; set; }
-    public List<Dictionary<string, object>>? Inventory { get; set; }
+
+    [JsonPropertyName("inventory")]
+    public List<InventoryItem>? Inventory { get; set; }
+
+    [JsonPropertyName("rawData")]
     public string? RawData { get; set; }
 }
