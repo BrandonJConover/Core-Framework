@@ -83,8 +83,7 @@ public class GroundItem extends Entity {
 	}
 
 	public boolean equals(final Entity o) {
-		if (o instanceof GroundItem) {
-			GroundItem item = (GroundItem) o;
+		if (o instanceof GroundItem item) {
 			return item.getID() == getID() && item.getAmount() == getAmount()
 				&& item.getSpawnedTime() == getSpawnedTime()
 				&& (item.getOwnerUsernameHash() == getOwnerUsernameHash())
@@ -154,7 +153,7 @@ public class GroundItem extends Entity {
 
 	@Override
 	public String toString() {
-		return "Item(" + this.getID() + ", " + this.amount + ") location = " + getLocation().toString();
+		return "Item(%d, %d) location = %s".formatted(getID(), amount, getLocation());
 	}
 
 	public ItemDefinition getDef() {

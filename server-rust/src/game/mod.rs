@@ -1,11 +1,14 @@
 //! Game logic module for OpenRSC Rust server.
 //! Contains game-specific logic like player management, world state, and game mechanics.
 
-pub mod player;
-pub mod world;
-pub mod entity;
+pub mod action;
+pub mod bank;
 pub mod combat;
+pub mod entity;
+pub mod player;
 pub mod skills;
+pub mod trade;
+pub mod world;
 
 use std::collections::HashMap;
 use std::sync::Arc;

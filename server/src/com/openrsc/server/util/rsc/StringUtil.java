@@ -92,17 +92,16 @@ public class StringUtil {
 	}
 
 	public static String formatItemCount(int count) {
-
-		String str = "" + count;
+		var str = String.valueOf(count);
 
 		for (int i = str.length() - 3; i > 0; i -= 3) {
 			str = str.substring(0, i) + "," + str.substring(i);
 		}
 
 		if (str.length() > 8) {
-			str = "@gre@" + str.substring(0, str.length() - 8) + " million @whi@(" + str + ")";
+			str = "@gre@%s million @whi@(%s)".formatted(str.substring(0, str.length() - 8), str);
 		} else if (str.length() > 4) {
-			str = "@cya@" + str.substring(0, str.length() - 4) + "K @whi@(" + str + ")";
+			str = "@cya@%sK @whi@(%s)".formatted(str.substring(0, str.length() - 4), str);
 		}
 
 		return str;
@@ -118,38 +117,18 @@ public class StringUtil {
 		if ((sender == null || sender.length() == 0) && type != MessageType.TRADE)
 			return colour + msg;
 
-		switch (type) {
-			case GAME:
-				return colour + sender + ": " + colour + msg;
-			case PRIVATE_RECIEVE:
-				if (sender.toLowerCase().contains("global$")) {
-					return colour + sender.substring(7) + colour + " tells [everyone]: " + msg;
-				} else {
-					return colour + sender + colour + " tells you: " + msg;
-				}
-			case PRIVATE_SEND:
-				if (sender.toLowerCase().equals("global$")) {
-					return colour + "You tell [everyone]" + colour + ": " + msg;
-				} else {
-					return colour + "You tell " + sender + colour + ": " + msg;
-				}
-			case QUEST:
-				return colour + sender + ": " + colour + msg;
-			case CHAT:
-				return colour + sender + ": " + colour + msg;
-			case FRIEND_STATUS:
-				return colour + msg;
-			case TRADE:
-				return colour + sender + colour + " wishes to trade with you.";
-			case INVENTORY:
-				return colour + sender + ": " + colour + msg;
-			case GLOBAL_CHAT:
-				return colour + msg;
-			case CLAN_CHAT:
-				return colour + msg;
-			default:
-				return colour;
-		}
+		return switch (type) {
+			case GAME, QUEST, CHAT, INVENTORY -> "%s%s: %s%s".formatted(colour, sender, colour, msg);
+			case PRIVATE_RECIEVE -> sender.toLowerCase().contains("global$")
+				? "%s%s%s tells [everyone]: %s".formatted(colour, sender.substring(7), colour, msg)
+				: "%s%s%s tells you: %s".formatted(colour, sender, colour, msg);
+			case PRIVATE_SEND -> sender.toLowerCase().equals("global$")
+				? "%sYou tell [everyone]%s: %s".formatted(colour, colour, msg)
+				: "%sYou tell %s%s: %s".formatted(colour, sender, colour, msg);
+			case FRIEND_STATUS, GLOBAL_CHAT, CLAN_CHAT -> colour + msg;
+			case TRADE -> "%s%s%s wishes to trade with you.".formatted(colour, sender, colour);
+			default -> colour;
+		};
 	}
 
 	private static boolean isAlphaNumeric(char c) {
