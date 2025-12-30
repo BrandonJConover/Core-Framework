@@ -271,7 +271,7 @@ public class ActionSender {
 				if (item.getNoted() && !player.isUsingCustomClient()) {
 					String itemName = item.getDef(player.getWorld()).getName();
 					player.playerServerMessage(MessageType.QUEST,
-						String.format("@ran@Please Confirm: @whi@Other player is staking @gre@%d @yel@%s", item.getAmount(), itemName));
+						"@ran@Please Confirm: @whi@Other player is staking @gre@%d @yel@%s".formatted(item.getAmount(), itemName));
 				}
 				if (struct.opponentNoted != null) {
 					struct.opponentNoted[i] = item.getNoted() ? 1 : 0;
@@ -357,7 +357,7 @@ public class ActionSender {
 				if (item.getNoted() && !player.isUsingCustomClient()) {
 					String itemName = item.getDef(player.getWorld()).getName();
 					player.playerServerMessage(MessageType.QUEST,
-						String.format("@whi@Other player is staking @gre@%d @yel@%s", item.getAmount(), itemName));
+						"@whi@Other player is staking @gre@%d @yel@%s".formatted(item.getAmount(), itemName));
 				}
 				if (struct.noted != null) {
 					struct.noted[i] = item.getNoted() ? 1 : 0;

@@ -21,8 +21,8 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class StatRestorationEvent extends GameTickEvent {
 
-	private HashMap<Integer, Integer> restoringStats = new HashMap<Integer, Integer>();
-	private AtomicReference<Boolean> restoringHits = new AtomicReference<Boolean>(false);
+	private HashMap<Integer, Integer> restoringStats = new HashMap<>();
+	private AtomicReference<Boolean> restoringHits = new AtomicReference<>(false);
 	private long lastStatRestoration = System.currentTimeMillis();
 	private long lastHitRestoration = System.currentTimeMillis();
 	private long numberSkills;
