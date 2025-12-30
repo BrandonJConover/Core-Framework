@@ -6,7 +6,7 @@ import java.util.Map;
 
 public final class ThreadSafeIPTracker<IP_T> implements IPTracker<IP_T> {
 
-	private final Map<IP_T, Integer> ips = new HashMap<IP_T, Integer>();
+	private final Map<IP_T, Integer> ips = new HashMap<>();
 
 	@Override
 	public synchronized boolean add(IP_T ip) {
