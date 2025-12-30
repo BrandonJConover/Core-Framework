@@ -237,10 +237,10 @@ public class Packet {
 		int length = packet.getReadableBytes();
 		int opcode = packet.getID();
 		ByteBuf buffer = packet.getBuffer();
-		StringBuilder sb = new StringBuilder();
-		sb.append(String.format("%s Packet Opcode %d:", direction, opcode));
+		var sb = new StringBuilder();
+		sb.append("%s Packet Opcode %d:".formatted(direction, opcode));
 		for (int i=0; i < length; i++) {
-			sb.append(String.format(" %d", Byte.toUnsignedInt(buffer.readByte())));
+			sb.append(" %d".formatted(Byte.toUnsignedInt(buffer.readByte())));
 		}
 		LOGGER.debug(sb.toString());
 		buffer.resetReaderIndex();
@@ -250,10 +250,10 @@ public class Packet {
 		ByteBuf bufferDup = buffer.duplicate();
 		bufferDup.resetReaderIndex();
 		int length = bufferDup.readableBytes();
-		StringBuilder sb = new StringBuilder();
-		sb.append(String.format("%s Packet:", direction));
+		var sb = new StringBuilder();
+		sb.append("%s Packet:".formatted(direction));
 		for (int i=0; i < length; i++) {
-			sb.append(String.format(" %d", Byte.toUnsignedInt(bufferDup.readByte())));
+			sb.append(" %d".formatted(Byte.toUnsignedInt(bufferDup.readByte())));
 		}
 		LOGGER.debug(sb.toString());
 	}
