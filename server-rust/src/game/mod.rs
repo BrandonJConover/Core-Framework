@@ -5,6 +5,7 @@ pub mod action;
 pub mod bank;
 pub mod chat;
 pub mod combat;
+pub mod duel;
 pub mod entity;
 pub mod equipment;
 pub mod game_object;

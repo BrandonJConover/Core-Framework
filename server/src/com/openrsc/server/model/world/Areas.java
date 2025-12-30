@@ -4,7 +4,7 @@ import java.util.HashMap;
 
 public class Areas {
 
-	public static HashMap<String, Area> areas = new HashMap<String, Area>();
+	public static HashMap<String, Area> areas = new HashMap<>();
 
 	static {
 		addArea(new Area(796, 799, 3467, 3471, "ibans_room"));

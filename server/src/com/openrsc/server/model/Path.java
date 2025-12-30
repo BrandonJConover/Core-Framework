@@ -10,7 +10,7 @@ import java.util.LinkedList;
 public class Path {
 
 	private static final int MAXIMUM_SIZE = 50;
-	private Deque<Point> waypoints = new LinkedList<Point>();
+	private Deque<Point> waypoints = new LinkedList<>();
 	private PathType pathType;
 	private Mob mob;
 	public Path(Mob mob, PathType type) {

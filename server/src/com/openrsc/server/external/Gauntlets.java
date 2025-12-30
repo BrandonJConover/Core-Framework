@@ -13,7 +13,7 @@ public enum Gauntlets {
 	private int id;
 	private int catalogId;
 
-	private static final Map<Integer, Gauntlets> byId = new HashMap<Integer, Gauntlets>();
+	private static final Map<Integer, Gauntlets> byId = new HashMap<>();
 	static {
 		for (Gauntlets enchantment : Gauntlets.values()) {
 			if (byId.put(enchantment.id(), enchantment) != null) {
