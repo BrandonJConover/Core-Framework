@@ -7,6 +7,7 @@ pub mod chat;
 pub mod combat;
 pub mod entity;
 pub mod equipment;
+pub mod game_object;
 pub mod ground_item;
 pub mod inventory;
 pub mod item;
