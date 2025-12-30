@@ -14,7 +14,7 @@ public class Item implements Comparable<Item> {
 	/**
 	 * A place to put a special attribute if needed
 	 */
-	protected final Map<String, Object> attributes = new HashMap<String, Object>();
+	protected final Map<String, Object> attributes = new HashMap<>();
 	/**
 	 * Value given to a newly generated item
 	 */
@@ -32,8 +32,7 @@ public class Item implements Comparable<Item> {
 
 	@Override
 	public boolean equals(Object o) {
-		if (o instanceof Item) {
-			Item item = (Item) o;
+		if (o instanceof Item item) {
 			return item.getCatalogId() == getCatalogId()
 				&& item.getNoted() == getNoted();
 		}
@@ -42,7 +41,7 @@ public class Item implements Comparable<Item> {
 
 	@Override
 	public String toString() {
-		return "Item(" + getCatalogId() + ", " + getAmount() + ", " + getNoted() + ")";
+		return "Item(%d, %d, %b)".formatted(getCatalogId(), getAmount(), getNoted());
 	}
 	//-----------------------------------------------------------------
 	//Constructors------------------------------------------------------

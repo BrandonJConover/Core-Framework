@@ -478,10 +478,10 @@ public abstract class Mob extends Entity {
 
 	public void setPossessing(final Mob mob) {
 		possessing = mob;
-		if (mob instanceof Player) {
-			possessingUsername = ((Player)mob).getUsername();
-		} else {
-			possessingUsername = ((Npc) possessing).getDef().getName();
+		if (mob instanceof Player player) {
+			possessingUsername = player.getUsername();
+		} else if (possessing instanceof Npc npc) {
+			possessingUsername = npc.getDef().getName();
 		}
 		possessionEvent = new GameTickEvent(getWorld(), this, 0, "Moderator possessing Mob", DuplicationStrategy.ALLOW_MULTIPLE) {
 			public void run() {
@@ -495,7 +495,7 @@ public abstract class Mob extends Entity {
 							moderator.message("The body you possessed has left this world, but your spirit still searches for them...");
 							moderator.knowsPossesseeLoggedOut = true;
 						}
-						Player targetPlayer = moderator.getWorld().getPlayer(DataConversions.usernameToHash(moderator.possessingUsername));
+						var targetPlayer = moderator.getWorld().getPlayer(DataConversions.usernameToHash(moderator.possessingUsername));
 						if (targetPlayer == null)
 							return;
 						moderator.message("Your spirit has found @mag@" + possessingUsername + "@whi@ once again.");

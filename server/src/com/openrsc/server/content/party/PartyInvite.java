@@ -63,7 +63,7 @@ public class PartyInvite {
 				return;
 			}
 		} else {
-			if (invited.getPartyInviteSetting() == true) {
+			if (invited.getPartyInviteSetting()) {
 				ActionSender.sendBox(player,
 					"@lre@Party: %"
 						+ " %"

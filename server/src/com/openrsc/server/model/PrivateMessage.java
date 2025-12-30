@@ -2,39 +2,26 @@ package com.openrsc.server.model;
 
 import com.openrsc.server.model.entity.player.Player;
 
-public class PrivateMessage {
-
-	private Player player;
-	private String message;
-	private long friend;
-
-	public PrivateMessage(Player player, String message, long friend) {
-		this.setPlayer(player);
-		this.setMessage(message);
-		this.setFriend(friend);
+/**
+ * Represents a private message between players.
+ * Modernized to Java 16+ record for immutability.
+ */
+public record PrivateMessage(
+	Player player,
+	String message,
+	long friend
+) {
+	/**
+	 * Compact constructor with validation.
+	 */
+	public PrivateMessage {
+		if (message == null) {
+			message = "";
+		}
 	}
 
-	public Player getPlayer() {
-		return player;
-	}
-
-	public void setPlayer(Player player) {
-		this.player = player;
-	}
-
-	public long getFriend() {
-		return friend;
-	}
-
-	public void setFriend(long friend) {
-		this.friend = friend;
-	}
-
-	public String getMessage() {
-		return message;
-	}
-
-	public void setMessage(String message) {
-		this.message = message;
-	}
+	// Legacy getter aliases for backwards compatibility
+	public Player getPlayer() { return player; }
+	public String getMessage() { return message; }
+	public long getFriend() { return friend; }
 }

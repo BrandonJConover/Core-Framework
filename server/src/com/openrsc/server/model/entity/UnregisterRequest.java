@@ -44,7 +44,7 @@ public class UnregisterRequest {
 		if (force == UnregisterForcefulness.FORCED || player.canLogout()) {
 			player.updateCacheTimersForLogout();
 			player.alertQueuedSleepwordCancelledByLogout();
-			LOGGER.info("Requesting unregistration for " + player.getUsername() + ": " + reason);
+			LOGGER.info("Requesting unregistration for %s: %s".formatted(player.getUsername(), reason));
 			player.setUnregistering(true);
 		} else {
 			if (force == UnregisterForcefulness.WAIT_UNTIL_COMBAT_ENDS) {

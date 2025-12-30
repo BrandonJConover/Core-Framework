@@ -2200,39 +2200,27 @@ public final class Player extends Mob {
 		getSettings().getAttackedBy().clear();
 		getCache().store("last_death", System.currentTimeMillis());
 
-		final Player player = mob instanceof Player ? (Player) mob : null;
+		final Player player = mob instanceof Player p ? p : null;
 
 		if (player != null) {
-			player.message(String.format("You have defeated %s!", getUsername()));
+			player.message("You have defeated %s!".formatted(getUsername()));
 			ActionSender.sendSound(player, "victory");
 
 			if (player.getLocation().inWilderness()) {
-				final int killTypeId;
-
-				switch (player.getKillType()) {
-					case COMBAT:
+				final int killTypeId = switch (player.getKillType()) {
+					case COMBAT -> {
 						final int weaponId = player.getEquippedWeaponID();
-
-						if (weaponId == ItemId.NOTHING.id() || weaponId == ItemId.PHOENIX_CROSSBOW.id() ||
-							weaponId == ItemId.CROSSBOW.id()) {
-							killTypeId = 16;
-						} else {
-							killTypeId = weaponId;
-						}
-						break;
-					case RANGED:
-						killTypeId = -2;
-						break;
-					case MAGIC:
-					default:
-						killTypeId = -1;
-						break;
-				}
+						yield (weaponId == ItemId.NOTHING.id() || weaponId == ItemId.PHOENIX_CROSSBOW.id() ||
+							weaponId == ItemId.CROSSBOW.id()) ? 16 : weaponId;
+					}
+					case RANGED -> -2;
+					case MAGIC -> -1;
+				};
 
 				getWorld().sendKilledUpdate(getUsernameHash(), player.getUsernameHash(), killTypeId);
 				player.incKills();
 				incDeaths();
-				getWorld().getServer().getGameLogger().addQuery(new LiveFeedLog(player, String.format("has PKed %s", getUsername())));
+				getWorld().getServer().getGameLogger().addQuery(new LiveFeedLog(player, "has PKed %s".formatted(getUsername())));
 			}
 
 			// Defense skillcape message
