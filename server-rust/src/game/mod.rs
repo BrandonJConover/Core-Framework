@@ -3,6 +3,7 @@
 
 pub mod action;
 pub mod bank;
+pub mod chat;
 pub mod combat;
 pub mod entity;
 pub mod equipment;
@@ -11,6 +12,7 @@ pub mod inventory;
 pub mod item;
 pub mod magic;
 pub mod npc;
+pub mod pathfinding;
 pub mod player;
 pub mod prayer;
 pub mod quest;
