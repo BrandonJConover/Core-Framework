@@ -336,17 +336,12 @@ public class CombatFormula {
 	 * Uses values from the old projectile.txt file included with configXX.jag.
 	 */
 	private static int rangedPowerRetro(final int bowId) {
-		switch (ItemId.getById(bowId)) {
-			case SHORTBOW:
-				return 14;
-			case LONGBOW:
-				return 20;
-			case CROSSBOW:
-			case PHOENIX_CROSSBOW:
-				return 22;
-			default:
-				return 0;
-		}
+		return switch (ItemId.getById(bowId)) {
+			case SHORTBOW -> 14;
+			case LONGBOW -> 20;
+			case CROSSBOW, PHOENIX_CROSSBOW -> 22;
+			default -> 0;
+		};
 	}
 
 	/**

@@ -629,9 +629,9 @@ public class Point {
 		if (offsetX == 24 && offsetY == 24) {
 			// According to Rab, the spot that a new player spawns at is where /rtele 05050 went to
 			// It is the center of the chunk.
-			return String.format("%d%02d%02d", height, sectorX, sectorY);
+			return "%d%02d%02d".formatted(height, sectorX, sectorY);
 		}
-		return String.format("%d%02d%02d %02d%02d", height, sectorX, sectorY, offsetX, offsetY);
+		return "%d%02d%02d %02d%02d".formatted(height, sectorX, sectorY, offsetX, offsetY);
 	}
 
 	public static final int UNABLE_TO_CONVERT = -10000;
