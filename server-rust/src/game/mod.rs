@@ -5,6 +5,8 @@ pub mod action;
 pub mod bank;
 pub mod combat;
 pub mod entity;
+pub mod equipment;
+pub mod inventory;
 pub mod item;
 pub mod npc;
 pub mod player;

@@ -54,35 +54,35 @@ public class ActionSender {
 	 * Get respective generator
 	 * */
 	public static PayloadGenerator<OpcodeOut> getGenerator(Player player) {
-		PayloadGenerator<OpcodeOut> generator;
+		// Using pattern matching with if-else chain since client version checks
+		// are method-based predicates rather than discrete values
 		if (player.isUsing38CompatibleClient() || player.isUsing39CompatibleClient()) {
-			generator = new Payload38Generator();
+			return new Payload38Generator();
 		} else if (player.isUsing69CompatibleClient()) {
-			generator = new Payload69Generator();
+			return new Payload69Generator();
 		} else if (player.isUsing233CompatibleClient()) {
-			generator = new Payload235Generator();
+			return new Payload235Generator();
 		} else if (player.isUsing203CompatibleClient()) {
-			generator = new Payload203Generator();
+			return new Payload203Generator();
 		} else if (player.isUsing202CompatibleClient()) {
-			generator = new Payload202Generator();
+			return new Payload202Generator();
 		} else if (player.isUsing201CompatibleClient()) {
-			generator = new Payload201Generator();
+			return new Payload201Generator();
 		} else if (player.isUsing199CompatibleClient()) {
-			generator = new Payload199Generator();
+			return new Payload199Generator();
 		} else if (player.isUsing198CompatibleClient()) {
-			generator = new Payload198Generator();
+			return new Payload198Generator();
 		} else if (player.isUsing196CompatibleClient()) {
-			generator = new Payload196Generator();
+			return new Payload196Generator();
 		} else if (player.isUsing177CompatibleClient()) {
-			generator = new Payload177Generator();
+			return new Payload177Generator();
 		} else if (player.isUsing140CompatibleClient()) {
-			generator = new Payload140Generator();
+			return new Payload140Generator();
 		} else if (player.isUsing115CompatibleClient()) {
-			generator = new Payload115Generator();
+			return new Payload115Generator();
 		} else {
-			generator = new PayloadCustomGenerator();
+			return new PayloadCustomGenerator();
 		}
-		return generator;
 	}
 
 	/**
@@ -98,15 +98,9 @@ public class ActionSender {
 				player.write(p);
 		} catch (GameNetworkException gne) {
 			// do nothing, the player just doesn't get the packet (possibly logged out) & script this is called from can continue
-			String username, clientVersion;
-			if (player != null) {
-				username = player.getUsername();
-				clientVersion = String.format("%d", player.getClientVersion());
-			} else {
-				username = "<null>";
-				clientVersion = "<unknown>";
-			}
-			LOGGER.warn("GameNetworkException for player " + username + " with client version " + clientVersion + " on opcode " + opcode.name());
+			var username = player != null ? player.getUsername() : "<null>";
+			var clientVersion = player != null ? "%d".formatted(player.getClientVersion()) : "<unknown>";
+			LOGGER.warn("GameNetworkException for player %s with client version %s on opcode %s".formatted(username, clientVersion, opcode.name()));
 		}
 	}
 
