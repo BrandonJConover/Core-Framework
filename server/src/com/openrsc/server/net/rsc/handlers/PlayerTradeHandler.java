@@ -252,7 +252,7 @@ public class PlayerTradeHandler implements PayloadProcessor<PlayerTradeStruct, O
 
 					if (item.getAmount() < 1) {
 						player.setSuspiciousPlayer(true,
-							String.format("trading invalid amount of itemId: %d", item.getCatalogId()));
+							"trading invalid amount of itemId: %d".formatted(item.getCatalogId()));
 						player.setRequiresOfferUpdate(true);
 						continue;
 					}
@@ -296,7 +296,7 @@ public class PlayerTradeHandler implements PayloadProcessor<PlayerTradeStruct, O
 					final int tradeCount = player.getTrade().getTradeOffer().countId(item.getCatalogId());
 
 					if (item.getAmount() > (invCount - tradeCount)) {
-						player.setSuspiciousPlayer(true, String.format("trading insufficient amount of itemId: %d", item.getCatalogId()));
+						player.setSuspiciousPlayer(true, "trading insufficient amount of itemId: %d".formatted(item.getCatalogId()));
 						player.getTrade().resetAll();
 						return;
 					}

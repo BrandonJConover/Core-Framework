@@ -199,9 +199,9 @@ public class StringUtil {
 	}
 
 	public static String byteArrayToHex(byte[] a) {
-		StringBuilder sb = new StringBuilder(a.length * 2);
+		var sb = new StringBuilder(a.length * 2);
 		for (byte b : a)
-			sb.append(String.format("%02x", b));
+			sb.append("%02x".formatted(b));
 		return sb.toString();
 	}
 	private static final Pattern IPV4_PATTERN = Pattern.compile("^(([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}([01]?\\d\\d?|2[0-4]\\d|25[0-5])$");

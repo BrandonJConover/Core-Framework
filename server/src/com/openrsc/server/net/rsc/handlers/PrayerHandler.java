@@ -76,7 +76,7 @@ public class PrayerHandler implements PayloadProcessor<PrayerStruct, OpcodeIn> {
 
 		if (prayerID < THICK_SKIN || prayerID > PROTECT_FROM_MISSILES) {
 			player.setSuspiciousPlayer(true,
-				String.format("prayerID < %d or prayerID > %d", THICK_SKIN, PROTECT_FROM_MISSILES));
+				"prayerID < %d or prayerID > %d".formatted(THICK_SKIN, PROTECT_FROM_MISSILES));
 			return;
 		}
 

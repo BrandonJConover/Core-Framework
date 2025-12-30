@@ -162,9 +162,9 @@ public final class SecurityUtils {
      * Converts bytes to hexadecimal string.
      */
     private static String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
+            sb.append("%02x".formatted(b));
         }
         return sb.toString();
     }
