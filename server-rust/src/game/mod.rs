@@ -8,6 +8,7 @@ pub mod combat;
 pub mod duel;
 pub mod entity;
 pub mod equipment;
+pub mod event;
 pub mod game_object;
 pub mod ground_item;
 pub mod inventory;
