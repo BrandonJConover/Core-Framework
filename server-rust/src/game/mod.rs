@@ -19,6 +19,7 @@ pub mod pathfinding;
 pub mod player;
 pub mod prayer;
 pub mod quest;
+pub mod ranged;
 pub mod shop;
 pub mod skills;
 pub mod trade;
