@@ -165,8 +165,7 @@ public class GameObject extends Entity {
 
 	@Override
 	public boolean equals(final Object o) {
-		if (o instanceof GameObject) {
-			GameObject go = (GameObject) o;
+		if (o instanceof GameObject go) {
 			return go.getLocation().equals(getLocation())
 				&& go.getID() == getID()
 				&& go.getDirection() == getDirection()
