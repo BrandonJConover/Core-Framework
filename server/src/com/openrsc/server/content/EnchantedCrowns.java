@@ -23,22 +23,15 @@ public class EnchantedCrowns {
 		if (!player.getCarriedItems().getEquipment().hasEquipped(crown.id()))
 			return false;
 
-		switch (crown) {
-			case CROWN_OF_DEW:
-				return dewCrown();
-			case CROWN_OF_MIMICRY:
-				return mimicryCrown();
-			case CROWN_OF_THE_ARTISAN:
-				return artisanCrown();
-			case CROWN_OF_THE_ITEMS:
-				return itemsCrown();
-			case CROWN_OF_THE_HERBALIST:
-				return herbalistCrown(player);
-			case CROWN_OF_THE_OCCULT:
-				return occultCrown(player);
-		}
-
-		return false;
+		return switch (crown) {
+			case CROWN_OF_DEW -> dewCrown();
+			case CROWN_OF_MIMICRY -> mimicryCrown();
+			case CROWN_OF_THE_ARTISAN -> artisanCrown();
+			case CROWN_OF_THE_ITEMS -> itemsCrown();
+			case CROWN_OF_THE_HERBALIST -> herbalistCrown(player);
+			case CROWN_OF_THE_OCCULT -> occultCrown(player);
+			default -> false;
+		};
 	}
 
 	public static void useCharge(Player player, ItemId crown) {
@@ -142,53 +135,31 @@ public class EnchantedCrowns {
 	}
 
 	private static boolean dewCrown() {
-		double rerollPercent = 60;
-		if (rand1to100() <= rerollPercent) {
-			return true;
-		}
-		return false;
+		return rand1to100() <= 60;
 	}
 
 	private static boolean mimicryCrown() {
-		double rerollPercent = 30;
-		if (rand1to100() <= rerollPercent) {
-			return true;
-		}
-		return false;
+		return rand1to100() <= 30;
 	}
 
 	private static boolean artisanCrown() {
-		double rerollPercent = 15;
-		if (rand1to100() <= rerollPercent) {
-			return true;
-		}
-		return false;
+		return rand1to100() <= 15;
 	}
 
 	private static boolean itemsCrown() {
-		double rerollPercent = 8;
-		if (rand1to100() <= rerollPercent) {
-			return true;
-		}
-		return false;
+		return rand1to100() <= 8;
 	}
 
 	private static boolean herbalistCrown(Player player) {
-		double rerollPercent = 4;
-		if (rand1to100() <= rerollPercent) {
-			return player.getCache().hasKey("herbalistcrown") &&
-				HERBALIST_CROWN_USES - player.getCache().getInt("herbalistcrown") > 0;
-		}
-		return false;
+		return rand1to100() <= 4
+			&& player.getCache().hasKey("herbalistcrown")
+			&& HERBALIST_CROWN_USES - player.getCache().getInt("herbalistcrown") > 0;
 	}
 
 	private static boolean occultCrown(Player player) {
-		double rerollPercent = 4;
-		if (rand1to100() <= rerollPercent) {
-			return player.getCache().hasKey("occultcrown") &&
-				OCCULT_CROWN_USES - player.getCache().getInt("occultcrown") > 0;
-		}
-		return false;
+		return rand1to100() <= 4
+			&& player.getCache().hasKey("occultcrown")
+			&& OCCULT_CROWN_USES - player.getCache().getInt("occultcrown") > 0;
 	}
 
 	private static int rand1to100() {
