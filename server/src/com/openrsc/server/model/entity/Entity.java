@@ -13,15 +13,15 @@ public abstract class Entity {
 
 	private final World world;
 
-	private final Map<String, Object> attributes = new ConcurrentHashMap<String, Object>();
+	private final Map<String, Object> attributes = new ConcurrentHashMap<>();
 
 	private int id;
 
 	private int index;
 
-	private final AtomicReference<Point> location = new AtomicReference<Point>();
+	private final AtomicReference<Point> location = new AtomicReference<>();
 
-	private final AtomicReference<Region> region = new AtomicReference<Region>();
+	private final AtomicReference<Region> region = new AtomicReference<>();
 
 	private boolean removed = false;
 
