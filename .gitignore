@@ -151,3 +151,6 @@ Backups/*.zip
 Deployment_Scripts/.discordstaffmonitorwebhook
 server/ipbans.txt
 server/ipbans.temp
+
+# Rust build output
+server-rust/target/
