@@ -3,12 +3,14 @@
 
 pub mod action;
 pub mod agility;
+pub mod auth;
 pub mod bank;
 pub mod chat;
 pub mod clan;
 pub mod combat;
 pub mod cooking;
 pub mod crafting;
+pub mod database;
 pub mod duel;
 pub mod entity;
 pub mod equipment;
