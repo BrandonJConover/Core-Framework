@@ -81,7 +81,7 @@ public final class Player extends Mob {
 	// so everything is multiplied by 2 to avoid decimals
 	private final int KITTEN_ACTIVITY_THRESHOLD = 50;
 	public int sessionId;
-	private Queue<PrivateMessage> privateMessageQueue = new LinkedList<PrivateMessage>();
+	private Queue<PrivateMessage> privateMessageQueue = new LinkedList<>();
 	private int actionsMouseStill = 0;
 	private long lastMouseMoved = 0;
 	private Map<Integer, Integer> achievements = new ConcurrentHashMap<>();
@@ -119,14 +119,14 @@ public final class Player extends Mob {
 	private long consumeTimer = 0;
 	private long lastSaveTime = System.currentTimeMillis();
 	private int appearanceID;
-	private HashMap<Long, Integer> knownPlayersAppearanceIDs = new HashMap<Long, Integer>();
+	private HashMap<Long, Integer> knownPlayersAppearanceIDs = new HashMap<>();
 	private long lastCommand;
-	private LinkedHashSet<Player> localPlayers = new LinkedHashSet<Player>();
-	private LinkedHashSet<Npc> localNpcs = new LinkedHashSet<Npc>();
-	private LinkedHashSet<GameObject> localObjects = new LinkedHashSet<GameObject>();
-	private LinkedHashSet<GameObject> localWallObjects = new LinkedHashSet<GameObject>();
-	private LinkedHashSet<GroundItem> localGroundItems = new LinkedHashSet<GroundItem>();
-	private ArrayDeque<Point> locationsToClear = new ArrayDeque<Point>();
+	private LinkedHashSet<Player> localPlayers = new LinkedHashSet<>();
+	private LinkedHashSet<Npc> localNpcs = new LinkedHashSet<>();
+	private LinkedHashSet<GameObject> localObjects = new LinkedHashSet<>();
+	private LinkedHashSet<GameObject> localWallObjects = new LinkedHashSet<>();
+	private LinkedHashSet<GroundItem> localGroundItems = new LinkedHashSet<>();
+	private ArrayDeque<Point> locationsToClear = new ArrayDeque<>();
 	private String currentIP = "0.0.0.0";
 	private int incorrectSleepTries = 0;
 	private volatile int questionOption;

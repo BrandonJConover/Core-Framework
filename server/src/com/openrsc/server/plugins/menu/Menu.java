@@ -14,7 +14,7 @@ import static com.openrsc.server.plugins.Functions.say;
  */
 public class Menu {
 
-	private ArrayList<Option> options = new ArrayList<Option>();
+	private ArrayList<Option> options = new ArrayList<>();
 
 	/**
 	 * Adds a single option to the menu. Usage: Menu defaultMenu = new Menu();

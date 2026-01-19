@@ -360,8 +360,8 @@ public abstract class Mob extends Entity {
 			return true;
 		}
 		return (val & 64) != 0
-			&& (e instanceof Npc || e instanceof Player || (e instanceof GroundItem && !((GroundItem) e).isOn(x, y))
-			|| (e instanceof GameObject && !((GameObject) e).isOn(x, y)));
+			&& (e instanceof Npc || e instanceof Player || (e instanceof GroundItem groundItem && !groundItem.isOn(x, y))
+			|| (e instanceof GameObject gameObject && !gameObject.isOn(x, y)));
 	}
 
 	public boolean withinRange(final Entity e) {
@@ -527,10 +527,9 @@ public abstract class Mob extends Entity {
 	}
 
 	public void becomeLain(boolean serial, int interval) {
-		if (!(this instanceof Player)) {
+		if (!(this instanceof Player lain)) {
 			return;
 		}
-		Player lain = (Player) this;
 		lain.setCacheInvisible(true);
 		lain.message("@yel@Lain: Hello, Navi.");
 		lain.message("@whi@Navi: Hello, Lain.");
@@ -643,12 +642,12 @@ public abstract class Mob extends Entity {
 
 		if (possessionEvent != null) {
 			if (tellLeft) {
-				if (this instanceof Player) {
+				if (this instanceof Player thisPlayer) {
 					if (possessing instanceof Player) {
-						((Player) this).message("Your spirit has left @mag@" + possessingUsername + "@whi@ and returned to your body.");
-					} else {
-						((Player) this).message("Your spirit has left @mag@" + ((Npc) possessing).getDef().getName() + "@whi@ and returned to your body.");
-						((Player) this).setCacheInvisible(false);
+						thisPlayer.message("Your spirit has left @mag@" + possessingUsername + "@whi@ and returned to your body.");
+					} else if (possessing instanceof Npc possessedNpc) {
+						thisPlayer.message("Your spirit has left @mag@" + possessedNpc.getDef().getName() + "@whi@ and returned to your body.");
+						thisPlayer.setCacheInvisible(false);
 					}
 				}
 			}
@@ -1227,8 +1226,7 @@ public abstract class Mob extends Entity {
 
 	public void runDropEvent(boolean fromInventory) {
 		// TODO: Allow npcs to use this code for drop parties?
-		if (!this.isPlayer()) return; // We can only run Plugins on Players.
-		final Player player = (Player) this;
+		if (!(this instanceof Player player)) return; // We can only run Plugins on Players.
 		final Item item = player.getDropItemEvent();
 		final int index = dropItemIndex;
 		this.setDropItemEvent(-1, null);
@@ -1264,8 +1262,8 @@ public abstract class Mob extends Entity {
 
 	@Override
 	public boolean equals(Object obj) {
-		if(obj instanceof Mob) {
-			return ((Mob)obj).getUUID().equals(uuid);
+		if (obj instanceof Mob mob) {
+			return mob.getUUID().equals(uuid);
 		}
 		return false;
 	}

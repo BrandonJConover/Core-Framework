@@ -24,8 +24,7 @@ public class RangeEventNpc extends GameTickEvent {
     }
 
     public boolean equals(Object o) {
-        if (o instanceof RangeEventNpc) {
-            RangeEventNpc e = (RangeEventNpc) o;
+        if (o instanceof RangeEventNpc e) {
             return e.belongsTo(getOwner());
         }
         return false;
