@@ -104,9 +104,7 @@ public final class PluginHandler implements IPluginHandler {
             // Triggers found, create an instance
             Object pluginInstance = getPluginInstance(pluginType);
 
-            if (pluginInstance instanceof AbstractShop) {
-                final AbstractShop shopPlugin = (AbstractShop) pluginInstance;
-
+            if (pluginInstance instanceof AbstractShop shopPlugin) {
                 for (final Shop shop : shopPlugin.getShops(server.getWorld())) {
                     server.getWorld().getShops().add(shop);
                     server.getGameEventHandler().add(new ShopRestockEvent(server.getWorld(), shop));
