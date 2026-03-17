@@ -12,6 +12,7 @@ pub mod combat;
 pub mod cooking;
 pub mod crafting;
 pub mod database;
+pub mod dialogue;
 pub mod duel;
 pub mod entity;
 pub mod equipment;
