@@ -23,6 +23,9 @@ package com.openrsc.server.database.impl.mysql;
  *  limitations under the License.
  */
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.*;
 import java.sql.*;
 import java.text.SimpleDateFormat;
@@ -33,6 +36,7 @@ import java.util.regex.Pattern;
  * Tool to run database scripts
  */
 public class ScriptRunner {
+    private static final Logger LOGGER = LogManager.getLogger();
 
     private static final String DEFAULT_DELIMITER = ";";
     private static final Pattern SOURCE_COMMAND = Pattern.compile("^\\s*SOURCE\\s+(.*?)\\s*$", Pattern.CASE_INSENSITIVE);
@@ -75,7 +79,7 @@ public class ScriptRunner {
                 logWriter = new PrintWriter(new FileWriter(logFile, false));
             }
         } catch(IOException e){
-            System.err.println("Unable to access or create the db_create log");
+            LOGGER.error("Unable to access or create the db_create log");
         }
         try {
             if (errorLogFile.exists()) {
@@ -84,7 +88,7 @@ public class ScriptRunner {
                 errorLogWriter = new PrintWriter(new FileWriter(errorLogFile, false));
             }
         } catch(IOException e){
-            System.err.println("Unable to access or create the db_create error log");
+            LOGGER.error("Unable to access or create the db_create error log");
         }
         String timeStamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date());
         println("\n-------\n" + timeStamp + "\n-------\n");
@@ -249,7 +253,7 @@ public class ScriptRunner {
             final String errText = String.format("Error executing '%s' (line %d): %s",
                     command, lineReader.getLineNumber(), e.getMessage());
             printlnError(errText);
-            System.err.println(errText);
+            LOGGER.error(errText);
             if (stopOnError) {
                 throw new SQLException(errText, e);
             }

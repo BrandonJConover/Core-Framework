@@ -2,27 +2,15 @@ package com.openrsc.server.model.entity.update;
 
 import com.openrsc.server.model.entity.player.Player;
 
-public class Bubble {
-	/**
-	 * What to draw in it
-	 */
-	private int itemID;
-	/**
-	 * Who the bubble belongs to
-	 */
-	private Player owner;
-
-	public Bubble(Player owner, int itemID) {
-		this.owner = owner;
-		this.itemID = itemID;
-	}
-
-	public int getID() {
-		return itemID;
-	}
-
-	public Player getOwner() {
-		return owner;
-	}
-
+/**
+ * Represents a skill bubble displayed above a player.
+ * Modernized to Java 16+ record for immutability.
+ */
+public record Bubble(
+	Player owner,
+	int itemID
+) {
+	// Legacy getter aliases for backwards compatibility
+	public int getID() { return itemID; }
+	public Player getOwner() { return owner; }
 }

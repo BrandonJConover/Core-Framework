@@ -309,7 +309,7 @@ public class CharacterCreateRequest extends LoginExecutorProcess{
 		}
 
 		if (!isSimRegister) {
-			System.out.println("Register was successful!");
+			LOGGER.info("Register was successful!");
 		}
 		return (byte) RegisterLoginResponse.REGISTER_SUCCESSFUL;
 	}

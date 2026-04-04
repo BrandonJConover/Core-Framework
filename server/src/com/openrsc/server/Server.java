@@ -102,7 +102,7 @@ public class Server implements Runnable {
 	private EventLoopGroup workerGroupWs;
 	private EventLoopGroup bossGroupWs;
 
-	private volatile AtomicBoolean running = new AtomicBoolean(false);
+	private final AtomicBoolean running = new AtomicBoolean(false);
 	private boolean restarting = false;
 	private boolean shuttingDown = false;
 
@@ -226,7 +226,7 @@ public class Server implements Runnable {
 				try {
 					Thread.sleep(1000);
 				} catch (final InterruptedException e) {
-					e.printStackTrace();
+					LOGGER.catching(e);
 				}
 
 				for (final Server server : serversList.values()) {
@@ -779,8 +779,8 @@ public class Server implements Runnable {
 					getDiscordService().reportDowntimeToDiscord(timeOffline, System.currentTimeMillis(), unloadedPlayers, playersOnline);
 				}
 			}
-		} catch(IOException ex) {
-			ex.printStackTrace();
+		} catch(IOException e) {
+			LOGGER.catching(e);
 		}
 	}
 
@@ -804,7 +804,7 @@ public class Server implements Runnable {
 					getWorld().getServer().shutdown(300);*/
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOGGER.catching(e);
 		}
 	}
 

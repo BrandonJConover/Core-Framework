@@ -1,75 +1,130 @@
 plugins {
-    id "application"
-    id "java"
+    id 'java'
+    id 'application'
 }
 
-group "org.openrsc"
-version "1.0-SNAPSHOT"
+group = 'com.openrsc'
+version = '2.0.0'
 
-application {
-    mainClassName = "com.openrsc.server.Server"
-    applicationDefaultJvmArgs = ['-DcoloredLogging=true','-Dconf=default']
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {
     mavenCentral()
-    maven {
-        url = uri("https://repo.spring.io/libs-release/")
-    }
+}
+
+dependencies {
+    // Core Networking - Netty
+    implementation 'io.netty:netty-all:4.1.100.Final'
+    implementation 'io.netty.incubator:netty-incubator-codec-quic:0.0.54.Final'
+
+    // Database
+    implementation 'mysql:mysql-connector-java:8.0.33'
+    implementation 'org.xerial:sqlite-jdbc:3.44.0.0'
+    implementation 'com.zaxxer:HikariCP:5.1.0'
+    implementation 'redis.clients:jedis:5.1.0'
+
+    // Logging
+    implementation 'org.apache.logging.log4j:log4j-api:2.22.0'
+    implementation 'org.apache.logging.log4j:log4j-core:2.22.0'
+    implementation 'org.apache.logging.log4j:log4j-slf4j2-impl:2.22.0'
+    implementation 'com.lmax:disruptor:3.4.4'
+
+    // Serialization
+    implementation 'org.msgpack:msgpack-core:0.9.6'
+    implementation 'org.msgpack:jackson-dataformat-msgpack:0.9.6'
+    implementation 'com.google.flatbuffers:flatbuffers-java:24.3.25'
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Observability - OpenTelemetry
+    implementation platform('io.opentelemetry:opentelemetry-bom:1.33.0')
+    implementation 'io.opentelemetry:opentelemetry-api'
+    implementation 'io.opentelemetry:opentelemetry-sdk'
+    implementation 'io.opentelemetry:opentelemetry-sdk-extension-autoconfigure'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    implementation 'io.opentelemetry:opentelemetry-exporter-prometheus:1.33.0-alpha'
+    implementation 'io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations:1.33.0'
+    implementation 'io.opentelemetry.instrumentation:opentelemetry-netty-4.1:1.33.0-alpha'
+
+    // Prometheus Metrics
+    implementation 'io.micrometer:micrometer-core:1.12.1'
+    implementation 'io.micrometer:micrometer-registry-prometheus:1.12.1'
+    implementation 'io.prometheus:simpleclient:0.16.0'
+    implementation 'io.prometheus:simpleclient_httpserver:0.16.0'
+    implementation 'io.prometheus:simpleclient_hotspot:0.16.0'
+
+    // Service Discovery
+    implementation 'com.orbitz.consul:consul-client:1.5.3'
+    implementation 'io.etcd:jetcd-core:0.7.6'
+
+    // Azure Integration
+    implementation 'com.azure:azure-identity:1.11.0'
+    implementation 'com.azure.spring:spring-cloud-azure-appconfiguration-config:5.8.0'
+    implementation 'com.microsoft.azure:applicationinsights-core:3.4.17'
+
+    // HTTP Server for Health/Metrics
+    implementation 'io.javalin:javalin:5.6.3'
+
+    // Utilities
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    implementation 'commons-codec:commons-codec:1.16.0'
+    implementation 'com.google.guava:guava:32.1.3-jre'
+
+    // Testing
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+    testImplementation 'org.mockito:mockito-core:5.8.0'
 }
 
 sourceSets {
     main {
         java {
-            srcDirs "src"
-            srcDirs "plugins"
+            srcDirs = ['src']
+        }
+        resources {
+            srcDirs = ['conf']
         }
     }
 }
 
-dependencies {
-    // Only available on jcenter which is due to be shutdown, reference locally
-    implementation files("lib/JDA-4.0.0_55-withDependencies.jar")
-
-    // Discord
-    implementation "com.vdurmont:emoji-java:4.0.0"
-    implementation "org.gitlab4j:gitlab4j-api:4.12.17"
-
-    // Others
-    implementation group: 'mysql', name: 'mysql-connector-java', version: '5.1.40'
-//    implementation "org.mariadb.jdbc:mariadb-java-client:2.1.2"
-    implementation "org.xerial:sqlite-jdbc:3.34.0"
-
-    implementation "com.thoughtworks.xstream:xstream:1.4.9"
-    implementation "com.lmax:disruptor:3.3.11"
-
-    implementation "org.apache.commons:commons-collections4:4.0"
-    implementation "org.apache.commons:commons-lang3:3.12.0"
-    implementation "org.apache.commons:commons-compress:1.18"
-    implementation "commons-lang:commons-lang:2.6"
-
-    implementation("org.apache.logging.log4j:log4j-api:2.17.0")
-    implementation("org.apache.logging.log4j:log4j-core:2.17.0")
-    implementation("org.apache.logging.log4j:log4j-iostreams:2.17.0")
-    implementation("org.apache.logging.log4j:log4j-slf4j-impl:2.17.0")
-
-    implementation("org.json:json:20190722")
-    implementation("commons-codec:commons-codec:1.14")
-    implementation("xpp3:xpp3:1.1.4c")
-    implementation("com.google.guava:guava:30.1.1-jre")
-    implementation("com.google.inject:guice:5.0.1")
-    implementation("io.netty:netty-all:4.1.107.Final")
-
-    testImplementation "org.junit.jupiter:junit-jupiter-api:5.6.0"
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine"
+application {
+    mainClass = 'com.openrsc.server.Server'
+    applicationDefaultJvmArgs = [
+        '-Xms2G',
+        '-Xmx4G',
+        '-XX:+UseG1GC',
+        '-XX:+UseStringDeduplication',
+        '-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector'
+    ]
 }
 
-ant.importBuild("build.xml")
-
-run {
-    dependsOn compile_plugins
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'com.openrsc.server.Server',
+            'Implementation-Title': 'OpenRSC Server',
+            'Implementation-Version': version
+        )
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
 }
 
-test {
+tasks.named('test') {
     useJUnitPlatform()
+}
+
+task runServer(type: JavaExec) {
+    mainClass = 'com.openrsc.server.Server'
+    classpath = sourceSets.main.runtimeClasspath
+    args = ['default.conf']
+    jvmArgs = [
+        '-Xms2G',
+        '-Xmx4G',
+        '-XX:+UseG1GC',
+        '-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector'
+    ]
 }

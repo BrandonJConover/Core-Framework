@@ -12,9 +12,17 @@ public abstract class WalkToObjectAction extends WalkToAction {
 		this.object = object;
 	}
 
+	public GameObject getObject() {
+		return object;
+	}
+
 	@Override
 	public boolean shouldExecuteInternal() {
 		return getPlayer().atObject(object);
 	}
 
+	@Override
+	public String getFailureMessage() {
+		return "You are unable to reach the object.";
+	}
 }

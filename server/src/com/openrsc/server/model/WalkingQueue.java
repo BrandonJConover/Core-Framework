@@ -29,10 +29,8 @@ public class WalkingQueue {
     */ 
 	private void handlePlayerFinishedWalking() {
 		if (playerWasWalking) {
-			Player currentPlayer = mob.isPlayer() ? (Player)mob : null;
-
 			// Only track finished walking status of players.
-			if (currentPlayer != null && !currentPlayer.isBusy()) {
+			if (mob instanceof Player currentPlayer && !currentPlayer.isBusy()) {
 				Point targetTile = currentPlayer.getLastTileClicked();
 
 				if (targetTile != null) {
@@ -78,10 +76,10 @@ public class WalkingQueue {
 
 		Point walkPoint = path.poll();
 
-		if (mob.getAttribute("blink", false)) {
+		if (mob.getAttribute("blink", false) && mob instanceof Player player) {
 			if (path.size() >= 1) {
 				walkPoint = path.getLastPoint();
-				((Player) mob).teleport(walkPoint.getX(), walkPoint.getY(), false);
+				player.teleport(walkPoint.getX(), walkPoint.getY(), false);
 			}
 			return;
 		}
@@ -96,16 +94,14 @@ public class WalkingQueue {
 			return;
 		}
 
-		if (mob.isNpc()) {
-			NPCLoc loc = ((Npc) mob).getLoc();
+		if (mob instanceof Npc npc) {
+			NPCLoc loc = npc.getLoc();
 			if (Point.location(destX, destY).inBounds(loc.minX() - 12, loc.minY() - 12,
 				loc.maxX() + 12, loc.maxY() + 12) || (destX == 0 && destY == 0)) {
 				mob.face(Point.location(destX, destY));
 				mob.setLocation(Point.location(destX, destY));
 			}
-		}
-		else {
-			Player player = (Player) mob;
+		} else if (mob instanceof Player player) {
 			player.face(Point.location(destX, destY));
 			player.setLocation(Point.location(destX, destY));
 			player.stepIncrementActivity();

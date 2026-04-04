@@ -85,8 +85,7 @@ public final class DataConversions {
 				}
 			}
 		}
-		return Integer.toString(dd) + " days " + Integer.toString(hh) + " hours " + Integer.toString(mm)
-			+ " minutes " + Integer.toString(ss) + " seconds";
+		return "%d days %d hours %d minutes %d seconds".formatted(dd, hh, mm, ss);
 
 	}
 
@@ -356,8 +355,8 @@ public final class DataConversions {
 			encryption.decryptString(srct, dest, 0, 0, -1, count);
 
 			return getStringFromBytes(dest, 0, count);
-		} catch (Exception ex) {
-			ex.printStackTrace();
+		} catch (Exception e) {
+			LOGGER.catching(e);
 			return "Cabbage";
 		}
 	}

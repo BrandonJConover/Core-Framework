@@ -20,17 +20,17 @@ public class MessageFilter {
 	 * The asynchronous logger.
 	 */
 	private static final Logger LOGGER = LogManager.getLogger();
-	private static ArrayList<String> badwords = new ArrayList<String>();
-	private static ArrayList<String> goodwords = new ArrayList<String>();
-	private static ArrayList<String> alertwords = new ArrayList<String>();
+	private static ArrayList<String> badwords = new ArrayList<>();
+	private static ArrayList<String> goodwords = new ArrayList<>();
+	private static ArrayList<String> alertwords = new ArrayList<>();
 
 	public static Triple<Integer, Integer, Integer> loadGoodAndBadWordsFromDisk() {
 		List<String> lines = Collections.emptyList();
 
 		// reinitialize in case this function has been called post-server boot
-		badwords = new ArrayList<String>();
-		goodwords = new ArrayList<String>();
-		alertwords = new ArrayList<String>();
+		badwords = new ArrayList<>();
+		goodwords = new ArrayList<>();
+		alertwords = new ArrayList<>();
 		int goodwordCount = 0;
 		int badwordCount = 0;
 		int alertwordCount = 0;
@@ -273,7 +273,7 @@ public class MessageFilter {
 			if (sender.getWorld().getServer().getDiscordService() != null) {
 				sender.getWorld().getServer().getDiscordService().reportNaughtyWordToDiscord(sender, originalMessage, "Cabbage", stringProblems, context);
 			}
-			e.printStackTrace();
+			LOGGER.catching(e);
 			return "Cabbage";
 		}
 

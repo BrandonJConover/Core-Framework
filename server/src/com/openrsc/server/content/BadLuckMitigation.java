@@ -11,7 +11,7 @@ public class BadLuckMitigation {
 	private final HashMap<String, HashMap<Integer, Integer>> mitigationTable;
 
 	public BadLuckMitigation() {
-		mitigationTable = new HashMap<String, HashMap<Integer, Integer>>();
+		mitigationTable = new HashMap<>();
 	}
 
 	public void addItem(String dropTableId, int itemId, HashMap<Integer, Integer> rollModifiers) {

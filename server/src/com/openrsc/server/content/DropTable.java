@@ -74,14 +74,10 @@ public class DropTable {
 	public DropTable clone(String description) {
 		DropTable clonedDropTable = new DropTable(description, this.rare);
 		for (Drop drop : drops) {
-			if (drop.type == dropType.NOTHING) {
-				clonedDropTable.addEmptyDrop(drop.weight);
-			}
-			else if (drop.type == dropType.ITEM) {
-				clonedDropTable.addItemDrop(drop.id, drop.amount, drop.weight, drop.noted);
-			}
-			else if (drop.type == dropType.TABLE) {
-				clonedDropTable.addTableDrop(drop.table, drop.weight);
+			switch (drop.type) {
+				case NOTHING -> clonedDropTable.addEmptyDrop(drop.weight);
+				case ITEM -> clonedDropTable.addItemDrop(drop.id, drop.amount, drop.weight, drop.noted);
+				case TABLE -> clonedDropTable.addTableDrop(drop.table, drop.weight);
 			}
 		}
 		return clonedDropTable;
@@ -101,7 +97,7 @@ public class DropTable {
 
 	public void addEmptyDrop(int weight) {
 		if (weight < 0) {
-			LOGGER.error("The drop table for \"" + this.description + "\" doesn't add up as expected!!!");
+			LOGGER.error("The drop table for \"%s\" doesn't add up as expected!!!".formatted(this.description));
 			System.exit(0);
 		}
 		drops.add(new Drop(ItemId.NOTHING.id(), 0, weight, false, dropType.NOTHING));
@@ -297,17 +293,11 @@ public class DropTable {
 		TABLE;
 	}
 
-	public static class Accessor {
-		int id;
-		int numerator;
-		int denominator;
-
-		public Accessor(int id, int numerator, int denominator) {
-			this.id = id;
-			this.numerator = numerator;
-			this.denominator = denominator;
-		}
-	}
+	/**
+	 * Accessor record for drop table access rules.
+	 * Modernized to Java 16+ record.
+	 */
+	public record Accessor(int id, int numerator, int denominator) {}
 
 	public boolean rollAccess(int id, boolean ringOfWealth) {
 		int numerator, denominator;

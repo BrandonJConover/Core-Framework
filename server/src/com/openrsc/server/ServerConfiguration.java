@@ -334,6 +334,10 @@ public class ServerConfiguration {
 	public int PVP_CATCHING_DISTANCE;
 	public int PVP_REATTACK_TIMER;
 	public int MAX_PVP_MELEE_ATTACK_DISTANCE;
+
+	// Action retry settings
+	public boolean ACTION_RETRY_ENABLED;
+	public int ACTION_MAX_RETRIES;
 	public int BABY_MODE_LEVEL_THRESHOLD;
 	public boolean SHUFFLE_PID_ORDER;
 	public int SHUFFLE_PID_ORDER_INTERVAL;
@@ -487,6 +491,11 @@ public class ServerConfiguration {
 		PVP_CATCHING_DISTANCE = tryReadInt("pvp_catching_distance").orElse(1);
 		PVP_REATTACK_TIMER = tryReadInt("pvp_reattack_timer").orElse(5);
 		MAX_PVP_MELEE_ATTACK_DISTANCE = tryReadInt("max_pvp_melee_attack_distance").orElse(2);
+
+		// Action retry settings - allows actions to automatically retry if they fail
+		ACTION_RETRY_ENABLED = tryReadBool("action_retry_enabled").orElse(true);
+		ACTION_MAX_RETRIES = tryReadInt("action_max_retries").orElse(10);
+
 		BABY_MODE_LEVEL_THRESHOLD = tryReadInt("baby_mode_level_threshold").orElse(0);
 		SHUFFLE_PID_ORDER = tryReadBool("shuffle_pid_order").orElse(true);
 		SHUFFLE_PID_ORDER_INTERVAL = tryReadInt("shuffle_pid_order_interval").orElse(500);
@@ -850,10 +859,8 @@ public class ServerConfiguration {
 	private void readGlobalRules(final String fileName) {
 		File file = new File(fileName);
 
-		try {
+		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
 			ArrayList<String> globalRules = new ArrayList<String>();
-
-			BufferedReader reader = new BufferedReader(new FileReader(file));
 
 			String line = reader.readLine();
 			while (line != null) {

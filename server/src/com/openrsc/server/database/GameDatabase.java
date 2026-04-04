@@ -41,7 +41,7 @@ public abstract class GameDatabase {
 	private static final Logger LOGGER = LogManager.getLogger();
 
 	public final Server server;
-	private volatile AtomicBoolean open = new AtomicBoolean(false);
+	private final AtomicBoolean open = new AtomicBoolean(false);
 
 	public GameDatabase(final Server server) {
 		this.server = server;
@@ -976,15 +976,13 @@ public abstract class GameDatabase {
 			caches[i].value = o != null ? o.toString() : null;
 			caches[i].key = key;
 
-			if (o instanceof Integer) {
-				caches[i].type = 0;
-			} else if (o instanceof String) {
-				caches[i].type = 1;
-			} else if (o instanceof Boolean) {
-				caches[i].type = 2;
-			} else if (o instanceof Long) {
-				caches[i].type = 3;
-			}
+			caches[i].type = switch (o) {
+				case Integer ignored -> 0;
+				case String ignored -> 1;
+				case Boolean ignored -> 2;
+				case Long ignored -> 3;
+				case null, default -> -1;
+			};
 			i++;
 		}
 

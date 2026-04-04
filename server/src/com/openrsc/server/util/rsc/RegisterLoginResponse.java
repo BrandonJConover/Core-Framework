@@ -37,86 +37,33 @@ public class RegisterLoginResponse {
 			if (registering && responseCode == REGISTER_SUCCESSFUL) {
 				return REGISTER_SUCCESSFUL;
 			}
-			switch (responseCode) {
-				case LoginResponse.SERVER_TIMEOUT:
-					return SERVER_TIMEOUT;
-				case LoginResponse.LOGIN_UNSUCCESSFUL:
-					return UNSUCCESSFUL;
-				case LoginResponse.RECONNECT_SUCCESFUL:
-					return RECONNECT_SUCCESFUL;
-				case LoginResponse.INVALID_CREDENTIALS:
-					return USERNAME_TAKEN_OR_INVALID;
-				case LoginResponse.ACCOUNT_LOGGEDIN:
-					return ACCOUNT_LOGGEDIN;
-				case LoginResponse.CLIENT_UPDATED:
-					return CLIENT_UPDATED;
-				case LoginResponse.IP_IN_USE:
-					return IP_IN_USE;
-				case LoginResponse.LOGIN_ATTEMPTS_EXCEEDED:
-					return LOGIN_ATTEMPTS_EXCEEDED;
-				case LoginResponse.ACCOUNT_TEMP_DISABLED:
-					return ACCOUNT_TEMP_DISABLED;
-				case LoginResponse.ACCOUNT_PERM_DISABLED:
-					return ACCOUNT_PERM_DISABLED;
-				case LoginResponse.WORLD_IS_FULL:
-					return WORLD_IS_FULL;
-				case LoginResponse.NEED_MEMBERS_ACCOUNT:
-					return NEED_MEMBERS_ACCOUNT;
-				case LoginResponse.LOGINSERVER_OFFLINE:
-				case LoginResponse.FAILED_TO_DECODE_PROFILE:
-				case LoginResponse.ACCOUNT_SUSPECTED_STOLEN:
-				case LoginResponse.LOGINSERVER_MISMATCH:
-				case LoginResponse.NOT_VETERAN_ACCOUNT:
-				case LoginResponse.PASSWORD_STOLEN:
-				case LoginResponse.NEED_TO_SET_DISPLAY_NAME:
-				case LoginResponse.WORLD_DOES_NOT_ACCEPT_NEW_PLAYERS:
-				case LoginResponse.NONE_OF_YOUR_CHARACTERS_CAN_LOGIN:
-				case LoginResponse.UNRECOGNIZED_LOGIN:
-				case LoginResponse.SERVER_REJECT:
-				case LoginResponse.UNDER_13_YEARS_OLD:
-				case LoginResponse.USERNAME_ALREADY_IN_USE: //wat
-					return UNSUCCESSFUL;
-
-			}
+			return switch (responseCode) {
+				case LoginResponse.SERVER_TIMEOUT -> SERVER_TIMEOUT;
+				case LoginResponse.LOGIN_UNSUCCESSFUL -> UNSUCCESSFUL;
+				case LoginResponse.RECONNECT_SUCCESFUL -> RECONNECT_SUCCESFUL;
+				case LoginResponse.INVALID_CREDENTIALS -> USERNAME_TAKEN_OR_INVALID;
+				case LoginResponse.ACCOUNT_LOGGEDIN -> ACCOUNT_LOGGEDIN;
+				case LoginResponse.CLIENT_UPDATED -> CLIENT_UPDATED;
+				case LoginResponse.IP_IN_USE -> IP_IN_USE;
+				case LoginResponse.LOGIN_ATTEMPTS_EXCEEDED -> LOGIN_ATTEMPTS_EXCEEDED;
+				case LoginResponse.ACCOUNT_TEMP_DISABLED -> ACCOUNT_TEMP_DISABLED;
+				case LoginResponse.ACCOUNT_PERM_DISABLED -> ACCOUNT_PERM_DISABLED;
+				case LoginResponse.WORLD_IS_FULL -> WORLD_IS_FULL;
+				case LoginResponse.NEED_MEMBERS_ACCOUNT -> NEED_MEMBERS_ACCOUNT;
+				default -> UNSUCCESSFUL;
+			};
 		} else {
-			switch (responseCode) {
-				case LoginResponse.RECONNECT_SUCCESFUL:
-				case REGISTER_SUCCESSFUL:
-					return LOGIN_SUCCESSFUL;
-				case LoginResponse.CLIENT_UPDATED:
-					return CLIENT_UPDATED_RETRO;
-				case LoginResponse.INVALID_CREDENTIALS:
-					if (!registering) return INVALID_USERNAME_OR_PASSWORD_RETRO;
-					else return USERNAME_TAKEN_RETRO;
-				case LoginResponse.ACCOUNT_LOGGEDIN:
-				case LoginResponse.IP_IN_USE:
-				case LoginResponse.USERNAME_ALREADY_IN_USE:
-					return USERNAME_ALREADY_IN_USE_RETRO;
-				case LoginResponse.WORLD_IS_FULL:
-					return WORLD_IS_FULL_RETRO;
-
-				case LoginResponse.SERVER_TIMEOUT:
-				case LoginResponse.LOGIN_UNSUCCESSFUL:
-				case LoginResponse.LOGIN_ATTEMPTS_EXCEEDED:
-				case LoginResponse.ACCOUNT_TEMP_DISABLED:
-				case LoginResponse.ACCOUNT_PERM_DISABLED:
-				case LoginResponse.NEED_MEMBERS_ACCOUNT:
-				case LoginResponse.LOGINSERVER_OFFLINE:
-				case LoginResponse.FAILED_TO_DECODE_PROFILE:
-				case LoginResponse.ACCOUNT_SUSPECTED_STOLEN:
-				case LoginResponse.LOGINSERVER_MISMATCH:
-				case LoginResponse.NOT_VETERAN_ACCOUNT:
-				case LoginResponse.PASSWORD_STOLEN:
-				case LoginResponse.NEED_TO_SET_DISPLAY_NAME:
-				case LoginResponse.WORLD_DOES_NOT_ACCEPT_NEW_PLAYERS:
-				case LoginResponse.NONE_OF_YOUR_CHARACTERS_CAN_LOGIN:
-				case LoginResponse.SERVER_REJECT:
-				case LoginResponse.UNDER_13_YEARS_OLD:
-					return UNSUCCESSFUL;
-
-			}
+			return switch (responseCode) {
+				case LoginResponse.RECONNECT_SUCCESFUL, REGISTER_SUCCESSFUL -> LOGIN_SUCCESSFUL;
+				case LoginResponse.CLIENT_UPDATED -> CLIENT_UPDATED_RETRO;
+				case LoginResponse.INVALID_CREDENTIALS ->
+					registering ? USERNAME_TAKEN_RETRO : INVALID_USERNAME_OR_PASSWORD_RETRO;
+				case LoginResponse.ACCOUNT_LOGGEDIN, LoginResponse.IP_IN_USE,
+					 LoginResponse.USERNAME_ALREADY_IN_USE -> USERNAME_ALREADY_IN_USE_RETRO;
+				case LoginResponse.WORLD_IS_FULL -> WORLD_IS_FULL_RETRO;
+				default -> UNSUCCESSFUL;
+			};
 		}
-		return UNSUCCESSFUL;
 	}
 
 }

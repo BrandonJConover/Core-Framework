@@ -25,12 +25,11 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, WebSocketFrame frame) throws Exception {
-		if (frame instanceof TextWebSocketFrame) {
+		if (frame instanceof TextWebSocketFrame textFrame) {
 			// Send the uppercase string back.
-			String request = ((TextWebSocketFrame) frame).text();
+			String request = textFrame.text();
 			ctx.channel().writeAndFlush(new TextWebSocketFrame(request.toUpperCase(Locale.US)));
-		} else if (frame instanceof BinaryWebSocketFrame) {
-			BinaryWebSocketFrame binframe = (BinaryWebSocketFrame) frame;
+		} else if (frame instanceof BinaryWebSocketFrame binframe) {
 			ByteBuf buffer = binframe.content().retain();
 			ctx.fireChannelRead(buffer);
 		} else {

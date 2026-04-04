@@ -9,7 +9,7 @@ public class ItemContainer {
 	private int SIZE = -1;
 
 	private List<Item> list = Collections.synchronizedList(new ArrayList<>());
-	private LinkedList<ContainerListener> listeners = new LinkedList<ContainerListener>();
+	private LinkedList<ContainerListener> listeners = new LinkedList<>();
 
 	private final Player player;
 

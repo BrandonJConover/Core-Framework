@@ -687,12 +687,11 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 					player.playerServerMessage(MessageType.QUEST, "Your opponent already has weakened " + skillName);
 					return;
 				}
-				if (affectedMob.isPlayer()) {
-					Player aff = (Player) affectedMob;
+				if (affectedMob instanceof Player aff) {
 					// Yes, it's authentic that it's spelled "defence"...
 					final String skillName = (spellEnum == Spells.CLAWS_OF_GUTHIX) ?
 						"defence" : "magic";
-					aff.message(String.format("Your %s has been reduced by the spell!", skillName));
+					aff.message("Your %s has been reduced by the spell!".formatted(skillName));
 				}
 			}
 			affectedMob.getSkills().setLevel(affectsStat, newStat);
@@ -1328,7 +1327,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 			if (isInPkZone && !player.canBeReattacked()) {
 				player.resetPath();
 				// TODO: ...? should probably display a message here instead of dying silently...?
-				System.out.println("Killed pvp cast silently because they shot too fast");
+				LOGGER.debug("Killed pvp cast silently because they shot too fast");
 				return;
 			}
 		}

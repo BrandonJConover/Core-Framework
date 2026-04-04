@@ -155,15 +155,14 @@ public class CombatFormula {
 		boolean isHit = calculateMeleeAccuracy(source, victim);
 		boolean wasHit = isHit;
 		int damage = calculateMeleeDamage(source);
-		if (victim instanceof Player) {
+		if (victim instanceof Player playerVictim) {
 			// Track the damage dealt to the player
-			Player playerVictim = (Player)victim;
 			if (isHit) {
 				int damageToPlayer = damage;
 				int blockedDamage = 0;
 
 				// Defense skillcape
-				if (SkillCapes.shouldActivate((Player) victim, DEFENSE_CAPE) && damageToPlayer > 0) {
+				if (SkillCapes.shouldActivate(playerVictim, DEFENSE_CAPE) && damageToPlayer > 0) {
 					damage /= 2;
 					blockedDamage = damage;
 				}
@@ -171,17 +170,17 @@ public class CombatFormula {
 				playerVictim.updateDamageAndBlockedDamageTracking(source, damageToPlayer, blockedDamage);
 			}
 		}
-		if (source instanceof Player) {
-			while(SkillCapes.shouldActivate((Player)source, ATTACK_CAPE, isHit)){
+		if (source instanceof Player sourcePlayer) {
+			while(SkillCapes.shouldActivate(sourcePlayer, ATTACK_CAPE, isHit)){
 				isHit = calculateMeleeAccuracy(source, victim);
 			}
 			if (!wasHit && isHit)
-				((Player) source).message("@red@Your Attack cape has prevented a zero hit");
+				sourcePlayer.message("@red@Your Attack cape has prevented a zero hit");
 
 			final double maximum = (double) (getMeleeDamage(source) + 320) / 640;
-			if (damage >= (maximum * 0.5) && SkillCapes.shouldActivate((Player) source, STRENGTH_CAPE, isHit)) {
+			if (damage >= (maximum * 0.5) && SkillCapes.shouldActivate(sourcePlayer, STRENGTH_CAPE, isHit)) {
 				damage += (maximum*0.2);
-				((Player) source).message("@ora@Your Strength cape has granted you a critical hit");
+				sourcePlayer.message("@ora@Your Strength cape has granted you a critical hit");
 			}
 		}
 
@@ -315,8 +314,7 @@ public class CombatFormula {
 	 * @return A multiplier to modify the context mob's relevant stat to the prayers.
 	 */
 	protected static double addPrayers(final Mob source, final int prayer1, final int prayer2, final int prayer3) {
-		if (source.isPlayer()) {
-			final Player sourcePlayer = (Player) source;
+		if (source instanceof Player sourcePlayer) {
 			if (sourcePlayer.getPrayers().isPrayerActivated(prayer3)) {
 				return 1.15D;
 			}
@@ -336,17 +334,12 @@ public class CombatFormula {
 	 * Uses values from the old projectile.txt file included with configXX.jag.
 	 */
 	private static int rangedPowerRetro(final int bowId) {
-		switch (ItemId.getById(bowId)) {
-			case SHORTBOW:
-				return 14;
-			case LONGBOW:
-				return 20;
-			case CROSSBOW:
-			case PHOENIX_CROSSBOW:
-				return 22;
-			default:
-				return 0;
-		}
+		return switch (ItemId.getById(bowId)) {
+			case SHORTBOW -> 14;
+			case LONGBOW -> 20;
+			case CROSSBOW, PHOENIX_CROSSBOW -> 22;
+			default -> 0;
+		};
 	}
 
 	/**

@@ -76,7 +76,7 @@ public class PrayerHandler implements PayloadProcessor<PrayerStruct, OpcodeIn> {
 
 		if (prayerID < THICK_SKIN || prayerID > PROTECT_FROM_MISSILES) {
 			player.setSuspiciousPlayer(true,
-				String.format("prayerID < %d or prayerID > %d", THICK_SKIN, PROTECT_FROM_MISSILES));
+				"prayerID < %d or prayerID > %d".formatted(THICK_SKIN, PROTECT_FROM_MISSILES));
 			return;
 		}
 
@@ -97,23 +97,25 @@ public class PrayerHandler implements PayloadProcessor<PrayerStruct, OpcodeIn> {
 
 		final OpcodeIn opcode = payload.getOpcode();
 
-		if (opcode == OpcodeIn.PRAYER_ACTIVATED) {
-			final PrayerDef prayerDef = player.getWorld().getServer().getEntityHandler().getPrayerDef(prayerID);
-			assert prayerDef != null;
+		switch (opcode) {
+			case PRAYER_ACTIVATED -> {
+				final PrayerDef prayerDef = player.getWorld().getServer().getEntityHandler().getPrayerDef(prayerID);
+				assert prayerDef != null;
 
-			if (player.getSkills().getMaxStat(Skill.PRAYER.id()) < prayerDef.getReqLevel()) {
-				player.message("Your prayer ability is not high enough to use this prayer");
-				return;
+				if (player.getSkills().getMaxStat(Skill.PRAYER.id()) < prayerDef.getReqLevel()) {
+					player.message("Your prayer ability is not high enough to use this prayer");
+					return;
+				}
+
+				if (player.getSkills().getLevel(Skill.PRAYER.id()) <= 0) {
+					player.message("You have run out of prayer points. Return to a church to recharge");
+					return;
+				}
+
+				activatePrayer(player.getPrayers(), prayerID);
 			}
-
-			if (player.getSkills().getLevel(Skill.PRAYER.id()) <= 0) {
-				player.message("You have run out of prayer points. Return to a church to recharge");
-				return;
-			}
-
-			activatePrayer(player.getPrayers(), prayerID);
-		} else if (opcode == OpcodeIn.PRAYER_DEACTIVATED) {
-			deactivatePrayer(player.getPrayers(), prayerID, true);
+			case PRAYER_DEACTIVATED -> deactivatePrayer(player.getPrayers(), prayerID, true);
+			default -> { }
 		}
 	}
 }
