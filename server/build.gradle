@@ -132,11 +132,12 @@ tasks.named('test') {
 task runServer(type: JavaExec) {
     mainClass = 'com.openrsc.server.Server'
     classpath = sourceSets.main.runtimeClasspath
-    args = ['default.conf']
+    def confFile = System.getProperty('confFile') ?: project.findProperty('confFile') ?: 'default'
     jvmArgs = [
         '-Xms2G',
         '-Xmx4G',
         '-XX:+UseG1GC',
-        '-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector'
+        '-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector',
+        "-Dconf=${confFile}"
     ]
 }

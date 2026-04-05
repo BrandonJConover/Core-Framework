@@ -1,5 +1,12 @@
 import Foundation
 
+struct DuelSettings {
+    var disallowRetreat: Bool = false
+    var disallowMagic: Bool = false
+    var disallowPrayer: Bool = false
+    var disallowWeapons: Bool = false
+}
+
 /// Main game client that manages game state.
 /// Complete implementation matching server protocol.
 @MainActor
@@ -83,6 +90,59 @@ final class GameClient: ObservableObject {
 
     @Published var fatigue: Int = 0
     @Published var questList: [Int: Int] = [:]
+
+    // Equipment (11 slots; -1 = empty)
+    @Published var wornEquipment: [Int] = Array(repeating: -1, count: 11)
+
+    // Combat
+    @Published var combatStyle: Int = 0   // 0=Controlled 1=Aggressive 2=Accurate 3=Defensive
+
+    // Prayer
+    @Published var activePrayers: [Bool] = Array(repeating: false, count: 18)
+
+    // Trade
+    @Published var showingTrade: Bool = false
+    @Published var tradePartnerId: Int = -1
+    @Published var tradePartnerName: String = ""
+    @Published var tradeMyItems: [(id: Int, amount: Int, noted: Bool)] = []
+    @Published var tradeTheirItems: [(id: Int, amount: Int, noted: Bool)] = []
+    @Published var tradeAccepted: Bool = false
+    @Published var tradeTheyAccepted: Bool = false
+    @Published var showingTradeConfirm: Bool = false
+
+    // Duel
+    @Published var showingDuel: Bool = false
+    @Published var duelPartnerId: Int = -1
+    @Published var duelMyItems: [(id: Int, amount: Int, noted: Bool)] = []
+    @Published var duelTheirItems: [(id: Int, amount: Int, noted: Bool)] = []
+    @Published var duelSettings: DuelSettings = DuelSettings()
+    @Published var duelAccepted: Bool = false
+    @Published var duelTheyAccepted: Bool = false
+    @Published var showingDuelConfirm: Bool = false
+
+    // System
+    @Published var systemUpdateTimer: Int = 0
+    @Published var showingAppearanceScreen: Bool = false
+    @Published var showingWelcomeScreen: Bool = false
+    @Published var welcomeLastIp: String = ""
+    @Published var welcomeDaysSinceLogin: Int = 0
+
+    // Privacy / Settings
+    @Published var blockChat: Bool = false
+    @Published var blockPrivate: Bool = false
+    @Published var blockTrade: Bool = false
+    @Published var blockDuel: Bool = false
+    @Published var autoCamera: Bool = true
+    @Published var soundDisabled: Bool = false
+
+    // Online list
+    @Published var onlinePlayers: [(name: String, icon: Int, location: String)] = []
+
+    // Sleep
+    @Published var incorrectSleepwordAttempt: Bool = false
+
+    // Bank preset data (raw bytes per preset slot index)
+    @Published var bankPresetData: [Int: Data] = [:]
 
     // Camera
     @Published var cameraX: Int = 0
@@ -816,6 +876,303 @@ final class GameClient: ObservableObject {
     func logout() async throws {
         // Opcode 102 = LOGOUT (1 is not valid for custom parser)
         try await networkClient.send(PacketBuilder().build(opcode: 102))
+    }
+
+    // MARK: - State Mutators (called by PacketHandler)
+
+    func setCombatStyle(_ style: Int) {
+        combatStyle = style
+    }
+
+    func setActivePrayers(_ prayers: [Bool]) {
+        activePrayers = prayers
+    }
+
+    func setInventorySlot(slot: Int, itemId: Int, wielded: Bool, noted: Bool, amount: Int) {
+        // Ensure inventory is large enough
+        while inventory.count <= slot {
+            inventory.append(InventoryItem(itemId: 0, amount: 0, equipped: false))
+        }
+        if itemId == 0 {
+            // Empty slot — remove if within bounds
+            if slot < inventory.count {
+                inventory.remove(at: slot)
+            }
+        } else {
+            inventory[slot] = InventoryItem(itemId: itemId, amount: amount, equipped: wielded)
+        }
+    }
+
+    func removeInventorySlot(slot: Int) {
+        guard slot < inventory.count else { return }
+        inventory.remove(at: slot)
+    }
+
+    func setFullEquipment(slots: [(wieldPosition: Int, itemId: Int, amount: Int)]) {
+        wornEquipment = Array(repeating: -1, count: 11)
+        for slot in slots {
+            let pos = slot.wieldPosition
+            if pos >= 0 && pos < wornEquipment.count {
+                wornEquipment[pos] = slot.itemId
+            }
+        }
+    }
+
+    func updateEquipmentSlot(slot: Int, itemId: Int, amount: Int) {
+        guard slot >= 0 && slot < wornEquipment.count else { return }
+        wornEquipment[slot] = (itemId == 0xFFFF) ? -1 : itemId
+    }
+
+    func setSystemUpdateTimer(_ seconds: Int) {
+        systemUpdateTimer = seconds
+    }
+
+    func showAppearanceScreen() {
+        showingAppearanceScreen = true
+    }
+
+    func showWelcomeScreen(lastIp: String, daysSinceLogin: Int, recoveryDays: Int) {
+        welcomeLastIp = lastIp
+        welcomeDaysSinceLogin = daysSinceLogin
+        showingWelcomeScreen = true
+    }
+
+    func setPrivacySettings(blockChat: Bool, blockPrivate: Bool, blockTrade: Bool, blockDuel: Bool) {
+        self.blockChat = blockChat
+        self.blockPrivate = blockPrivate
+        self.blockTrade = blockTrade
+        self.blockDuel = blockDuel
+    }
+
+    func setGameSettings(autoCamera: Bool, singleMouseButton: Bool, soundDisabled: Bool) {
+        self.autoCamera = autoCamera
+        self.soundDisabled = soundDisabled
+    }
+
+    func setOnlineList(_ players: [(name: String, icon: Int, location: String)]) {
+        onlinePlayers = players
+    }
+
+    func onIncorrectSleepword() {
+        incorrectSleepwordAttempt = true
+        // Reset after a moment so it can trigger again
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.incorrectSleepwordAttempt = false
+        }
+    }
+
+    func setBankPresetData(slotIndex: Int, data: Data) {
+        bankPresetData[slotIndex] = data
+    }
+
+    // Trade mutators
+    func showTrade(partnerIndex: Int) {
+        tradePartnerId = partnerIndex
+        tradeMyItems = []
+        tradeTheirItems = []
+        tradeAccepted = false
+        tradeTheyAccepted = false
+        showingTrade = true
+    }
+
+    func updateTradeTheirItems(_ items: [(id: Int, amount: Int, noted: Bool)]) {
+        tradeTheirItems = items
+    }
+
+    func setTradeAccepted(_ accepted: Bool) {
+        tradeAccepted = accepted
+    }
+
+    func setTradeTheyAccepted(_ accepted: Bool) {
+        tradeTheyAccepted = accepted
+    }
+
+    func showTradeConfirm(partnerName: String, myItems: [(id: Int, amount: Int, noted: Bool)], theirItems: [(id: Int, amount: Int, noted: Bool)]) {
+        tradePartnerName = partnerName
+        tradeMyItems = myItems
+        tradeTheirItems = theirItems
+        showingTradeConfirm = true
+    }
+
+    func hideTrade() {
+        showingTrade = false
+        showingTradeConfirm = false
+        tradePartnerId = -1
+        tradePartnerName = ""
+        tradeMyItems = []
+        tradeTheirItems = []
+        tradeAccepted = false
+        tradeTheyAccepted = false
+    }
+
+    // Duel mutators
+    func showDuel(partnerIndex: Int) {
+        duelPartnerId = partnerIndex
+        duelMyItems = []
+        duelTheirItems = []
+        duelAccepted = false
+        duelTheyAccepted = false
+        showingDuel = true
+    }
+
+    func updateDuelTheirItems(_ items: [(id: Int, amount: Int, noted: Bool)]) {
+        duelTheirItems = items
+    }
+
+    func updateDuelSettings(_ settings: DuelSettings) {
+        duelSettings = settings
+    }
+
+    func setDuelAccepted(_ accepted: Bool) {
+        duelAccepted = accepted
+    }
+
+    func setDuelTheyAccepted(_ accepted: Bool) {
+        duelTheyAccepted = accepted
+    }
+
+    func showDuelConfirm(partnerName: String, myItems: [(id: Int, amount: Int, noted: Bool)], theirItems: [(id: Int, amount: Int, noted: Bool)], settings: DuelSettings) {
+        tradePartnerName = partnerName  // reuse tradePartnerName for duel partner display
+        duelMyItems = myItems
+        duelTheirItems = theirItems
+        duelSettings = settings
+        showingDuelConfirm = true
+    }
+
+    func hideDuel() {
+        showingDuel = false
+        showingDuelConfirm = false
+        duelPartnerId = -1
+        duelMyItems = []
+        duelTheirItems = []
+        duelAccepted = false
+        duelTheyAccepted = false
+    }
+
+    // MARK: - Action Senders
+
+    func sendCombatStyle(_ style: Int) async throws {
+        // opcode 29, payload: 1 byte style
+        var b = PacketBuilder()
+        b.writeByte(UInt8(style))
+        try await networkClient.send(b.build(opcode: 29))
+    }
+
+    func sendPrayerToggle(prayerId: Int, active: Bool) async throws {
+        // opcode 60 = activate, 254 = deactivate; payload: 2 bytes (short prayerId)
+        var b = PacketBuilder()
+        b.writeShort(UInt16(prayerId))
+        try await networkClient.send(b.build(opcode: active ? 60 : 254))
+    }
+
+    func sendTradeAccept() async throws {
+        try await networkClient.send(PacketBuilder().build(opcode: 104))
+    }
+
+    func sendTradeDecline() async throws {
+        try await networkClient.send(PacketBuilder().build(opcode: 230))
+    }
+
+    func sendTradeWith(playerIndex: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(playerIndex))
+        try await networkClient.send(b.build(opcode: 142))
+    }
+
+    func sendDialogueAnswer(optionIndex: Int) async throws {
+        var b = PacketBuilder()
+        b.writeByte(UInt8(optionIndex))
+        try await networkClient.send(b.build(opcode: 116))
+    }
+
+    func sendBankClose() async throws {
+        try await networkClient.send(PacketBuilder().build(opcode: 212))
+    }
+
+    func sendBankWithdraw(slot: Int, amount: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(slot))
+        b.writeInt(UInt32(amount))
+        try await networkClient.send(b.build(opcode: 22))
+    }
+
+    func sendBankDeposit(slot: Int, amount: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(slot))
+        b.writeInt(UInt32(amount))
+        try await networkClient.send(b.build(opcode: 23))
+    }
+
+    func sendShopClose() async throws {
+        try await networkClient.send(PacketBuilder().build(opcode: 166))
+    }
+
+    func sendShopBuy(itemId: Int, amount: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(itemId))
+        b.writeInt(UInt32(amount))
+        try await networkClient.send(b.build(opcode: 236))
+    }
+
+    func sendShopSell(slot: Int, amount: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(slot))
+        b.writeInt(UInt32(amount))
+        try await networkClient.send(b.build(opcode: 221))
+    }
+
+    func sendSleepword(_ word: String) async throws {
+        var b = PacketBuilder()
+        b.writeLinefeedString(word)
+        try await networkClient.send(b.build(opcode: 45))
+    }
+
+    func talkToNpc(npcIndex: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(npcIndex))
+        try await networkClient.send(b.build(opcode: 153))
+    }
+
+    func attackNpc(npcIndex: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(npcIndex))
+        try await networkClient.send(b.build(opcode: 190))
+    }
+
+    func attackPlayer(playerIndex: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(playerIndex))
+        try await networkClient.send(b.build(opcode: 171))
+    }
+
+    func followPlayer(playerIndex: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(playerIndex))
+        try await networkClient.send(b.build(opcode: 165))
+    }
+
+    func duelPlayer(playerIndex: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(playerIndex))
+        try await networkClient.send(b.build(opcode: 103))
+    }
+
+    func dropItem(slot: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(slot))
+        try await networkClient.send(b.build(opcode: 246))
+    }
+
+    func equipItem(slot: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(slot))
+        try await networkClient.send(b.build(opcode: 169))
+    }
+
+    func unequipItem(slot: Int) async throws {
+        var b = PacketBuilder()
+        b.writeShort(UInt16(slot))
+        try await networkClient.send(b.build(opcode: 170))
     }
 }
 

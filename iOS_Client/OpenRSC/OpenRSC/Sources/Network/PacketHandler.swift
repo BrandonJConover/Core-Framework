@@ -43,7 +43,6 @@ actor PacketHandler {
         case message = 131
         case privateMessageSent = 87
         case privateMessageReceived = 120
-        case friendList = 71
         case friendUpdate = 149
         case ignoreList = 109
 
@@ -57,6 +56,41 @@ actor PacketHandler {
         case teleport = 145
         case showSleepScreen = 117
         case wakeUp = 84
+
+        // New state handlers
+        case setInventorySlot = 90
+        case removeInventorySlot = 123
+        case updateStat = 159
+        case combatStyleChanged = 129
+        case setPrayers = 206
+        case showWelcome = 182
+        case incorrectSleepword = 194
+        case privacySettings = 51
+        case gameSettings = 240
+        case sendServerConfigs = 19
+        case showAppearanceChange = 59
+        case systemUpdateTimer = 52
+        case updateEquipment = 254
+        case updateEquipmentSlot = 255
+        case unlockedAppearances = 250
+        case onlineList = 136
+        case bankPreset = 150
+
+        // Trade
+        case initiateTrade = 92
+        case showConfirmTrade = 20
+        case updateItemsTradedToYou = 97
+        case updateTradeAcceptance = 15
+        case updateTradeRecipientAcceptance = 162
+        case concludeTrade = 128
+
+        // Duel
+        case syncDuelSettings = 30
+        case updateStakedItemsOpponent = 6
+        case showConfirmDuel = 172
+        case updateDuelAcceptance = 210
+        case updateDuelOpponentAcceptance = 253
+        case cancelDuelDialogue = 225
     }
 
     init(gameClient: GameClient) {
@@ -134,8 +168,6 @@ actor PacketHandler {
             await handlePrivateMessageSent(&reader)
         case .privateMessageReceived:
             await handlePrivateMessageReceived(&reader)
-        case .friendList:
-            await handleFriendList(&reader)
         case .friendUpdate:
             await handleFriendUpdate(&reader)
         case .ignoreList:
@@ -158,6 +190,66 @@ actor PacketHandler {
             await handleShowSleepScreen(&reader)
         case .wakeUp:
             await handleWakeUp()
+
+        // New state handlers
+        case .setInventorySlot:
+            await handleSetInventorySlot(&reader)
+        case .removeInventorySlot:
+            await handleRemoveInventorySlot(&reader)
+        case .updateStat:
+            await handleUpdateStat(&reader)
+        case .combatStyleChanged:
+            await handleCombatStyleChanged(&reader)
+        case .setPrayers:
+            await handleSetPrayers(&reader)
+        case .showWelcome:
+            await handleShowWelcome(&reader)
+        case .incorrectSleepword:
+            await handleIncorrectSleepword()
+        case .privacySettings:
+            await handlePrivacySettings(&reader)
+        case .gameSettings:
+            await handleGameSettings(&reader)
+        case .sendServerConfigs:
+            await handleSendServerConfigs(&reader)
+        case .showAppearanceChange:
+            await handleShowAppearanceChange()
+        case .systemUpdateTimer:
+            await handleSystemUpdateTimer(&reader)
+        case .updateEquipment:
+            await handleUpdateEquipment(&reader)
+        case .updateEquipmentSlot:
+            await handleUpdateEquipmentSlot(&reader)
+        case .unlockedAppearances:
+            await handleUnlockedAppearances(&reader)
+        case .onlineList:
+            await handleOnlineList(&reader)
+        case .bankPreset:
+            await handleBankPreset(&reader)
+        case .initiateTrade:
+            await handleInitiateTrade(&reader)
+        case .showConfirmTrade:
+            await handleShowConfirmTrade(&reader)
+        case .updateItemsTradedToYou:
+            await handleUpdateItemsTradedToYou(&reader)
+        case .updateTradeAcceptance:
+            await handleUpdateTradeAcceptance(&reader)
+        case .updateTradeRecipientAcceptance:
+            await handleUpdateTradeRecipientAcceptance(&reader)
+        case .concludeTrade:
+            await handleConcludeTrade()
+        case .syncDuelSettings:
+            await handleSyncDuelSettings(&reader)
+        case .updateStakedItemsOpponent:
+            await handleUpdateStakedItemsOpponent(&reader)
+        case .showConfirmDuel:
+            await handleShowConfirmDuel(&reader)
+        case .updateDuelAcceptance:
+            await handleUpdateDuelAcceptance(&reader)
+        case .updateDuelOpponentAcceptance:
+            await handleUpdateDuelOpponentAcceptance(&reader)
+        case .cancelDuelDialogue:
+            await handleCancelDuelDialogue()
         }
     }
 
@@ -799,7 +891,7 @@ actor PacketHandler {
     private func handleShowBank(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        guard let itemCount = reader.readByte(),
+        guard let itemCount = reader.readShort(),
               let maxBankSize = reader.readShort() else { return }
 
         var bankItems: [(id: Int, amount: Int)] = []
@@ -831,24 +923,22 @@ actor PacketHandler {
     private func handleShowShop(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        guard let itemCount = reader.readByte(),
-              let generalStore = reader.readByte(),
-              let sellMultiplier = reader.readByte(),
-              let buyMultiplier = reader.readByte() else { return }
+        guard let itemCount = reader.readByte() else { return }
+        _ = reader.readByte() // stockSensitivity (discard)
 
         var shopItems: [(id: Int, amount: Int, price: Int)] = []
         for _ in 0..<itemCount {
             guard let itemId = reader.readShort(),
                   let amount = reader.readShort(),
-                  let price = reader.readInt() else { continue }
-            shopItems.append((id: Int(itemId), amount: Int(amount), price: Int(price)))
+                  let baseAmount = reader.readShort() else { continue }
+            shopItems.append((id: Int(itemId), amount: Int(amount), price: Int(baseAmount)))
         }
 
         await gameClient.showShop(
             items: shopItems,
-            isGeneralStore: generalStore == 1,
-            sellMultiplier: Int(sellMultiplier),
-            buyMultiplier: Int(buyMultiplier)
+            isGeneralStore: false,
+            sellMultiplier: 1,
+            buyMultiplier: 1
         )
     }
 
@@ -879,20 +969,27 @@ actor PacketHandler {
 
     private func handleChatMessage(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
-        guard let message = reader.readString() else { return }
 
-        if message.contains(":") {
-            let parts = message.split(separator: ":", maxSplits: 1)
-            if parts.count == 2 {
-                await gameClient.addChatMessage(
-                    sender: String(parts[0]),
-                    message: String(parts[1]).trimmingCharacters(in: .whitespaces)
-                )
-                return
-            }
+        guard let _iconSprite = reader.readInt(),
+              let _messageType = reader.readByte(),
+              let infoContained = reader.readByte(),
+              let message = reader.readString() else { return }
+
+        var sender: String? = nil
+        if (infoContained & 1) != 0 {
+            sender = reader.readString()
+            _ = reader.readString() // discard extra field
+        }
+        // color string: discard
+        if (infoContained & 2) != 0 {
+            _ = reader.readString()
         }
 
-        await gameClient.addServerMessage(message)
+        if let sender = sender {
+            await gameClient.addChatMessage(sender: sender, message: message)
+        } else {
+            await gameClient.addServerMessage(message)
+        }
     }
 
     private func handlePrivateMessageSent(_ reader: inout PacketReader) async {
@@ -903,30 +1000,21 @@ actor PacketHandler {
     }
 
     private func handlePrivateMessageReceived(_ reader: inout PacketReader) async {
-        guard let sender = reader.readString(),
-              let message = reader.readString() else { return }
+        guard let sender = reader.readString() else { return }
+        let formerName = reader.readString() ?? ""
+        guard let _iconSprite = reader.readInt() else { return }
+        let message = reader.readRSCString() ?? ""
 
         await soundManager.play(.privateMessage)
         await gameClient?.onPrivateMessageReceived(from: sender, message: message)
     }
 
-    private func handleFriendList(_ reader: inout PacketReader) async {
-        guard let gameClient = gameClient else { return }
-        guard let count = reader.readByte() else { return }
-
-        var friends: [(name: String, online: Bool)] = []
-        for _ in 0..<count {
-            guard let name = reader.readString(),
-                  let worldId = reader.readByte() else { continue }
-            friends.append((name: name, online: worldId > 0))
-        }
-
-        await gameClient.setFriendList(friends)
-    }
-
     private func handleFriendUpdate(_ reader: inout PacketReader) async {
-        guard let name = reader.readString(),
-              let worldId = reader.readByte() else { return }
+        guard let name = reader.readString() else { return }
+        let formerName = reader.readString() ?? ""
+        guard let worldId = reader.readByte() else { return }
+        var world: String? = nil
+        if reader.hasMoreData { world = reader.readString() }
 
         await gameClient?.updateFriendStatus(name: name, online: worldId > 0)
     }
@@ -937,9 +1025,12 @@ actor PacketHandler {
 
         var ignoreList: [String] = []
         for _ in 0..<count {
-            if let name = reader.readString() {
-                ignoreList.append(name)
-            }
+            // Each entry has 4 strings: name, name, formerName, formerName
+            let name = reader.readString() ?? ""
+            _ = reader.readString() // second name
+            _ = reader.readString() // formerName
+            _ = reader.readString() // formerName duplicate
+            ignoreList.append(name)
         }
 
         await gameClient.setIgnoreList(ignoreList)
@@ -988,8 +1079,8 @@ actor PacketHandler {
     // MARK: - Misc
 
     private func handlePlaySound(_ reader: inout PacketReader) async {
-        guard let soundId = reader.readShort() else { return }
-        await soundManager.playById(Int(soundId))
+        guard let soundName = reader.readString() else { return }
+        await soundManager.playByName(soundName)
     }
 
     private func handleTeleport(_ reader: inout PacketReader) async {
@@ -1001,20 +1092,318 @@ actor PacketHandler {
     }
 
     private func handleShowSleepScreen(_ reader: inout PacketReader) async {
-        guard let imageLength = reader.readShort() else { return }
-
-        var imageData = Data()
-        for _ in 0..<imageLength {
-            if let byte = reader.readByte() {
-                imageData.append(byte)
-            }
-        }
-
+        let imageData = reader.readRemainingBytes()
         await gameClient?.showSleepScreen(captchaImage: imageData)
     }
 
     private func handleWakeUp() async {
         await gameClient?.hideSleepScreen()
+    }
+
+    // MARK: - New State Handler Stubs (Loop 0B - full implementation in Loop 1)
+
+    private func handleSetInventorySlot(_ reader: inout PacketReader) async {
+        guard let slot = reader.readByte(),
+              let rawId = reader.readShort(),
+              let noted = reader.readByte() else { return }
+
+        let wielded = (rawId & 0x8000) != 0
+        let itemId = Int(rawId & 0x7FFF)
+        var amount = 1
+        if reader.hasMoreData {
+            amount = Int(reader.readInt() ?? 1)
+            if amount == 0 { amount = 1 }
+        }
+
+        await gameClient?.setInventorySlot(
+            slot: Int(slot), itemId: itemId, wielded: wielded,
+            noted: noted != 0, amount: amount
+        )
+    }
+
+    private func handleRemoveInventorySlot(_ reader: inout PacketReader) async {
+        guard let slot = reader.readByte() else { return }
+        await gameClient?.removeInventorySlot(slot: Int(slot))
+    }
+
+    private func handleUpdateStat(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+        guard let statId = reader.readByte(),
+              let current = reader.readByte(),
+              let max = reader.readByte(),
+              let experience = reader.readInt() else { return }
+
+        await gameClient.updateSkill(
+            skillId: Int(statId),
+            current: Int(current),
+            max: Int(max),
+            experience: Int(experience)
+        )
+    }
+
+    private func handleCombatStyleChanged(_ reader: inout PacketReader) async {
+        guard let style = reader.readByte() else { return }
+        await gameClient?.setCombatStyle(Int(style))
+    }
+
+    private func handleSetPrayers(_ reader: inout PacketReader) async {
+        var prayers: [Bool] = []
+        while reader.hasMoreData {
+            let active = (reader.readByte() ?? 0) != 0
+            prayers.append(active)
+        }
+        // Pad or truncate to 18 prayers
+        while prayers.count < 18 { prayers.append(false) }
+        if prayers.count > 18 { prayers = Array(prayers.prefix(18)) }
+        await gameClient?.setActivePrayers(prayers)
+    }
+
+    private func handleShowWelcome(_ reader: inout PacketReader) async {
+        guard let lastIp = reader.readString(),
+              let daysSinceLogin = reader.readShort(),
+              let daysUntilRecovery = reader.readShort() else { return }
+
+        await gameClient?.showWelcomeScreen(
+            lastIp: lastIp,
+            daysSinceLogin: Int(daysSinceLogin),
+            recoveryDays: Int(daysUntilRecovery)
+        )
+    }
+
+    private func handleIncorrectSleepword() async {
+        await gameClient?.onIncorrectSleepword()
+    }
+
+    private func handlePrivacySettings(_ reader: inout PacketReader) async {
+        guard let blockChat = reader.readByte(),
+              let blockPrivate = reader.readByte(),
+              let blockTrade = reader.readByte(),
+              let blockDuel = reader.readByte() else { return }
+
+        await gameClient?.setPrivacySettings(
+            blockChat: blockChat != 0,
+            blockPrivate: blockPrivate != 0,
+            blockTrade: blockTrade != 0,
+            blockDuel: blockDuel != 0
+        )
+    }
+
+    private func handleGameSettings(_ reader: inout PacketReader) async {
+        guard let autoCamera = reader.readByte(),
+              let singleMouseButton = reader.readByte(),
+              let soundDisabled = reader.readByte() else { return }
+        // Discard any remaining settings bytes
+        while reader.hasMoreData { _ = reader.readByte() }
+
+        await gameClient?.setGameSettings(
+            autoCamera: autoCamera != 0,
+            singleMouseButton: singleMouseButton != 0,
+            soundDisabled: soundDisabled != 0
+        )
+    }
+
+    private func handleSendServerConfigs(_ reader: inout PacketReader) async {
+        // Server configs not used by this client — discard
+        while reader.hasMoreData { _ = reader.readByte() }
+    }
+
+    private func handleShowAppearanceChange() async {
+        await gameClient?.showAppearanceScreen()
+    }
+
+    private func handleSystemUpdateTimer(_ reader: inout PacketReader) async {
+        guard let seconds = reader.readShort() else { return }
+        await gameClient?.setSystemUpdateTimer(Int(seconds))
+    }
+
+    private func handleUpdateEquipment(_ reader: inout PacketReader) async {
+        guard let count = reader.readByte() else { return }
+        var slots: [(wieldPosition: Int, itemId: Int, amount: Int)] = []
+        for _ in 0..<count {
+            guard let wieldPos = reader.readByte(),
+                  let catalogID = reader.readShort() else { break }
+            // Read optional amount if remaining data suggests it (4 bytes per remaining item)
+            var amount = 1
+            if reader.hasMoreData && (reader.remaining % 4 == 0) {
+                amount = Int(reader.readInt() ?? 1)
+            }
+            slots.append((wieldPosition: Int(wieldPos), itemId: Int(catalogID), amount: amount))
+        }
+        await gameClient?.setFullEquipment(slots: slots)
+    }
+
+    private func handleUpdateEquipmentSlot(_ reader: inout PacketReader) async {
+        guard let slot = reader.readByte(),
+              let catalogID = reader.readShort() else { return }
+        var amount = 1
+        if catalogID != 0xFFFF && reader.hasMoreData {
+            amount = Int(reader.readInt() ?? 1)
+        }
+        await gameClient?.updateEquipmentSlot(
+            slot: Int(slot), itemId: Int(catalogID), amount: amount
+        )
+    }
+
+    private func handleUnlockedAppearances(_ reader: inout PacketReader) async {
+        // Store raw appearance data; full UI deferred
+        while reader.hasMoreData { _ = reader.readByte() }
+    }
+
+    private func handleOnlineList(_ reader: inout PacketReader) async {
+        guard let count = reader.readShort() else { return }
+        var players: [(name: String, icon: Int, location: String)] = []
+        for _ in 0..<count {
+            guard let name = reader.readString(),
+                  let icon = reader.readInt(),
+                  let location = reader.readString() else { break }
+            players.append((name: name, icon: Int(icon), location: location))
+        }
+        await gameClient?.setOnlineList(players)
+    }
+
+    private func handleBankPreset(_ reader: inout PacketReader) async {
+        let data = reader.readRemainingBytes()
+        // Index 0 for now; full preset UI deferred
+        await gameClient?.setBankPresetData(slotIndex: 0, data: data)
+    }
+
+    // MARK: - Trade Handler Stubs (Loop 0B - full implementation in Loop 2)
+
+    private func handleInitiateTrade(_ reader: inout PacketReader) async {
+        guard let partnerIndex = reader.readShort() else { return }
+        await gameClient?.showTrade(partnerIndex: Int(partnerIndex))
+    }
+
+    private func handleShowConfirmTrade(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+        guard let partnerName = reader.readString() else { return }
+
+        var theirItems: [(id: Int, amount: Int, noted: Bool)] = []
+        if let theirCount = reader.readByte() {
+            for _ in 0..<theirCount {
+                guard let id = reader.readShort(),
+                      let amount = reader.readInt() else { break }
+                theirItems.append((id: Int(id), amount: Int(amount), noted: false))
+            }
+        }
+
+        var myItems: [(id: Int, amount: Int, noted: Bool)] = []
+        if let myCount = reader.readByte() {
+            for _ in 0..<myCount {
+                guard let id = reader.readShort(),
+                      let amount = reader.readInt() else { break }
+                myItems.append((id: Int(id), amount: Int(amount), noted: false))
+            }
+        }
+
+        await gameClient.showTradeConfirm(
+            partnerName: partnerName, myItems: myItems, theirItems: theirItems
+        )
+    }
+
+    private func handleUpdateItemsTradedToYou(_ reader: inout PacketReader) async {
+        guard let count = reader.readByte() else { return }
+        var items: [(id: Int, amount: Int, noted: Bool)] = []
+        for _ in 0..<count {
+            guard let id = reader.readShort(),
+                  let amount = reader.readInt() else { break }
+            items.append((id: Int(id), amount: Int(amount), noted: false))
+        }
+        await gameClient?.updateTradeTheirItems(items)
+    }
+
+    private func handleUpdateTradeAcceptance(_ reader: inout PacketReader) async {
+        guard let accepted = reader.readByte() else { return }
+        await gameClient?.setTradeAccepted(accepted != 0)
+    }
+
+    private func handleUpdateTradeRecipientAcceptance(_ reader: inout PacketReader) async {
+        guard let accepted = reader.readByte() else { return }
+        await gameClient?.setTradeTheyAccepted(accepted != 0)
+    }
+
+    private func handleConcludeTrade() async {
+        await gameClient?.hideTrade()
+    }
+
+    // MARK: - Duel Handler Stubs (Loop 0B - full implementation in Loop 2)
+
+    private func handleSyncDuelSettings(_ reader: inout PacketReader) async {
+        guard let retreat = reader.readByte(),
+              let magic = reader.readByte(),
+              let prayer = reader.readByte(),
+              let weapons = reader.readByte() else { return }
+
+        let settings = DuelSettings(
+            disallowRetreat: retreat != 0,
+            disallowMagic: magic != 0,
+            disallowPrayer: prayer != 0,
+            disallowWeapons: weapons != 0
+        )
+        await gameClient?.updateDuelSettings(settings)
+    }
+
+    private func handleUpdateStakedItemsOpponent(_ reader: inout PacketReader) async {
+        guard let count = reader.readByte() else { return }
+        var items: [(id: Int, amount: Int, noted: Bool)] = []
+        for _ in 0..<count {
+            guard let id = reader.readShort(),
+                  let amount = reader.readInt() else { break }
+            items.append((id: Int(id), amount: Int(amount), noted: false))
+        }
+        await gameClient?.updateDuelTheirItems(items)
+    }
+
+    private func handleShowConfirmDuel(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+        guard let partnerName = reader.readString() else { return }
+
+        var theirItems: [(id: Int, amount: Int, noted: Bool)] = []
+        if let oppCount = reader.readByte() {
+            for _ in 0..<oppCount {
+                guard let id = reader.readShort(),
+                      let amount = reader.readInt() else { break }
+                theirItems.append((id: Int(id), amount: Int(amount), noted: false))
+            }
+        }
+
+        var myItems: [(id: Int, amount: Int, noted: Bool)] = []
+        if let myCount = reader.readByte() {
+            for _ in 0..<myCount {
+                guard let id = reader.readShort(),
+                      let amount = reader.readInt() else { break }
+                myItems.append((id: Int(id), amount: Int(amount), noted: false))
+            }
+        }
+
+        let retreat = reader.readByte() ?? 0
+        let magic = reader.readByte() ?? 0
+        let prayer = reader.readByte() ?? 0
+        let weapons = reader.readByte() ?? 0
+        let settings = DuelSettings(
+            disallowRetreat: retreat != 0,
+            disallowMagic: magic != 0,
+            disallowPrayer: prayer != 0,
+            disallowWeapons: weapons != 0
+        )
+
+        await gameClient.showDuelConfirm(
+            partnerName: partnerName, myItems: myItems, theirItems: theirItems, settings: settings
+        )
+    }
+
+    private func handleUpdateDuelAcceptance(_ reader: inout PacketReader) async {
+        guard let accepted = reader.readByte() else { return }
+        await gameClient?.setDuelAccepted(accepted != 0)
+    }
+
+    private func handleUpdateDuelOpponentAcceptance(_ reader: inout PacketReader) async {
+        guard let accepted = reader.readByte() else { return }
+        await gameClient?.setDuelTheyAccepted(accepted != 0)
+    }
+
+    private func handleCancelDuelDialogue() async {
+        await gameClient?.hideDuel()
     }
 }
 
@@ -1023,5 +1412,25 @@ actor PacketHandler {
 extension PacketReader {
     var hasMoreData: Bool {
         return remaining > 0
+    }
+
+    /// Reads an RSC-encoded string: 2-byte length prefix (big-endian, bit 15 stripped for length),
+    /// followed by that many raw UTF-8 bytes.
+    mutating func readRSCString() -> String? {
+        guard let raw = readShort() else { return nil }
+        let length = Int(raw & 0x7FFF)
+        guard remaining >= length else { return nil }
+        var bytes = [UInt8]()
+        for _ in 0..<length {
+            if let b = readByte() { bytes.append(b) }
+        }
+        return String(bytes: bytes, encoding: .utf8) ?? ""
+    }
+
+    /// Reads all remaining bytes in the packet as a Data value.
+    mutating func readRemainingBytes() -> Data {
+        var data = Data()
+        while let b = readByte() { data.append(b) }
+        return data
     }
 }
