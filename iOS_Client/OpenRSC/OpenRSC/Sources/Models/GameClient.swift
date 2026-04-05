@@ -7,9 +7,13 @@ final class GameClient: ObservableObject {
     // Game dimensions (matches RSC)
     static let gameWidth = 512
     static let gameHeight = 334
-    private static let fallbackDefaultZoom = 176
-    private static let minimumCameraZoom = 96
-    private static let maximumCameraZoom = 240
+    private static let cameraRotationStep = 32
+    private static let fallbackDefaultZoom = 184
+    private static let minimumCameraZoom = 168
+    private static let maximumCameraZoom = 192
+    private static let cameraZoomPresets = [168, 184, 192]
+    private static let dragRotationThreshold: Float = 7
+    private static let dragZoomThreshold: Float = 8
     private static let clothingPalette: [UInt32] = [
         0xFFFF0000, 0xFFFF8000, 0xFFFFE000, 0xFFA0E000, 0xFF00E000,
         0xFF008000, 0xFF00A080, 0xFF00B0FF, 0xFF0080FF, 0xFF0030F0,
@@ -84,7 +88,7 @@ final class GameClient: ObservableObject {
     @Published var cameraX: Int = 0
     @Published var cameraY: Int = 0
     @Published var cameraRotation: Int = 128
-    @Published var cameraZoom: Int = 176
+    @Published var cameraZoom: Int
 
     // UI State
     @Published var showingMenu: Bool = false
@@ -99,12 +103,15 @@ final class GameClient: ObservableObject {
     private let networkClient: NetworkClient
     private var packetHandler: PacketHandler?
     private let landscapeArchive = LandscapeArchive.shared
+    private var dragRotationAccumulator: Float = 0
+    private var dragZoomAccumulator: Float = 0
 
     // Frame buffer for rendering
     var frameBuffer: [UInt32]
 
     init(networkClient: NetworkClient) {
         self.networkClient = networkClient
+        self.cameraZoom = Self.fallbackDefaultZoom
         self.frameBuffer = Array(repeating: 0xFF000000, count: Self.gameWidth * Self.gameHeight)
 
         self.packetHandler = PacketHandler(gameClient: self)
@@ -674,16 +681,55 @@ final class GameClient: ObservableObject {
 
     func handlePan(deltaX: Float, deltaY: Float) {
         if deltaX != 0 {
-            cameraRotation = (cameraRotation + Int(deltaX * 0.7)) & 255
+            dragRotationAccumulator += deltaX
+            while abs(dragRotationAccumulator) >= Self.dragRotationThreshold {
+                stepCameraRotation(dragRotationAccumulator > 0 ? 1 : -1)
+                dragRotationAccumulator += dragRotationAccumulator > 0 ? -Self.dragRotationThreshold : Self.dragRotationThreshold
+            }
         }
+
         if deltaY != 0 {
-            let zoomDelta = Int(deltaY * 0.9)
-            cameraZoom = max(Self.minimumCameraZoom, min(Self.maximumCameraZoom, cameraZoom - zoomDelta))
+            dragZoomAccumulator += deltaY
+            while abs(dragZoomAccumulator) >= Self.dragZoomThreshold {
+                stepCameraZoom(dragZoomAccumulator < 0 ? 1 : -1)
+                dragZoomAccumulator += dragZoomAccumulator > 0 ? -Self.dragZoomThreshold : Self.dragZoomThreshold
+            }
         }
     }
 
     func handlePinch(scale: Float) {
-        cameraZoom = max(Self.minimumCameraZoom, min(Self.maximumCameraZoom, Int(Float(cameraZoom) * scale)))
+        if scale > 1.06 {
+            stepCameraZoom(1)
+        } else if scale < 0.94 {
+            stepCameraZoom(-1)
+        }
+    }
+
+    func stepCameraRotation(_ direction: Int) {
+        guard direction != 0 else { return }
+        let nextRotation = cameraRotation + (direction * Self.cameraRotationStep)
+        cameraRotation = ((nextRotation % 256) + 256) % 256
+        dragRotationAccumulator = 0
+    }
+
+    func stepCameraZoom(_ direction: Int) {
+        guard direction != 0,
+              let currentIndex = Self.cameraZoomPresets.firstIndex(of: nearestCameraZoomPreset(to: cameraZoom)) else {
+            return
+        }
+
+        let nextIndex = max(0, min(Self.cameraZoomPresets.count - 1, currentIndex + direction))
+        cameraZoom = Self.cameraZoomPresets[nextIndex]
+        dragZoomAccumulator = 0
+    }
+
+    private func nearestCameraZoomPreset(to value: Int) -> Int {
+        Self.cameraZoomPresets.min(by: { abs($0 - value) < abs($1 - value) }) ?? Self.fallbackDefaultZoom
+    }
+
+    func finishCameraGesture() {
+        dragRotationAccumulator = 0
+        dragZoomAccumulator = 0
     }
 
     // MARK: - Coordinate Conversion
@@ -1768,7 +1814,7 @@ extension GameClient {
     }
 
     private func horizonLineY() -> Int {
-        Self.gameHeight / 2 + 22
+        Self.gameHeight / 2 + 30
     }
 
     private func fallbackTileWidth() -> Int {

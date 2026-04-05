@@ -1,6 +1,31 @@
 import SwiftUI
 import MetalKit
 
+private enum GamePanel {
+    case social
+    case inventory
+    case skills
+    case settings
+}
+
+private enum SocialListTab: String, CaseIterable, Identifiable {
+    case friends = "Friends"
+    case ignore = "Ignore"
+
+    var id: String { rawValue }
+}
+
+private enum ClassicPalette {
+    static let shell = Color(red: 0.11, green: 0.11, blue: 0.12)
+    static let shellInset = Color(red: 0.20, green: 0.20, blue: 0.22)
+    static let panel = Color(red: 0.79, green: 0.79, blue: 0.76)
+    static let panelAlt = Color(red: 0.70, green: 0.70, blue: 0.68)
+    static let panelBorder = Color(red: 0.24, green: 0.22, blue: 0.18)
+    static let text = Color(red: 0.08, green: 0.08, blue: 0.08)
+    static let mutedText = Color(red: 0.31, green: 0.30, blue: 0.28)
+    static let accent = Color(red: 0.94, green: 0.79, blue: 0.27)
+}
+
 /// Main game view that renders the game world.
 /// Equivalent to Android's RSCBitmapSurfaceView.
 struct GameView: View {
@@ -8,21 +33,24 @@ struct GameView: View {
     @ObservedObject var gameClient: GameClient
     @StateObject private var inputHandler = InputHandler()
 
-    @State private var showingInventory = false
-    @State private var showingSkills = false
-    @State private var showingChat = false
-    @State private var showingSettings = false
+    @State private var activePanel: GamePanel?
+    @State private var socialListTab: SocialListTab = .friends
 
     private var isAnyPanelOpen: Bool {
-        showingInventory || showingSkills || showingSettings
+        activePanel != nil
     }
 
     var body: some View {
         GeometryReader { geometry in
             let viewportRect = GameViewport.fittedRect(in: geometry.size)
+            let uiScale = viewportScale(for: viewportRect.size)
+            let panelWidth = min(max(viewportRect.width * 0.42, 220), 320)
+            let panelX = min(
+                geometry.size.width - panelWidth / 2 - (10 * uiScale),
+                viewportRect.maxX - panelWidth / 2 - (10 * uiScale)
+            )
 
             ZStack {
-                // Game renderer — edge-to-edge under notch/home indicator
                 GameRendererView(gameClient: gameClient)
                     .ignoresSafeArea()
 
@@ -34,66 +62,44 @@ struct GameView: View {
                         .gameGestures(inputHandler, viewSize: viewportRect.size)
                 }
 
-                // UI overlay — respects safe area
-                ZStack {
-                    if isAnyPanelOpen {
-                        Color.black.opacity(0.001)
-                            .ignoresSafeArea()
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                closePanels()
-                            }
-                    }
-
-                    VStack {
-                        // Top bar
-                        TopBar(gameClient: gameClient)
-
-                        Spacer()
-
-                        // Bottom UI
-                        HStack(alignment: .bottom, spacing: 0) {
-                            // Chat area
-                            ChatView(messages: gameClient.chatMessages)
-                                .frame(maxWidth: .infinity, maxHeight: 130)
-
-                            // Tab buttons
-                            TabButtonsView(
-                                showingInventory: $showingInventory,
-                                showingSkills: $showingSkills,
-                                showingSettings: $showingSettings
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 8)
-
-                    // Side panels
-                    if showingInventory {
-                        InventoryView(items: gameClient.inventory) {
+                if isAnyPanelOpen {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
                             closePanels()
                         }
-                            .frame(width: 200)
-                            .transition(.move(edge: .trailing))
-                            .position(x: geometry.size.width - 100, y: geometry.size.height / 2)
-                    }
+                }
 
-                    if showingSkills {
-                        SkillsView(skills: gameClient.skills) {
-                            closePanels()
-                        }
-                            .frame(width: 200)
-                            .transition(.move(edge: .trailing))
-                            .position(x: geometry.size.width - 100, y: geometry.size.height / 2)
-                    }
+                VStack(spacing: 0) {
+                    TopBar(gameClient: gameClient, uiScale: uiScale)
+                        .padding(.top, 6 * uiScale)
 
-                    if showingSettings {
-                        SettingsPanel {
-                            closePanels()
-                        }
-                            .frame(width: 240)
-                            .transition(.move(edge: .trailing))
-                            .position(x: geometry.size.width - 120, y: geometry.size.height / 2)
+                    Spacer(minLength: 0)
+
+                    HStack(alignment: .bottom, spacing: 10 * uiScale) {
+                        ChatView(messages: gameClient.chatMessages, uiScale: uiScale)
+                            .frame(maxWidth: viewportRect.width * 0.62)
+
+                        Spacer(minLength: 0)
+
+                        TabButtonsView(
+                            activePanel: activePanel,
+                            uiScale: uiScale,
+                            onTap: togglePanel
+                        )
                     }
+                    .padding(.horizontal, 10 * uiScale)
+                    .padding(.bottom, 8 * uiScale)
+                }
+                .frame(width: viewportRect.width, height: viewportRect.height)
+                .position(x: viewportRect.midX, y: viewportRect.midY)
+
+                if let activePanel {
+                    panelView(for: activePanel, uiScale: uiScale)
+                        .frame(width: panelWidth)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        .position(x: panelX, y: viewportRect.midY)
                 }
             }
             .ignoresSafeArea()
@@ -103,10 +109,43 @@ struct GameView: View {
         }
     }
 
+    @ViewBuilder
+    private func panelView(for panel: GamePanel, uiScale: CGFloat) -> some View {
+        switch panel {
+        case .social:
+            SocialPanel(
+                selectedTab: $socialListTab,
+                friends: gameClient.friendList,
+                ignores: gameClient.ignoreList,
+                uiScale: uiScale,
+                onClose: closePanels
+            )
+        case .inventory:
+            InventoryView(items: gameClient.inventory, uiScale: uiScale, onClose: closePanels)
+        case .skills:
+            SkillsView(skills: gameClient.skills, uiScale: uiScale, onClose: closePanels)
+        case .settings:
+            SettingsPanel(uiScale: uiScale, onClose: closePanels)
+        }
+    }
+
+    private func togglePanel(_ panel: GamePanel) {
+        withAnimation(.easeOut(duration: 0.18)) {
+            activePanel = activePanel == panel ? nil : panel
+        }
+    }
+
     private func closePanels() {
-        showingInventory = false
-        showingSkills = false
-        showingSettings = false
+        withAnimation(.easeOut(duration: 0.18)) {
+            activePanel = nil
+        }
+    }
+
+    private func viewportScale(for size: CGSize) -> CGFloat {
+        guard size.width > 0, size.height > 0 else { return 1 }
+        let widthScale = size.width / CGFloat(GameClient.gameWidth)
+        let heightScale = size.height / CGFloat(GameClient.gameHeight)
+        return max(0.82, min(1.55, min(widthScale, heightScale)))
     }
 }
 
@@ -142,7 +181,8 @@ final class BatteryMonitor: ObservableObject {
 
         observers.append(NotificationCenter.default.addObserver(
             forName: UIDevice.batteryLevelDidChangeNotification,
-            object: nil, queue: .main
+            object: nil,
+            queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.refresh()
@@ -151,7 +191,8 @@ final class BatteryMonitor: ObservableObject {
 
         observers.append(NotificationCenter.default.addObserver(
             forName: UIDevice.batteryStateDidChangeNotification,
-            object: nil, queue: .main
+            object: nil,
+            queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.refresh()
@@ -160,7 +201,8 @@ final class BatteryMonitor: ObservableObject {
 
         observers.append(NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
-            object: nil, queue: .main
+            object: nil,
+            queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.refresh()
@@ -183,41 +225,42 @@ final class BatteryMonitor: ObservableObject {
 
 private struct BatteryStatusView: View {
     @ObservedObject var battery: BatteryMonitor
+    let uiScale: CGFloat
 
-    private let bodyWidth: CGFloat = 22
-    private let bodyHeight: CGFloat = 10
+    private var bodyWidth: CGFloat { 22 * uiScale }
+    private var bodyHeight: CGFloat { 10 * uiScale }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 4 * uiScale) {
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2)
-                    .stroke(battery.color.opacity(0.95), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 2 * uiScale)
+                    .stroke(battery.color.opacity(0.95), lineWidth: max(1, uiScale))
                     .frame(width: bodyWidth, height: bodyHeight)
 
-                RoundedRectangle(cornerRadius: 1.5)
+                RoundedRectangle(cornerRadius: 1.5 * uiScale)
                     .fill(battery.color.opacity(0.95))
                     .frame(
-                        width: max(2, (bodyWidth - 3) * battery.normalizedLevel),
-                        height: bodyHeight - 3
+                        width: max(2 * uiScale, (bodyWidth - (3 * uiScale)) * battery.normalizedLevel),
+                        height: bodyHeight - (3 * uiScale)
                     )
-                    .padding(.leading, 1.5)
+                    .padding(.leading, 1.5 * uiScale)
 
                 if battery.state == .charging || battery.state == .full {
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 6, weight: .bold))
+                        .font(.system(size: 6 * uiScale, weight: .bold))
                         .foregroundColor(.black.opacity(0.7))
                         .frame(width: bodyWidth, height: bodyHeight)
                 }
             }
             .overlay(alignment: .trailing) {
-                RoundedRectangle(cornerRadius: 1)
+                RoundedRectangle(cornerRadius: uiScale)
                     .fill(battery.color.opacity(0.95))
-                    .frame(width: 2, height: 5)
-                    .offset(x: 4)
+                    .frame(width: max(2, 2 * uiScale), height: 5 * uiScale)
+                    .offset(x: 4 * uiScale)
             }
 
             Text(battery.percentageText)
-                .font(.caption2.monospacedDigit())
+                .font(.system(size: 10 * uiScale, weight: .semibold, design: .monospaced))
                 .foregroundColor(battery.color)
         }
         .animation(.easeOut(duration: 0.2), value: battery.normalizedLevel)
@@ -231,299 +274,547 @@ struct TopBar: View {
     @ObservedObject var gameClient: GameClient
     @StateObject private var battery = BatteryMonitor()
 
+    let uiScale: CGFloat
+
     var body: some View {
-        HStack {
-            // Compass
-            Image(systemName: "safari")
-                .foregroundColor(.white)
-                .rotationEffect(.degrees(Double(gameClient.cameraRotation) * 1.4))
+        HStack(spacing: 10 * uiScale) {
+            Group {
+                if let compassImage = SpriteManager.shared.getGuiImage(.compass) {
+                    Image(uiImage: compassImage)
+                        .resizable()
+                        .interpolation(.none)
+                        .aspectRatio(contentMode: .fit)
+                } else {
+                    Image(systemName: "location.north.fill")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundColor(.white)
+                }
+            }
+            .frame(width: 22 * uiScale, height: 22 * uiScale)
+            .rotationEffect(.degrees(Double(gameClient.cameraRotation) / 256.0 * 360.0))
 
-            Spacer()
-
-            // Player info
             if let player = gameClient.localPlayer {
-                Text(player.username)
-                    .font(.caption)
+                VStack(alignment: .leading, spacing: 2 * uiScale) {
+                    Text(player.username)
+                        .font(.system(size: 12 * uiScale, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                    Text("Combat \(player.combatLevel)")
+                        .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
+                        .foregroundColor(Color.white.opacity(0.72))
+                }
+            } else {
+                Text("Connecting")
+                    .font(.system(size: 12 * uiScale, weight: .semibold, design: .monospaced))
                     .foregroundColor(.white)
-
-                Text("Combat: \(player.combatLevel)")
-                    .font(.caption2)
-                    .foregroundColor(.gray)
             }
 
             Spacer()
 
-            // Battery/connectivity indicators
-            HStack(spacing: 8) {
-                Image(systemName: "wifi")
-                    .foregroundColor(gameState.isConnected ? .green : .red)
-                BatteryStatusView(battery: battery)
+            VStack(alignment: .trailing, spacing: 4 * uiScale) {
+                HStack(spacing: 8 * uiScale) {
+                    Image(systemName: gameState.isConnected ? "wifi" : "wifi.slash")
+                        .font(.system(size: 12 * uiScale, weight: .bold))
+                        .foregroundColor(gameState.isConnected ? .green : .red)
+                    BatteryStatusView(battery: battery, uiScale: uiScale)
+                }
+
+                Text("Camera \(cameraAngleLabel)")
+                    .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
+                    .foregroundColor(Color.white.opacity(0.65))
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.black.opacity(0.5))
+        .padding(.horizontal, 10 * uiScale)
+        .padding(.vertical, 6 * uiScale)
+        .background(
+            RoundedRectangle(cornerRadius: 8 * uiScale)
+                .fill(ClassicPalette.shell.opacity(0.84))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8 * uiScale)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal, 8 * uiScale)
+    }
+
+    private var cameraAngleLabel: String {
+        let step = ((gameClient.cameraRotation + 16) / 32) & 7
+        return "Angle \(step)"
     }
 }
 
 /// Chat display area.
 struct ChatView: View {
     let messages: [ChatMessage]
+    let uiScale: CGFloat
 
     var body: some View {
-        ScrollViewReader { proxy in
+        ScrollViewReader { _ in
             ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 2 * uiScale) {
                     ForEach(messages.suffix(20)) { message in
-                        HStack(spacing: 4) {
+                        HStack(spacing: 4 * uiScale) {
                             if let sender = message.sender {
                                 Text("\(sender):")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(.system(size: 11 * uiScale, weight: .bold, design: .monospaced))
                                     .foregroundColor(.cyan)
                             }
                             Text(message.message)
-                                .font(.system(size: 11))
+                                .font(.system(size: 11 * uiScale, weight: .medium, design: .monospaced))
                                 .foregroundColor(messageColor(for: message.type))
                         }
                     }
                 }
-                .padding(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(6 * uiScale)
             }
         }
-        .background(Color.black.opacity(0.6))
+        .frame(maxHeight: 118 * uiScale)
+        .background(
+            RoundedRectangle(cornerRadius: 8 * uiScale)
+                .fill(ClassicPalette.shell.opacity(0.86))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8 * uiScale)
+                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                )
+        )
     }
 
     private func messageColor(for type: ChatMessage.MessageType) -> Color {
         switch type {
-        case .player: return .white
-        case .server: return .yellow
-        case .quest: return .green
-        case .trade: return .purple
-        case .privateIn: return .cyan
-        case .privateOut: return .cyan
+        case .player:
+            return .white
+        case .server:
+            return .yellow
+        case .quest:
+            return .green
+        case .trade:
+            return .purple
+        case .privateIn, .privateOut:
+            return .cyan
         }
     }
 }
 
-/// Tab buttons for inventory, skills, etc.
-struct TabButtonsView: View {
-    @Binding var showingInventory: Bool
-    @Binding var showingSkills: Bool
-    @Binding var showingSettings: Bool
+private struct TabButtonsView: View {
+    let activePanel: GamePanel?
+    let uiScale: CGFloat
+    let onTap: (GamePanel) -> Void
+
+    private let buttons: [(panel: GamePanel, guiPart: SpriteManager.GuiPart)] = [
+        (.social, .socialTab),
+        (.inventory, .bagTab),
+        (.skills, .skillsTab),
+        (.settings, .settingsTab)
+    ]
 
     var body: some View {
-        VStack(spacing: 2) {
-            TabButton(icon: "bag.fill", isActive: showingInventory) {
-                showingInventory.toggle()
-                showingSkills = false
-                showingSettings = false
-            }
-
-            TabButton(icon: "chart.bar.fill", isActive: showingSkills) {
-                showingSkills.toggle()
-                showingInventory = false
-                showingSettings = false
-            }
-
-            TabButton(icon: "map.fill", isActive: false) {
-                // Toggle map
-            }
-
-            TabButton(icon: "gearshape.fill", isActive: showingSettings) {
-                showingSettings.toggle()
-                showingInventory = false
-                showingSkills = false
+        VStack(spacing: 5 * uiScale) {
+            ForEach(Array(buttons.enumerated()), id: \.offset) { _, entry in
+                ClassicTabButton(
+                    guiPart: entry.guiPart,
+                    isActive: activePanel == entry.panel,
+                    uiScale: uiScale
+                ) {
+                    onTap(entry.panel)
+                }
             }
         }
-        .padding(4)
-        .background(Color.black.opacity(0.5))
-        .cornerRadius(4)
+        .padding(.vertical, 4 * uiScale)
+    }
+}
+
+private struct ClassicTabButton: View {
+    let guiPart: SpriteManager.GuiPart
+    let isActive: Bool
+    let uiScale: CGFloat
+    let action: () -> Void
+
+    private var width: CGFloat {
+        122 * uiScale
+    }
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                if let image = SpriteManager.shared.getGuiImage(guiPart) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .interpolation(.none)
+                        .aspectRatio(contentMode: .fit)
+                } else {
+                    RoundedRectangle(cornerRadius: 5 * uiScale)
+                        .fill(ClassicPalette.panelAlt)
+                }
+            }
+            .frame(width: width)
+            .padding(.vertical, 1 * uiScale)
+            .overlay(
+                RoundedRectangle(cornerRadius: 5 * uiScale)
+                    .stroke(isActive ? ClassicPalette.accent : Color.white.opacity(0.18), lineWidth: isActive ? 2 : 1)
+            )
+            .shadow(color: .black.opacity(isActive ? 0.30 : 0.14), radius: isActive ? 6 : 3, y: 2)
+            .opacity(isActive ? 1 : 0.92)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct ClassicPanelContainer<Content: View>: View {
+    let title: String
+    let guiPart: SpriteManager.GuiPart
+    let uiScale: CGFloat
+    let onClose: () -> Void
+    let content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8 * uiScale) {
+                ClassicGuiSpriteView(part: guiPart)
+                    .frame(width: 86 * uiScale)
+
+                Text(title)
+                    .font(.system(size: 13 * uiScale, weight: .bold, design: .monospaced))
+                    .foregroundColor(ClassicPalette.text)
+
+                Spacer()
+
+                Button(action: onClose) {
+                    if let image = SpriteManager.shared.getGuiImage(.xMark) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .interpolation(.none)
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 16 * uiScale, height: 16 * uiScale)
+                    } else {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18 * uiScale, weight: .semibold))
+                            .foregroundColor(ClassicPalette.text.opacity(0.8))
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10 * uiScale)
+            .padding(.vertical, 8 * uiScale)
+            .background(ClassicPalette.panelAlt)
+
+            Divider()
+                .overlay(ClassicPalette.panelBorder)
+
+            content
+                .padding(10 * uiScale)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10 * uiScale)
+                .fill(ClassicPalette.panel)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10 * uiScale)
+                        .stroke(ClassicPalette.panelBorder, lineWidth: 2)
+                )
+        )
+        .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
+    }
+}
+
+private struct ClassicGuiSpriteView: View {
+    let part: SpriteManager.GuiPart
+
+    var body: some View {
+        if let image = SpriteManager.shared.getGuiImage(part) {
+            Image(uiImage: image)
+                .resizable()
+                .interpolation(.none)
+                .aspectRatio(contentMode: .fit)
+        } else {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(ClassicPalette.panelAlt)
+        }
     }
 }
 
 struct SettingsPanel: View {
     @EnvironmentObject private var gameState: GameState
+    let uiScale: CGFloat
     let onClose: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Settings")
-                    .font(.caption.bold())
-                    .foregroundColor(.white)
+        ClassicPanelContainer(
+            title: "Options",
+            guiPart: .settingsTab,
+            uiScale: uiScale,
+            onClose: onClose,
+            content: VStack(alignment: .leading, spacing: 12 * uiScale) {
+                settingsSection(title: "Display") {
+                    VStack(alignment: .leading, spacing: 8 * uiScale) {
+                        Text("Landscape orientation")
+                            .font(.system(size: 12 * uiScale, weight: .bold, design: .monospaced))
+                            .foregroundColor(ClassicPalette.text)
 
-                Spacer()
+                        Picker(
+                            "Landscape Orientation",
+                            selection: Binding(
+                                get: { gameState.gameOrientationPreference },
+                                set: { gameState.updateGameOrientationPreference($0) }
+                            )
+                        ) {
+                            ForEach(GameOrientationPreference.allCases) { preference in
+                                Text(preference.shortTitle).tag(preference)
+                            }
+                        }
+                        .pickerStyle(.segmented)
 
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color.white.opacity(0.75))
+                        Text(gameState.gameOrientationPreference.detail)
+                            .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
+                            .foregroundColor(ClassicPalette.mutedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .buttonStyle(.plain)
+
+                settingsSection(title: "Camera") {
+                    VStack(alignment: .leading, spacing: 6 * uiScale) {
+                        SettingsBullet(text: "Rotation snaps in classic 8-way steps.", uiScale: uiScale)
+                        SettingsBullet(text: "Zoom is limited to the original-style mobile-safe range.", uiScale: uiScale)
+                        SettingsBullet(text: "Viewport stays aspect-fit to the device instead of stretching.", uiScale: uiScale)
+                    }
+                }
             }
+        )
+    }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Landscape Orientation")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color(white: 0.8))
+    @ViewBuilder
+    private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6 * uiScale) {
+            Text(title)
+                .font(.system(size: 11 * uiScale, weight: .bold, design: .monospaced))
+                .foregroundColor(ClassicPalette.mutedText)
+            content()
+        }
+    }
+}
 
-                Picker(
-                    "Landscape Orientation",
-                    selection: Binding(
-                        get: { gameState.gameOrientationPreference },
-                        set: { gameState.updateGameOrientationPreference($0) }
-                    )
-                ) {
-                    ForEach(GameOrientationPreference.allCases) { preference in
-                        Text(preference.shortTitle).tag(preference)
+private struct SettingsBullet: View {
+    let text: String
+    let uiScale: CGFloat
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6 * uiScale) {
+            Circle()
+                .fill(ClassicPalette.accent)
+                .frame(width: 5 * uiScale, height: 5 * uiScale)
+                .padding(.top, 5 * uiScale)
+
+            Text(text)
+                .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
+                .foregroundColor(ClassicPalette.text)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct SocialPanel: View {
+    @Binding var selectedTab: SocialListTab
+    let friends: [(name: String, online: Bool)]
+    let ignores: [String]
+    let uiScale: CGFloat
+    let onClose: () -> Void
+
+    var body: some View {
+        ClassicPanelContainer(
+            title: "Social",
+            guiPart: .socialTab,
+            uiScale: uiScale,
+            onClose: onClose,
+            content: VStack(alignment: .leading, spacing: 10 * uiScale) {
+                Picker("Social", selection: $selectedTab) {
+                    ForEach(SocialListTab.allCases) { tab in
+                        Text(tab.rawValue).tag(tab)
                     }
                 }
                 .pickerStyle(.segmented)
 
-                Text(gameState.gameOrientationPreference.detail)
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(white: 0.65))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                if selectedTab == .friends {
+                    Text("Click a name to send a message")
+                        .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
+                        .foregroundColor(ClassicPalette.mutedText)
 
-            Spacer()
-        }
-        .padding(10)
-        .background(Color.black.opacity(0.82))
-        .cornerRadius(8)
+                    ScrollView {
+                        LazyVStack(spacing: 6 * uiScale) {
+                            if friends.isEmpty {
+                                SocialEmptyState(text: "Your friends list is empty.", uiScale: uiScale)
+                            } else {
+                                ForEach(Array(friends.enumerated()), id: \.offset) { _, friend in
+                                    SocialRow(
+                                        name: friend.name,
+                                        statusText: friend.online ? "Online" : "Offline",
+                                        statusColor: friend.online ? .green : .red,
+                                        uiScale: uiScale
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 260 * uiScale)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 6 * uiScale) {
+                            if ignores.isEmpty {
+                                SocialEmptyState(text: "Your ignore list is empty.", uiScale: uiScale)
+                            } else {
+                                ForEach(ignores, id: \.self) { name in
+                                    SocialRow(
+                                        name: name,
+                                        statusText: "Ignored",
+                                        statusColor: .yellow,
+                                        uiScale: uiScale
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 260 * uiScale)
+                }
+            }
+        )
     }
 }
 
-struct TabButton: View {
-    let icon: String
-    let isActive: Bool
-    let action: () -> Void
+private struct SocialRow: View {
+    let name: String
+    let statusText: String
+    let statusColor: Color
+    let uiScale: CGFloat
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundColor(isActive ? .yellow : .white)
-                .frame(width: 32, height: 32)
+        HStack(spacing: 8 * uiScale) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 7 * uiScale, height: 7 * uiScale)
+
+            Text(name)
+                .font(.system(size: 11 * uiScale, weight: .bold, design: .monospaced))
+                .foregroundColor(ClassicPalette.text)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(statusText)
+                .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
+                .foregroundColor(ClassicPalette.mutedText)
         }
+        .padding(.horizontal, 8 * uiScale)
+        .padding(.vertical, 7 * uiScale)
+        .background(
+            RoundedRectangle(cornerRadius: 6 * uiScale)
+                .fill(Color.white.opacity(0.28))
+        )
+    }
+}
+
+private struct SocialEmptyState: View {
+    let text: String
+    let uiScale: CGFloat
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11 * uiScale, weight: .medium, design: .monospaced))
+            .foregroundColor(ClassicPalette.mutedText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 16 * uiScale)
     }
 }
 
 /// Inventory panel.
 struct InventoryView: View {
     let items: [InventoryItem]
+    let uiScale: CGFloat
     let onClose: () -> Void
 
-    let columns = Array(repeating: GridItem(.fixed(32), spacing: 2), count: 5)
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(minimum: 34 * uiScale, maximum: 38 * uiScale), spacing: 4 * uiScale), count: 5)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Inventory")
-                    .font(.caption.bold())
-                    .foregroundColor(.white)
-
-                Spacer()
-
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.white.opacity(0.72))
-                }
-                .buttonStyle(.plain)
-            }
-
-            LazyVGrid(columns: columns, spacing: 2) {
-                ForEach(0..<30) { index in
+        ClassicPanelContainer(
+            title: "Inventory",
+            guiPart: .bagTab,
+            uiScale: uiScale,
+            onClose: onClose,
+            content: LazyVGrid(columns: columns, spacing: 4 * uiScale) {
+                ForEach(0..<30, id: \.self) { index in
                     if index < items.count {
-                        InventorySlot(item: items[index])
+                        InventorySlot(item: items[index], uiScale: uiScale)
                     } else {
-                        EmptySlot()
+                        EmptySlot(uiScale: uiScale)
                     }
                 }
             }
-        }
-        .padding(8)
-        .background(Color.black.opacity(0.8))
-        .cornerRadius(8)
+        )
     }
 }
 
 struct InventorySlot: View {
     let item: InventoryItem
+    let uiScale: CGFloat
 
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .frame(width: 32, height: 32)
+            RoundedRectangle(cornerRadius: 4 * uiScale)
+                .fill(Color.white.opacity(0.28))
+                .frame(width: 36 * uiScale, height: 36 * uiScale)
 
-            // Item icon placeholder
             Text("\(item.itemId)")
-                .font(.system(size: 8))
-                .foregroundColor(.white)
+                .font(.system(size: 7 * uiScale, weight: .bold, design: .monospaced))
+                .foregroundColor(ClassicPalette.text)
 
             if item.amount > 1 {
                 Text("\(item.amount)")
-                    .font(.system(size: 8))
+                    .font(.system(size: 8 * uiScale, weight: .bold, design: .monospaced))
                     .foregroundColor(.yellow)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(2)
+                    .padding(2 * uiScale)
             }
         }
-        .cornerRadius(2)
     }
 }
 
 struct EmptySlot: View {
+    let uiScale: CGFloat
+
     var body: some View {
-        Rectangle()
-            .fill(Color.gray.opacity(0.2))
-            .frame(width: 32, height: 32)
-            .cornerRadius(2)
+        RoundedRectangle(cornerRadius: 4 * uiScale)
+            .fill(Color.white.opacity(0.16))
+            .frame(width: 36 * uiScale, height: 36 * uiScale)
     }
 }
 
 /// Skills panel.
 struct SkillsView: View {
     let skills: [Skill]
+    let uiScale: CGFloat
     let onClose: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Skills")
-                    .font(.caption.bold())
-                    .foregroundColor(.white)
+        ClassicPanelContainer(
+            title: "Skills",
+            guiPart: .skillsTab,
+            uiScale: uiScale,
+            onClose: onClose,
+            content: VStack(alignment: .leading, spacing: 6 * uiScale) {
+                ForEach(skills) { skill in
+                    HStack {
+                        Text(skill.name)
+                            .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                            .foregroundColor(ClassicPalette.text)
+                            .frame(width: 88 * uiScale, alignment: .leading)
 
-                Spacer()
+                        Text("\(skill.currentLevel)/\(skill.maxLevel)")
+                            .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
+                            .foregroundColor(.yellow)
 
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.white.opacity(0.72))
-                }
-                .buttonStyle(.plain)
-            }
-
-            ForEach(skills) { skill in
-                HStack {
-                    Text(skill.name)
-                        .font(.system(size: 10))
-                        .foregroundColor(.white)
-                        .frame(width: 70, alignment: .leading)
-
-                    Text("\(skill.currentLevel)/\(skill.maxLevel)")
-                        .font(.system(size: 10))
-                        .foregroundColor(.yellow)
-
-                    Spacer()
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 2 * uiScale)
                 }
             }
-        }
-        .padding(8)
-        .background(Color.black.opacity(0.8))
-        .cornerRadius(8)
+        )
     }
 }
 

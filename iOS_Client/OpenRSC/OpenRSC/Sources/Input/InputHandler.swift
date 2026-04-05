@@ -93,6 +93,7 @@ final class InputHandler: ObservableObject {
         hasDragged = false
         lastPanTranslation = .zero
         lastPinchScale = 1
+        gameClient?.finishCameraGesture()
     }
 
     func onTouchCancelled() {
@@ -102,6 +103,7 @@ final class InputHandler: ObservableObject {
         lastPanTranslation = .zero
         lastPinchScale = 1
         longPressTimer?.invalidate()
+        gameClient?.finishCameraGesture()
     }
 
     // MARK: - Gesture Handling
@@ -162,6 +164,7 @@ final class InputHandler: ObservableObject {
 
     func onPinchEnded() {
         lastPinchScale = 1
+        gameClient?.finishCameraGesture()
     }
 
     // MARK: - Keyboard Input
@@ -171,13 +174,13 @@ final class InputHandler: ObservableObject {
 
         switch key {
         case "←":
-            client.cameraRotation = (client.cameraRotation - 8) & 255
+            client.stepCameraRotation(-1)
         case "→":
-            client.cameraRotation = (client.cameraRotation + 8) & 255
+            client.stepCameraRotation(1)
         case "↑":
-            client.cameraZoom = min(240, client.cameraZoom + 8)
+            client.stepCameraZoom(1)
         case "↓":
-            client.cameraZoom = max(96, client.cameraZoom - 8)
+            client.stepCameraZoom(-1)
         default:
             // Handle text input
             break
