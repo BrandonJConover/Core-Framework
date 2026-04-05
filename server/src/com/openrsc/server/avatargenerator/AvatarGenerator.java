@@ -1051,12 +1051,12 @@ public final class AvatarGenerator {
 							destColumnSkewPerRow, destFirstColumn, 1603920392, 0, colorMask2, scaleY, scaleX, srcStartX,
 							skipEveryOther, srcStartY, spriteWidth, colorMask, height, destRowHead, colourTransform, blueMask, e);
 					}
-				} catch (Exception e) {
-					LOGGER.catching(e);
+				} catch (Exception ex) {
+					LOGGER.catching(ex);
 				}
 
-			} catch (RuntimeException e) {
-				LOGGER.catching(e);
+			} catch (RuntimeException ex) {
+				LOGGER.catching(ex);
 			}
 		}
 
@@ -1157,12 +1157,12 @@ public final class AvatarGenerator {
 						destRowHead += e.getSomething1();
 						destFirstColumn += destColumnSkewPerRow;
 					}
-				} catch (Exception e) {
-					LOGGER.catching(e);
+				} catch (Exception ex) {
+					LOGGER.catching(ex);
 				}
 
-			} catch (RuntimeException e) {
-				LOGGER.catching(e);
+			} catch (RuntimeException ex) {
+				LOGGER.catching(ex);
 			}
 		}
 
@@ -1249,12 +1249,12 @@ public final class AvatarGenerator {
 						destFirstColumn += destColumnSkewPerRow;
 						destRowHead += e.getSomething1();
 					}
-				} catch (Exception e) {
-					LOGGER.catching(e);
+				} catch (Exception ex) {
+					LOGGER.catching(ex);
 				}
 
-			} catch (RuntimeException e) {
-				LOGGER.catching(e);
+			} catch (RuntimeException ex) {
+				LOGGER.catching(ex);
 			}
 		}
 

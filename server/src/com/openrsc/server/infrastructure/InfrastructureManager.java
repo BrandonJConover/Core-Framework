@@ -158,8 +158,8 @@ public class InfrastructureManager implements AutoCloseable {
         if (redisCache != null) {
             healthServer.registerHealthCheck("redis", () ->
                 redisCache.healthCheck()
-                    ? HealthCheckServer.HealthCheck.healthy(Map.of("connected", true))
-                    : HealthCheckServer.HealthCheck.unhealthy("Redis connection failed")
+                    ? HealthCheckServer.HealthCheck.up(Map.of("connected", true))
+                    : HealthCheckServer.HealthCheck.down("Redis connection failed")
             );
         }
 
@@ -167,8 +167,8 @@ public class InfrastructureManager implements AutoCloseable {
         if (serviceDiscovery != null) {
             healthServer.registerHealthCheck("consul", () ->
                 serviceDiscovery.isRegistered()
-                    ? HealthCheckServer.HealthCheck.healthy(Map.of("registered", true))
-                    : HealthCheckServer.HealthCheck.unhealthy("Not registered with Consul")
+                    ? HealthCheckServer.HealthCheck.up(Map.of("registered", true))
+                    : HealthCheckServer.HealthCheck.down("Not registered with Consul")
             );
         }
     }
@@ -319,6 +319,30 @@ public class InfrastructureManager implements AutoCloseable {
 
         public static Builder builder() {
             return new Builder();
+        }
+
+        public boolean enhancedLoggingEnabled() {
+            return false;
+        }
+
+        public EnhancedLogging.EnhancedLoggingSettings enhancedLoggingSettings() {
+            return new EnhancedLogging.EnhancedLoggingSettings();
+        }
+
+        public boolean quicEnabled() {
+            return false;
+        }
+
+        public QuicTransport.QuicTransportSettings quicSettings() {
+            return new QuicTransport.QuicTransportSettings();
+        }
+
+        public boolean etcdEnabled() {
+            return false;
+        }
+
+        public EtcdServiceDiscovery.EtcdSettings etcdSettings() {
+            return new EtcdServiceDiscovery.EtcdSettings();
         }
 
         public static class Builder {

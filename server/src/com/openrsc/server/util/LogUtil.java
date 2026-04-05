@@ -61,8 +61,10 @@ public class LogUtil {
             );
             System.setProperty("logPattern", logPattern.toString());
 
-            LoggerContext ctx = (LoggerContext) LogManager.getContext();
-            ctx.reconfigure();
+            org.apache.logging.log4j.spi.LoggerContext ctx = LogManager.getContext(false);
+            if (ctx instanceof LoggerContext coreContext) {
+                coreContext.reconfigure();
+            }
 
             Logger logger = LogManager.getLogger(Server.class);
 
