@@ -176,28 +176,28 @@ impl MetricsCollector {
 }
 
 /// Timer guard for automatic timing.
-pub struct TimerGuard<'a> {
+pub struct TimerGuard {
     start: Instant,
-    histogram_name: &'a str,
-    labels: Vec<(&'a str, String)>,
+    histogram_name: String,
+    labels: Vec<(String, String)>,
 }
 
-impl<'a> TimerGuard<'a> {
-    pub fn new(histogram_name: &'a str) -> Self {
+impl TimerGuard {
+    pub fn new(histogram_name: &str) -> Self {
         Self {
             start: Instant::now(),
-            histogram_name,
+            histogram_name: histogram_name.to_owned(),
             labels: Vec::new(),
         }
     }
 
-    pub fn with_label(mut self, key: &'a str, value: impl Into<String>) -> Self {
-        self.labels.push((key, value.into()));
+    pub fn with_label(mut self, key: &str, value: impl Into<String>) -> Self {
+        self.labels.push((key.to_owned(), value.into()));
         self
     }
 }
 
-impl Drop for TimerGuard<'_> {
+impl Drop for TimerGuard {
     fn drop(&mut self) {
         let duration = self.start.elapsed().as_secs_f64();
         let name = self.histogram_name.clone();

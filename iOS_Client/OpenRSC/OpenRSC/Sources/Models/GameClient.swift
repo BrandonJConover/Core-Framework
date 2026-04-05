@@ -145,9 +145,10 @@ final class GameClient: ObservableObject {
     func login(username: String, password: String) async throws {
         var builder = PacketBuilder()
         builder.writeByte(0) // Not reconnecting
-        builder.writeShort(1) // Client version
-        builder.writeString(username)
-        builder.writeString(password)
+        builder.writeInt(1) // Client version (4-byte int, server reads readInt)
+        builder.writeLinefeedString(username) // Server getString reads until 0x0A
+        builder.writeLinefeedString(password)
+        builder.writeLong(0) // UID placeholder (8 bytes)
         let packet = builder.build(opcode: 0) // Login opcode
         try await networkClient.send(packet)
     }
@@ -793,7 +794,8 @@ final class GameClient: ObservableObject {
         var builder = PacketBuilder()
         builder.writeShort(UInt16(x))
         builder.writeShort(UInt16(y))
-        try await networkClient.send(builder.build(opcode: 16))
+        // Opcode 187 = WALK_TO_POINT (16 is WALK_TO_ENTITY)
+        try await networkClient.send(builder.build(opcode: 187))
     }
 
     func pickupItem(_ item: GroundItem) async throws {
@@ -806,12 +808,14 @@ final class GameClient: ObservableObject {
 
     func sendChat(_ message: String) async throws {
         var builder = PacketBuilder()
-        builder.writeString(message)
+        // Server custom parser expects linefeed-terminated string for chat
+        builder.writeLinefeedString(message)
         try await networkClient.send(builder.build(opcode: 216))
     }
 
     func logout() async throws {
-        try await networkClient.send(PacketBuilder().build(opcode: 1))
+        // Opcode 102 = LOGOUT (1 is not valid for custom parser)
+        try await networkClient.send(PacketBuilder().build(opcode: 102))
     }
 }
 

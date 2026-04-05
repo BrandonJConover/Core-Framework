@@ -32,7 +32,12 @@ final class InputHandler: ObservableObject {
     }
 
     /// Converts screen coordinates to game coordinates.
-    func screenToGame(x: CGFloat, y: CGFloat, viewSize: CGSize) -> (Int, Int) {
+    func screenToGame(
+        x: CGFloat,
+        y: CGFloat,
+        viewSize: CGSize,
+        origin: CGPoint = .zero
+    ) -> (Int, Int) {
         guard viewSize.width > 0, viewSize.height > 0 else {
             return (0, 0)
         }
@@ -40,8 +45,11 @@ final class InputHandler: ObservableObject {
         let scaleX = CGFloat(GameClient.gameWidth) / viewSize.width
         let scaleY = CGFloat(GameClient.gameHeight) / viewSize.height
 
-        let gameX = Int((x * scaleX).rounded())
-        let gameY = Int((y * scaleY).rounded())
+        let viewportX = min(max(x + origin.x, 0), viewSize.width)
+        let viewportY = min(max(y + origin.y, 0), viewSize.height)
+
+        let gameX = Int((viewportX * scaleX).rounded())
+        let gameY = Int((viewportY * scaleY).rounded())
 
         return (
             min(max(gameX, 0), GameClient.gameWidth - 1),
@@ -51,8 +59,8 @@ final class InputHandler: ObservableObject {
 
     // MARK: - Touch Handling
 
-    func onTouchBegan(at location: CGPoint, in viewSize: CGSize) {
-        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize)
+    func onTouchBegan(at location: CGPoint, in viewSize: CGSize, origin: CGPoint = .zero) {
+        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize, origin: origin)
         mouseX = gameX
         mouseY = gameY
         isPressed = true
@@ -69,8 +77,8 @@ final class InputHandler: ObservableObject {
         }
     }
 
-    func onTouchMoved(at location: CGPoint, in viewSize: CGSize) {
-        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize)
+    func onTouchMoved(at location: CGPoint, in viewSize: CGSize, origin: CGPoint = .zero) {
+        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize, origin: origin)
         mouseX = gameX
         mouseY = gameY
 
@@ -78,8 +86,8 @@ final class InputHandler: ObservableObject {
         longPressTimer?.invalidate()
     }
 
-    func onTouchEnded(at location: CGPoint, in viewSize: CGSize) {
-        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize)
+    func onTouchEnded(at location: CGPoint, in viewSize: CGSize, origin: CGPoint = .zero) {
+        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize, origin: origin)
         mouseX = gameX
         mouseY = gameY
         isPressed = false
@@ -192,7 +200,8 @@ final class InputHandler: ObservableObject {
 
 struct GameGestureModifier: ViewModifier {
     @ObservedObject var inputHandler: InputHandler
-    let viewSize: CGSize
+    let viewportSize: CGSize
+    let inputOrigin: CGPoint
 
     func body(content: Content) -> some View {
         content
@@ -200,15 +209,15 @@ struct GameGestureModifier: ViewModifier {
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
                         if !inputHandler.isPressed {
-                            inputHandler.onTouchBegan(at: value.location, in: viewSize)
+                            inputHandler.onTouchBegan(at: value.location, in: viewportSize, origin: inputOrigin)
                         }
                         if value.translation != .zero {
-                            inputHandler.onTouchMoved(at: value.location, in: viewSize)
-                            inputHandler.onPan(translation: value.translation, viewSize: viewSize)
+                            inputHandler.onTouchMoved(at: value.location, in: viewportSize, origin: inputOrigin)
+                            inputHandler.onPan(translation: value.translation, viewSize: viewportSize)
                         }
                     }
                     .onEnded { value in
-                        inputHandler.onTouchEnded(at: value.location, in: viewSize)
+                        inputHandler.onTouchEnded(at: value.location, in: viewportSize, origin: inputOrigin)
                     }
             )
             .simultaneousGesture(
@@ -224,8 +233,18 @@ struct GameGestureModifier: ViewModifier {
 }
 
 extension View {
-    func gameGestures(_ handler: InputHandler, viewSize: CGSize) -> some View {
-        modifier(GameGestureModifier(inputHandler: handler, viewSize: viewSize))
+    func gameGestures(
+        _ handler: InputHandler,
+        viewportSize: CGSize,
+        inputOrigin: CGPoint = .zero
+    ) -> some View {
+        modifier(
+            GameGestureModifier(
+                inputHandler: handler,
+                viewportSize: viewportSize,
+                inputOrigin: inputOrigin
+            )
+        )
     }
 }
 

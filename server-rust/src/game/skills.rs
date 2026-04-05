@@ -72,16 +72,18 @@ impl Skills {
     /// Add experience to a skill.
     pub fn add_experience(&mut self, skill: SkillId, exp: u32) -> bool {
         let current_exp = self.experience.entry(skill).or_insert(0);
-        let old_level = self.level_for_experience(*current_exp);
-
-        *current_exp = current_exp.saturating_add(exp);
+        let mut new_exp = current_exp.saturating_add(exp);
 
         // Cap at max experience
-        if *current_exp > 13034431 {
-            *current_exp = 13034431;
+        if new_exp > 13034431 {
+            new_exp = 13034431;
         }
 
-        let new_level = self.level_for_experience(*current_exp);
+        let old_exp = *current_exp;
+        *current_exp = new_exp;
+
+        let old_level = level_for_experience(old_exp);
+        let new_level = level_for_experience(new_exp);
 
         // Level up
         if new_level > old_level {
@@ -113,16 +115,6 @@ impl Skills {
         for skill in ALL_SKILLS.iter() {
             self.restore(*skill);
         }
-    }
-
-    /// Get level for given experience amount.
-    fn level_for_experience(&self, exp: u32) -> u8 {
-        for (level, &required) in EXPERIENCE_TABLE.iter().enumerate() {
-            if exp < required {
-                return level as u8;
-            }
-        }
-        99
     }
 
     /// Get experience required for a level.
@@ -166,6 +158,16 @@ impl Default for Skills {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Get level for given experience amount.
+fn level_for_experience(exp: u32) -> u8 {
+    for (level, &required) in EXPERIENCE_TABLE.iter().enumerate() {
+        if exp < required {
+            return level as u8;
+        }
+    }
+    99
 }
 
 /// All skill IDs.

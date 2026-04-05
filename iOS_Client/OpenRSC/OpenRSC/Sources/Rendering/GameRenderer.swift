@@ -261,9 +261,10 @@ struct GameRendererView: UIViewRepresentable {
         let mtkView = MTKView()
         mtkView.device = MTLCreateSystemDefaultDevice()
         mtkView.delegate = context.coordinator
-        mtkView.preferredFramesPerSecond = 60
+        mtkView.preferredFramesPerSecond = 30
         mtkView.enableSetNeedsDisplay = false
         mtkView.isPaused = false
+        mtkView.isUserInteractionEnabled = false
         mtkView.colorPixelFormat = .bgra8Unorm
         return mtkView
     }

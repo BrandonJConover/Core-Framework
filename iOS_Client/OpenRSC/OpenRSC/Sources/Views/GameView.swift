@@ -44,6 +44,7 @@ struct GameView: View {
         GeometryReader { geometry in
             let viewportRect = GameViewport.fittedRect(in: geometry.size)
             let uiScale = viewportScale(for: viewportRect.size)
+            let interactionFrame = gameplayInteractionFrame(in: viewportRect.size, uiScale: uiScale)
             let panelWidth = min(max(viewportRect.width * 0.42, 220), 320)
             let panelX = min(
                 geometry.size.width - panelWidth / 2 - (10 * uiScale),
@@ -53,13 +54,24 @@ struct GameView: View {
             ZStack {
                 GameRendererView(gameClient: gameClient)
                     .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .zIndex(0)
 
                 if !isAnyPanelOpen {
                     Color.clear
-                        .frame(width: viewportRect.width, height: viewportRect.height)
-                        .position(x: viewportRect.midX, y: viewportRect.midY)
+                        .frame(width: interactionFrame.width, height: interactionFrame.height)
+                        .position(
+                            x: viewportRect.minX + interactionFrame.midX,
+                            y: viewportRect.minY + interactionFrame.midY
+                        )
                         .contentShape(Rectangle())
-                        .gameGestures(inputHandler, viewSize: viewportRect.size)
+                        .gameGestures(
+                            inputHandler,
+                            viewportSize: viewportRect.size,
+                            inputOrigin: interactionFrame.origin
+                        )
+                        .allowsHitTesting(true)
+                        .zIndex(1)
                 }
 
                 if isAnyPanelOpen {
@@ -69,6 +81,7 @@ struct GameView: View {
                         .onTapGesture {
                             closePanels()
                         }
+                        .zIndex(2)
                 }
 
                 VStack(spacing: 0) {
@@ -94,12 +107,15 @@ struct GameView: View {
                 }
                 .frame(width: viewportRect.width, height: viewportRect.height)
                 .position(x: viewportRect.midX, y: viewportRect.midY)
+                .zIndex(3)
 
                 if let activePanel {
                     panelView(for: activePanel, uiScale: uiScale)
                         .frame(width: panelWidth)
+                        .contentShape(Rectangle())
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                         .position(x: panelX, y: viewportRect.midY)
+                        .zIndex(4)
                 }
             }
             .ignoresSafeArea()
@@ -146,6 +162,21 @@ struct GameView: View {
         let widthScale = size.width / CGFloat(GameClient.gameWidth)
         let heightScale = size.height / CGFloat(GameClient.gameHeight)
         return max(0.82, min(1.55, min(widthScale, heightScale)))
+    }
+
+    private func gameplayInteractionFrame(in viewportSize: CGSize, uiScale: CGFloat) -> CGRect {
+        let horizontalInset = min(18 * uiScale, viewportSize.width * 0.04)
+        let topInset = min(max(54 * uiScale, 40), viewportSize.height * 0.18)
+        let bottomInset = min(max(124 * uiScale, 92), viewportSize.height * 0.36)
+        let width = max(120, viewportSize.width - horizontalInset * 2)
+        let height = max(120, viewportSize.height - topInset - bottomInset)
+
+        return CGRect(
+            x: horizontalInset,
+            y: topInset,
+            width: width,
+            height: height
+        )
     }
 }
 
@@ -434,11 +465,24 @@ private struct ClassicTabButton: View {
         122 * uiScale
     }
 
+    private var minimumHeight: CGFloat {
+        max(34 * uiScale, 44)
+    }
+
+    private var guiImage: UIImage? {
+        SpriteManager.shared.getGuiImage(guiPart)
+    }
+
+    private var buttonHeight: CGFloat {
+        guard let guiImage else { return minimumHeight }
+        return max(minimumHeight, width * (guiImage.size.height / max(guiImage.size.width, 1)))
+    }
+
     var body: some View {
         Button(action: action) {
             ZStack {
-                if let image = SpriteManager.shared.getGuiImage(guiPart) {
-                    Image(uiImage: image)
+                if let guiImage {
+                    Image(uiImage: guiImage)
                         .resizable()
                         .interpolation(.none)
                         .aspectRatio(contentMode: .fit)
@@ -447,7 +491,7 @@ private struct ClassicTabButton: View {
                         .fill(ClassicPalette.panelAlt)
                 }
             }
-            .frame(width: width)
+            .frame(width: width, height: buttonHeight)
             .padding(.vertical, 1 * uiScale)
             .overlay(
                 RoundedRectangle(cornerRadius: 5 * uiScale)
@@ -456,6 +500,7 @@ private struct ClassicTabButton: View {
             .shadow(color: .black.opacity(isActive ? 0.30 : 0.14), radius: isActive ? 6 : 3, y: 2)
             .opacity(isActive ? 1 : 0.92)
         }
+        .contentShape(Rectangle())
         .buttonStyle(.plain)
     }
 }
@@ -492,6 +537,7 @@ private struct ClassicPanelContainer<Content: View>: View {
                             .foregroundColor(ClassicPalette.text.opacity(0.8))
                     }
                 }
+                .contentShape(Rectangle())
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 10 * uiScale)

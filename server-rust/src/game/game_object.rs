@@ -210,7 +210,7 @@ impl GameObject {
     }
 
     /// Get location key for spatial indexing.
-    pub fn location_key(&self) -> (u16, u16) {
+    pub fn location_key(&self) -> (i32, i32) {
         (self.position.x, self.position.y)
     }
 }
@@ -221,7 +221,7 @@ pub struct GameObjectManager {
     /// All objects by ID.
     objects: HashMap<EntityId, GameObject>,
     /// Objects indexed by location.
-    by_location: HashMap<(u16, u16), Vec<EntityId>>,
+    by_location: HashMap<(i32, i32), Vec<EntityId>>,
     /// Object definitions.
     definitions: HashMap<u32, ObjectDef>,
     /// Next entity ID.
@@ -260,7 +260,7 @@ impl GameObjectManager {
     /// Generate next entity ID.
     fn next_entity_id(&mut self) -> EntityId {
         self.next_id += 1;
-        EntityId(self.next_id)
+        EntityId(self.next_id as u64)
     }
 
     /// Register an object definition.
@@ -319,7 +319,7 @@ impl GameObjectManager {
     }
 
     /// Get objects at a location.
-    pub fn at_location(&self, x: u16, y: u16) -> Vec<&GameObject> {
+    pub fn at_location(&self, x: i32, y: i32) -> Vec<&GameObject> {
         self.by_location
             .get(&(x, y))
             .map(|ids| ids.iter().filter_map(|id| self.objects.get(id)).collect())
@@ -327,14 +327,14 @@ impl GameObjectManager {
     }
 
     /// Get scenery at location.
-    pub fn scenery_at(&self, x: u16, y: u16) -> Option<&GameObject> {
+    pub fn scenery_at(&self, x: i32, y: i32) -> Option<&GameObject> {
         self.at_location(x, y)
             .into_iter()
             .find(|obj| obj.object_type == ObjectType::Scenery && !obj.is_hidden())
     }
 
     /// Get boundary at location.
-    pub fn boundary_at(&self, x: u16, y: u16) -> Option<&GameObject> {
+    pub fn boundary_at(&self, x: i32, y: i32) -> Option<&GameObject> {
         self.at_location(x, y)
             .into_iter()
             .find(|obj| obj.object_type == ObjectType::Boundary && !obj.is_hidden())

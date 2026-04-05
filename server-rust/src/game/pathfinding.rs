@@ -176,9 +176,9 @@ pub fn find_path<C: CollisionMap>(
     };
 
     let mut open_set = BinaryHeap::new();
-    let mut came_from: HashMap<(u16, u16), Position> = HashMap::new();
-    let mut g_scores: HashMap<(u16, u16), u32> = HashMap::new();
-    let mut closed_set: HashSet<(u16, u16)> = HashSet::new();
+    let mut came_from: HashMap<(i32, i32), Position> = HashMap::new();
+    let mut g_scores: HashMap<(i32, i32), u32> = HashMap::new();
+    let mut closed_set: HashSet<(i32, i32)> = HashSet::new();
 
     open_set.push(PathNode {
         position: start,
@@ -224,8 +224,8 @@ pub fn find_path<C: CollisionMap>(
                 continue;
             }
 
-            let neighbor_x = (pos.x as i16 + dx) as u16;
-            let neighbor_y = (pos.y as i16 + dy) as u16;
+            let neighbor_x = pos.x + dx as i32;
+            let neighbor_y = pos.y + dy as i32;
             let neighbor_key = (neighbor_x, neighbor_y);
 
             if closed_set.contains(&neighbor_key) {
@@ -273,8 +273,8 @@ pub fn find_path_to_adjacent<C: CollisionMap>(
 
     // Find walkable tile adjacent to target
     for &(dx, dy) in &DIRECTIONS {
-        let adj_x = (target.x as i16 + dx) as u16;
-        let adj_y = (target.y as i16 + dy) as u16;
+        let adj_x = target.x + dx as i32;
+        let adj_y = target.y + dy as i32;
 
         if collision.is_walkable(adj_x, adj_y, target.plane) {
             let adj_pos = Position {

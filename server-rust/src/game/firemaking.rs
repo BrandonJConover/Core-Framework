@@ -119,7 +119,7 @@ pub fn calculate_light_chance(firemaking_level: u8, log_level: u8) -> f64 {
 #[derive(Debug, Default)]
 pub struct FiremakingManager {
     /// Active fires by position.
-    fires: HashMap<(u16, u16), Fire>,
+    fires: HashMap<(i32, i32), Fire>,
 }
 
 impl FiremakingManager {
@@ -135,12 +135,12 @@ impl FiremakingManager {
     }
 
     /// Get fire at position.
-    pub fn get_fire(&self, x: u16, y: u16) -> Option<&Fire> {
+    pub fn get_fire(&self, x: i32, y: i32) -> Option<&Fire> {
         self.fires.get(&(x, y))
     }
 
     /// Check if there's a fire at position.
-    pub fn has_fire(&self, x: u16, y: u16) -> bool {
+    pub fn has_fire(&self, x: i32, y: i32) -> bool {
         self.fires.contains_key(&(x, y))
     }
 

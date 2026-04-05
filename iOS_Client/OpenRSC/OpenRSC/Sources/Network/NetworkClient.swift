@@ -368,6 +368,15 @@ struct PacketBuilder {
         data.append(0) // Null terminator
     }
 
+    /// Writes a string terminated with a linefeed (0x0A) instead of null.
+    /// Required for the server's getString() which reads until byte 10.
+    mutating func writeLinefeedString(_ value: String) {
+        if let bytes = value.data(using: .utf8) {
+            data.append(bytes)
+        }
+        data.append(0x0A) // Linefeed terminator
+    }
+
     mutating func writeBytes(_ bytes: Data) {
         data.append(bytes)
     }

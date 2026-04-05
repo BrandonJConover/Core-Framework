@@ -223,7 +223,7 @@ pub fn check_nest_drop(woodcutting_level: u8) -> Option<NestType> {
 #[derive(Debug, Default)]
 pub struct WoodcuttingManager {
     /// Trees by position.
-    trees: HashMap<(u16, u16), Tree>,
+    trees: HashMap<(i32, i32), Tree>,
 }
 
 impl WoodcuttingManager {
@@ -239,12 +239,12 @@ impl WoodcuttingManager {
     }
 
     /// Get tree at position.
-    pub fn get_tree(&self, x: u16, y: u16) -> Option<&Tree> {
+    pub fn get_tree(&self, x: i32, y: i32) -> Option<&Tree> {
         self.trees.get(&(x, y))
     }
 
     /// Get mutable tree at position.
-    pub fn get_tree_mut(&mut self, x: u16, y: u16) -> Option<&mut Tree> {
+    pub fn get_tree_mut(&mut self, x: i32, y: i32) -> Option<&mut Tree> {
         self.trees.get_mut(&(x, y))
     }
 

@@ -216,7 +216,7 @@ public final class PluginHandler implements IPluginHandler {
             }
 
             try {
-                if (!shouldBlockDefault) {
+                if (!shouldBlockDefault && defaultHandler != null) {
                     invokePluginAction(triggerType, owner, defaultHandler, data, walkToAction);
                 }
             } catch (final Exception e) {
@@ -235,6 +235,10 @@ public final class PluginHandler implements IPluginHandler {
             WalkToAction walkToAction
     ) {
         if (reloading) {
+            return;
+        }
+
+        if (triggerInstance == null) {
             return;
         }
 
