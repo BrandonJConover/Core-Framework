@@ -202,48 +202,42 @@ final class SpriteManager {
 
     /// Gets a player sprite based on appearance.
     func getPlayerSprite(appearance: PlayerAppearance?, direction: Int, isWalking: Bool, animationFrame: Int) -> Sprite? {
-        // Try archive sprites based on appearance head sprite
         if let app = appearance {
             let spriteIndex = app.headSprite + Self.spriteMedia
             if let archiveSprite = getSpriteByIndex(spriteIndex) {
                 return archiveSprite
             }
         }
-        if isWalking {
-            let frameId = "player_walk_\(animationFrame % 2)"
-            return getSprite(id: frameId)
-        }
-        return getSprite(id: "player_idle")
+        return nil
     }
 
     /// Gets an NPC sprite.
     func getNpcSprite(npcId: Int, direction: Int, animation: Int) -> Sprite? {
-        // NPC sprites start at spriteMedia offset in the archive
         if let archiveSprite = getSpriteByIndex(npcId + Self.spriteMedia) {
             return archiveSprite
         }
-        let id = "npc_\(npcId)"
-        return getSprite(id: id) ?? getSprite(id: "npc_default")
+        return nil
     }
 
     /// Gets an item sprite.
     func getItemSprite(itemId: Int) -> Sprite? {
-        // Item sprites: spriteID + spriteItem offset
+        if let appearanceId = ItemDefinitions.appearanceId(itemId: itemId),
+           let archiveSprite = getSpriteByIndex(appearanceId + Self.spriteItem) {
+            return archiveSprite
+        }
+
         if let archiveSprite = getSpriteByIndex(itemId + Self.spriteItem) {
             return archiveSprite
         }
-        let id = "item_\(itemId)"
-        return getSprite(id: id) ?? getSprite(id: "item_default")
+        return nil
     }
 
     /// Gets a scenery object sprite.
     func getObjectSprite(objectId: Int) -> Sprite? {
-        // Object sprites in the media range
         if let archiveSprite = getSpriteByIndex(objectId + Self.spriteMedia) {
             return archiveSprite
         }
-        let id = "object_\(objectId)"
-        return getSprite(id: id) ?? getSprite(id: "object_default")
+        return nil
     }
 
     // MARK: - Cache Management

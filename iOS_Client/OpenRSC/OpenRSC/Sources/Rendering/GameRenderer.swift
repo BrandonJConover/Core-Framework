@@ -3,6 +3,35 @@ import Metal
 import MetalKit
 import SwiftUI
 
+struct GameViewport {
+    static let aspectRatio = CGFloat(GameRenderer.width) / CGFloat(GameRenderer.height)
+
+    static func fittedRect(in size: CGSize) -> CGRect {
+        guard size.width > 0, size.height > 0 else { return .zero }
+
+        let containerAspect = size.width / size.height
+        if containerAspect > aspectRatio {
+            let height = size.height
+            let width = height * aspectRatio
+            return CGRect(
+                x: (size.width - width) / 2,
+                y: 0,
+                width: width,
+                height: height
+            ).integral
+        } else {
+            let width = size.width
+            let height = width / aspectRatio
+            return CGRect(
+                x: 0,
+                y: (size.height - height) / 2,
+                width: width,
+                height: height
+            ).integral
+        }
+    }
+}
+
 /// Metal-based game renderer.
 /// Renders the game world to a texture that is displayed in SwiftUI.
 final class GameRenderer: NSObject, ObservableObject {
@@ -129,7 +158,11 @@ final class GameRenderer: NSObject, ObservableObject {
     }
 
     /// Renders the current frame to the given drawable.
-    func render(to drawable: CAMetalDrawable, commandBuffer: MTLCommandBuffer) {
+    func render(
+        to drawable: CAMetalDrawable,
+        in viewportRect: CGRect,
+        commandBuffer: MTLCommandBuffer
+    ) {
         guard let pipelineState = pipelineState,
               let texture = texture else { return }
 
@@ -142,6 +175,16 @@ final class GameRenderer: NSObject, ObservableObject {
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else { return }
 
         encoder.setRenderPipelineState(pipelineState)
+        encoder.setViewport(
+            MTLViewport(
+                originX: viewportRect.origin.x,
+                originY: viewportRect.origin.y,
+                width: viewportRect.size.width,
+                height: viewportRect.size.height,
+                znear: 0,
+                zfar: 1
+            )
+        )
         encoder.setFragmentTexture(texture, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
         encoder.endEncoding()
@@ -162,27 +205,38 @@ final class GameRenderer: NSObject, ObservableObject {
 
     /// Draws a filled rectangle.
     func fillRect(x: Int, y: Int, width: Int, height: Int, color: UInt32) {
-        for py in y..<min(y + height, Self.height) {
-            for px in x..<min(x + width, Self.width) {
-                if px >= 0 && py >= 0 {
-                    pixelBuffer[py * Self.width + px] = color
-                }
+        guard width > 0, height > 0 else { return }
+        let startY = max(0, y)
+        let endY = min(y + height, Self.height)
+        let startX = max(0, x)
+        let endX = min(x + width, Self.width)
+        guard startX < endX, startY < endY else { return }
+
+        for py in startY..<endY {
+            for px in startX..<endX {
+                pixelBuffer[py * Self.width + px] = color
             }
         }
     }
 
     /// Draws a horizontal line.
     func drawHLine(x: Int, y: Int, width: Int, color: UInt32) {
-        guard y >= 0 && y < Self.height else { return }
-        for px in max(0, x)..<min(x + width, Self.width) {
+        guard y >= 0 && y < Self.height, width > 0 else { return }
+        let startX = max(0, x)
+        let endX = min(x + width, Self.width)
+        guard startX < endX else { return }
+        for px in startX..<endX {
             pixelBuffer[y * Self.width + px] = color
         }
     }
 
     /// Draws a vertical line.
     func drawVLine(x: Int, y: Int, height: Int, color: UInt32) {
-        guard x >= 0 && x < Self.width else { return }
-        for py in max(0, y)..<min(y + height, Self.height) {
+        guard x >= 0 && x < Self.width, height > 0 else { return }
+        let startY = max(0, y)
+        let endY = min(y + height, Self.height)
+        guard startY < endY else { return }
+        for py in startY..<endY {
             pixelBuffer[py * Self.width + x] = color
         }
     }
@@ -225,6 +279,7 @@ struct GameRendererView: UIViewRepresentable {
     class Coordinator: NSObject, MTKViewDelegate {
         var gameClient: GameClient
         private let renderer: GameRenderer
+        private var commandQueue: MTLCommandQueue?
 
         init(gameClient: GameClient) {
             self.gameClient = gameClient
@@ -238,16 +293,26 @@ struct GameRendererView: UIViewRepresentable {
         }
 
         func draw(in view: MTKView) {
+            // Lazily create a single command queue (not one per frame)
+            if commandQueue == nil {
+                commandQueue = view.device?.makeCommandQueue()
+            }
+
             guard let drawable = view.currentDrawable,
-                  let commandBuffer = view.device?.makeCommandQueue()?.makeCommandBuffer() else {
+                  let commandBuffer = commandQueue?.makeCommandBuffer() else {
                 return
             }
 
-            // Update renderer with game state
-            renderer.updateFrameBuffer(gameClient.frameBuffer)
+            // Render game world into the CPU frame buffer
+            gameClient.renderFrame()
 
-            // Render to drawable
-            renderer.render(to: drawable, commandBuffer: commandBuffer)
+            // Upload frame buffer to Metal texture and render
+            renderer.updateFrameBuffer(gameClient.frameBuffer)
+            let viewport = GameViewport.fittedRect(in: CGSize(
+                width: view.drawableSize.width,
+                height: view.drawableSize.height
+            ))
+            renderer.render(to: drawable, in: viewport, commandBuffer: commandBuffer)
 
             commandBuffer.present(drawable)
             commandBuffer.commit()

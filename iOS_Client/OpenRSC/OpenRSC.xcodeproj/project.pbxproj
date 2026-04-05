@@ -10,12 +10,17 @@
 		133DC4B9AEEA6A91C0E2D7AB /* GameClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E006C472EDDC179D0DD7D2DB /* GameClient.swift */; };
 		1D7EF7D2B5FEC232A6CAEFE0 /* InputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A110D1D14B9BF2AC271B3F2E /* InputHandler.swift */; };
 		304B61AC93930B37028B76B9 /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66B0E46BA7D0CE47E1F90658 /* SoundManager.swift */; };
+		55455A8AC9C34129176CCDED /* ItemDefs.json in Resources */ = {isa = PBXBuildFile; fileRef = 8F441A77288B177DC71D53F2 /* ItemDefs.json */; };
 		5A6814D89E5705FE8BAD1C67 /* GameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7CA322DF305DFA6942CF030 /* GameView.swift */; };
 		5C66A8A962E1A1082500146F /* NetworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F99B5EBAC7663489DAB89C3 /* NetworkClient.swift */; };
+		6385CDC5EE107042A52A5EB8 /* TileDef.xml in Resources */ = {isa = PBXBuildFile; fileRef = 34A11AC74733C4B6D128521E /* TileDef.xml */; };
 		6E675ACFE0D85F33AF3D0183 /* SpriteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91ECA2AB661D220E48CE4768 /* SpriteManager.swift */; };
+		705C6CAD527DB52F8E92EE0F /* LandscapeArchiveReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B384319453A7E168028E8D76 /* LandscapeArchiveReader.swift */; };
+		82C888CB7B728F1270EDCC87 /* Authentic_Landscape.orsc in Resources */ = {isa = PBXBuildFile; fileRef = 6837DA438FE3589995F740D3 /* Authentic_Landscape.orsc */; };
 		8A790CF41C1584CAEFB72750 /* GameContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2052820F8671C3F6EE02F2D8 /* GameContainerView.swift */; };
 		B3AC6D64B34491EA7DA74015 /* SpriteArchiveReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D23E9C81F159E4D149B6911 /* SpriteArchiveReader.swift */; };
 		B57602B2EB425F5DDCEC0C4F /* MobileOptimizations.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5F2115088E3B18B08FFF1AF /* MobileOptimizations.swift */; };
+		B7C1BCADDB447B881447671E /* Authentic_Sprites.orsc in Resources */ = {isa = PBXBuildFile; fileRef = EC995A9542D1E8FCD4F848BA /* Authentic_Sprites.orsc */; };
 		CD70A609DB7DA23B39A94AB9 /* PacketHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2E38D68C9C49641B553385 /* PacketHandler.swift */; };
 		CE9CCE1D8EB83F708CF6AB16 /* OpenRSCApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3312C364ED0C1C4D2A2F4A /* OpenRSCApp.swift */; };
 		D708B468D2C4CF3F4895C6B1 /* SecureNetworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6D36971B0516074AFDEF85F /* SecureNetworkClient.swift */; };
@@ -25,20 +30,25 @@
 
 /* Begin PBXFileReference section */
 		2052820F8671C3F6EE02F2D8 /* GameContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameContainerView.swift; sourceTree = "<group>"; };
+		34A11AC74733C4B6D128521E /* TileDef.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = TileDef.xml; sourceTree = "<group>"; };
 		3D23E9C81F159E4D149B6911 /* SpriteArchiveReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteArchiveReader.swift; sourceTree = "<group>"; };
 		3F99B5EBAC7663489DAB89C3 /* NetworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkClient.swift; sourceTree = "<group>"; };
-		5D5705B24E1415694C5BFC19 /* OpenRSC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenRSC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5D5705B24E1415694C5BFC19 /* OpenRSC.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenRSC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		66B0E46BA7D0CE47E1F90658 /* SoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
+		6837DA438FE3589995F740D3 /* Authentic_Landscape.orsc */ = {isa = PBXFileReference; path = Authentic_Landscape.orsc; sourceTree = "<group>"; };
 		74AD0EB3EF811559305899EF /* GameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameRenderer.swift; sourceTree = "<group>"; };
+		8F441A77288B177DC71D53F2 /* ItemDefs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ItemDefs.json; sourceTree = "<group>"; };
 		91ECA2AB661D220E48CE4768 /* SpriteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteManager.swift; sourceTree = "<group>"; };
 		A110D1D14B9BF2AC271B3F2E /* InputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandler.swift; sourceTree = "<group>"; };
 		A5F2115088E3B18B08FFF1AF /* MobileOptimizations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileOptimizations.swift; sourceTree = "<group>"; };
 		A7CA322DF305DFA6942CF030 /* GameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameView.swift; sourceTree = "<group>"; };
+		B384319453A7E168028E8D76 /* LandscapeArchiveReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandscapeArchiveReader.swift; sourceTree = "<group>"; };
 		B6D36971B0516074AFDEF85F /* SecureNetworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureNetworkClient.swift; sourceTree = "<group>"; };
 		C967FD084D08522D1096B6E6 /* ItemDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemDefinitions.swift; sourceTree = "<group>"; };
 		DB3312C364ED0C1C4D2A2F4A /* OpenRSCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRSCApp.swift; sourceTree = "<group>"; };
 		DD2E38D68C9C49641B553385 /* PacketHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketHandler.swift; sourceTree = "<group>"; };
 		E006C472EDDC179D0DD7D2DB /* GameClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameClient.swift; sourceTree = "<group>"; };
+		EC995A9542D1E8FCD4F848BA /* Authentic_Sprites.orsc */ = {isa = PBXFileReference; path = Authentic_Sprites.orsc; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -87,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				74AD0EB3EF811559305899EF /* GameRenderer.swift */,
+				B384319453A7E168028E8D76 /* LandscapeArchiveReader.swift */,
 				3D23E9C81F159E4D149B6911 /* SpriteArchiveReader.swift */,
 				91ECA2AB661D220E48CE4768 /* SpriteManager.swift */,
 			);
@@ -102,6 +113,18 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		AC151FE3DB7482B41AB17CF6 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				6837DA438FE3589995F740D3 /* Authentic_Landscape.orsc */,
+				EC995A9542D1E8FCD4F848BA /* Authentic_Sprites.orsc */,
+				8F441A77288B177DC71D53F2 /* ItemDefs.json */,
+				34A11AC74733C4B6D128521E /* TileDef.xml */,
+			);
+			name = Resources;
+			path = OpenRSC/Resources;
+			sourceTree = "<group>";
+		};
 		ADD982BEC2B669E41DB5B410 /* Network */ = {
 			isa = PBXGroup;
 			children = (
@@ -115,6 +138,7 @@
 		AE48DCA49FA0A56E68FB6864 = {
 			isa = PBXGroup;
 			children = (
+				AC151FE3DB7482B41AB17CF6 /* Resources */,
 				C9CA13B1AA6483EF8C043C08 /* Sources */,
 				14BFB150E52CE5887FD9D2C4 /* Products */,
 			);
@@ -152,6 +176,7 @@
 			buildConfigurationList = B8B47ADBC563D9AFEB8ED8B3 /* Build configuration list for PBXNativeTarget "OpenRSC" */;
 			buildPhases = (
 				27EBD023E308F40C21193944 /* Sources */,
+				C619CAAC18FDD0E65217EADB /* Resources */,
 			);
 			buildRules = (
 			);
@@ -174,6 +199,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					24C87ADC8A795C0A7A2949E7 = {
+						DevelopmentTeam = MJAYYU2WWD;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -197,6 +223,20 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		C619CAAC18FDD0E65217EADB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				82C888CB7B728F1270EDCC87 /* Authentic_Landscape.orsc in Resources */,
+				B7C1BCADDB447B881447671E /* Authentic_Sprites.orsc in Resources */,
+				55455A8AC9C34129176CCDED /* ItemDefs.json in Resources */,
+				6385CDC5EE107042A52A5EB8 /* TileDef.xml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		27EBD023E308F40C21193944 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -208,6 +248,7 @@
 				5A6814D89E5705FE8BAD1C67 /* GameView.swift in Sources */,
 				1D7EF7D2B5FEC232A6CAEFE0 /* InputHandler.swift in Sources */,
 				E1738B26972A35770C261546 /* ItemDefinitions.swift in Sources */,
+				705C6CAD527DB52F8E92EE0F /* LandscapeArchiveReader.swift in Sources */,
 				B57602B2EB425F5DDCEC0C4F /* MobileOptimizations.swift in Sources */,
 				5C66A8A962E1A1082500146F /* NetworkClient.swift in Sources */,
 				CE9CCE1D8EB83F708CF6AB16 /* OpenRSCApp.swift in Sources */,
@@ -235,8 +276,17 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
+					UIInterfaceOrientationPortrait,
+					UIInterfaceOrientationLandscapeLeft,
+					UIInterfaceOrientationLandscapeRight,
+				);
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = (
+					UIInterfaceOrientationPortrait,
+					UIInterfaceOrientationPortraitUpsideDown,
+					UIInterfaceOrientationLandscapeLeft,
+					UIInterfaceOrientationLandscapeRight,
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -383,8 +433,17 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
+					UIInterfaceOrientationPortrait,
+					UIInterfaceOrientationLandscapeLeft,
+					UIInterfaceOrientationLandscapeRight,
+				);
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = (
+					UIInterfaceOrientationPortrait,
+					UIInterfaceOrientationPortraitUpsideDown,
+					UIInterfaceOrientationLandscapeLeft,
+					UIInterfaceOrientationLandscapeRight,
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

@@ -1,6 +1,7 @@
 //! Skills module for player skill management.
 
 use super::player::SkillId;
+pub use super::player::SkillId as SkillType;
 use std::collections::HashMap;
 
 /// Experience table for levels 1-99.
@@ -51,6 +52,11 @@ impl Skills {
     /// Get the base level of a skill.
     pub fn level(&self, skill: SkillId) -> u8 {
         *self.levels.get(&skill).unwrap_or(&1)
+    }
+
+    /// Alias for `level()` — get the base level of a skill.
+    pub fn get_level(&self, skill: SkillId) -> u8 {
+        self.level(skill)
     }
 
     /// Get the current level of a skill (may be boosted/drained).
@@ -141,7 +147,7 @@ impl Skills {
     pub fn combat_level(&self) -> u32 {
         let attack = self.level(SkillId::Attack) as f64;
         let strength = self.level(SkillId::Strength) as f64;
-        let defense = self.level(SkillId::Defense) as f64;
+        let defense = self.level(SkillId::Defence) as f64;
         let hits = self.level(SkillId::Hits) as f64;
         let ranged = self.level(SkillId::Ranged) as f64;
         let prayer = self.level(SkillId::Prayer) as f64;
@@ -165,7 +171,7 @@ impl Default for Skills {
 /// All skill IDs.
 const ALL_SKILLS: [SkillId; 18] = [
     SkillId::Attack,
-    SkillId::Defense,
+    SkillId::Defence,
     SkillId::Strength,
     SkillId::Hits,
     SkillId::Ranged,
@@ -179,7 +185,7 @@ const ALL_SKILLS: [SkillId; 18] = [
     SkillId::Crafting,
     SkillId::Smithing,
     SkillId::Mining,
-    SkillId::Herblaw,
+    SkillId::Herblore,
     SkillId::Agility,
     SkillId::Thieving,
 ];

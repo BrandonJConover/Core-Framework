@@ -13,16 +13,21 @@ impl std::fmt::Display for EntityId {
     }
 }
 
-/// 2D position in the game world.
+/// Position in the game world.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
+    pub plane: i32,
 }
 
 impl Position {
     pub fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
+        Self { x, y, plane: 0 }
+    }
+
+    pub fn with_plane(x: i32, y: i32, plane: i32) -> Self {
+        Self { x, y, plane }
     }
 
     /// Calculate distance to another position.

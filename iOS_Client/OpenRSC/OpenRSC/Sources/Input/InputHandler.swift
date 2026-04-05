@@ -21,6 +21,11 @@ final class InputHandler: ObservableObject {
     // Timing
     private var lastTapTime: Date?
     private var longPressTimer: Timer?
+    private var lastPanTranslation: CGSize = .zero
+    private var lastPinchScale: CGFloat = 1
+    private var hasDragged = false
+
+    private let tapMovementThreshold: CGFloat = 12
 
     init(gameClient: GameClient? = nil) {
         self.gameClient = gameClient
@@ -28,13 +33,20 @@ final class InputHandler: ObservableObject {
 
     /// Converts screen coordinates to game coordinates.
     func screenToGame(x: CGFloat, y: CGFloat, viewSize: CGSize) -> (Int, Int) {
+        guard viewSize.width > 0, viewSize.height > 0 else {
+            return (0, 0)
+        }
+
         let scaleX = CGFloat(GameClient.gameWidth) / viewSize.width
         let scaleY = CGFloat(GameClient.gameHeight) / viewSize.height
 
-        let gameX = Int(x * scaleX)
-        let gameY = Int(y * scaleY)
+        let gameX = Int((x * scaleX).rounded())
+        let gameY = Int((y * scaleY).rounded())
 
-        return (gameX, gameY)
+        return (
+            min(max(gameX, 0), GameClient.gameWidth - 1),
+            min(max(gameY, 0), GameClient.gameHeight - 1)
+        )
     }
 
     // MARK: - Touch Handling
@@ -44,11 +56,16 @@ final class InputHandler: ObservableObject {
         mouseX = gameX
         mouseY = gameY
         isPressed = true
+        hasDragged = false
+        lastPanTranslation = .zero
+        lastPinchScale = 1
 
         // Start long press timer
         longPressTimer?.invalidate()
         longPressTimer = Timer.scheduledTimer(withTimeInterval: longPressDelay, repeats: false) { [weak self] _ in
-            self?.onLongPress()
+            Task { @MainActor [weak self] in
+                self?.onLongPress()
+            }
         }
     }
 
@@ -69,15 +86,21 @@ final class InputHandler: ObservableObject {
 
         longPressTimer?.invalidate()
 
-        if !isLongPress {
+        if !isLongPress && !hasDragged {
             onTap(x: gameX, y: gameY)
         }
         isLongPress = false
+        hasDragged = false
+        lastPanTranslation = .zero
+        lastPinchScale = 1
     }
 
     func onTouchCancelled() {
         isPressed = false
         isLongPress = false
+        hasDragged = false
+        lastPanTranslation = .zero
+        lastPinchScale = 1
         longPressTimer?.invalidate()
     }
 
@@ -104,17 +127,41 @@ final class InputHandler: ObservableObject {
     }
 
     func onPan(translation: CGSize, viewSize: CGSize) {
-        guard swipeToRotate else { return }
+        guard swipeToRotate || swipeToZoom else { return }
 
-        let deltaX = Float(translation.width / viewSize.width) * 100
-        let deltaY = Float(translation.height / viewSize.height) * 100
+        let movement = hypot(translation.width, translation.height)
+        if movement >= tapMovementThreshold {
+            hasDragged = true
+        }
 
+        let incrementalTranslation = CGSize(
+            width: translation.width - lastPanTranslation.width,
+            height: translation.height - lastPanTranslation.height
+        )
+        lastPanTranslation = translation
+
+        guard hasDragged else { return }
+
+        let deltaX = swipeToRotate ? Float(incrementalTranslation.width / viewSize.width) * 100 : 0
+        let deltaY = swipeToZoom ? Float(incrementalTranslation.height / viewSize.height) * 100 : 0
+
+        guard deltaX != 0 || deltaY != 0 else { return }
         gameClient?.handlePan(deltaX: deltaX, deltaY: deltaY)
     }
 
     func onPinch(scale: CGFloat) {
         guard swipeToZoom else { return }
-        gameClient?.handlePinch(scale: Float(scale))
+        let incrementalScale = scale / max(lastPinchScale, 0.001)
+        lastPinchScale = scale
+
+        guard incrementalScale.isFinite, incrementalScale > 0 else { return }
+
+        hasDragged = true
+        gameClient?.handlePinch(scale: Float(incrementalScale))
+    }
+
+    func onPinchEnded() {
+        lastPinchScale = 1
     }
 
     // MARK: - Keyboard Input
@@ -128,9 +175,9 @@ final class InputHandler: ObservableObject {
         case "→":
             client.cameraRotation = (client.cameraRotation + 8) & 255
         case "↑":
-            client.cameraZoom = min(255, client.cameraZoom + 8)
+            client.cameraZoom = min(240, client.cameraZoom + 8)
         case "↓":
-            client.cameraZoom = max(0, client.cameraZoom - 8)
+            client.cameraZoom = max(96, client.cameraZoom - 8)
         default:
             // Handle text input
             break
@@ -149,9 +196,10 @@ struct GameGestureModifier: ViewModifier {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        if value.translation == .zero {
+                        if !inputHandler.isPressed {
                             inputHandler.onTouchBegan(at: value.location, in: viewSize)
-                        } else {
+                        }
+                        if value.translation != .zero {
                             inputHandler.onTouchMoved(at: value.location, in: viewSize)
                             inputHandler.onPan(translation: value.translation, viewSize: viewSize)
                         }
@@ -160,10 +208,13 @@ struct GameGestureModifier: ViewModifier {
                         inputHandler.onTouchEnded(at: value.location, in: viewSize)
                     }
             )
-            .gesture(
+            .simultaneousGesture(
                 MagnificationGesture()
                     .onChanged { scale in
                         inputHandler.onPinch(scale: scale)
+                    }
+                    .onEnded { _ in
+                        inputHandler.onPinchEnded()
                     }
             )
     }

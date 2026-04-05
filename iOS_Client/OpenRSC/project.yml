@@ -10,11 +10,9 @@ targets:
     platform: iOS
     deploymentTarget: "16.0"
     sources:
-      - OpenRSC/Sources
-    resources:
-      - ../../server/bin/main/server/defs/ItemDefs.json
-      - ../../Client_Base/Cache/video/Authentic_Sprites.orsc
-      - ../../Client_Base/Cache/video/Authentic_Landscape.orsc
+      - path: OpenRSC/Sources
+      - path: OpenRSC/Resources
+        buildPhase: resources
     settings:
       base:
         PRODUCT_NAME: OpenRSC

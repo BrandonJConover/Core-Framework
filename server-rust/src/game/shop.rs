@@ -342,9 +342,7 @@ mod tests {
     use super::*;
 
     fn test_repo() -> ItemRepository {
-        let mut repo = ItemRepository::new();
-        repo.load_defaults();
-        repo
+        ItemRepository::new()
     }
 
     #[test]

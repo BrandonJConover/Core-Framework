@@ -5,16 +5,27 @@ enum ItemDefinitions {
         shared.stackableItemIds.contains(itemId)
     }
 
+    static func appearanceId(itemId: Int) -> Int? {
+        shared.appearanceByItemId[itemId]
+    }
+
     private static let shared = Store()
 
     private final class Store {
         let stackableItemIds: Set<Int>
+        let appearanceByItemId: [Int: Int]
 
         init(bundle: Bundle = .main) {
-            stackableItemIds = Self.loadStackableItemIds(bundle: bundle)
+            let definitions = Self.loadDefinitions(bundle: bundle)
+            stackableItemIds = Set(definitions.compactMap { definition in
+                definition.isStackable != 0 ? definition.id : nil
+            })
+            appearanceByItemId = Dictionary(uniqueKeysWithValues: definitions.map { definition in
+                (definition.id, definition.appearanceID)
+            })
         }
 
-        private static func loadStackableItemIds(bundle: Bundle) -> Set<Int> {
+        private static func loadDefinitions(bundle: Bundle) -> [ItemDefinitionEntry] {
             guard let url = bundle.url(forResource: "ItemDefs", withExtension: "json"),
                   let data = try? Data(contentsOf: url),
                   let document = try? JSONDecoder().decode(ItemDefinitionsDocument.self, from: data) else {
@@ -22,9 +33,7 @@ enum ItemDefinitions {
                 return []
             }
 
-            return Set(document.item.compactMap { definition in
-                definition.isStackable != 0 ? definition.id : nil
-            })
+            return document.item
         }
     }
 }
@@ -36,4 +45,5 @@ private struct ItemDefinitionsDocument: Decodable {
 private struct ItemDefinitionEntry: Decodable {
     let id: Int
     let isStackable: Int
+    let appearanceID: Int
 }

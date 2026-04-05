@@ -71,7 +71,7 @@ pub enum PathResult {
 /// Collision data for the world.
 pub trait CollisionMap {
     /// Check if a tile is walkable.
-    fn is_walkable(&self, x: u16, y: u16, plane: u8) -> bool;
+    fn is_walkable(&self, x: i32, y: i32, plane: i32) -> bool;
 
     /// Check if can walk from one tile to adjacent tile.
     fn can_traverse(&self, from: Position, dx: i16, dy: i16) -> bool;
@@ -81,7 +81,7 @@ pub trait CollisionMap {
 #[derive(Debug, Default)]
 pub struct SimpleCollisionMap {
     /// Blocked tiles.
-    blocked: HashSet<(u16, u16, u8)>,
+    blocked: HashSet<(i32, i32, i32)>,
 }
 
 impl SimpleCollisionMap {
@@ -91,24 +91,24 @@ impl SimpleCollisionMap {
     }
 
     /// Block a tile.
-    pub fn block(&mut self, x: u16, y: u16, plane: u8) {
+    pub fn block(&mut self, x: i32, y: i32, plane: i32) {
         self.blocked.insert((x, y, plane));
     }
 
     /// Unblock a tile.
-    pub fn unblock(&mut self, x: u16, y: u16, plane: u8) {
+    pub fn unblock(&mut self, x: i32, y: i32, plane: i32) {
         self.blocked.remove(&(x, y, plane));
     }
 }
 
 impl CollisionMap for SimpleCollisionMap {
-    fn is_walkable(&self, x: u16, y: u16, plane: u8) -> bool {
+    fn is_walkable(&self, x: i32, y: i32, plane: i32) -> bool {
         !self.blocked.contains(&(x, y, plane))
     }
 
     fn can_traverse(&self, from: Position, dx: i16, dy: i16) -> bool {
-        let to_x = (from.x as i16 + dx) as u16;
-        let to_y = (from.y as i16 + dy) as u16;
+        let to_x = from.x + dx as i32;
+        let to_y = from.y + dy as i32;
 
         // Check destination is walkable
         if !self.is_walkable(to_x, to_y, from.plane) {
@@ -117,10 +117,10 @@ impl CollisionMap for SimpleCollisionMap {
 
         // For diagonal movement, check corners
         if dx != 0 && dy != 0 {
-            let side1_x = (from.x as i16 + dx) as u16;
+            let side1_x = from.x + dx as i32;
             let side1_y = from.y;
             let side2_x = from.x;
-            let side2_y = (from.y as i16 + dy) as u16;
+            let side2_y = from.y + dy as i32;
 
             if !self.is_walkable(side1_x, side1_y, from.plane)
                 || !self.is_walkable(side2_x, side2_y, from.plane)

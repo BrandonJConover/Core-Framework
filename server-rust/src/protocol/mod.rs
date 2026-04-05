@@ -162,6 +162,170 @@ impl PacketBuilder {
     }
 }
 
+/// Bit-level packet builder for RSC entity update packets.
+/// The Java server uses `PacketBuilder.writeBits()` for player/NPC coordinate updates.
+#[derive(Debug)]
+pub struct BitWriter {
+    buffer: Vec<u8>,
+    bit_position: usize,
+}
+
+impl BitWriter {
+    pub fn new() -> Self {
+        Self {
+            buffer: Vec::with_capacity(256),
+            bit_position: 0,
+        }
+    }
+
+    /// Write `count` bits from `value` (MSB first, matching Java's writeBits).
+    pub fn write_bits(&mut self, value: i32, count: usize) {
+        let byte_pos = self.bit_position >> 3;
+        let bit_offset = 8 - (self.bit_position & 7);
+
+        // Ensure buffer is large enough
+        let needed = ((self.bit_position + count + 7) >> 3) as usize;
+        while self.buffer.len() < needed {
+            self.buffer.push(0);
+        }
+
+        self.bit_position += count;
+
+        let mut remaining = count;
+        let mut byte_idx = byte_pos;
+
+        // First partial byte
+        if remaining >= bit_offset {
+            let mask = (1 << bit_offset) - 1;
+            self.buffer[byte_idx] &= !(mask as u8);
+            self.buffer[byte_idx] |= ((value >> (remaining - bit_offset)) & mask) as u8;
+            remaining -= bit_offset;
+            byte_idx += 1;
+        } else {
+            let shift = bit_offset - remaining;
+            let mask = ((1 << remaining) - 1) << shift;
+            self.buffer[byte_idx] &= !(mask as u8);
+            self.buffer[byte_idx] |= ((value & ((1 << remaining) - 1)) << shift) as u8;
+            return;
+        }
+
+        // Full bytes
+        while remaining >= 8 {
+            remaining -= 8;
+            self.buffer[byte_idx] = ((value >> remaining) & 0xFF) as u8;
+            byte_idx += 1;
+        }
+
+        // Last partial byte
+        if remaining > 0 {
+            let shift = 8 - remaining;
+            let mask = ((1 << remaining) - 1) << shift;
+            self.buffer[byte_idx] &= !(mask as u8);
+            self.buffer[byte_idx] |= ((value & ((1 << remaining) - 1)) << shift) as u8;
+        }
+    }
+
+    /// Get the total number of bits written.
+    pub fn bit_position(&self) -> usize {
+        self.bit_position
+    }
+
+    /// Finish writing and return the byte buffer (padded to byte boundary).
+    pub fn finish(self) -> Vec<u8> {
+        let byte_len = (self.bit_position + 7) >> 3;
+        self.buffer[..byte_len].to_vec()
+    }
+
+    /// Build into a Packet with the given opcode.
+    pub fn build_packet(self, opcode: u8) -> Packet {
+        let bytes = self.finish();
+        Packet::new(opcode, bytes)
+    }
+}
+
+/// Bit-level packet reader for RSC entity update packets.
+#[derive(Debug)]
+pub struct BitReader {
+    buffer: Bytes,
+    bit_position: usize,
+}
+
+impl BitReader {
+    pub fn new(data: Bytes) -> Self {
+        Self {
+            buffer: data,
+            bit_position: 0,
+        }
+    }
+
+    pub fn from_packet(packet: &Packet) -> Self {
+        Self::new(packet.payload.clone())
+    }
+
+    /// Read `count` bits as an unsigned value.
+    pub fn read_bits(&mut self, count: usize) -> io::Result<u32> {
+        if (self.bit_position + count) > (self.buffer.len() * 8) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "Not enough bits"));
+        }
+
+        let mut value: u32 = 0;
+        let mut remaining = count;
+        let mut byte_idx = self.bit_position >> 3;
+        let mut bit_offset = 8 - (self.bit_position & 7);
+
+        self.bit_position += count;
+
+        // First partial byte
+        if remaining >= bit_offset {
+            let mask = (1u32 << bit_offset) - 1;
+            value |= (self.buffer[byte_idx] as u32 & mask) << (remaining - bit_offset);
+            remaining -= bit_offset;
+            byte_idx += 1;
+        } else {
+            let shift = bit_offset - remaining;
+            value |= (self.buffer[byte_idx] as u32 >> shift) & ((1u32 << remaining) - 1);
+            return Ok(value);
+        }
+
+        // Full bytes
+        while remaining >= 8 {
+            remaining -= 8;
+            value |= (self.buffer[byte_idx] as u32) << remaining;
+            byte_idx += 1;
+        }
+
+        // Last partial byte
+        if remaining > 0 {
+            let shift = 8 - remaining;
+            value |= (self.buffer[byte_idx] as u32 >> shift) & ((1u32 << remaining) - 1);
+        }
+
+        Ok(value)
+    }
+
+    /// Read `count` bits as a signed value (sign extension).
+    pub fn read_signed_bits(&mut self, count: usize) -> io::Result<i32> {
+        let value = self.read_bits(count)?;
+        // Sign extend
+        let sign_bit = 1u32 << (count - 1);
+        if value & sign_bit != 0 {
+            Ok(value as i32 | !((1i32 << count) - 1))
+        } else {
+            Ok(value as i32)
+        }
+    }
+
+    /// Check if there are more bits to read.
+    pub fn has_remaining(&self) -> bool {
+        self.bit_position < self.buffer.len() * 8
+    }
+
+    /// Get current bit position.
+    pub fn bit_position(&self) -> usize {
+        self.bit_position
+    }
+}
+
 /// Packet reader for parsing incoming packets.
 #[derive(Debug)]
 pub struct PacketReader {

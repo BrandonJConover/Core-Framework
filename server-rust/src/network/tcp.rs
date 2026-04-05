@@ -1,155 +1,167 @@
+//! TCP connection handler.
+//! Manages individual TCP connections, packet framing, and routing to the server state.
+
 use anyhow::Result;
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tracing::{debug, error, warn};
+use tokio::sync::{mpsc, RwLock};
+use tracing::{debug, error, info, warn};
 
-use crate::infrastructure::serialization::{Packet, ProtocolAdapter, SerializationFormat};
+use crate::game::server::{HandleResult, ServerState};
+use crate::protocol::Packet;
 
-/// Handle a TCP connection.
-pub async fn handle_connection(mut socket: TcpStream, addr: SocketAddr) -> Result<()> {
-    let mut buffer = BytesMut::with_capacity(65536);
-    let mut protocol_detected = false;
-    let mut protocol_format = SerializationFormat::RscBinary;
+/// Handle a TCP connection with full session lifecycle.
+pub async fn handle_connection(
+    mut socket: TcpStream,
+    addr: SocketAddr,
+    server_state: Arc<RwLock<ServerState>>,
+) -> Result<()> {
+    let mut buffer = BytesMut::with_capacity(4096);
 
+    // Create session with outgoing packet channel
+    let (tx, mut rx) = mpsc::channel::<Packet>(256);
+
+    let session_id = {
+        let mut state = server_state.write().await;
+        match state.sessions.create_session(addr, tx).await {
+            Some(session) => {
+                let s = session.read().await;
+                s.id
+            }
+            None => {
+                warn!("Failed to create session for {} (rate limited)", addr);
+                return Ok(());
+            }
+        }
+    };
+
+    info!("Session {} created for {}", session_id, addr);
+
+    // Split socket for concurrent read/write
+    let (mut reader, mut writer) = socket.into_split();
+
+    // Spawn outgoing packet writer
+    let write_handle = tokio::spawn(async move {
+        while let Some(packet) = rx.recv().await {
+            let encoded = encode_outgoing(&packet);
+            if let Err(e) = writer.write_all(&encoded).await {
+                debug!("Write error for session: {}", e);
+                break;
+            }
+        }
+    });
+
+    // Read incoming packets
     loop {
-        // Read data into buffer
-        let bytes_read = socket.read_buf(&mut buffer).await?;
+        let bytes_read = match reader.read_buf(&mut buffer).await {
+            Ok(0) => {
+                debug!("Connection closed by {}", addr);
+                break;
+            }
+            Ok(n) => n,
+            Err(e) => {
+                debug!("Read error from {}: {}", addr, e);
+                break;
+            }
+        };
 
-        if bytes_read == 0 {
-            debug!("Connection closed by {}", addr);
-            break;
-        }
-
-        // Detect protocol on first packet
-        if !protocol_detected && buffer.len() > 0 {
-            protocol_format = ProtocolAdapter::detect_protocol(&buffer);
-            protocol_detected = true;
-            debug!("Client {} using {:?} protocol", addr, protocol_format);
-        }
-
-        // Process complete packets
-        while let Some(packet) = try_decode_packet(&mut buffer, protocol_format)? {
+        // Process all complete packets in buffer
+        while let Some(packet) = try_decode_rsc_packet(&mut buffer)? {
             debug!(
-                "Received packet opcode={} size={} from {}",
+                "Session {} packet opcode={} size={}",
+                session_id,
                 packet.opcode,
-                packet.payload.len(),
-                addr
+                packet.payload.len()
             );
 
-            // Process packet
-            match process_packet(&packet).await {
-                Ok(response) => {
-                    let response_bytes = ProtocolAdapter::encode(&response, protocol_format)?;
-                    socket.write_all(&response_bytes).await?;
-                }
-                Err(e) => {
-                    warn!("Failed to process packet from {}: {}", addr, e);
+            // Route packet to server state handler
+            let result = {
+                let mut state = server_state.write().await;
+                state.handle_packet(session_id, packet).await
+            };
+
+            match result {
+                HandleResult::Continue => {}
+                HandleResult::Disconnect => {
+                    info!("Session {} disconnecting (handler requested)", session_id);
+                    // Clean up session
+                    let mut state = server_state.write().await;
+                    state.sessions.remove_session(session_id).await;
+                    write_handle.abort();
+                    return Ok(());
                 }
             }
         }
     }
 
+    // Connection closed — clean up
+    info!("Session {} disconnected", session_id);
+    {
+        let mut state = server_state.write().await;
+        // Unregister player from game if logged in
+        if let Some(session) = state.sessions.get_session(session_id) {
+            let s = session.read().await;
+            if s.state == crate::session::SessionState::LoggedIn {
+                state.game.unregister_player(session_id).await;
+            }
+        }
+        state.sessions.remove_session(session_id).await;
+    }
+    write_handle.abort();
+
     Ok(())
 }
 
-/// Try to decode a complete packet from the buffer.
-fn try_decode_packet(buffer: &mut BytesMut, format: SerializationFormat) -> Result<Option<Packet>> {
-    match format {
-        SerializationFormat::RscBinary => try_decode_rsc_packet(buffer),
-        SerializationFormat::MessagePack => try_decode_msgpack_packet(buffer),
-        _ => Err(anyhow::anyhow!("Unsupported protocol")),
-    }
-}
-
-/// Try to decode an RSC binary packet.
+/// Try to decode an RSC binary packet from the buffer.
+/// RSC client->server format: 2-byte length (excludes length field) + 1-byte opcode + payload
 fn try_decode_rsc_packet(buffer: &mut BytesMut) -> Result<Option<Packet>> {
-    if buffer.len() < 3 {
-        return Ok(None); // Need at least length (2) + opcode (1)
+    if buffer.len() < 2 {
+        return Ok(None);
     }
 
-    // Peek at length
+    // Read 2-byte length (big-endian, excludes the 2 length bytes)
     let length = ((buffer[0] as u16) << 8 | buffer[1] as u16) as usize;
-    let total_length = 2 + length;
+
+    if length == 0 {
+        // Empty packet, skip
+        buffer.split_to(2);
+        return Ok(None);
+    }
+
+    let total_length = 2 + length; // 2 length bytes + payload (which includes opcode)
 
     if buffer.len() < total_length {
-        return Ok(None); // Incomplete packet
+        return Ok(None); // Incomplete packet, wait for more data
     }
 
-    // Extract and decode packet
+    // Extract packet data
     let packet_data = buffer.split_to(total_length);
-    let packet = Packet::decode_rsc(&packet_data)?;
 
-    Ok(Some(packet))
+    // First byte after length is opcode
+    let opcode = packet_data[2];
+    let payload = if length > 1 {
+        bytes::Bytes::copy_from_slice(&packet_data[3..total_length])
+    } else {
+        bytes::Bytes::new()
+    };
+
+    Ok(Some(Packet::new(opcode, payload)))
 }
 
-/// Try to decode a MessagePack packet.
-fn try_decode_msgpack_packet(buffer: &mut BytesMut) -> Result<Option<Packet>> {
-    if buffer.len() < 6 {
-        return Ok(None); // Need header
-    }
+/// Encode an outgoing packet for the RSC client.
+/// RSC server->client format: 2-byte length (includes length field) + opcode + payload
+fn encode_outgoing(packet: &Packet) -> Vec<u8> {
+    let payload_len = packet.payload.len();
+    let total_len = 2 + 1 + payload_len; // length field + opcode + payload
+    let length_value = total_len as u16; // includes the 2 length bytes
 
-    // Check magic byte
-    if buffer[0] != ProtocolAdapter::MSGPACK_MAGIC {
-        return Err(anyhow::anyhow!("Invalid MessagePack magic byte"));
-    }
-
-    // Get length
-    let length = ((buffer[2] as u32) << 24
-        | (buffer[3] as u32) << 16
-        | (buffer[4] as u32) << 8
-        | buffer[5] as u32) as usize;
-
-    let total_length = 6 + length;
-
-    if buffer.len() < total_length {
-        return Ok(None); // Incomplete packet
-    }
-
-    // Extract and decode packet
-    let packet_data = buffer.split_to(total_length);
-    let packet = Packet::decode_msgpack(&packet_data)?;
-
-    Ok(Some(packet))
-}
-
-/// Process a game packet and generate response.
-async fn process_packet(packet: &Packet) -> Result<Packet> {
-    // Placeholder - actual game logic would go here
-    match packet.opcode {
-        0 => {
-            // Ping/pong
-            Ok(Packet::new(0, bytes::Bytes::from_static(b"pong")))
-        }
-        1 => {
-            // Login request (placeholder)
-            Ok(Packet::new(1, bytes::Bytes::from_static(&[0]))) // Success
-        }
-        _ => {
-            // Echo back for unknown opcodes
-            Ok(Packet::new(packet.opcode, packet.payload.clone()))
-        }
-    }
-}
-
-/// TCP connection state for a client.
-pub struct ConnectionState {
-    pub addr: SocketAddr,
-    pub protocol: SerializationFormat,
-    pub authenticated: bool,
-    pub username: Option<String>,
-    pub session_id: Option<String>,
-}
-
-impl ConnectionState {
-    pub fn new(addr: SocketAddr) -> Self {
-        Self {
-            addr,
-            protocol: SerializationFormat::RscBinary,
-            authenticated: false,
-            username: None,
-            session_id: None,
-        }
-    }
+    let mut buf = Vec::with_capacity(total_len);
+    buf.push((length_value >> 8) as u8);
+    buf.push((length_value & 0xFF) as u8);
+    buf.push(packet.opcode);
+    buf.extend_from_slice(&packet.payload);
+    buf
 }

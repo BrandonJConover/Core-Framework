@@ -200,7 +200,7 @@ impl<'a> TimerGuard<'a> {
 impl Drop for TimerGuard<'_> {
     fn drop(&mut self) {
         let duration = self.start.elapsed().as_secs_f64();
-        // Record with labels would need metrics macro support
-        histogram!(self.histogram_name).record(duration);
+        let name = self.histogram_name.clone();
+        histogram!(name).record(duration);
     }
 }

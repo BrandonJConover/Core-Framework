@@ -1,5 +1,5 @@
 use anyhow::Result;
-use opentelemetry::trace::TracerProvider;
+use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{runtime, trace as sdktrace};
 use tracing_subscriber::layer::SubscriberExt;
@@ -23,7 +23,7 @@ impl TracingConfig {
             .tracing()
             .with_exporter(exporter)
             .with_trace_config(
-                sdktrace::config()
+                sdktrace::Config::default()
                     .with_sampler(sdktrace::Sampler::TraceIdRatioBased(config.sample_rate))
                     .with_resource(opentelemetry_sdk::Resource::new(vec![
                         opentelemetry::KeyValue::new("service.name", config.service_name.clone()),
@@ -32,8 +32,13 @@ impl TracingConfig {
             )
             .install_batch(runtime::Tokio)?;
 
-        // Create OpenTelemetry layer
-        let tracer = tracer_provider.tracer("openrsc-server");
+        // Create OpenTelemetry layer using the versioned tracer method
+        let tracer = tracer_provider.versioned_tracer(
+            "openrsc-server",
+            Some(env!("CARGO_PKG_VERSION")),
+            None::<&str>,
+            None,
+        );
         let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
 
         // Set up subscriber with both fmt and OpenTelemetry layers

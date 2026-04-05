@@ -120,7 +120,7 @@ impl GroundItem {
 
     /// Get the location key for spatial lookup.
     pub fn location_key(&self) -> (u16, u16) {
-        (self.position.x, self.position.y)
+        (self.position.x as u16, self.position.y as u16)
     }
 }
 
@@ -189,7 +189,7 @@ impl GroundItemManager {
     /// Generate next entity ID.
     fn next_entity_id(&mut self) -> EntityId {
         self.next_id += 1;
-        EntityId(self.next_id)
+        EntityId(self.next_id as u64)
     }
 
     /// Spawn a ground item.
@@ -340,7 +340,7 @@ impl GroundItemManager {
             .values()
             .filter(|item| {
                 let pos = &item.position;
-                pos.x >= x1 && pos.x <= x2 && pos.y >= y1 && pos.y <= y2
+                pos.x >= x1 as i32 && pos.x <= x2 as i32 && pos.y >= y1 as i32 && pos.y <= y2 as i32
             })
             .collect()
     }
