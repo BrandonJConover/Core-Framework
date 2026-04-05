@@ -1,7 +1,7 @@
 import Foundation
 
 /// Handles incoming packets from the server.
-/// Complete implementation matching server OpcodeOut.
+/// Complete implementation matching server OpcodeOut for custom client protocol.
 actor PacketHandler {
     weak var gameClient: GameClient?
     private let soundManager = SoundManager.shared
@@ -163,150 +163,490 @@ actor PacketHandler {
 
     // MARK: - World Updates
 
+    /// Decodes bit-packed player coordinate updates from the server.
+    /// Server format (custom client path in GameStateUpdater):
+    ///   localPlayerX:      11 bits
+    ///   localPlayerY:      13 bits
+    ///   localPlayerSprite:  4 bits
+    ///   knownPlayerCount:   8 bits
+    ///   Per known player:
+    ///     hasUpdate: 1 bit
+    ///     if hasUpdate=1: updateType: 1 bit
+    ///       type=0: direction 3 bits (moved)
+    ///       type=1: read 2 bits -> if 3: remove, else read 2 more -> 4-bit sprite
+    ///   New players (until end of bits):
+    ///     playerIndex: 11 bits
+    ///     xOffset:      6 bits (signed)
+    ///     yOffset:      6 bits (signed)
+    ///     sprite:       4 bits
     private func handlePlayerCoords(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        // Read local player update first
-        guard let localX = reader.readShort(),
-              let localY = reader.readShort() else { return }
+        reader.startBitReading()
 
-        await gameClient.updateLocalPlayerPosition(x: Int(localX), y: Int(localY))
+        guard let localX = reader.readBits(11),
+              let localY = reader.readBits(13),
+              let localSprite = reader.readBits(4),
+              let knownPlayerCount = reader.readBits(8) else {
+            reader.finishBitReading()
+            return
+        }
 
-        // Read other players
-        while reader.hasMoreData {
-            guard let serverIndex = reader.readShort(),
-                  let x = reader.readShort(),
-                  let y = reader.readShort(),
-                  let direction = reader.readByte() else { break }
+        await gameClient.updateLocalPlayerPosition(x: localX, y: localY)
+        await gameClient.updateLocalPlayerSprite(localSprite)
 
-            await gameClient.updatePlayerPosition(
-                index: Int(serverIndex),
-                x: Int(x),
-                y: Int(y),
-                direction: Int(direction)
+        // Snapshot the ordered known-player list before processing updates.
+        // Each sequential update corresponds to the next entity in this list.
+        let knownIndices = await gameClient.localPlayerIndices
+        var survivingIndices: [Int] = []
+
+        // Process known player updates
+        for i in 0..<knownPlayerCount {
+            let playerIndex = i < knownIndices.count ? knownIndices[i] : -1
+
+            guard let hasUpdate = reader.readBits(1) else { break }
+            if hasUpdate == 1 {
+                guard let updateType = reader.readBits(1) else { break }
+                if updateType == 0 {
+                    // Moved: 3-bit direction
+                    guard let direction = reader.readBits(3) else { break }
+                    await gameClient.knownPlayerMoved(index: playerIndex, direction: direction)
+                    survivingIndices.append(playerIndex)
+                } else {
+                    // Not moving: read 2 bits
+                    guard let subType = reader.readBits(2) else { break }
+                    if subType == 3 {
+                        // Remove player
+                        await gameClient.knownPlayerRemoved(index: playerIndex)
+                    } else {
+                        // Sprite changed: subType is upper 2 bits, read 2 more for full 4-bit sprite
+                        guard let lowerBits = reader.readBits(2) else { break }
+                        let sprite = (subType << 2) | lowerBits
+                        await gameClient.knownPlayerSpriteChanged(index: playerIndex, sprite: sprite)
+                        survivingIndices.append(playerIndex)
+                    }
+                }
+            } else {
+                await gameClient.knownPlayerNoUpdate(index: playerIndex)
+                survivingIndices.append(playerIndex)
+            }
+        }
+
+        // Rebuild localPlayerIndices: surviving known players + new players
+        await MainActor.run { gameClient.localPlayerIndices = survivingIndices }
+
+        // Process new players until end of bit data
+        while reader.hasMoreBits {
+            guard let playerIndex = reader.readBits(11) else { break }
+            // If playerIndex is 2047 (all 1s for 11 bits), that signals end
+            if playerIndex == 2047 { break }
+            guard let xOffset = reader.readSignedBits(6),
+                  let yOffset = reader.readSignedBits(6),
+                  let sprite = reader.readBits(4) else { break }
+
+            await gameClient.addNewPlayer(
+                index: playerIndex,
+                xOffset: xOffset,
+                yOffset: yOffset,
+                sprite: sprite
             )
         }
+
+        reader.finishBitReading()
     }
 
+    /// Decodes bit-packed NPC coordinate updates from the server.
+    /// Server format (custom client path):
+    ///   knownNpcCount: 8 bits
+    ///   Per known NPC:
+    ///     hasUpdate: 1 bit
+    ///     if hasUpdate=1: updateType: 1 bit
+    ///       type=0: direction 3 bits (moved)
+    ///       type=1: read 2 bits -> if 3: remove, else read 2 more -> 4-bit sprite
+    ///   New NPCs (until end of bits):
+    ///     npcIndex: 12 bits
+    ///     xOffset:   6 bits (signed)
+    ///     yOffset:   6 bits (signed)
+    ///     sprite:    4 bits
+    ///     npcId:    10 bits
     private func handleNpcCoords(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        while reader.hasMoreData {
-            guard let serverIndex = reader.readShort(),
-                  let npcId = reader.readShort(),
-                  let x = reader.readShort(),
-                  let y = reader.readShort(),
-                  let direction = reader.readByte() else { break }
+        reader.startBitReading()
 
-            await gameClient.updateNpc(
-                index: Int(serverIndex),
-                npcId: Int(npcId),
-                x: Int(x),
-                y: Int(y),
-                direction: Int(direction)
+        guard let knownNpcCount = reader.readBits(8) else {
+            reader.finishBitReading()
+            return
+        }
+
+        // Snapshot the ordered known-NPC list before processing updates.
+        let knownIndices = await gameClient.localNpcIndices
+        var survivingIndices: [Int] = []
+
+        // Process known NPC updates
+        for i in 0..<knownNpcCount {
+            let npcIndex = i < knownIndices.count ? knownIndices[i] : -1
+
+            guard let hasUpdate = reader.readBits(1) else { break }
+            if hasUpdate == 1 {
+                guard let updateType = reader.readBits(1) else { break }
+                if updateType == 0 {
+                    guard let direction = reader.readBits(3) else { break }
+                    await gameClient.knownNpcMoved(index: npcIndex, direction: direction)
+                    survivingIndices.append(npcIndex)
+                } else {
+                    guard let subType = reader.readBits(2) else { break }
+                    if subType == 3 {
+                        await gameClient.knownNpcRemoved(index: npcIndex)
+                    } else {
+                        guard let lowerBits = reader.readBits(2) else { break }
+                        let sprite = (subType << 2) | lowerBits
+                        await gameClient.knownNpcSpriteChanged(index: npcIndex, sprite: sprite)
+                        survivingIndices.append(npcIndex)
+                    }
+                }
+            } else {
+                await gameClient.knownNpcNoUpdate(index: npcIndex)
+                survivingIndices.append(npcIndex)
+            }
+        }
+
+        // Rebuild localNpcIndices: surviving known NPCs + new NPCs
+        await MainActor.run { gameClient.localNpcIndices = survivingIndices }
+
+        // Process new NPCs until end of bit data
+        while reader.hasMoreBits {
+            guard let npcIndex = reader.readBits(12) else { break }
+            if npcIndex == 4095 { break } // all 1s signals end
+            guard let xOffset = reader.readSignedBits(6),
+                  let yOffset = reader.readSignedBits(6),
+                  let sprite = reader.readBits(4),
+                  let npcId = reader.readBits(10) else { break }
+
+            await gameClient.addNewNpc(
+                index: npcIndex,
+                xOffset: xOffset,
+                yOffset: yOffset,
+                sprite: sprite,
+                npcId: npcId
             )
         }
+
+        reader.finishBitReading()
     }
 
+    /// Decodes player appearance/action updates with type-based dispatch.
+    /// Server format (PayloadCustomGenerator heterogeneous stream):
+    ///   short updateCount
+    ///   Per update: short playerIndex, byte updateType, then type-specific data
     private func handleUpdatePlayers(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
         guard let count = reader.readShort() else { return }
 
         for _ in 0..<count {
-            guard let serverIndex = reader.readShort(),
-                  let appearanceId = reader.readShort(),
-                  let combatLevel = reader.readByte() else { continue }
+            guard let playerIndex = reader.readShort(),
+                  let updateType = reader.readByte() else { break }
 
-            // Read appearance data
-            let headSprite = reader.readByte() ?? 0
-            let bodySprite = reader.readByte() ?? 0
-            let legSprite = reader.readByte() ?? 0
-            let hairColor = reader.readByte() ?? 0
-            let topColor = reader.readByte() ?? 0
-            let bottomColor = reader.readByte() ?? 0
-            let skinColor = reader.readByte() ?? 0
+            switch updateType {
+            case 0: // Bubble (action bubble over player head)
+                guard let itemId = reader.readShort() else { break }
+                await gameClient.showPlayerBubble(
+                    index: Int(playerIndex), itemId: Int(itemId)
+                )
 
-            await gameClient.updatePlayerAppearance(
-                index: Int(serverIndex),
-                combatLevel: Int(combatLevel),
-                appearance: PlayerAppearance(
-                    headSprite: Int(headSprite),
-                    bodySprite: Int(bodySprite),
-                    legSprite: Int(legSprite),
+            case 1: // Public chat
+                guard let iconSprite = reader.readInt(),
+                      let message = reader.readString() else { break }
+                await gameClient.playerPublicChat(
+                    index: Int(playerIndex),
+                    icon: Int(iconSprite),
+                    message: message
+                )
+
+            case 2: // Damage
+                guard let damage = reader.readByte(),
+                      let curHits = reader.readByte(),
+                      let maxHits = reader.readByte() else { break }
+                await gameClient.playerDamage(
+                    index: Int(playerIndex),
+                    damage: Int(damage),
+                    curHits: Int(curHits),
+                    maxHits: Int(maxHits)
+                )
+
+            case 3: // Projectile -> NPC
+                guard let projectileType = reader.readShort(),
+                      let victimIndex = reader.readShort() else { break }
+                await gameClient.playerProjectileToNpc(
+                    casterIndex: Int(playerIndex),
+                    projectileType: Int(projectileType),
+                    victimIndex: Int(victimIndex)
+                )
+
+            case 4: // Projectile -> Player
+                guard let projectileType = reader.readShort(),
+                      let victimIndex = reader.readShort() else { break }
+                await gameClient.playerProjectileToPlayer(
+                    casterIndex: Int(playerIndex),
+                    projectileType: Int(projectileType),
+                    victimIndex: Int(victimIndex)
+                )
+
+            case 5: // Appearance
+                guard let username = reader.readString() else { break }
+
+                guard let equipCount = reader.readByte() else { break }
+                var wornItems: [Int] = []
+                for _ in 0..<equipCount {
+                    guard let wornItem = reader.readShort() else { break }
+                    wornItems.append(Int(wornItem))
+                }
+
+                guard let hairColor = reader.readByte(),
+                      let topColor = reader.readByte(),
+                      let trouserColor = reader.readByte(),
+                      let skinColor = reader.readByte(),
+                      let combatLevel = reader.readByte(),
+                      let skullType = reader.readByte() else { break }
+
+                guard let hasClan = reader.readByte() else { break }
+                var clanTag: String? = nil
+                if hasClan == 1 {
+                    clanTag = reader.readString()
+                }
+
+                guard let isInvisible = reader.readByte(),
+                      let isInvulnerable = reader.readByte(),
+                      let groupId = reader.readByte(),
+                      let icon = reader.readInt() else { break }
+
+                await gameClient.updatePlayerAppearanceFull(
+                    index: Int(playerIndex),
+                    username: username,
+                    wornItems: wornItems,
                     hairColor: Int(hairColor),
                     topColor: Int(topColor),
-                    bottomColor: Int(bottomColor),
-                    skinColor: Int(skinColor)
+                    trouserColor: Int(trouserColor),
+                    skinColor: Int(skinColor),
+                    combatLevel: Int(combatLevel),
+                    skullType: Int(skullType),
+                    clanTag: clanTag,
+                    isInvisible: isInvisible != 0,
+                    isInvulnerable: isInvulnerable != 0,
+                    groupId: Int(groupId),
+                    icon: Int(icon)
                 )
-            )
+
+            case 6: // Quest chat (NPC talking to player)
+                guard let message = reader.readString() else { break }
+                await gameClient.playerQuestChat(
+                    index: Int(playerIndex), message: message
+                )
+
+            case 7: // Muted/tutorial chat
+                guard let isMuted = reader.readByte(),
+                      let onTutorial = reader.readByte(),
+                      let message = reader.readString() else { break }
+                await gameClient.playerMutedChat(
+                    index: Int(playerIndex),
+                    isMuted: isMuted != 0,
+                    onTutorial: onTutorial != 0,
+                    message: message
+                )
+
+            case 9: // HP update (custom client only)
+                guard let curHits = reader.readByte(),
+                      let maxHits = reader.readByte() else { break }
+                await gameClient.playerHpUpdate(
+                    index: Int(playerIndex),
+                    curHits: Int(curHits),
+                    maxHits: Int(maxHits)
+                )
+
+            default:
+                print("Unknown player update type: \(updateType)")
+                break
+            }
         }
     }
 
+    /// Decodes NPC appearance/action updates with type-based dispatch.
+    /// Server format (GameStateUpdater.updateNpcAppearances, custom client):
+    ///   short updateCount
+    ///   Per update: short npcIndex, byte updateType, then type-specific data
+    ///     Type 1 (chat):       short recipientIndex, string message
+    ///     Type 2 (damage):     byte damage, byte curHits, byte maxHits
+    ///     Type 3 (proj->NPC):  short projectileType, short victimIndex
+    ///     Type 4 (proj->player): short projectileType, short victimIndex
+    ///     Type 5 (skull):      byte skullType
+    ///     Type 6 (wield):      byte wield, byte wield2
+    ///     Type 7 (bubble):     short itemId
     private func handleUpdateNpcs(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        while reader.hasMoreData {
-            guard let serverIndex = reader.readShort(),
-                  let animation = reader.readByte() else { break }
+        guard let count = reader.readShort() else { return }
 
-            await gameClient.updateNpcAnimation(
-                index: Int(serverIndex),
-                animation: Int(animation)
-            )
+        for _ in 0..<count {
+            guard let npcIndex = reader.readShort(),
+                  let updateType = reader.readByte() else { break }
+
+            switch updateType {
+            case 1: // Chat message
+                guard let recipientIndex = reader.readShort(),
+                      let message = reader.readString() else { break }
+                await gameClient.npcChat(
+                    index: Int(npcIndex),
+                    recipientIndex: Int(Int16(bitPattern: recipientIndex)),
+                    message: message
+                )
+
+            case 2: // Damage
+                guard let damage = reader.readByte(),
+                      let curHits = reader.readByte(),
+                      let maxHits = reader.readByte() else { break }
+                await gameClient.npcDamage(
+                    index: Int(npcIndex),
+                    damage: Int(damage),
+                    curHits: Int(curHits),
+                    maxHits: Int(maxHits)
+                )
+
+            case 3: // Projectile -> NPC
+                guard let projectileType = reader.readShort(),
+                      let victimIndex = reader.readShort() else { break }
+                await gameClient.npcProjectileToNpc(
+                    casterIndex: Int(npcIndex),
+                    projectileType: Int(projectileType),
+                    victimIndex: Int(victimIndex)
+                )
+
+            case 4: // Projectile -> Player
+                guard let projectileType = reader.readShort(),
+                      let victimIndex = reader.readShort() else { break }
+                await gameClient.npcProjectileToPlayer(
+                    casterIndex: Int(npcIndex),
+                    projectileType: Int(projectileType),
+                    victimIndex: Int(victimIndex)
+                )
+
+            case 5: // Skull
+                guard let skullType = reader.readByte() else { break }
+                await gameClient.npcSkull(
+                    index: Int(npcIndex),
+                    skullType: Int(skullType)
+                )
+
+            case 6: // Wield
+                guard let wield = reader.readByte(),
+                      let wield2 = reader.readByte() else { break }
+                await gameClient.npcWield(
+                    index: Int(npcIndex),
+                    wield: Int(wield),
+                    wield2: Int(wield2)
+                )
+
+            case 7: // Bubble (action bubble over NPC head)
+                guard let itemId = reader.readShort() else { break }
+                await gameClient.npcBubble(
+                    index: Int(npcIndex),
+                    itemId: Int(itemId)
+                )
+
+            default:
+                print("Unknown NPC update type: \(updateType)")
+                break
+            }
         }
     }
 
+    /// Decodes scenery object updates.
+    /// Server format (PayloadCustomGenerator): short id, byte x, byte y, byte direction
+    /// x/y are signed byte offsets from player position.
     private func handleSceneryUpdate(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
         while reader.hasMoreData {
             guard let objectId = reader.readShort(),
-                  let x = reader.readShort(),
-                  let y = reader.readShort() else { break }
-
-            if objectId == 60000 {
-                await gameClient.removeSceneryObject(x: Int(x), y: Int(y))
-            } else {
-                await gameClient.addSceneryObject(id: Int(objectId), x: Int(x), y: Int(y))
-            }
-        }
-    }
-
-    private func handleBoundaryUpdate(_ reader: inout PacketReader) async {
-        guard let gameClient = gameClient else { return }
-
-        while reader.hasMoreData {
-            guard let boundaryId = reader.readShort(),
-                  let x = reader.readShort(),
-                  let y = reader.readShort(),
+                  let x = reader.readSignedByte(),
+                  let y = reader.readSignedByte(),
                   let direction = reader.readByte() else { break }
 
-            if boundaryId == 60000 {
-                await gameClient.removeBoundary(x: Int(x), y: Int(y))
+            if objectId == 60000 {
+                await gameClient.removeSceneryObject(
+                    xOffset: Int(x), yOffset: Int(y)
+                )
             } else {
-                await gameClient.addBoundary(
-                    id: Int(boundaryId),
-                    x: Int(x),
-                    y: Int(y),
+                await gameClient.addSceneryObject(
+                    id: Int(objectId),
+                    xOffset: Int(x),
+                    yOffset: Int(y),
                     direction: Int(direction)
                 )
             }
         }
     }
 
+    /// Decodes boundary/wall object updates.
+    /// Server format (PayloadCustomGenerator): short id, byte x, byte y, byte direction
+    /// Same as scenery — x/y are signed byte offsets.
+    private func handleBoundaryUpdate(_ reader: inout PacketReader) async {
+        guard let gameClient = gameClient else { return }
+
+        while reader.hasMoreData {
+            guard let boundaryId = reader.readShort(),
+                  let x = reader.readSignedByte(),
+                  let y = reader.readSignedByte(),
+                  let direction = reader.readByte() else { break }
+
+            if boundaryId == 60000 {
+                await gameClient.removeBoundary(
+                    xOffset: Int(x), yOffset: Int(y)
+                )
+            } else {
+                await gameClient.addBoundary(
+                    id: Int(boundaryId),
+                    xOffset: Int(x),
+                    yOffset: Int(y),
+                    direction: Int(direction)
+                )
+            }
+        }
+    }
+
+    /// Decodes ground item updates.
+    /// Server format (PayloadCustomGenerator):
+    ///   Removal: byte 255, byte x, byte y
+    ///   Item:    short id (2 bytes), byte x, byte y
+    /// First byte distinguishes: 0xFF = removal (1 byte), otherwise high byte of short id.
     private func handleGroundItems(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
         while reader.hasMoreData {
-            guard let itemId = reader.readShort(),
-                  let x = reader.readShort(),
-                  let y = reader.readShort() else { break }
+            guard let firstByte = reader.readByte() else { break }
 
-            if itemId == 60000 {
-                await gameClient.clearGroundItemsAt(x: Int(x), y: Int(y))
+            let isRemoval = firstByte == 255
+            let itemId: Int
+            if isRemoval {
+                itemId = -1
             } else {
-                await gameClient.addGroundItem(itemId: Int(itemId), x: Int(x), y: Int(y))
+                guard let secondByte = reader.readByte() else { break }
+                itemId = (Int(firstByte) << 8) | Int(secondByte)
+            }
+
+            guard let x = reader.readSignedByte(),
+                  let y = reader.readSignedByte() else { break }
+
+            if isRemoval {
+                await gameClient.removeGroundItem(
+                    xOffset: Int(x), yOffset: Int(y)
+                )
+            } else {
+                await gameClient.addGroundItem(
+                    itemId: itemId,
+                    xOffset: Int(x),
+                    yOffset: Int(y)
+                )
             }
         }
     }
@@ -320,7 +660,6 @@ actor PacketHandler {
     private func handlePlayerStats(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
-        // Read all 19 skills (including Runecraft)
         for skillId in 0..<19 {
             guard let current = reader.readByte(),
                   let max = reader.readByte(),
@@ -334,7 +673,6 @@ actor PacketHandler {
             )
         }
 
-        // Read quest points
         if let questPoints = reader.readShort() {
             await gameClient.setQuestPoints(Int(questPoints))
         }
@@ -376,7 +714,6 @@ actor PacketHandler {
 
         await gameClient.updateExperience(skillId: Int(skillId), experience: Int(experience))
 
-        // Play level up sound if level increased
         await soundManager.play(.levelUp)
     }
 
@@ -393,24 +730,58 @@ actor PacketHandler {
         await gameClient.setQuestList(quests)
     }
 
+    /// Decodes inventory.
+    /// Server format (PayloadCustomGenerator, custom client):
+    ///   byte count
+    ///   Per item: short catalogID, byte wielded, byte noted,
+    ///             conditional int amount (only written when amount > 0)
+    /// The server writes amount when `isStackable || noted` (ActionSender.java:969).
+    /// Without item defs client-side, we use total payload size to determine the mode:
+    ///   count*8 bytes → every item has an amount (all stackable/noted)
+    ///   count*4 bytes → no item has an amount (all non-stackable gear)
+    ///   otherwise     → mixed; read amount only when noted != 0 (best effort)
     private func handleInventory(_ reader: inout PacketReader) async {
         guard let gameClient = gameClient else { return }
 
         guard let count = reader.readByte() else { return }
+        let itemCount = Int(count)
+        let totalItemBytes = reader.remaining
 
-        var items: [(id: Int, amount: Int, equipped: Bool)] = []
-        for _ in 0..<count {
-            guard let itemIdWithFlag = reader.readShort() else { continue }
+        // Determine amount mode from total payload size
+        let allHaveAmounts = totalItemBytes == itemCount * 8
+        let noneHaveAmounts = totalItemBytes == itemCount * 4
 
-            let equipped = (itemIdWithFlag & 0x8000) != 0
-            let itemId = Int(itemIdWithFlag & 0x7FFF)
+        var items: [(id: Int, amount: Int, equipped: Bool, noted: Bool)] = []
+        for _ in 0..<itemCount {
+            guard let catalogID = reader.readShort(),
+                  let wielded = reader.readByte(),
+                  let noted = reader.readByte() else { continue }
 
             var amount = 1
-            if let stackAmount = reader.readInt(), stackAmount > 0 {
-                amount = Int(stackAmount)
+            let shouldReadAmount: Bool
+            if allHaveAmounts {
+                shouldReadAmount = true
+            } else if noneHaveAmounts {
+                shouldReadAmount = false
+            } else {
+                // Mixed inventory: read amount for noted items (always have amount).
+                // Un-noted stackable items will be wrong, but avoids total desync.
+                shouldReadAmount = noted != 0
             }
 
-            items.append((id: itemId, amount: amount, equipped: equipped))
+            if shouldReadAmount {
+                if let stackAmount = reader.readInt() {
+                    amount = Int(stackAmount)
+                    if amount == 0 { amount = 1 }
+                }
+            }
+
+            items.append((
+                id: Int(catalogID),
+                amount: amount,
+                equipped: wielded != 0,
+                noted: noted != 0
+            ))
         }
 
         await gameClient.setFullInventory(items)
@@ -651,6 +1022,6 @@ actor PacketHandler {
 
 extension PacketReader {
     var hasMoreData: Bool {
-        return position < data.count
+        return remaining > 0
     }
 }

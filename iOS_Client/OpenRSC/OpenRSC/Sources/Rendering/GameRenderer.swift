@@ -17,7 +17,7 @@ final class GameRenderer: NSObject, ObservableObject {
     private var texture: MTLTexture?
 
     // Frame buffer (ARGB format, matching Android)
-    private var pixelBuffer: [UInt32]
+    var pixelBuffer: [UInt32]
 
     // Rendering state
     @Published var isReady = false
@@ -183,7 +183,7 @@ final class GameRenderer: NSObject, ObservableObject {
     func drawVLine(x: Int, y: Int, height: Int, color: UInt32) {
         guard x >= 0 && x < Self.width else { return }
         for py in max(0, y)..<min(y + height, Self.height) {
-            pixelBuffer[py * Self.width + x] = height
+            pixelBuffer[py * Self.width + x] = color
         }
     }
 

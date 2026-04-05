@@ -10,15 +10,44 @@ final class SpriteManager {
     private var spriteCache: [String: Sprite] = [:]
     private var animationCache: [String: SpriteAnimation] = [:]
 
+    // Archive-loaded sprites indexed by numeric ID (matching Java sprite indices)
+    private(set) var indexedSprites: [Int: Sprite] = [:]
+    private(set) var isLoaded = false
+    private(set) var totalSpritesLoaded = 0
+
     // LRU eviction
     private var accessOrder: [String] = []
-    private let maxCacheSize = 200
+    private let maxCacheSize = 500
 
     // Sprite sheet dimensions
     private let tileSize = 32
 
     private init() {
         loadDefaultSprites()
+    }
+
+    /// Loads sprites from a .orsc archive file.
+    func loadArchive(from url: URL) {
+        let reader = SpriteArchiveReader()
+        guard let workspace = reader.readArchive(from: url) else {
+            print("SpriteManager: Failed to load archive from \(url.lastPathComponent)")
+            return
+        }
+
+        for (index, frame) in workspace.indexedSprites {
+            let sprite = frame.toSprite(id: "\(index)")
+            indexedSprites[index] = sprite
+            addToCache(id: "archive_\(index)", sprite: sprite)
+        }
+
+        totalSpritesLoaded = indexedSprites.count
+        isLoaded = true
+        print("SpriteManager: Loaded \(totalSpritesLoaded) sprites from \(url.lastPathComponent)")
+    }
+
+    /// Gets a sprite by its numeric archive index.
+    func getSpriteByIndex(_ index: Int) -> Sprite? {
+        return indexedSprites[index]
     }
 
     /// Loads default/placeholder sprites.
@@ -163,10 +192,23 @@ final class SpriteManager {
         return sprites
     }
 
+    /// RSC sprite index constants (matching Java mudclient.java)
+    static let spriteMedia = 2000
+    static let spriteUtil = 2100
+    static let spriteItem = 2150
+    static let spriteLogo = 3150
+    static let spriteProjectile = 3160
+    static let spriteTexture = 3225
+
     /// Gets a player sprite based on appearance.
     func getPlayerSprite(appearance: PlayerAppearance?, direction: Int, isWalking: Bool, animationFrame: Int) -> Sprite? {
-        // In production, this would compose sprites based on appearance
-        // For now, return placeholder
+        // Try archive sprites based on appearance head sprite
+        if let app = appearance {
+            let spriteIndex = app.headSprite + Self.spriteMedia
+            if let archiveSprite = getSpriteByIndex(spriteIndex) {
+                return archiveSprite
+            }
+        }
         if isWalking {
             let frameId = "player_walk_\(animationFrame % 2)"
             return getSprite(id: frameId)
@@ -176,18 +218,30 @@ final class SpriteManager {
 
     /// Gets an NPC sprite.
     func getNpcSprite(npcId: Int, direction: Int, animation: Int) -> Sprite? {
+        // NPC sprites start at spriteMedia offset in the archive
+        if let archiveSprite = getSpriteByIndex(npcId + Self.spriteMedia) {
+            return archiveSprite
+        }
         let id = "npc_\(npcId)"
         return getSprite(id: id) ?? getSprite(id: "npc_default")
     }
 
     /// Gets an item sprite.
     func getItemSprite(itemId: Int) -> Sprite? {
+        // Item sprites: spriteID + spriteItem offset
+        if let archiveSprite = getSpriteByIndex(itemId + Self.spriteItem) {
+            return archiveSprite
+        }
         let id = "item_\(itemId)"
         return getSprite(id: id) ?? getSprite(id: "item_default")
     }
 
     /// Gets a scenery object sprite.
     func getObjectSprite(objectId: Int) -> Sprite? {
+        // Object sprites in the media range
+        if let archiveSprite = getSpriteByIndex(objectId + Self.spriteMedia) {
+            return archiveSprite
+        }
         let id = "object_\(objectId)"
         return getSprite(id: id) ?? getSprite(id: "object_default")
     }
@@ -247,6 +301,11 @@ struct Sprite {
     let width: Int
     let height: Int
     let pixels: [UInt32]
+    var useShift: Bool = false
+    var offsetX: Int = 0
+    var offsetY: Int = 0
+    var boundWidth: Int = 0
+    var boundHeight: Int = 0
 
     /// Gets pixel at coordinates, or transparent if out of bounds.
     func getPixel(x: Int, y: Int) -> UInt32 {
@@ -390,7 +449,7 @@ extension GameRenderer {
     /// Draws an animated sprite.
     func drawAnimation(_ animation: SpriteAnimation, at x: Int, y: Int, time: TimeInterval) {
         if let frame = animation.getFrame(at: time) {
-            drawSprite(frame, at: x, y)
+            drawSprite(frame, at: x, y: y)
         }
     }
 }

@@ -168,6 +168,8 @@ struct ChatView: View {
         case .server: return .yellow
         case .quest: return .green
         case .trade: return .purple
+        case .privateIn: return .cyan
+        case .privateOut: return .cyan
         }
     }
 }

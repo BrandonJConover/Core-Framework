@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Handles touch input and gestures.
 /// Equivalent to Android's InputImpl.
+@MainActor
 final class InputHandler: ObservableObject {
     weak var gameClient: GameClient?
 

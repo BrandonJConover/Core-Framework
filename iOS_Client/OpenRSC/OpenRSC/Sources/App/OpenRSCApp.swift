@@ -51,7 +51,7 @@ final class GameState: ObservableObject {
     }
 
     func disconnect() {
-        networkClient.disconnect()
+        Task { await networkClient.disconnect() }
         isConnected = false
         isLoggedIn = false
     }
