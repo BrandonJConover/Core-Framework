@@ -5,6 +5,7 @@ private enum GamePanel {
     case social
     case inventory
     case skills
+    case magic
     case settings
 }
 
@@ -91,8 +92,14 @@ struct GameView: View {
                     Spacer(minLength: 0)
 
                     HStack(alignment: .bottom, spacing: 10 * uiScale) {
-                        ChatView(messages: gameClient.chatMessages, uiScale: uiScale)
-                            .frame(maxWidth: viewportRect.width * 0.62)
+                        ChatView(
+                            messages: gameClient.chatMessages,
+                            uiScale: uiScale,
+                            onSend: { text in
+                                Task { try? await gameClient.sendChat(text) }
+                            }
+                        )
+                        .frame(maxWidth: viewportRect.width * 0.62)
 
                         Spacer(minLength: 0)
 
@@ -139,7 +146,20 @@ struct GameView: View {
         case .inventory:
             InventoryView(items: gameClient.inventory, uiScale: uiScale, onClose: closePanels)
         case .skills:
-            SkillsView(skills: gameClient.skills, uiScale: uiScale, onClose: closePanels)
+            SkillsView(
+                skills: gameClient.skills,
+                questPoints: gameClient.questPoints,
+                questList: gameClient.questList,
+                uiScale: uiScale,
+                onClose: closePanels
+            )
+        case .magic:
+            MagicPanel(
+                magicLevel: gameClient.skills.first(where: { $0.name == "Magic" })?.currentLevel ?? 1,
+                prayerLevel: gameClient.skills.first(where: { $0.name == "Prayer" })?.currentLevel ?? 1,
+                uiScale: uiScale,
+                onClose: closePanels
+            )
         case .settings:
             SettingsPanel(uiScale: uiScale, onClose: closePanels)
         }
@@ -374,33 +394,110 @@ struct TopBar: View {
     }
 }
 
-/// Chat display area.
+private enum ChatTab: String, CaseIterable {
+    case all = "All"
+    case game = "Game"
+    case quest = "Quest"
+    case priv = "Private"
+}
+
+/// Chat display area with message tabs and text input.
 struct ChatView: View {
     let messages: [ChatMessage]
     let uiScale: CGFloat
+    var onSend: ((String) -> Void)?
+
+    @State private var selectedTab: ChatTab = .all
+    @State private var inputText: String = ""
+
+    private var filteredMessages: [ChatMessage] {
+        switch selectedTab {
+        case .all:
+            return Array(messages.suffix(20))
+        case .game:
+            return messages.filter { $0.type == .server || $0.type == .player || $0.type == .trade }.suffix(20).map { $0 }
+        case .quest:
+            return messages.filter { $0.type == .quest }.suffix(20).map { $0 }
+        case .priv:
+            return messages.filter { $0.type == .privateIn || $0.type == .privateOut }.suffix(20).map { $0 }
+        }
+    }
 
     var body: some View {
-        ScrollViewReader { _ in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2 * uiScale) {
-                    ForEach(messages.suffix(20)) { message in
-                        HStack(spacing: 4 * uiScale) {
-                            if let sender = message.sender {
-                                Text("\(sender):")
-                                    .font(.system(size: 11 * uiScale, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.cyan)
+        VStack(spacing: 0) {
+            // Message type tabs
+            HStack(spacing: 0) {
+                ForEach(ChatTab.allCases, id: \.self) { tab in
+                    Button(action: { selectedTab = tab }) {
+                        Text(tab.rawValue)
+                            .font(.system(size: 9 * uiScale, weight: .semibold, design: .monospaced))
+                            .foregroundColor(selectedTab == tab ? ClassicPalette.accent : Color.white.opacity(0.6))
+                            .padding(.horizontal, 6 * uiScale)
+                            .padding(.vertical, 3 * uiScale)
+                            .background(
+                                selectedTab == tab
+                                    ? ClassicPalette.shell.opacity(0.9)
+                                    : Color.clear
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 4 * uiScale)
+            .background(ClassicPalette.shell.opacity(0.6))
+
+            // Messages
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 2 * uiScale) {
+                        ForEach(filteredMessages) { message in
+                            HStack(spacing: 4 * uiScale) {
+                                if let sender = message.sender {
+                                    Text("\(sender):")
+                                        .font(.system(size: 11 * uiScale, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.cyan)
+                                }
+                                Text(message.message)
+                                    .font(.system(size: 11 * uiScale, weight: .medium, design: .monospaced))
+                                    .foregroundColor(messageColor(for: message.type))
                             }
-                            Text(message.message)
-                                .font(.system(size: 11 * uiScale, weight: .medium, design: .monospaced))
-                                .foregroundColor(messageColor(for: message.type))
+                            .id(message.id)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(6 * uiScale)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(6 * uiScale)
+                .onChange(of: messages.count) { _ in
+                    if let last = filteredMessages.last {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
             }
+            .frame(maxHeight: 80 * uiScale)
+
+            // Chat input
+            HStack(spacing: 6 * uiScale) {
+                TextField("Chat...", text: $inputText)
+                    .font(.system(size: 11 * uiScale, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white)
+                    .tint(ClassicPalette.accent)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit { sendMessage() }
+
+                Button(action: sendMessage) {
+                    Text("Send")
+                        .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                        .foregroundColor(inputText.isEmpty ? Color.white.opacity(0.4) : ClassicPalette.accent)
+                }
+                .buttonStyle(.plain)
+                .disabled(inputText.isEmpty)
+            }
+            .padding(.horizontal, 8 * uiScale)
+            .padding(.vertical, 4 * uiScale)
+            .background(ClassicPalette.shell.opacity(0.7))
         }
-        .frame(maxHeight: 118 * uiScale)
         .background(
             RoundedRectangle(cornerRadius: 8 * uiScale)
                 .fill(ClassicPalette.shell.opacity(0.86))
@@ -409,20 +506,23 @@ struct ChatView: View {
                         .stroke(Color.white.opacity(0.10), lineWidth: 1)
                 )
         )
+        .clipShape(RoundedRectangle(cornerRadius: 8 * uiScale))
+    }
+
+    private func sendMessage() {
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        onSend?(text)
+        inputText = ""
     }
 
     private func messageColor(for type: ChatMessage.MessageType) -> Color {
         switch type {
-        case .player:
-            return .white
-        case .server:
-            return .yellow
-        case .quest:
-            return .green
-        case .trade:
-            return .purple
-        case .privateIn, .privateOut:
-            return .cyan
+        case .player: return .white
+        case .server: return .yellow
+        case .quest: return .green
+        case .trade: return .purple
+        case .privateIn, .privateOut: return .cyan
         }
     }
 }
@@ -436,6 +536,7 @@ private struct TabButtonsView: View {
         (.social, .socialTab),
         (.inventory, .bagTab),
         (.skills, .skillsTab),
+        (.magic, .spellTab),
         (.settings, .settingsTab)
     ]
 
@@ -800,24 +901,54 @@ struct InventorySlot: View {
     let item: InventoryItem
     let uiScale: CGFloat
 
+    private var itemImage: UIImage? {
+        SpriteManager.shared.getItemSprite(itemId: item.itemId).flatMap {
+            SpriteManager.shared.imageForSprite($0)
+        }
+    }
+
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 4 * uiScale)
-                .fill(Color.white.opacity(0.28))
+                .fill(Color(red: 0.71, green: 0.71, blue: 0.71).opacity(0.5))
                 .frame(width: 36 * uiScale, height: 36 * uiScale)
 
-            Text("\(item.itemId)")
-                .font(.system(size: 7 * uiScale, weight: .bold, design: .monospaced))
-                .foregroundColor(ClassicPalette.text)
+            if let img = itemImage {
+                Image(uiImage: img)
+                    .resizable()
+                    .interpolation(.none)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 32 * uiScale, height: 32 * uiScale)
+                    .frame(width: 36 * uiScale, height: 36 * uiScale)
+            } else {
+                Image(systemName: "square.dashed")
+                    .font(.system(size: 14 * uiScale))
+                    .foregroundColor(ClassicPalette.text.opacity(0.4))
+                    .frame(width: 36 * uiScale, height: 36 * uiScale)
+            }
 
             if item.amount > 1 {
-                Text("\(item.amount)")
+                Text(formatAmount(item.amount))
                     .font(.system(size: 8 * uiScale, weight: .bold, design: .monospaced))
-                    .foregroundColor(.yellow)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(2 * uiScale)
+                    .foregroundColor(amountColor(item.amount))
+                    .shadow(color: .black.opacity(0.8), radius: 1, x: 1, y: 1)
+                    .padding(.leading, 2 * uiScale)
+                    .padding(.top, 1 * uiScale)
             }
         }
+        .frame(width: 36 * uiScale, height: 36 * uiScale)
+    }
+
+    private func formatAmount(_ n: Int) -> String {
+        if n >= 1_000_000 { return "\(n / 1_000_000)M" }
+        if n >= 1_000 { return "\(n / 1_000)K" }
+        return "\(n)"
+    }
+
+    private func amountColor(_ n: Int) -> Color {
+        if n >= 1_000_000 { return .green }
+        if n >= 1_000 { return .yellow }
+        return .white
     }
 }
 
@@ -831,11 +962,20 @@ struct EmptySlot: View {
     }
 }
 
-/// Skills panel.
+private enum SkillsSubTab { case stats, quests }
+
+/// Skills panel — two-column layout matching the desktop client.
 struct SkillsView: View {
     let skills: [Skill]
+    let questPoints: Int
+    let questList: [Int: Int]
     let uiScale: CGFloat
     let onClose: () -> Void
+
+    @State private var subTab: SkillsSubTab = .stats
+
+    private var leftSkills: [Skill] { Array(skills.prefix(skills.count / 2)) }
+    private var rightSkills: [Skill] { Array(skills.dropFirst(skills.count / 2)) }
 
     var body: some View {
         ClassicPanelContainer(
@@ -843,24 +983,254 @@ struct SkillsView: View {
             guiPart: .skillsTab,
             uiScale: uiScale,
             onClose: onClose,
-            content: VStack(alignment: .leading, spacing: 6 * uiScale) {
-                ForEach(skills) { skill in
-                    HStack {
-                        Text(skill.name)
-                            .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
-                            .foregroundColor(ClassicPalette.text)
-                            .frame(width: 88 * uiScale, alignment: .leading)
+            content: VStack(alignment: .leading, spacing: 8 * uiScale) {
+                // Sub-tab selector matching desktop Stats / Quests
+                HStack(spacing: 0) {
+                    subTabButton("Stats", selected: subTab == .stats) { subTab = .stats }
+                    subTabButton("Quests", selected: subTab == .quests) { subTab = .quests }
+                    Spacer(minLength: 0)
+                }
 
-                        Text("\(skill.currentLevel)/\(skill.maxLevel)")
-                            .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
-                            .foregroundColor(.yellow)
-
-                        Spacer(minLength: 0)
+                if subTab == .stats {
+                    HStack(alignment: .top, spacing: 4 * uiScale) {
+                        VStack(alignment: .leading, spacing: 3 * uiScale) {
+                            ForEach(leftSkills) { skill in
+                                skillRow(skill, uiScale: uiScale)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 3 * uiScale) {
+                            ForEach(rightSkills) { skill in
+                                skillRow(skill, uiScale: uiScale)
+                            }
+                        }
                     }
-                    .padding(.vertical, 2 * uiScale)
+                } else {
+                    VStack(alignment: .leading, spacing: 4 * uiScale) {
+                        HStack(spacing: 4 * uiScale) {
+                            Text("Quest Points:")
+                                .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white)
+                            Text("\(questPoints)")
+                                .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                                .foregroundColor(ClassicPalette.accent)
+                        }
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 3 * uiScale) {
+                                if questList.isEmpty {
+                                    Text("No quests started.")
+                                        .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
+                                        .foregroundColor(ClassicPalette.mutedText)
+                                } else {
+                                    ForEach(questList.keys.sorted(), id: \.self) { qId in
+                                        let state = questList[qId] ?? 0
+                                        HStack(spacing: 4 * uiScale) {
+                                            Circle()
+                                                .fill(state > 0 ? Color.green : Color.white.opacity(0.4))
+                                                .frame(width: 6 * uiScale, height: 6 * uiScale)
+                                            Text("Quest \(qId)")
+                                                .font(.system(size: 10 * uiScale, weight: .medium, design: .monospaced))
+                                                .foregroundColor(state > 0 ? .white : ClassicPalette.mutedText)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 200 * uiScale)
+                    }
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    private func subTabButton(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 11 * uiScale, weight: .bold, design: .monospaced))
+                .foregroundColor(selected ? ClassicPalette.text : ClassicPalette.mutedText)
+                .padding(.horizontal, 10 * uiScale)
+                .padding(.vertical, 5 * uiScale)
+                .background(
+                    RoundedRectangle(cornerRadius: 4 * uiScale)
+                        .fill(selected ? Color.white.opacity(0.55) : Color.white.opacity(0.22))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func skillRow(_ skill: Skill, uiScale: CGFloat) -> some View {
+        let drained = skill.currentLevel < skill.maxLevel
+        HStack(spacing: 2 * uiScale) {
+            Text("\(skill.name):")
+                .font(.system(size: 9 * uiScale, weight: .medium, design: .monospaced))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text("\(skill.currentLevel)")
+                .font(.system(size: 9 * uiScale, weight: .bold, design: .monospaced))
+                .foregroundColor(drained ? .red : .yellow)
+            Text("/\(skill.maxLevel)")
+                .font(.system(size: 9 * uiScale, weight: .medium, design: .monospaced))
+                .foregroundColor(.yellow)
+        }
+    }
+}
+
+// MARK: - Magic / Prayer Panel
+
+private enum MagicSubTab { case magic, prayers }
+
+private struct ClassicSpell {
+    let name: String
+    let level: Int
+    let runes: String
+}
+
+private struct ClassicPrayer {
+    let name: String
+    let level: Int
+}
+
+struct MagicPanel: View {
+    let magicLevel: Int
+    let prayerLevel: Int
+    let uiScale: CGFloat
+    let onClose: () -> Void
+
+    @State private var subTab: MagicSubTab = .magic
+
+    private static let spells: [ClassicSpell] = [
+        ClassicSpell(name: "Wind Strike", level: 1, runes: "1 Air, 1 Mind"),
+        ClassicSpell(name: "Water Strike", level: 5, runes: "1 Air, 1 Mind, 1 Water"),
+        ClassicSpell(name: "Earth Strike", level: 9, runes: "2 Air, 1 Mind, 1 Earth"),
+        ClassicSpell(name: "Fire Strike", level: 13, runes: "3 Air, 1 Mind, 1 Fire"),
+        ClassicSpell(name: "Wind Bolt", level: 17, runes: "2 Air, 1 Chaos"),
+        ClassicSpell(name: "Water Bolt", level: 23, runes: "2 Air, 1 Chaos, 2 Water"),
+        ClassicSpell(name: "Earth Bolt", level: 29, runes: "3 Air, 1 Chaos, 2 Earth"),
+        ClassicSpell(name: "Fire Bolt", level: 35, runes: "4 Air, 1 Chaos, 3 Fire"),
+        ClassicSpell(name: "Wind Blast", level: 41, runes: "3 Air, 1 Death"),
+        ClassicSpell(name: "Water Blast", level: 47, runes: "3 Air, 1 Death, 3 Water"),
+        ClassicSpell(name: "Earth Blast", level: 53, runes: "4 Air, 1 Death, 3 Earth"),
+        ClassicSpell(name: "Fire Blast", level: 59, runes: "5 Air, 1 Death, 4 Fire"),
+        ClassicSpell(name: "Teleport to Lumbridge", level: 31, runes: "1 Law, 3 Air, 1 Earth"),
+        ClassicSpell(name: "Teleport to Falador", level: 37, runes: "1 Law, 3 Air, 1 Water"),
+        ClassicSpell(name: "Teleport to Varrock", level: 25, runes: "1 Law, 3 Air, 1 Fire"),
+    ]
+
+    private static let prayers: [ClassicPrayer] = [
+        ClassicPrayer(name: "Thick Skin", level: 1),
+        ClassicPrayer(name: "Burst of Strength", level: 4),
+        ClassicPrayer(name: "Clarity of Thought", level: 7),
+        ClassicPrayer(name: "Rock Skin", level: 10),
+        ClassicPrayer(name: "Superhuman Strength", level: 13),
+        ClassicPrayer(name: "Improved Reflexes", level: 16),
+        ClassicPrayer(name: "Rapid Restore", level: 19),
+        ClassicPrayer(name: "Rapid Heal", level: 22),
+        ClassicPrayer(name: "Protect Item", level: 25),
+        ClassicPrayer(name: "Steel Skin", level: 28),
+        ClassicPrayer(name: "Ultimate Strength", level: 31),
+        ClassicPrayer(name: "Incredible Reflexes", level: 34),
+        ClassicPrayer(name: "Paralyze Monster", level: 37),
+        ClassicPrayer(name: "Protect from Magic", level: 40),
+    ]
+
+    var body: some View {
+        ClassicPanelContainer(
+            title: "Magic & Prayers",
+            guiPart: .spellTab,
+            uiScale: uiScale,
+            onClose: onClose,
+            content: VStack(alignment: .leading, spacing: 8 * uiScale) {
+                // Sub-tab selector
+                HStack(spacing: 0) {
+                    subTabButton("Magic", selected: subTab == .magic) { subTab = .magic }
+                    subTabButton("Prayers", selected: subTab == .prayers) { subTab = .prayers }
+                    Spacer(minLength: 0)
+                }
+
+                if subTab == .magic {
+                    Text("Magic level: \(magicLevel)")
+                        .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                        .foregroundColor(ClassicPalette.accent)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 4 * uiScale) {
+                            ForEach(Self.spells.sorted(by: { $0.level < $1.level }), id: \.name) { spell in
+                                let canCast = magicLevel >= spell.level
+                                HStack(alignment: .top, spacing: 4 * uiScale) {
+                                    Text("Lv.\(spell.level)")
+                                        .font(.system(size: 9 * uiScale, weight: .bold, design: .monospaced))
+                                        .foregroundColor(canCast ? ClassicPalette.accent : ClassicPalette.mutedText)
+                                        .frame(width: 30 * uiScale, alignment: .leading)
+                                    VStack(alignment: .leading, spacing: 1 * uiScale) {
+                                        Text(spell.name)
+                                            .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                                            .foregroundColor(canCast ? .white : ClassicPalette.mutedText)
+                                        Text(spell.runes)
+                                            .font(.system(size: 8 * uiScale, weight: .medium, design: .monospaced))
+                                            .foregroundColor(ClassicPalette.mutedText)
+                                    }
+                                }
+                                .padding(.vertical, 2 * uiScale)
+                                .padding(.horizontal, 4 * uiScale)
+                                .background(
+                                    canCast
+                                        ? RoundedRectangle(cornerRadius: 3 * uiScale).fill(Color.white.opacity(0.06))
+                                        : nil
+                                )
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 260 * uiScale)
+                } else {
+                    Text("Prayer level: \(prayerLevel)")
+                        .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                        .foregroundColor(ClassicPalette.accent)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 4 * uiScale) {
+                            ForEach(Self.prayers, id: \.name) { prayer in
+                                let canUse = prayerLevel >= prayer.level
+                                HStack(spacing: 4 * uiScale) {
+                                    Text("Lv.\(prayer.level)")
+                                        .font(.system(size: 9 * uiScale, weight: .bold, design: .monospaced))
+                                        .foregroundColor(canUse ? ClassicPalette.accent : ClassicPalette.mutedText)
+                                        .frame(width: 30 * uiScale, alignment: .leading)
+                                    Text(prayer.name)
+                                        .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                                        .foregroundColor(canUse ? .white : ClassicPalette.mutedText)
+                                }
+                                .padding(.vertical, 2 * uiScale)
+                                .padding(.horizontal, 4 * uiScale)
+                                .background(
+                                    canUse
+                                        ? RoundedRectangle(cornerRadius: 3 * uiScale).fill(Color.white.opacity(0.06))
+                                        : nil
+                                )
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 260 * uiScale)
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func subTabButton(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 11 * uiScale, weight: .bold, design: .monospaced))
+                .foregroundColor(selected ? ClassicPalette.text : ClassicPalette.mutedText)
+                .padding(.horizontal, 10 * uiScale)
+                .padding(.vertical, 5 * uiScale)
+                .background(
+                    RoundedRectangle(cornerRadius: 4 * uiScale)
+                        .fill(selected ? Color.white.opacity(0.55) : Color.white.opacity(0.22))
+                )
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -455,6 +455,3 @@ mod tests {
         assert!(!handler.is_sleeping());
     }
 }
-dler.is_sleeping());
-    }
-}

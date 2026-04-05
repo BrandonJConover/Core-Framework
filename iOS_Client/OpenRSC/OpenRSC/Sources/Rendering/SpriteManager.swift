@@ -60,6 +60,11 @@ final class SpriteManager {
         return image(for: sprite, cacheKey: "gui_\(part.rawValue)")
     }
 
+    /// Public helper to render any sprite as a UIImage.
+    func imageForSprite(_ sprite: Sprite) -> UIImage? {
+        return image(for: sprite, cacheKey: "sprite_\(sprite.id)")
+    }
+
     /// Loads default/placeholder sprites.
     private func loadDefaultSprites() {
         // Create placeholder sprites for common entities
@@ -217,6 +222,7 @@ final class SpriteManager {
         case settingsTab
         case skillsTab
         case bagTab
+        case spellTab
         case compass
         case checkMark
         case xMark
@@ -235,6 +241,8 @@ final class SpriteManager {
                 return SpriteManager.spriteMedia + 3
             case .bagTab:
                 return SpriteManager.spriteMedia + 1
+            case .spellTab:
+                return SpriteManager.spriteMedia + 4
             case .compass:
                 return SpriteManager.spriteMedia + 24
             case .checkMark:

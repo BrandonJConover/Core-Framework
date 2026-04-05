@@ -557,6 +557,3 @@ mod tests {
         assert_eq!(packet.opcode, OpcodeOut::CloseInterface as u8);
     }
 }
-;
-    }
-}
