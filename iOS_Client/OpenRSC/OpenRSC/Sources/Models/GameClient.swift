@@ -178,6 +178,13 @@ final class GameClient: ObservableObject {
     // Frame buffer for rendering
     var frameBuffer: [UInt32]
 
+    // 3D rendering pipeline
+    private(set) var graphicsController: GraphicsController?
+    private(set) var scene: RSScene?
+    private(set) var world: World?
+    private var rendererInitialized = false
+    private var lastSpriteCount = 0
+
     init(networkClient: NetworkClient) {
         self.networkClient = networkClient
         self.cameraZoom = Self.fallbackDefaultZoom
@@ -190,6 +197,7 @@ final class GameClient: ObservableObject {
         }
 
         loadSpriteArchives()
+        initRenderer()
     }
 
     /// Loads .orsc sprite archives from the app bundle.
@@ -199,6 +207,31 @@ final class GameClient: ObservableObject {
         } else {
             print("GameClient: Authentic_Sprites.orsc not found in bundle")
         }
+    }
+
+    /// Initializes the 3D rendering pipeline (Scene, World, GraphicsController).
+    func initRenderer() {
+        guard !rendererInitialized else { return }
+        let gc = GraphicsController(width: Self.gameWidth, height: Self.gameHeight, spriteCount: 5000)
+        let sc = RSScene(graphics: gc, modelCount: 25000, polyCount: 50000, spriteCount: 5000)
+        let w = World(scene: sc, graphics: gc)
+
+        // Load 3D models
+        ModelArchiveLoader.shared.loadModels()
+
+        // Set lighting direction
+        sc.setDiffuseDir(x: -50, y: -10, z: -50)
+
+        graphicsController = gc
+        scene = sc
+        world = w
+        rendererInitialized = true
+    }
+
+    /// Triggers world terrain loading for the given region coordinates and plane.
+    /// Call this when the client receives a region/area change packet.
+    func loadWorldSections(worldX: Int, worldZ: Int, plane: Int) {
+        world?.loadSections(worldX: worldX, worldZ: worldZ, plane: plane)
     }
 
     private func setupPacketHandling() async {
@@ -831,14 +864,16 @@ final class GameClient: ObservableObject {
     }
 
     private func screenToWorld(screenX: Int, screenY: Int) -> (x: Int, y: Int) {
+        // Simplified screen-to-world mapping for the 3D pipeline.
+        // Uses the camera rotation angle and a fixed tile scale approximation
+        // to project screen coordinates back to world tile coordinates.
         let centerX = Self.gameWidth / 2
-        let centerY = horizonLineY()
-        let tileWidth = Double(fallbackTileWidth())
-        let tileHeight = Double(fallbackTileHeight())
-        let rotation = cameraAngleRadians()
+        let centerY = Self.gameHeight / 2
+        let tileScale = Double(max(1, 256 - cameraZoom + 80))
+        let rotation = Double(cameraRotation) / 256.0 * (.pi * 2.0)
 
-        let rotatedX = Double(screenX - centerX) / tileWidth
-        let rotatedY = Double(screenY - centerY) / tileHeight
+        let rotatedX = Double(screenX - centerX) / tileScale
+        let rotatedY = Double(screenY - centerY) / tileScale
 
         let worldOffsetX = rotatedX * cos(rotation) + rotatedY * sin(rotation)
         let worldOffsetY = -rotatedX * sin(rotation) + rotatedY * cos(rotation)
@@ -1388,1120 +1423,92 @@ struct ChatMessage: Identifiable {
     let timestamp = Date()
 }
 
-// MARK: - Rendering Extension
+// MARK: - 3D Rendering Extension
 
 extension GameClient {
-    private enum TerrainKind {
-        case water
-        case beach
-        case grass
-        case path
-        case heath
-        case stone
-    }
 
-    private struct TerrainTile {
-        let worldX: Int
-        let worldY: Int
-        let screenX: Int
-        let screenY: Int
-        let kind: TerrainKind
-        let seed: Int
-        let baseColorOverride: UInt32?
-        let detailColorOverride: UInt32?
-        let elevation: Int
-        let groundTexture: Int
-        let groundOverlay: Int
-        let horizontalWall: Int
-        let verticalWall: Int
-        let diagonalWalls: Int
-    }
-
-    private struct AuthenticTerrainVisual {
-        let baseColor: UInt32
-        let detailColor: UInt32
-        let elevation: Int
-        let groundTexture: Int
-        let groundOverlay: Int
-        let horizontalWall: Int
-        let verticalWall: Int
-        let diagonalWalls: Int
-    }
-
-    private struct SceneCommand {
-        let sortY: Int
-        let sortX: Int
-        let draw: () -> Void
-    }
-
+    /// Renders a single frame using the 3D RSScene pipeline.
+    /// Called each frame by the Metal draw loop (GameRendererView.Coordinator).
     func renderFrame() {
-        frameBuffer = Array(repeating: 0xFF000000, count: Self.gameWidth * Self.gameHeight)
-        drawSkyGradient()
-        drawTerrain()
-        drawEntities()
-        drawSceneVignette()
-    }
-
-    // MARK: - Sky
-
-    private func drawSkyGradient() {
-        let horizon = horizonLineY()
-        for y in 0..<horizon {
-            let t = Double(y) / Double(max(1, horizon))
-            let top = Self.rgbStatic(r: 56, g: 93, b: 152)
-            let bottom = Self.rgbStatic(r: 165, g: 198, b: 224)
-            let rowColor = blend(top, with: bottom, alpha: Int(t * 255))
-            drawHLineInBuffer(x: 0, y: y, width: Self.gameWidth, color: rowColor)
-        }
-
-        let sunX = Self.gameWidth - 92
-        let sunY = 46
-        fillEllipseInBuffer(centerX: sunX, centerY: sunY, radiusX: 22, radiusY: 22, color: 0xFFFFE6A6, alpha: 210)
-        fillEllipseInBuffer(centerX: sunX, centerY: sunY, radiusX: 34, radiusY: 34, color: 0xFFFFE0A0, alpha: 48)
-
-        drawCloud(centerX: 104, centerY: 40, scale: 20)
-        drawCloud(centerX: 214, centerY: 58, scale: 14)
-        drawCloud(centerX: 366, centerY: 36, scale: 18)
-        drawDistantHills()
-    }
-
-    private func drawCloud(centerX: Int, centerY: Int, scale: Int) {
-        let cloudColor: UInt32 = 0xFFF7FBFF
-        fillEllipseInBuffer(centerX: centerX - scale, centerY: centerY + 2, radiusX: scale, radiusY: scale / 2, color: cloudColor, alpha: 115)
-        fillEllipseInBuffer(centerX: centerX, centerY: centerY - 2, radiusX: scale + 6, radiusY: scale / 2 + 2, color: cloudColor, alpha: 135)
-        fillEllipseInBuffer(centerX: centerX + scale, centerY: centerY + 2, radiusX: scale - 2, radiusY: scale / 2, color: cloudColor, alpha: 110)
-    }
-
-    private func drawDistantHills() {
-        let horizon = horizonLineY()
-        for x in stride(from: -32, to: Self.gameWidth + 32, by: 32) {
-            let wave = Int(10 * sin(Double(x) * 0.04))
-            let height = 26 + Int(14 * sin(Double(x) * 0.015 + 1.2))
-            fillTriangleFanPeak(
-                baseX: x,
-                baseY: horizon - 8,
-                width: 56,
-                height: height + wave,
-                colorTop: 0xFF5A7D67,
-                colorBottom: 0xFF314E40
-            )
-        }
-    }
-
-    // MARK: - Terrain
-
-    private func drawTerrain() {
-        let tileWidth = fallbackTileWidth()
-        let tileHeight = fallbackTileHeight()
-        let radiusX = Self.gameWidth / max(1, tileWidth) / 2 + 10
-        let radiusY = Self.gameHeight / max(1, tileHeight) / 2 + 10
-
-        var tiles: [TerrainTile] = []
-        tiles.reserveCapacity((radiusX * 2 + 1) * (radiusY * 2 + 1))
-
-        for worldY in (cameraY - radiusY)...(cameraY + radiusY) {
-            for worldX in (cameraX - radiusX)...(cameraX + radiusX) {
-                let (screenX, screenY) = worldToScreen(x: worldX, y: worldY)
-                guard screenX >= -tileWidth, screenX <= Self.gameWidth + tileWidth,
-                      screenY >= horizonLineY() - tileHeight * 2, screenY <= Self.gameHeight + tileHeight else {
-                    continue
-                }
-
-                let seed = terrainSeed(worldX: worldX, worldY: worldY)
-                let authentic = authenticTerrainVisual(worldX: worldX, worldY: worldY)
-                tiles.append(
-                    TerrainTile(
-                        worldX: worldX,
-                        worldY: worldY,
-                        screenX: screenX,
-                        screenY: screenY,
-                        kind: terrainKind(worldX: worldX, worldY: worldY, seed: seed),
-                        seed: seed,
-                        baseColorOverride: authentic?.baseColor,
-                        detailColorOverride: authentic?.detailColor,
-                        elevation: authentic?.elevation ?? 0,
-                        groundTexture: authentic?.groundTexture ?? 0,
-                        groundOverlay: authentic?.groundOverlay ?? 0,
-                        horizontalWall: authentic?.horizontalWall ?? 0,
-                        verticalWall: authentic?.verticalWall ?? 0,
-                        diagonalWalls: authentic?.diagonalWalls ?? 0
-                    )
-                )
-            }
-        }
-
-        tiles.sort {
-            if $0.screenY == $1.screenY {
-                return $0.screenX < $1.screenX
-            }
-            return $0.screenY < $1.screenY
-        }
-
-        for tile in tiles {
-            drawTerrainTile(tile, tileWidth: tileWidth, tileHeight: tileHeight)
-        }
-    }
-
-    private func drawTerrainTile(_ tile: TerrainTile, tileWidth: Int, tileHeight: Int) {
-        let halfWidth = tileWidth / 2
-        let halfHeight = tileHeight / 2
-        let baseColor = tile.baseColorOverride ?? terrainBaseColor(kind: tile.kind, seed: tile.seed)
-        let elevationBias = max(-10, min(14, tile.elevation / 9))
-
-        for row in -halfHeight...halfHeight {
-            let span = max(0, halfWidth - abs(row) * max(1, halfWidth) / max(1, halfHeight))
-            let shadeBias = (row < 0 ? 28 - abs(row) * 2 : -12 - row) + elevationBias
-            let shaded = shadeBias >= 0
-                ? lighten(baseColor, by: min(72, shadeBias))
-                : darken(baseColor, by: min(68, -shadeBias))
-            drawHLineInBuffer(
-                x: tile.screenX - span,
-                y: tile.screenY + row,
-                width: span * 2 + 1,
-                color: shaded
-            )
-        }
-
-        let borderLight = lighten(baseColor, by: 50)
-        let borderDark = darken(baseColor, by: 74)
-        for row in 0...halfHeight {
-            let offset = row * max(1, halfWidth) / max(1, halfHeight)
-            setPixelInBuffer(x: tile.screenX - offset, y: tile.screenY - row, color: borderLight)
-            setPixelInBuffer(x: tile.screenX + offset, y: tile.screenY - row, color: borderLight)
-            setPixelInBuffer(x: tile.screenX - offset, y: tile.screenY + row, color: borderDark)
-            setPixelInBuffer(x: tile.screenX + offset, y: tile.screenY + row, color: borderDark)
-        }
-
-        drawTerrainDetail(tile, tileWidth: tileWidth, tileHeight: tileHeight, baseColor: baseColor)
-    }
-
-    private func drawTerrainDetail(_ tile: TerrainTile, tileWidth: Int, tileHeight: Int, baseColor: UInt32) {
-        if let detailColor = tile.detailColorOverride {
-            drawAuthenticTerrainDetail(
-                tile,
-                tileWidth: tileWidth,
-                tileHeight: tileHeight,
-                baseColor: baseColor,
-                detailColor: detailColor
-            )
+        guard let gc = graphicsController, let sc = scene, let w = world else {
+            // Fallback: clear to black if renderer not ready
+            frameBuffer = Array(repeating: 0xFF000000, count: Self.gameWidth * Self.gameHeight)
             return
         }
 
-        let sparkleColor = lighten(baseColor, by: 36)
-        let darker = darken(baseColor, by: 38)
-        switch tile.kind {
-        case .water:
-            let rippleY = tile.screenY - tileHeight / 6
-            drawHLineInBuffer(x: tile.screenX - tileWidth / 4, y: rippleY, width: tileWidth / 2, color: sparkleColor)
-            drawHLineInBuffer(x: tile.screenX - tileWidth / 6, y: rippleY + 3, width: tileWidth / 3, color: blend(baseColor, with: 0xFFFFFFFF, alpha: 24))
-        case .beach:
-            fillEllipseInBuffer(centerX: tile.screenX - 4, centerY: tile.screenY, radiusX: 2, radiusY: 1, color: darker, alpha: 180)
-            fillEllipseInBuffer(centerX: tile.screenX + 5, centerY: tile.screenY - 2, radiusX: 2, radiusY: 1, color: darker, alpha: 150)
-        case .grass:
-            drawVLineInBuffer(x: tile.screenX - 4, y: tile.screenY - 2, height: 4, color: sparkleColor)
-            drawVLineInBuffer(x: tile.screenX + 4, y: tile.screenY - 1, height: 3, color: darker)
-        case .path:
-            drawHLineInBuffer(x: tile.screenX - tileWidth / 5, y: tile.screenY, width: tileWidth / 3, color: darker)
-            drawHLineInBuffer(x: tile.screenX - tileWidth / 6, y: tile.screenY - 2, width: tileWidth / 4, color: sparkleColor)
-        case .heath:
-            fillEllipseInBuffer(centerX: tile.screenX - 3, centerY: tile.screenY - 2, radiusX: 2, radiusY: 2, color: darker, alpha: 180)
-            fillEllipseInBuffer(centerX: tile.screenX + 5, centerY: tile.screenY + 1, radiusX: 2, radiusY: 1, color: sparkleColor, alpha: 140)
-        case .stone:
-            drawHLineInBuffer(x: tile.screenX - tileWidth / 6, y: tile.screenY - 1, width: tileWidth / 4, color: darker)
-            drawVLineInBuffer(x: tile.screenX + 3, y: tile.screenY - 3, height: 5, color: sparkleColor)
-        }
-    }
+        // 1. Clear previous sprites
+        sc.reduceSprites(lastSpriteCount)
+        lastSpriteCount = 0
 
-    private func drawAuthenticTerrainDetail(
-        _ tile: TerrainTile,
-        tileWidth: Int,
-        tileHeight: Int,
-        baseColor: UInt32,
-        detailColor: UInt32
-    ) {
-        let highlight = lighten(detailColor, by: 26)
-        let darker = darken(baseColor, by: 30)
-        let textureBand = posMod(tile.groundTexture, 4)
-
-        switch tile.groundOverlay {
-        case 250:
-            let rippleY = tile.screenY - tileHeight / 6
-            drawHLineInBuffer(
-                x: tile.screenX - tileWidth / 4,
-                y: rippleY,
-                width: tileWidth / 2,
-                color: highlight
-            )
-            drawHLineInBuffer(
-                x: tile.screenX - tileWidth / 6,
-                y: rippleY + 3,
-                width: tileWidth / 3,
-                color: blend(baseColor, with: 0xFFFFFFFF, alpha: 28)
-            )
-        default:
-            let bandY = tile.screenY - tileHeight / 5 + textureBand
-            drawHLineInBuffer(
-                x: tile.screenX - tileWidth / 5,
-                y: bandY,
-                width: tileWidth / 3,
-                color: highlight
-            )
-            fillEllipseInBuffer(
-                centerX: tile.screenX - 3,
-                centerY: tile.screenY - 2,
-                radiusX: 2,
-                radiusY: 1,
-                color: darker,
-                alpha: 140
-            )
-            fillEllipseInBuffer(
-                centerX: tile.screenX + 4,
-                centerY: tile.screenY + 1,
-                radiusX: 2,
-                radiusY: 1,
-                color: detailColor,
-                alpha: 120
-            )
-        }
-
-        if tile.horizontalWall > 0 {
-            for row in 0...(tileHeight / 2) {
-                let offset = row * max(1, tileWidth / 2) / max(1, tileHeight / 2)
-                setPixelInBuffer(
-                    x: tile.screenX - offset,
-                    y: tile.screenY - row,
-                    color: lighten(detailColor, by: 42)
-                )
-                setPixelInBuffer(
-                    x: tile.screenX + offset,
-                    y: tile.screenY - row,
-                    color: darken(detailColor, by: 28)
-                )
-            }
-        }
-
-        if tile.verticalWall > 0 {
-            for row in 0...(tileHeight / 2) {
-                let offset = row * max(1, tileWidth / 2) / max(1, tileHeight / 2)
-                setPixelInBuffer(
-                    x: tile.screenX + offset,
-                    y: tile.screenY + row,
-                    color: darken(detailColor, by: 20)
-                )
-            }
-        }
-
-        if tile.diagonalWalls > 0 {
-            for offset in -(tileWidth / 4)...(tileWidth / 4) {
-                let diagY = tile.screenY - tileHeight / 4 + abs(offset) / 2
-                setPixelInBuffer(x: tile.screenX + offset, y: diagY, color: darker)
-            }
-        }
-    }
-
-    private func terrainSeed(worldX: Int, worldY: Int) -> Int {
-        let macro = posMod((worldX / 4) * 53 + (worldY / 4) * 79, 256)
-        let micro = posMod(worldX * 17 + worldY * 31, 128)
-        return posMod(macro * 5 + micro, 1024)
-    }
-
-    private func terrainKind(worldX: Int, worldY: Int, seed: Int) -> TerrainKind {
-        let coastal = posMod((worldX / 7) * 19 + (worldY / 7) * 23, 100)
-        if coastal < 11 { return .water }
-        if coastal < 16 { return .beach }
-        if seed < 460 { return .grass }
-        if seed < 590 { return .path }
-        if seed < 815 { return .heath }
-        return .stone
-    }
-
-    private func terrainBaseColor(kind: TerrainKind, seed: Int) -> UInt32 {
-        let variation = seed % 32
-        switch kind {
-        case .water:
-            return Self.rgbStatic(r: 48 + variation / 2, g: 94 + variation / 3, b: 160 + variation)
-        case .beach:
-            return Self.rgbStatic(r: 176 + variation / 2, g: 158 + variation / 4, b: 102 + variation / 5)
-        case .grass:
-            return Self.rgbStatic(r: 70 + variation / 3, g: 130 + variation, b: 58 + variation / 4)
-        case .path:
-            return Self.rgbStatic(r: 116 + variation / 3, g: 92 + variation / 5, b: 64 + variation / 6)
-        case .heath:
-            return Self.rgbStatic(r: 96 + variation / 4, g: 112 + variation / 4, b: 66 + variation / 5)
-        case .stone:
-            return Self.rgbStatic(r: 110 + variation / 4, g: 116 + variation / 4, b: 122 + variation / 5)
-        }
-    }
-
-    private func authenticTerrainVisual(worldX: Int, worldY: Int) -> AuthenticTerrainVisual? {
-        guard let tile = landscapeArchive.tile(
-            atWorldX: worldX,
-            worldY: worldY,
-            plane: worldPlane,
-            centeredAt: cameraX,
-            centerY: cameraY
-        ) else {
-            return nil
-        }
-
-        let textureColor = terrainTextureColor(tile.groundTexture)
-        let overlayColor = terrainOverlayColor(tile.groundOverlay) ?? textureColor
-        let baseColor: UInt32
-        let detailColor: UInt32
-
-        if tile.groundOverlay == 250 {
-            baseColor = blend(textureColor, with: Self.rgbStatic(r: 48, g: 96, b: 168), alpha: 180)
-            detailColor = lighten(baseColor, by: 24)
-        } else {
-            baseColor = overlayColor
-            detailColor = terrainOverlayAccent(
-                overlay: tile.groundOverlay,
-                fallback: lighten(overlayColor, by: 22)
-            )
-        }
-
-        return AuthenticTerrainVisual(
-            baseColor: baseColor,
-            detailColor: detailColor,
-            elevation: tile.groundElevation * 3,
-            groundTexture: tile.groundTexture,
-            groundOverlay: tile.groundOverlay,
-            horizontalWall: tile.horizontalWall,
-            verticalWall: tile.verticalWall,
-            diagonalWalls: tile.diagonalWalls
-        )
-    }
-
-    private func terrainTextureColor(_ textureId: Int) -> UInt32 {
-        let texture = posMod(textureId, 256)
-        switch texture {
-        case 0..<64:
-            return Self.rgbStatic(
-                r: 255 - texture * 4,
-                g: 255 - Int(Double(texture) * 1.75),
-                b: 255 - texture * 4
-            )
-        case 64..<128:
-            let value = texture - 64
-            return Self.rgbStatic(r: value * 3, g: 144, b: 0)
-        case 128..<192:
-            let value = texture - 128
-            return Self.rgbStatic(
-                r: 192 - Int(Double(value) * 1.5),
-                g: 144 - Int(Double(value) * 1.5),
-                b: 0
-            )
-        default:
-            let value = texture - 192
-            return Self.rgbStatic(
-                r: 96 - Int(Double(value) * 1.5),
-                g: Int(Double(value) * 1.5) + 48,
-                b: 0
-            )
-        }
-    }
-
-    private func terrainOverlayColor(_ overlayId: Int) -> UInt32? {
-        guard overlayId > 0 else { return nil }
-        guard let definition = TileDefinitions.shared.definition(for: overlayId) else {
-            return overlayId == 250 ? Self.rgbStatic(r: 46, g: 100, b: 174) : nil
-        }
-        return decodeTerrainColor(definition.color)
-    }
-
-    private func terrainOverlayAccent(overlay: Int, fallback: UInt32) -> UInt32 {
-        guard overlay > 0,
-              let definition = TileDefinitions.shared.definition(for: overlay) else {
-            return fallback
-        }
-        switch definition.objectType {
-        case 1:
-            return lighten(fallback, by: 18)
-        case 0:
-            return darken(fallback, by: 8)
-        default:
-            return fallback
-        }
-    }
-
-    private func decodeTerrainColor(_ colorValue: Int) -> UInt32? {
-        if colorValue == 12345678 {
-            return nil
-        }
-
-        if colorValue < 0 {
-            let packed = -colorValue - 1
-            let blue = packed & 31
-            let green = (packed >> 5) & 31
-            let red = (packed >> 10) & 31
-            return Self.rgbStatic(
-                r: red * 255 / 31,
-                g: green * 255 / 31,
-                b: blue * 255 / 31
-            )
-        }
-
-        if colorValue < 256 {
-            return terrainTextureColor(colorValue)
-        }
-
-        return 0xFF000000 | UInt32(colorValue & 0x00FF_FFFF)
-    }
-
-    // MARK: - Entities
-
-    private func drawEntities() {
-        let spriteManager = SpriteManager.shared
-        var commands: [SceneCommand] = []
-
-        for obj in sceneryObjects {
-            let (sx, sy) = worldToScreen(x: obj.x, y: obj.y)
-            commands.append(
-                SceneCommand(sortY: sy, sortX: sx) {
-                    self.drawSceneShadow(centerX: sx, centerY: sy - 2, radiusX: 12, radiusY: 5, intensity: 70)
-                    if let sprite = spriteManager.getObjectSprite(objectId: obj.objectId) {
-                        self.drawSpriteToBuffer(sprite, at: sx - sprite.width / 2, y: sy - sprite.height)
-                    } else {
-                        self.drawObjectShape(x: sx, y: sy, objectId: obj.objectId)
-                    }
-                }
-            )
-        }
-
-        for boundary in boundaries {
-            let (sx, sy) = worldToScreen(x: boundary.x, y: boundary.y)
-            commands.append(
-                SceneCommand(sortY: sy, sortX: sx) {
-                    self.drawSceneShadow(centerX: sx, centerY: sy - 1, radiusX: 11, radiusY: 4, intensity: 55)
-                    self.drawBoundaryShape(x: sx, y: sy, direction: boundary.direction)
-                }
-            )
-        }
-
-        for item in groundItems {
-            let (sx, sy) = worldToScreen(x: item.x, y: item.y)
-            commands.append(
-                SceneCommand(sortY: sy + 1, sortX: sx) {
-                    self.drawSceneShadow(centerX: sx, centerY: sy, radiusX: 7, radiusY: 3, intensity: 46)
-                    if let sprite = spriteManager.getItemSprite(itemId: item.itemId) {
-                        self.drawSpriteToBuffer(sprite, at: sx - sprite.width / 2, y: sy - sprite.height / 2)
-                    } else {
-                        self.drawItemShape(x: sx, y: sy, itemId: item.itemId)
-                    }
-                }
-            )
-        }
-
-        for (_, npc) in npcs {
-            let (sx, sy) = worldToScreen(x: npc.x, y: npc.y)
-            commands.append(
-                SceneCommand(sortY: sy + 8, sortX: sx) {
-                    self.drawSceneShadow(centerX: sx, centerY: sy - 1, radiusX: 10, radiusY: 4, intensity: 72)
-                    if let sprite = spriteManager.getNpcSprite(npcId: npc.npcId, direction: npc.direction, animation: npc.animation) {
-                        self.drawSpriteToBuffer(sprite, at: sx - sprite.width / 2, y: sy - sprite.height)
-                    } else {
-                        self.drawNpcShape(npc, x: sx, y: sy)
-                    }
-                    self.drawEntityOverlays(
-                        x: sx, y: sy,
-                        currentHits: npc.currentHits, maxHits: npc.maxHits,
-                        chatMessage: npc.chatMessage, chatMessageExpiry: npc.chatMessageExpiry,
-                        damageDisplay: npc.damageDisplay, damageExpiry: npc.damageExpiry
-                    )
-                }
-            )
-        }
-
+        // 2. Add player sprites to scene
         for (_, player) in players {
-            let (sx, sy) = worldToScreen(x: player.x, y: player.y)
-            commands.append(
-                SceneCommand(sortY: sy + 10, sortX: sx) {
-                    self.drawSceneShadow(centerX: sx, centerY: sy - 1, radiusX: 10, radiusY: 4, intensity: 76)
-                    if let sprite = spriteManager.getPlayerSprite(
-                        appearance: player.appearance,
-                        direction: player.direction,
-                        isWalking: player.animation != 0,
-                        animationFrame: player.animation
-                    ) {
-                        self.drawSpriteToBuffer(sprite, at: sx - sprite.width / 2, y: sy - sprite.height)
-                    } else {
-                        self.drawPlayerShape(player, x: sx, y: sy, isLocal: false)
-                    }
-                    self.drawEntityOverlays(
-                        x: sx, y: sy,
-                        currentHits: player.currentHits, maxHits: player.maxHits,
-                        chatMessage: player.chatMessage, chatMessageExpiry: player.chatMessageExpiry,
-                        damageDisplay: player.damageDisplay, damageExpiry: player.damageExpiry
-                    )
-                }
+            let tileX = player.x * 128 + 64
+            let tileZ = player.y * 128 + 64
+            let elevation = -w.getElevation(x: tileX, z: tileZ)
+            _ = sc.drawSprite(
+                spriteIndex: 5000 + player.index,
+                x: tileX, pickIndex: player.index, y: elevation,
+                z: tileZ, width: 145, height: 220
             )
+            lastSpriteCount += 1
         }
 
-        if let player = localPlayer {
-            let (sx, sy) = worldToScreen(x: player.x, y: player.y)
-            commands.append(
-                SceneCommand(sortY: sy + 11, sortX: sx) {
-                    self.drawSceneShadow(centerX: sx, centerY: sy - 1, radiusX: 10, radiusY: 4, intensity: 86)
-                    if let sprite = spriteManager.getPlayerSprite(
-                        appearance: player.appearance,
-                        direction: player.direction,
-                        isWalking: player.animation != 0,
-                        animationFrame: player.animation
-                    ) {
-                        self.drawSpriteToBuffer(sprite, at: sx - sprite.width / 2, y: sy - sprite.height)
-                    } else {
-                        self.drawPlayerShape(player, x: sx, y: sy, isLocal: true)
-                    }
-                    self.drawEntityOverlays(
-                        x: sx, y: sy,
-                        currentHits: player.currentHits, maxHits: player.maxHits,
-                        chatMessage: player.chatMessage, chatMessageExpiry: player.chatMessageExpiry,
-                        damageDisplay: player.damageDisplay, damageExpiry: player.damageExpiry
-                    )
-                }
+        // Local player sprite
+        if let lp = localPlayer {
+            let tileX = lp.x * 128 + 64
+            let tileZ = lp.y * 128 + 64
+            let elevation = -w.getElevation(x: tileX, z: tileZ)
+            _ = sc.drawSprite(
+                spriteIndex: 5000 + lp.index,
+                x: tileX, pickIndex: lp.index, y: elevation,
+                z: tileZ, width: 145, height: 220
             )
+            lastSpriteCount += 1
         }
 
-        commands.sort {
-            if $0.sortY == $1.sortY {
-                return $0.sortX < $1.sortX
-            }
-            return $0.sortY < $1.sortY
-        }
-        for command in commands {
-            command.draw()
-        }
-    }
-
-    // MARK: - Entity Overlays (health bars, chat bubbles, damage numbers)
-
-    /// Draws health bar, chat bubble text, and damage number for an entity at screen position (x, y).
-    private func drawEntityOverlays(
-        x: Int, y: Int,
-        currentHits: Int, maxHits: Int,
-        chatMessage: String?, chatMessageExpiry: Date?,
-        damageDisplay: Int?, damageExpiry: Date?
-    ) {
-        // --- Health bar ---
-        if maxHits > 0 {
-            let ratio = Float(max(0, currentHits)) / Float(maxHits)
-            let barW = 28
-            let filled = Int((Float(barW) * ratio).rounded())
-            let barX = x - barW / 2
-            let barY = y - 58
-            // Dark background
-            fillRectInBuffer(x: barX - 1, y: barY - 1, width: barW + 2, height: 5, color: 0xFF111111)
-            // Empty portion (dark red background)
-            fillRectInBuffer(x: barX, y: barY, width: barW, height: 3, color: 0xFF660000)
-            // Filled portion
-            if filled > 0 {
-                let barColor: UInt32 = ratio > 0.5 ? 0xFF00CC00 : (ratio > 0.25 ? 0xFFFFAA00 : 0xFFCC0000)
-                fillRectInBuffer(x: barX, y: barY, width: filled, height: 3, color: barColor)
-            }
+        // 3. Add NPC sprites
+        for (_, npc) in npcs {
+            let tileX = npc.x * 128 + 64
+            let tileZ = npc.y * 128 + 64
+            let elevation = -w.getElevation(x: tileX, z: tileZ)
+            _ = sc.drawSprite(
+                spriteIndex: 20000 + npc.index,
+                x: tileX, pickIndex: 20000 + npc.index, y: elevation,
+                z: tileZ, width: 145, height: 220
+            )
+            lastSpriteCount += 1
         }
 
-        // --- Chat bubble ---
-        let now = Date()
-        if let msg = chatMessage, let expiry = chatMessageExpiry, now < expiry {
-            let maxChars = 20
-            let display = msg.count > maxChars ? String(msg.prefix(maxChars)) + "…" : msg
-            let charW = 4
-            let charH = 6
-            let padding = 2
-            let bubbleW = display.count * (charW + 1) + padding * 2
-            let bubbleH = charH + padding * 2
-            let bubbleX = x - bubbleW / 2
-            let bubbleY = y - 70 - bubbleH
-            // Background
-            fillRectInBuffer(x: bubbleX - 1, y: bubbleY - 1, width: bubbleW + 2, height: bubbleH + 2, color: 0xFF000000)
-            fillRectInBuffer(x: bubbleX, y: bubbleY, width: bubbleW, height: bubbleH, color: 0xFF222222)
-            // Text
-            drawTextInBuffer(display, x: bubbleX + padding, y: bubbleY + padding, color: 0xFFFFFF00, charW: charW, charH: charH)
+        // 4. Add ground item sprites
+        for item in groundItems {
+            let tileX = item.x * 128 + 64
+            let tileZ = item.y * 128 + 64
+            let elevation = -w.getElevation(x: tileX, z: tileZ)
+            _ = sc.drawSprite(
+                spriteIndex: 40000 + item.itemId,
+                x: tileX, pickIndex: 40000 + item.itemId, y: elevation,
+                z: tileZ, width: 96, height: 64
+            )
+            lastSpriteCount += 1
         }
 
-        // --- Damage number ---
-        if let dmg = damageDisplay, let expiry = damageExpiry, now < expiry {
-            let text = "\(dmg)"
-            let charW = 4
-            let charH = 6
-            let textW = text.count * (charW + 1)
-            let dmgX = x + 6 - textW / 2
-            let dmgY = y - 68
-            // Shadow
-            drawTextInBuffer(text, x: dmgX + 1, y: dmgY + 1, color: 0xFF000000, charW: charW, charH: charH)
-            // Text
-            drawTextInBuffer(text, x: dmgX, y: dmgY, color: 0xFFFF4444, charW: charW, charH: charH)
-        }
-    }
+        // 5. Clear screen
+        gc.blackScreen()
 
-    // MARK: - Minimal bitmap text renderer
-
-    /// 4×6 bitmap font — printable ASCII 0x20–0x7E.
-    /// Each character is encoded as 6 rows of 4-bit column masks (LSB = left-most pixel).
-    private static let bitmapFont4x6: [Character: [UInt8]] = {
-        var f: [Character: [UInt8]] = [:]
-        // Space
-        f[" "] = [0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
-        // Digits
-        f["0"] = [0x6, 0x9, 0x9, 0x9, 0x9, 0x6]
-        f["1"] = [0x2, 0x6, 0x2, 0x2, 0x2, 0x7]
-        f["2"] = [0x6, 0x9, 0x1, 0x2, 0x4, 0xF]
-        f["3"] = [0x6, 0x9, 0x2, 0x1, 0x9, 0x6]
-        f["4"] = [0x1, 0x3, 0x5, 0x9, 0xF, 0x1]
-        f["5"] = [0xF, 0x8, 0xE, 0x1, 0x9, 0x6]
-        f["6"] = [0x6, 0x8, 0xE, 0x9, 0x9, 0x6]
-        f["7"] = [0xF, 0x1, 0x2, 0x4, 0x4, 0x4]
-        f["8"] = [0x6, 0x9, 0x6, 0x9, 0x9, 0x6]
-        f["9"] = [0x6, 0x9, 0x9, 0x7, 0x1, 0x6]
-        // Letters (uppercase A-Z)
-        f["A"] = [0x6, 0x9, 0x9, 0xF, 0x9, 0x9]
-        f["B"] = [0xE, 0x9, 0xE, 0x9, 0x9, 0xE]
-        f["C"] = [0x6, 0x9, 0x8, 0x8, 0x9, 0x6]
-        f["D"] = [0xE, 0x9, 0x9, 0x9, 0x9, 0xE]
-        f["E"] = [0xF, 0x8, 0xE, 0x8, 0x8, 0xF]
-        f["F"] = [0xF, 0x8, 0xE, 0x8, 0x8, 0x8]
-        f["G"] = [0x6, 0x9, 0x8, 0xB, 0x9, 0x6]
-        f["H"] = [0x9, 0x9, 0xF, 0x9, 0x9, 0x9]
-        f["I"] = [0xE, 0x4, 0x4, 0x4, 0x4, 0xE]
-        f["J"] = [0x7, 0x1, 0x1, 0x1, 0x9, 0x6]
-        f["K"] = [0x9, 0xA, 0xC, 0xA, 0xA, 0x9]
-        f["L"] = [0x8, 0x8, 0x8, 0x8, 0x8, 0xF]
-        f["M"] = [0x9, 0xF, 0xF, 0x9, 0x9, 0x9]
-        f["N"] = [0x9, 0xD, 0xB, 0x9, 0x9, 0x9]
-        f["O"] = [0x6, 0x9, 0x9, 0x9, 0x9, 0x6]
-        f["P"] = [0xE, 0x9, 0x9, 0xE, 0x8, 0x8]
-        f["Q"] = [0x6, 0x9, 0x9, 0x9, 0xB, 0x7]
-        f["R"] = [0xE, 0x9, 0x9, 0xE, 0xA, 0x9]
-        f["S"] = [0x6, 0x9, 0x4, 0x2, 0x9, 0x6]
-        f["T"] = [0xE, 0x4, 0x4, 0x4, 0x4, 0x4]
-        f["U"] = [0x9, 0x9, 0x9, 0x9, 0x9, 0x6]
-        f["V"] = [0x9, 0x9, 0x9, 0x9, 0x6, 0x6]
-        f["W"] = [0x9, 0x9, 0x9, 0xF, 0xF, 0x9]
-        f["X"] = [0x9, 0x9, 0x6, 0x6, 0x9, 0x9]
-        f["Y"] = [0x9, 0x9, 0x6, 0x4, 0x4, 0x4]
-        f["Z"] = [0xF, 0x1, 0x2, 0x4, 0x8, 0xF]
-        // Lowercase a-z
-        f["a"] = [0x0, 0x0, 0x6, 0x1, 0x7, 0x7]
-        f["b"] = [0x8, 0x8, 0xE, 0x9, 0x9, 0xE]
-        f["c"] = [0x0, 0x0, 0x6, 0x8, 0x8, 0x6]
-        f["d"] = [0x1, 0x1, 0x7, 0x9, 0x9, 0x7]
-        f["e"] = [0x0, 0x0, 0x6, 0xF, 0x8, 0x6]
-        f["f"] = [0x2, 0x4, 0xE, 0x4, 0x4, 0x4]
-        f["g"] = [0x0, 0x7, 0x9, 0x7, 0x1, 0x6]
-        f["h"] = [0x8, 0x8, 0xE, 0x9, 0x9, 0x9]
-        f["i"] = [0x0, 0x4, 0x0, 0x4, 0x4, 0x6]
-        f["j"] = [0x0, 0x2, 0x0, 0x2, 0x2, 0xC]
-        f["k"] = [0x8, 0x9, 0xA, 0xC, 0xA, 0x9]
-        f["l"] = [0x4, 0x4, 0x4, 0x4, 0x4, 0x2]
-        f["m"] = [0x0, 0x0, 0xA, 0xF, 0x9, 0x9]
-        f["n"] = [0x0, 0x0, 0xE, 0x9, 0x9, 0x9]
-        f["o"] = [0x0, 0x0, 0x6, 0x9, 0x9, 0x6]
-        f["p"] = [0x0, 0xE, 0x9, 0xE, 0x8, 0x8]
-        f["q"] = [0x0, 0x7, 0x9, 0x7, 0x1, 0x1]
-        f["r"] = [0x0, 0x0, 0xA, 0xC, 0x8, 0x8]
-        f["s"] = [0x0, 0x0, 0x6, 0x4, 0x2, 0xC]
-        f["t"] = [0x4, 0x4, 0xE, 0x4, 0x4, 0x2]
-        f["u"] = [0x0, 0x0, 0x9, 0x9, 0x9, 0x7]
-        f["v"] = [0x0, 0x0, 0x9, 0x9, 0x6, 0x6]
-        f["w"] = [0x0, 0x0, 0x9, 0x9, 0xF, 0x6]
-        f["x"] = [0x0, 0x0, 0x9, 0x6, 0x6, 0x9]
-        f["y"] = [0x0, 0x9, 0x9, 0x7, 0x1, 0x6]
-        f["z"] = [0x0, 0x0, 0xF, 0x2, 0x4, 0xF]
-        // Punctuation
-        f["."] = [0x0, 0x0, 0x0, 0x0, 0x0, 0x4]
-        f[","] = [0x0, 0x0, 0x0, 0x0, 0x2, 0x4]
-        f["!"] = [0x4, 0x4, 0x4, 0x4, 0x0, 0x4]
-        f["?"] = [0x6, 0x9, 0x2, 0x4, 0x0, 0x4]
-        f[":"] = [0x0, 0x4, 0x0, 0x0, 0x4, 0x0]
-        f["'"] = [0x4, 0x4, 0x0, 0x0, 0x0, 0x0]
-        f["-"] = [0x0, 0x0, 0x0, 0xF, 0x0, 0x0]
-        f["+"] = [0x0, 0x4, 0xE, 0x4, 0x0, 0x0]
-        f["…"] = [0x0, 0x0, 0x0, 0x0, 0xA, 0xA]
-        return f
-    }()
-
-    /// Renders a string into the frameBuffer using the 4×6 bitmap font.
-    private func drawTextInBuffer(_ text: String, x: Int, y: Int, color: UInt32, charW: Int = 4, charH: Int = 6) {
-        var cx = x
-        for ch in text {
-            let glyph = Self.bitmapFont4x6[ch] ?? Self.bitmapFont4x6["?"] ?? []
-            let rows = min(glyph.count, charH)
-            for row in 0..<rows {
-                let bits = glyph[row]
-                for col in 0..<charW {
-                    if (bits >> col) & 1 == 1 {
-                        setPixelInBuffer(x: cx + col, y: y + row, color: color)
-                    }
-                }
-            }
-            cx += charW + 1
-        }
-    }
-
-    private func drawPlayerShape(_ player: Player, x: Int, y: Int, isLocal: Bool) {
-        let skin = appearanceColor(player.appearance?.skinColor, palette: Self.skinPalette, default: 0xFFDCBC92)
-        let hair = appearanceColor(player.appearance?.hairColor, palette: Self.hairPalette, default: 0xFF6A4325)
-        let top = appearanceColor(player.appearance?.topColor, palette: Self.clothingPalette, default: 0xFF8E3D2F)
-        let bottom = appearanceColor(player.appearance?.bottomColor, palette: Self.clothingPalette, default: 0xFF5C482F)
-        let trim = isLocal ? 0xFFEEDC7B : darken(top, by: 72)
-
-        fillRectInBuffer(x: x - 7, y: y - 34, width: 3, height: 14, color: darken(top, by: 30))
-        fillRectInBuffer(x: x + 4, y: y - 34, width: 3, height: 14, color: darken(top, by: 30))
-
-        fillRectInBuffer(x: x - 5, y: y - 18, width: 4, height: 14, color: bottom)
-        fillRectInBuffer(x: x + 1, y: y - 18, width: 4, height: 14, color: bottom)
-        fillRectInBuffer(x: x - 6, y: y - 4, width: 5, height: 3, color: 0xFF2D1E18)
-        fillRectInBuffer(x: x + 1, y: y - 4, width: 5, height: 3, color: 0xFF2D1E18)
-
-        fillRectInBuffer(x: x - 7, y: y - 40, width: 14, height: 16, color: top)
-        fillRectInBuffer(x: x - 5, y: y - 47, width: 10, height: 8, color: skin)
-        fillRectInBuffer(x: x - 6, y: y - 49, width: 12, height: 3, color: hair)
-        fillRectInBuffer(x: x - 6, y: y - 47, width: 1, height: 7, color: hair)
-        fillRectInBuffer(x: x + 5, y: y - 47, width: 1, height: 7, color: hair)
-        fillRectInBuffer(x: x - 7, y: y - 40, width: 14, height: 2, color: trim)
-        fillRectInBuffer(x: x - 4, y: y - 37, width: 8, height: 2, color: lighten(top, by: 34))
-
-        fillRectInBuffer(x: x - 3, y: y - 28, width: 1, height: 1, color: trim)
-        fillRectInBuffer(x: x + 2, y: y - 28, width: 1, height: 1, color: trim)
-        if isLocal {
-            drawDiamondMarker(centerX: x, centerY: y - 54, radius: 5, color: 0xFFFFE082)
-        }
-    }
-
-    private func drawNpcShape(_ npc: Npc, x: Int, y: Int) {
-        let main = npcColor(npc.npcId)
-        let accent = lighten(main, by: 34)
-        let dark = darken(main, by: 66)
-
-        fillRectInBuffer(x: x - 6, y: y - 38, width: 12, height: 18, color: main)
-        fillRectInBuffer(x: x - 4, y: y - 48, width: 8, height: 10, color: accent)
-        fillRectInBuffer(x: x - 3, y: y - 20, width: 3, height: 14, color: dark)
-        fillRectInBuffer(x: x + 1, y: y - 20, width: 3, height: 14, color: dark)
-        fillRectInBuffer(x: x - 9, y: y - 34, width: 3, height: 11, color: main)
-        fillRectInBuffer(x: x + 6, y: y - 34, width: 3, height: 11, color: main)
-        if posMod(npc.npcId, 3) == 0 {
-            fillRectInBuffer(x: x - 5, y: y - 51, width: 2, height: 4, color: dark)
-            fillRectInBuffer(x: x + 3, y: y - 51, width: 2, height: 4, color: dark)
-        }
-    }
-
-    private func drawObjectShape(x: Int, y: Int, objectId: Int) {
-        switch posMod(objectId, 4) {
-        case 0:
-            drawTreeShape(x: x, y: y, objectId: objectId)
-        case 1:
-            drawRockShape(x: x, y: y, objectId: objectId)
-        case 2:
-            drawCrateShape(x: x, y: y)
-        default:
-            drawPillarShape(x: x, y: y)
-        }
-    }
-
-    private func drawTreeShape(x: Int, y: Int, objectId: Int) {
-        let leafBase = blend(0xFF2E7D32, with: 0xFF6A9D3E, alpha: posMod(objectId * 17, 70))
-        let leafHighlight = lighten(leafBase, by: 42)
-        let trunk: UInt32 = 0xFF6B4226
-        fillRectInBuffer(x: x - 3, y: y - 28, width: 6, height: 22, color: trunk)
-        fillEllipseInBuffer(centerX: x, centerY: y - 40, radiusX: 13, radiusY: 12, color: leafBase, alpha: 255)
-        fillEllipseInBuffer(centerX: x - 8, centerY: y - 34, radiusX: 9, radiusY: 8, color: darken(leafBase, by: 14), alpha: 255)
-        fillEllipseInBuffer(centerX: x + 8, centerY: y - 34, radiusX: 9, radiusY: 8, color: darken(leafBase, by: 12), alpha: 255)
-        fillEllipseInBuffer(centerX: x, centerY: y - 47, radiusX: 9, radiusY: 8, color: leafHighlight, alpha: 235)
-    }
-
-    private func drawRockShape(x: Int, y: Int, objectId: Int) {
-        let rock = blend(0xFF7A7B84, with: 0xFF5E646C, alpha: posMod(objectId * 13, 88))
-        fillEllipseInBuffer(centerX: x, centerY: y - 10, radiusX: 14, radiusY: 10, color: rock, alpha: 255)
-        fillEllipseInBuffer(centerX: x - 6, centerY: y - 16, radiusX: 8, radiusY: 7, color: lighten(rock, by: 22), alpha: 255)
-        drawHLineInBuffer(x: x - 7, y: y - 12, width: 10, color: darken(rock, by: 52))
-    }
-
-    private func drawCrateShape(x: Int, y: Int) {
-        let wood: UInt32 = 0xFF8B5A2B
-        fillRectInBuffer(x: x - 10, y: y - 18, width: 20, height: 16, color: wood)
-        drawHLineInBuffer(x: x - 10, y: y - 14, width: 20, color: lighten(wood, by: 28))
-        drawVLineInBuffer(x: x, y: y - 18, height: 16, color: darken(wood, by: 42))
-    }
-
-    private func drawPillarShape(x: Int, y: Int) {
-        let stone: UInt32 = 0xFF9A9285
-        fillRectInBuffer(x: x - 5, y: y - 28, width: 10, height: 24, color: stone)
-        fillRectInBuffer(x: x - 8, y: y - 32, width: 16, height: 5, color: lighten(stone, by: 24))
-        fillRectInBuffer(x: x - 7, y: y - 6, width: 14, height: 4, color: darken(stone, by: 35))
-    }
-
-    private func drawBoundaryShape(x: Int, y: Int, direction: Int) {
-        let wall: UInt32 = 0xFF8A8174
-        if direction == 0 || direction == 2 {
-            fillRectInBuffer(x: x - 16, y: y - 8, width: 32, height: 6, color: wall)
-            fillRectInBuffer(x: x - 16, y: y - 8, width: 32, height: 2, color: lighten(wall, by: 28))
-            fillRectInBuffer(x: x - 16, y: y - 2, width: 4, height: 8, color: darken(wall, by: 42))
-            fillRectInBuffer(x: x + 12, y: y - 2, width: 4, height: 8, color: darken(wall, by: 42))
-        } else {
-            fillRectInBuffer(x: x - 4, y: y - 24, width: 8, height: 24, color: wall)
-            fillRectInBuffer(x: x - 4, y: y - 24, width: 8, height: 3, color: lighten(wall, by: 28))
-            fillRectInBuffer(x: x + 2, y: y - 24, width: 2, height: 24, color: darken(wall, by: 44))
-        }
-    }
-
-    private func drawItemShape(x: Int, y: Int, itemId: Int) {
-        switch posMod(itemId, 4) {
-        case 0:
-            drawDiamondMarker(centerX: x, centerY: y - 3, radius: 5, color: 0xFFF0D35B)
-        case 1:
-            fillEllipseInBuffer(centerX: x, centerY: y - 3, radiusX: 6, radiusY: 4, color: 0xFFCFD7E2, alpha: 255)
-            fillEllipseInBuffer(centerX: x + 1, centerY: y - 4, radiusX: 2, radiusY: 1, color: 0xFFFFFFFF, alpha: 220)
-        case 2:
-            fillRectInBuffer(x: x - 2, y: y - 11, width: 4, height: 10, color: 0xFFC7E65F)
-            fillEllipseInBuffer(centerX: x, centerY: y - 12, radiusX: 4, radiusY: 3, color: 0xFFAC3248, alpha: 255)
-        default:
-            fillRectInBuffer(x: x - 1, y: y - 10, width: 2, height: 10, color: 0xFFCFC8C0)
-            fillRectInBuffer(x: x - 4, y: y - 11, width: 8, height: 2, color: 0xFFB74A4A)
-        }
-    }
-
-    // MARK: - Sprite Drawing
-
-    private func drawSpriteToBuffer(_ sprite: Sprite, at x: Int, y: Int) {
-        let drawX = sprite.useShift ? x + sprite.offsetX : x
-        let drawY = sprite.useShift ? y + sprite.offsetY : y
-
-        for sy in 0..<sprite.height {
-            let destY = drawY + sy
-            guard destY >= 0 && destY < Self.gameHeight else { continue }
-
-            for sx in 0..<sprite.width {
-                let destX = drawX + sx
-                guard destX >= 0 && destX < Self.gameWidth else { continue }
-
-                let pixel = sprite.pixels[sy * sprite.width + sx]
-                let alpha = (pixel >> 24) & 0xFF
-                if alpha == 0 { continue }
-
-                let destIndex = destY * Self.gameWidth + destX
-                if alpha == 255 {
-                    frameBuffer[destIndex] = pixel
-                } else {
-                    let a = Int(alpha)
-                    let srcR = Int((pixel >> 16) & 0xFF)
-                    let srcG = Int((pixel >> 8) & 0xFF)
-                    let srcB = Int(pixel & 0xFF)
-                    let dst = frameBuffer[destIndex]
-                    let dstR = Int((dst >> 16) & 0xFF)
-                    let dstG = Int((dst >> 8) & 0xFF)
-                    let dstB = Int(dst & 0xFF)
-                    let outR = UInt32((srcR * a + dstR * (255 - a)) / 255)
-                    let outG = UInt32((srcG * a + dstG * (255 - a)) / 255)
-                    let outB = UInt32((srcB * a + dstB * (255 - a)) / 255)
-                    frameBuffer[destIndex] = 0xFF000000 | (outR << 16) | (outG << 8) | outB
-                }
-            }
-        }
-    }
-
-    // MARK: - Primitive Drawing
-
-    private func fillRectInBuffer(x: Int, y: Int, width: Int, height: Int, color: UInt32) {
-        guard width > 0, height > 0 else { return }
-        let startY = max(0, y)
-        let endY = min(y + height, Self.gameHeight)
-        let startX = max(0, x)
-        let endX = min(x + width, Self.gameWidth)
-        guard startX < endX, startY < endY else { return }
-
-        for py in startY..<endY {
-            let rowStart = py * Self.gameWidth
-            for px in startX..<endX {
-                frameBuffer[rowStart + px] = color
-            }
-        }
-    }
-
-    private func drawHLineInBuffer(x: Int, y: Int, width: Int, color: UInt32) {
-        guard y >= 0 && y < Self.gameHeight, width > 0 else { return }
-        let startX = max(0, x)
-        let endX = min(x + width, Self.gameWidth)
-        guard startX < endX else { return }
-        let rowStart = y * Self.gameWidth
-        for px in startX..<endX {
-            frameBuffer[rowStart + px] = color
-        }
-    }
-
-    private func drawVLineInBuffer(x: Int, y: Int, height: Int, color: UInt32) {
-        guard x >= 0 && x < Self.gameWidth, height > 0 else { return }
-        let startY = max(0, y)
-        let endY = min(y + height, Self.gameHeight)
-        guard startY < endY else { return }
-        for py in startY..<endY {
-            frameBuffer[py * Self.gameWidth + x] = color
-        }
-    }
-
-    private func fillEllipseInBuffer(centerX: Int, centerY: Int, radiusX: Int, radiusY: Int, color: UInt32, alpha: Int) {
-        guard radiusX > 0, radiusY > 0, alpha > 0 else { return }
-        let clampedAlpha = max(0, min(255, alpha))
-        for y in -radiusY...radiusY {
-            let normalizedY = Double(y * y) / Double(radiusY * radiusY)
-            guard normalizedY <= 1 else { continue }
-            let span = Int(Double(radiusX) * sqrt(1 - normalizedY))
-            for x in -span...span {
-                blendPixel(x: centerX + x, y: centerY + y, color: color, alpha: clampedAlpha)
-            }
-        }
-    }
-
-    private func fillTriangleFanPeak(baseX: Int, baseY: Int, width: Int, height: Int, colorTop: UInt32, colorBottom: UInt32) {
-        guard height > 0 else { return }
-        for row in 0...height {
-            let t = Double(row) / Double(max(1, height))
-            let span = Int(Double(width) * (1 - t))
-            let color = blend(colorTop, with: colorBottom, alpha: Int(t * 255))
-            drawHLineInBuffer(x: baseX - span, y: baseY - row, width: span * 2 + 1, color: color)
-        }
-    }
-
-    private func drawDiamondMarker(centerX: Int, centerY: Int, radius: Int, color: UInt32) {
-        for row in -radius...radius {
-            let span = radius - abs(row)
-            drawHLineInBuffer(x: centerX - span, y: centerY + row, width: span * 2 + 1, color: color)
-        }
-        drawHLineInBuffer(x: centerX - radius, y: centerY, width: radius * 2 + 1, color: darken(color, by: 40))
-    }
-
-    private func drawSceneShadow(centerX: Int, centerY: Int, radiusX: Int, radiusY: Int, intensity: Int) {
-        let rotation = cameraAngleRadians() - (.pi / 5)
-        let offsetX = Int(cos(rotation) * 4)
-        let offsetY = Int(sin(rotation) * 2)
-        fillEllipseInBuffer(
-            centerX: centerX + offsetX,
-            centerY: centerY + offsetY,
-            radiusX: radiusX,
-            radiusY: radiusY,
-            color: 0xFF000000,
-            alpha: intensity
+        // 6. Set camera — map 2D client coords to 3D world space
+        let camTileX = cameraX * 128 + 64
+        let camTileZ = cameraY * 128 + 64
+        let camElev = -w.getElevation(x: camTileX, z: camTileZ) - 180
+        sc.setCamera(
+            centerX: camTileX, centerY: camElev, centerZ: camTileZ,
+            xRot: 912, yRot: cameraRotation * 4, zRot: 0,
+            offset: cameraZoom * 2
         )
-    }
 
-    private func drawSceneVignette() {
-        for y in 0..<Self.gameHeight {
-            let edgeY = min(y, Self.gameHeight - 1 - y)
-            for x in 0..<Self.gameWidth {
-                let edgeX = min(x, Self.gameWidth - 1 - x)
-                let edge = min(edgeX, edgeY)
-                if edge < 10 {
-                    let alpha = (10 - edge) * 8
-                    let index = y * Self.gameWidth + x
-                    frameBuffer[index] = blend(frameBuffer[index], with: 0xFF000000, alpha: alpha)
-                }
-            }
-        }
-    }
+        // 7. Render 3D scene
+        sc.endRSScene()
 
-    private func setPixelInBuffer(x: Int, y: Int, color: UInt32) {
-        guard x >= 0 && x < Self.gameWidth && y >= 0 && y < Self.gameHeight else { return }
-        frameBuffer[y * Self.gameWidth + x] = color
-    }
-
-    private func blendPixel(x: Int, y: Int, color: UInt32, alpha: Int) {
-        guard x >= 0 && x < Self.gameWidth && y >= 0 && y < Self.gameHeight else { return }
-        let index = y * Self.gameWidth + x
-        frameBuffer[index] = blend(frameBuffer[index], with: color, alpha: alpha)
-    }
-
-    // MARK: - Coordinate Utilities
-
-    private func worldToScreen(x: Int, y: Int) -> (Int, Int) {
-        let tileWidth = Double(fallbackTileWidth())
-        let tileHeight = Double(fallbackTileHeight())
-        let dx = Double(x - cameraX)
-        let dy = Double(y - cameraY)
-        let rotation = cameraAngleRadians()
-        let elevationOffset = Double(terrainElevation(worldX: x, worldY: y)) / 7.0
-
-        let rotatedX = dx * cos(rotation) - dy * sin(rotation)
-        let rotatedY = dx * sin(rotation) + dy * cos(rotation)
-
-        let screenX = Int(rotatedX * tileWidth) + Self.gameWidth / 2
-        let screenY = Int(rotatedY * tileHeight - elevationOffset) + horizonLineY()
-        return (screenX, screenY)
-    }
-
-    private func horizonLineY() -> Int {
-        Self.gameHeight / 2 + 30
-    }
-
-    private func fallbackTileWidth() -> Int {
-        max(22, min(42, 18 + cameraZoom / 9))
-    }
-
-    private func fallbackTileHeight() -> Int {
-        max(14, fallbackTileWidth() * 5 / 9)
-    }
-
-    private func cameraAngleRadians() -> Double {
-        Double(cameraRotation) / 256.0 * (.pi * 2.0)
-    }
-
-    private func terrainElevation(worldX: Int, worldY: Int) -> Int {
-        guard let tile = landscapeArchive.tile(
-            atWorldX: worldX,
-            worldY: worldY,
-            plane: worldPlane,
-            centeredAt: cameraX,
-            centerY: cameraY
-        ) else {
-            return 0
-        }
-        return tile.groundElevation * 3
-    }
-
-    // MARK: - Color Utilities
-
-    private static func rgbStatic(r: Int, g: Int, b: Int) -> UInt32 {
-        let cr = UInt32(max(0, min(255, r)))
-        let cg = UInt32(max(0, min(255, g)))
-        let cb = UInt32(max(0, min(255, b)))
-        return 0xFF000000 | (cr << 16) | (cg << 8) | cb
-    }
-
-    private func appearanceColor(_ index: Int?, palette: [UInt32], default defaultColor: UInt32) -> UInt32 {
-        guard let index else { return defaultColor }
-        return palette[posMod(index, palette.count)]
-    }
-
-    private func blend(_ base: UInt32, with overlay: UInt32, alpha: Int) -> UInt32 {
-        let a = max(0, min(255, alpha))
-        let bR = Int((base >> 16) & 0xFF)
-        let bG = Int((base >> 8) & 0xFF)
-        let bB = Int(base & 0xFF)
-        let oR = Int((overlay >> 16) & 0xFF)
-        let oG = Int((overlay >> 8) & 0xFF)
-        let oB = Int(overlay & 0xFF)
-        let r = UInt32((bR * (255 - a) + oR * a) / 255)
-        let g = UInt32((bG * (255 - a) + oG * a) / 255)
-        let b = UInt32((bB * (255 - a) + oB * a) / 255)
-        return 0xFF000000 | (r << 16) | (g << 8) | b
-    }
-
-    private func darken(_ color: UInt32, by amount: Int) -> UInt32 {
-        blend(color, with: 0xFF000000, alpha: amount)
-    }
-
-    private func lighten(_ color: UInt32, by amount: Int) -> UInt32 {
-        blend(color, with: 0xFFFFFFFF, alpha: amount)
-    }
-
-    private func npcColor(_ npcId: Int) -> UInt32 {
-        let colors: [UInt32] = [
-            0xFF6496C8, 0xFFC86464, 0xFF64C864, 0xFFC8C864,
-            0xFFC896C8, 0xFF64C8C8, 0xFFC89664, 0xFF9664C8
-        ]
-        return colors[posMod(npcId, colors.count)]
-    }
-
-    private func posMod(_ a: Int, _ b: Int) -> Int {
-        let m = a % b
-        return m < 0 ? m + b : m
+        // 8. Copy pixel data to frameBuffer for Metal upload
+        frameBuffer = gc.pixelData
     }
 }

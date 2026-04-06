@@ -190,67 +190,6 @@ final class GameRenderer: NSObject, ObservableObject {
         encoder.endEncoding()
     }
 
-    // MARK: - Software Rendering
-
-    /// Clears the frame buffer to black.
-    func clear() {
-        pixelBuffer = Array(repeating: 0xFF000000, count: Self.width * Self.height)
-    }
-
-    /// Sets a pixel at the given coordinates.
-    func setPixel(x: Int, y: Int, color: UInt32) {
-        guard x >= 0 && x < Self.width && y >= 0 && y < Self.height else { return }
-        pixelBuffer[y * Self.width + x] = color
-    }
-
-    /// Draws a filled rectangle.
-    func fillRect(x: Int, y: Int, width: Int, height: Int, color: UInt32) {
-        guard width > 0, height > 0 else { return }
-        let startY = max(0, y)
-        let endY = min(y + height, Self.height)
-        let startX = max(0, x)
-        let endX = min(x + width, Self.width)
-        guard startX < endX, startY < endY else { return }
-
-        for py in startY..<endY {
-            for px in startX..<endX {
-                pixelBuffer[py * Self.width + px] = color
-            }
-        }
-    }
-
-    /// Draws a horizontal line.
-    func drawHLine(x: Int, y: Int, width: Int, color: UInt32) {
-        guard y >= 0 && y < Self.height, width > 0 else { return }
-        let startX = max(0, x)
-        let endX = min(x + width, Self.width)
-        guard startX < endX else { return }
-        for px in startX..<endX {
-            pixelBuffer[y * Self.width + px] = color
-        }
-    }
-
-    /// Draws a vertical line.
-    func drawVLine(x: Int, y: Int, height: Int, color: UInt32) {
-        guard x >= 0 && x < Self.width, height > 0 else { return }
-        let startY = max(0, y)
-        let endY = min(y + height, Self.height)
-        guard startY < endY else { return }
-        for py in startY..<endY {
-            pixelBuffer[py * Self.width + x] = color
-        }
-    }
-
-    /// Draws text at the given position (simplified).
-    func drawText(_ text: String, x: Int, y: Int, color: UInt32) {
-        // Simplified text rendering - would use proper font rendering in production
-        var px = x
-        for char in text {
-            // Draw a simple placeholder for each character
-            fillRect(x: px, y: y, width: 6, height: 8, color: color)
-            px += 7
-        }
-    }
 }
 
 /// SwiftUI view that displays the Metal renderer.

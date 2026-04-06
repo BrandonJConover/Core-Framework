@@ -28,6 +28,17 @@
 		D708B468D2C4CF3F4895C6B1 /* SecureNetworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6D36971B0516074AFDEF85F /* SecureNetworkClient.swift */; };
 		E1738B26972A35770C261546 /* ItemDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C967FD084D08522D1096B6E6 /* ItemDefinitions.swift */; };
 		EA6886039381826479A9C474 /* GameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74AD0EB3EF811559305899EF /* GameRenderer.swift */; };
+		AA2222222222222222222222 /* FastMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1111111111111111111111 /* FastMath.swift */; };
+		BB2222222222222222222222 /* Polygon.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1111111111111111111111 /* Polygon.swift */; };
+		CC2222222222222222222222 /* Scanline.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1111111111111111111111 /* Scanline.swift */; };
+		DD2222222222222222222222 /* GraphicsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1111111111111111111111 /* GraphicsController.swift */; };
+		EE2222222222222222222222 /* RSModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1111111111111111111111 /* RSModel.swift */; };
+		FF2222222222222222222222 /* Shader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1111111111111111111111 /* Shader.swift */; };
+		A02222222222222222222222 /* Scene.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01111111111111111111111 /* Scene.swift */; };
+		A12222222222222222222222 /* World.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11111111111111111111111 /* World.swift */; };
+		A22222222222222222222222 /* ModelArchiveLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A21111111111111111111111 /* ModelArchiveLoader.swift */; };
+		A32222222222222222222222 /* EntityDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31111111111111111111111 /* EntityDefinitions.swift */; };
+		A42222222222222222222222 /* models.orsc in Resources */ = {isa = PBXBuildFile; fileRef = A41111111111111111111111 /* models.orsc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -53,6 +64,17 @@
 		DD2E38D68C9C49641B553385 /* PacketHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketHandler.swift; sourceTree = "<group>"; };
 		E006C472EDDC179D0DD7D2DB /* GameClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameClient.swift; sourceTree = "<group>"; };
 		EC995A9542D1E8FCD4F848BA /* Authentic_Sprites.orsc */ = {isa = PBXFileReference; path = Authentic_Sprites.orsc; sourceTree = "<group>"; };
+		AA1111111111111111111111 /* FastMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastMath.swift; sourceTree = "<group>"; };
+		BB1111111111111111111111 /* Polygon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polygon.swift; sourceTree = "<group>"; };
+		CC1111111111111111111111 /* Scanline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scanline.swift; sourceTree = "<group>"; };
+		DD1111111111111111111111 /* GraphicsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphicsController.swift; sourceTree = "<group>"; };
+		EE1111111111111111111111 /* RSModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSModel.swift; sourceTree = "<group>"; };
+		FF1111111111111111111111 /* Shader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shader.swift; sourceTree = "<group>"; };
+		A01111111111111111111111 /* Scene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scene.swift; sourceTree = "<group>"; };
+		A11111111111111111111111 /* World.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = World.swift; sourceTree = "<group>"; };
+		A21111111111111111111111 /* ModelArchiveLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelArchiveLoader.swift; sourceTree = "<group>"; };
+		A31111111111111111111111 /* EntityDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntityDefinitions.swift; sourceTree = "<group>"; };
+		A41111111111111111111111 /* models.orsc */ = {isa = PBXFileReference; path = models.orsc; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -83,6 +105,7 @@
 		63E407D680FE7CA75C9C9BAD /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				A31111111111111111111111 /* EntityDefinitions.swift */,
 				E006C472EDDC179D0DD7D2DB /* GameClient.swift */,
 				C967FD084D08522D1096B6E6 /* ItemDefinitions.swift */,
 			);
@@ -100,10 +123,19 @@
 		A281009307DD990CFC6C3AFA /* Rendering */ = {
 			isa = PBXGroup;
 			children = (
+				AA1111111111111111111111 /* FastMath.swift */,
 				74AD0EB3EF811559305899EF /* GameRenderer.swift */,
+				DD1111111111111111111111 /* GraphicsController.swift */,
 				B384319453A7E168028E8D76 /* LandscapeArchiveReader.swift */,
+				A21111111111111111111111 /* ModelArchiveLoader.swift */,
+				BB1111111111111111111111 /* Polygon.swift */,
+				EE1111111111111111111111 /* RSModel.swift */,
+				CC1111111111111111111111 /* Scanline.swift */,
+				A01111111111111111111111 /* Scene.swift */,
+				FF1111111111111111111111 /* Shader.swift */,
 				3D23E9C81F159E4D149B6911 /* SpriteArchiveReader.swift */,
 				91ECA2AB661D220E48CE4768 /* SpriteManager.swift */,
+				A11111111111111111111111 /* World.swift */,
 			);
 			path = Rendering;
 			sourceTree = "<group>";
@@ -125,6 +157,7 @@
 				6837DA438FE3589995F740D3 /* Authentic_Landscape.orsc */,
 				EC995A9542D1E8FCD4F848BA /* Authentic_Sprites.orsc */,
 				8F441A77288B177DC71D53F2 /* ItemDefs.json */,
+				A41111111111111111111111 /* models.orsc */,
 				34A11AC74733C4B6D128521E /* TileDef.xml */,
 			);
 			name = Resources;
@@ -238,6 +271,7 @@
 				B7C1BCADDB447B881447671E /* Authentic_Sprites.orsc in Resources */,
 				55455A8AC9C34129176CCDED /* ItemDefs.json in Resources */,
 				6385CDC5EE107042A52A5EB8 /* TileDef.xml in Resources */,
+				A42222222222222222222222 /* models.orsc in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -265,6 +299,16 @@
 				304B61AC93930B37028B76B9 /* SoundManager.swift in Sources */,
 				B3AC6D64B34491EA7DA74015 /* SpriteArchiveReader.swift in Sources */,
 				6E675ACFE0D85F33AF3D0183 /* SpriteManager.swift in Sources */,
+				AA2222222222222222222222 /* FastMath.swift in Sources */,
+				BB2222222222222222222222 /* Polygon.swift in Sources */,
+				CC2222222222222222222222 /* Scanline.swift in Sources */,
+				DD2222222222222222222222 /* GraphicsController.swift in Sources */,
+				EE2222222222222222222222 /* RSModel.swift in Sources */,
+				FF2222222222222222222222 /* Shader.swift in Sources */,
+				A02222222222222222222222 /* Scene.swift in Sources */,
+				A12222222222222222222222 /* World.swift in Sources */,
+				A22222222222222222222222 /* ModelArchiveLoader.swift in Sources */,
+				A32222222222222222222222 /* EntityDefinitions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

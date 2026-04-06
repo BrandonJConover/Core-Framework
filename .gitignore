@@ -170,5 +170,9 @@ DerivedData/
 # Planning docs
 docs/
 
+# Secrets / sensitive files
+.env
+VPN_SETUP.md
+
 # macOS
 .DS_Store
