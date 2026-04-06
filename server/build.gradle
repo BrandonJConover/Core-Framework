@@ -19,7 +19,9 @@ dependencies {
     // Core Networking - Netty
     implementation 'io.netty:netty-all:4.1.121.Final'
     implementation 'io.netty.incubator:netty-incubator-codec-classes-quic:0.0.72.Final'
+    // Native QUIC libs — include both macOS and Linux ARM64 so the fat JAR runs on either
     runtimeOnly 'io.netty.incubator:netty-incubator-codec-native-quic:0.0.72.Final:osx-aarch_64'
+    runtimeOnly 'io.netty.incubator:netty-incubator-codec-native-quic:0.0.72.Final:linux-aarch_64'
 
     // Database
     implementation 'mysql:mysql-connector-java:8.0.33'
@@ -120,6 +122,11 @@ jar {
         )
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // Exclude signature files from merged dependencies to avoid JNI security exceptions
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    exclude 'META-INF/*.EC'
     from {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
