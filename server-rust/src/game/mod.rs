@@ -4,20 +4,27 @@
 pub mod action;
 pub mod achievement;
 pub mod agility;
+pub mod appearance;
 pub mod auth;
 pub mod bank;
+pub mod bank_handler;
 pub mod chat;
 pub mod clan;
 pub mod combat;
+pub mod combat_event;
+pub mod consumables;
 pub mod cooking;
 pub mod crafting;
 pub mod database;
+pub mod death;
 pub mod dialogue;
+pub mod dialogue_handler;
 pub mod drop_table;
 pub mod duel;
 pub mod entity;
 pub mod equipment;
 pub mod event;
+pub mod fatigue;
 pub mod firemaking;
 pub mod fishing;
 pub mod fletching;
@@ -26,23 +33,35 @@ pub mod ground_item;
 pub mod herblore;
 pub mod inventory;
 pub mod item;
+pub mod item_use;
 pub mod magic;
 pub mod mining;
 pub mod npc;
+pub mod npc_behavior;
 pub mod party;
 pub mod pathfinding;
 pub mod player;
+pub mod poison;
 pub mod prayer;
 pub mod protocol;
 pub mod quest;
+pub mod quest_engine;
 pub mod ranged;
+pub mod region;
 pub mod runecrafting;
 pub mod shop;
+pub mod shop_handler;
 pub mod skills;
+pub mod social;
+pub mod server;
 pub mod smithing;
+pub mod state_updater;
 pub mod status_effect;
 pub mod thieving;
 pub mod trade;
+pub mod trade_handler;
+pub mod walking;
+pub mod wilderness;
 pub mod woodcutting;
 pub mod world;
 
@@ -125,6 +144,12 @@ impl GameState {
         self.players.insert(player_id, player);
         info!("Registered player {}", player_id);
         player_id
+    }
+
+    /// Register a player with an existing Arc.
+    pub async fn register_player_arc(&mut self, player_id: u64, player: Arc<RwLock<Player>>) {
+        self.players.insert(player_id, player);
+        info!("Registered player {}", player_id);
     }
 
     /// Remove a player from the game.

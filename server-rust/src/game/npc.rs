@@ -159,15 +159,15 @@ impl Npc {
 
     /// Get distance to a position.
     pub fn distance_to(&self, pos: Position) -> u32 {
-        let dx = (self.position.x as i32 - pos.x as i32).unsigned_abs();
-        let dy = (self.position.y as i32 - pos.y as i32).unsigned_abs();
+        let dx = (self.position.x - pos.x).unsigned_abs();
+        let dy = (self.position.y - pos.y).unsigned_abs();
         dx.max(dy)
     }
 
     /// Move towards a position.
     pub fn move_towards(&mut self, target: Position) -> bool {
-        let dx = target.x as i32 - self.position.x as i32;
-        let dy = target.y as i32 - self.position.y as i32;
+        let dx = target.x - self.position.x;
+        let dy = target.y - self.position.y;
 
         if dx == 0 && dy == 0 {
             return false;
@@ -224,12 +224,12 @@ impl Npc {
             return false;
         }
 
-        let new_x = (self.position.x as i32 + dx).max(0) as u16;
-        let new_y = (self.position.y as i32 + dy).max(0) as u16;
+        let new_x = (self.position.x + dx).max(0);
+        let new_y = (self.position.y + dy).max(0);
 
         // Check within wander radius
-        let spawn_dx = (new_x as i32 - self.spawn_position.x as i32).unsigned_abs();
-        let spawn_dy = (new_y as i32 - self.spawn_position.y as i32).unsigned_abs();
+        let spawn_dx = (new_x - self.spawn_position.x).unsigned_abs();
+        let spawn_dy = (new_y - self.spawn_position.y).unsigned_abs();
 
         if spawn_dx > wander_radius || spawn_dy > wander_radius {
             return false;

@@ -5,6 +5,16 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Unique item identifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ItemId(pub u32);
+
+impl From<ItemId> for u32 {
+    fn from(id: ItemId) -> u32 {
+        id.0
+    }
+}
+
 /// Item categories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ItemCategory {
@@ -35,6 +45,10 @@ pub enum EquipSlot {
     Boots,
     Ring,
     Arrows,
+    Hands,
+    Feet,
+    Ammo,
+    None,
 }
 
 /// Combat bonuses from an item.
@@ -89,13 +103,33 @@ impl CombatBonuses {
             ..Default::default()
         }
     }
+
+    /// Combine two CombatBonuses by adding all fields together.
+    pub fn combine(&self, other: &CombatBonuses) -> CombatBonuses {
+        CombatBonuses {
+            attack_stab: self.attack_stab + other.attack_stab,
+            attack_slash: self.attack_slash + other.attack_slash,
+            attack_crush: self.attack_crush + other.attack_crush,
+            attack_magic: self.attack_magic + other.attack_magic,
+            attack_ranged: self.attack_ranged + other.attack_ranged,
+            defense_stab: self.defense_stab + other.defense_stab,
+            defense_slash: self.defense_slash + other.defense_slash,
+            defense_crush: self.defense_crush + other.defense_crush,
+            defense_magic: self.defense_magic + other.defense_magic,
+            defense_ranged: self.defense_ranged + other.defense_ranged,
+            strength_bonus: self.strength_bonus + other.strength_bonus,
+            ranged_strength: self.ranged_strength + other.ranged_strength,
+            magic_damage: self.magic_damage + other.magic_damage,
+            prayer_bonus: self.prayer_bonus + other.prayer_bonus,
+        }
+    }
 }
 
 /// Skill requirements for using an item.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ItemRequirements {
     pub attack: u8,
-    pub defense: u8,
+    pub defence: u8,
     pub strength: u8,
     pub ranged: u8,
     pub magic: u8,
@@ -111,8 +145,8 @@ impl ItemRequirements {
         Self::default()
     }
 
-    pub fn melee(attack: u8, defense: u8) -> Self {
-        Self { attack, defense, ..Default::default() }
+    pub fn melee(attack: u8, defence: u8) -> Self {
+        Self { attack, defence, ..Default::default() }
     }
 
     pub fn ranged(level: u8) -> Self {
@@ -138,10 +172,11 @@ pub struct ItemDef {
     pub high_alch: u32,
     pub low_alch: u32,
     pub weight: f32,
-    pub equip_slot: Option<EquipSlot>,
+    pub equip_slot: EquipSlot,
     pub bonuses: CombatBonuses,
     pub requirements: ItemRequirements,
     pub two_handed: bool,
+    pub weapon_speed: Option<u32>,
 }
 
 impl ItemDef {
@@ -158,10 +193,11 @@ impl ItemDef {
             high_alch: 0,
             low_alch: 0,
             weight: 0.0,
-            equip_slot: None,
+            equip_slot: EquipSlot::None,
             bonuses: CombatBonuses::default(),
             requirements: ItemRequirements::default(),
             two_handed: false,
+            weapon_speed: None,
         }
     }
 
@@ -203,7 +239,7 @@ impl ItemDef {
     }
 
     pub fn equippable(mut self, slot: EquipSlot) -> Self {
-        self.equip_slot = Some(slot);
+        self.equip_slot = slot;
         self
     }
 
@@ -233,7 +269,7 @@ impl ItemDef {
         };
 
         get_level(0) >= self.requirements.attack &&
-        get_level(1) >= self.requirements.defense &&
+        get_level(1) >= self.requirements.defence &&
         get_level(2) >= self.requirements.strength &&
         get_level(4) >= self.requirements.ranged &&
         get_level(6) >= self.requirements.magic
@@ -442,9 +478,9 @@ impl ItemRepository {
         self.items.insert(def.id, def);
     }
 
-    /// Get an item definition by ID.
-    pub fn get(&self, id: u32) -> Option<&ItemDef> {
-        self.items.get(&id)
+    /// Get an item definition by raw ID.
+    pub fn get(&self, id: impl Into<u32>) -> Option<&ItemDef> {
+        self.items.get(&id.into())
     }
 
     /// Search items by name (case-insensitive).
@@ -465,7 +501,7 @@ impl ItemRepository {
     /// Get all equippable items for a slot.
     pub fn for_slot(&self, slot: EquipSlot) -> Vec<&ItemDef> {
         self.items.values()
-            .filter(|def| def.equip_slot == Some(slot))
+            .filter(|def| def.equip_slot == slot)
             .collect()
     }
 }

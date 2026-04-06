@@ -1,6 +1,5 @@
 use anyhow::Result;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use serde::{de::DeserializeOwned, Serialize};
 use std::io::Cursor;
 
 /// Serialization format.
@@ -17,10 +16,11 @@ pub enum SerializationFormat {
 }
 
 /// Trait for serializers.
+/// Uses `serde_json::Value` for object-safe serialization/deserialization.
 pub trait Serializer: Send + Sync {
     fn format(&self) -> SerializationFormat;
-    fn serialize<T: Serialize>(&self, value: &T) -> Result<Vec<u8>>;
-    fn deserialize<T: DeserializeOwned>(&self, data: &[u8]) -> Result<T>;
+    fn serialize_value(&self, value: &serde_json::Value) -> Result<Vec<u8>>;
+    fn deserialize_value(&self, data: &[u8]) -> Result<serde_json::Value>;
 }
 
 /// Factory for creating serializers.
@@ -67,11 +67,11 @@ impl Serializer for MessagePackSerializer {
         SerializationFormat::MessagePack
     }
 
-    fn serialize<T: Serialize>(&self, value: &T) -> Result<Vec<u8>> {
+    fn serialize_value(&self, value: &serde_json::Value) -> Result<Vec<u8>> {
         Ok(rmp_serde::to_vec(value)?)
     }
 
-    fn deserialize<T: DeserializeOwned>(&self, data: &[u8]) -> Result<T> {
+    fn deserialize_value(&self, data: &[u8]) -> Result<serde_json::Value> {
         Ok(rmp_serde::from_slice(data)?)
     }
 }
@@ -84,11 +84,11 @@ impl Serializer for JsonSerializer {
         SerializationFormat::Json
     }
 
-    fn serialize<T: Serialize>(&self, value: &T) -> Result<Vec<u8>> {
+    fn serialize_value(&self, value: &serde_json::Value) -> Result<Vec<u8>> {
         Ok(serde_json::to_vec(value)?)
     }
 
-    fn deserialize<T: DeserializeOwned>(&self, data: &[u8]) -> Result<T> {
+    fn deserialize_value(&self, data: &[u8]) -> Result<serde_json::Value> {
         Ok(serde_json::from_slice(data)?)
     }
 }
@@ -101,11 +101,11 @@ impl Serializer for BincodeSerializer {
         SerializationFormat::Bincode
     }
 
-    fn serialize<T: Serialize>(&self, value: &T) -> Result<Vec<u8>> {
+    fn serialize_value(&self, value: &serde_json::Value) -> Result<Vec<u8>> {
         Ok(bincode::serialize(value)?)
     }
 
-    fn deserialize<T: DeserializeOwned>(&self, data: &[u8]) -> Result<T> {
+    fn deserialize_value(&self, data: &[u8]) -> Result<serde_json::Value> {
         Ok(bincode::deserialize(data)?)
     }
 }
@@ -118,12 +118,12 @@ impl Serializer for RscBinarySerializer {
         SerializationFormat::RscBinary
     }
 
-    fn serialize<T: Serialize>(&self, _value: &T) -> Result<Vec<u8>> {
+    fn serialize_value(&self, _value: &serde_json::Value) -> Result<Vec<u8>> {
         // RSC binary uses a custom format, not generic serialization
         Err(anyhow::anyhow!("Use Packet struct for RSC binary serialization"))
     }
 
-    fn deserialize<T: DeserializeOwned>(&self, _data: &[u8]) -> Result<T> {
+    fn deserialize_value(&self, _data: &[u8]) -> Result<serde_json::Value> {
         Err(anyhow::anyhow!("Use Packet struct for RSC binary deserialization"))
     }
 }

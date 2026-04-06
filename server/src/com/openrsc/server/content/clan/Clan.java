@@ -86,7 +86,7 @@ public class Clan {
 		}
 
 		ClanRank setRank = ClanRank.getRankFor(newRank);
-		if (member.getRank().rankIndex == newRank) {
+		if (member.getRank().getRankIndex() == newRank) {
 			return;
 		}
 

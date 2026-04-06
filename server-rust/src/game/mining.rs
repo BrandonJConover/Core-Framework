@@ -251,7 +251,7 @@ pub fn check_gem_drop(mining_level: u8) -> Option<Gem> {
 #[derive(Debug, Default)]
 pub struct MiningManager {
     /// Rocks by position.
-    rocks: HashMap<(u16, u16), Rock>,
+    rocks: HashMap<(i32, i32), Rock>,
 }
 
 impl MiningManager {
@@ -267,12 +267,12 @@ impl MiningManager {
     }
 
     /// Get rock at position.
-    pub fn get_rock(&self, x: u16, y: u16) -> Option<&Rock> {
+    pub fn get_rock(&self, x: i32, y: i32) -> Option<&Rock> {
         self.rocks.get(&(x, y))
     }
 
     /// Get mutable rock at position.
-    pub fn get_rock_mut(&mut self, x: u16, y: u16) -> Option<&mut Rock> {
+    pub fn get_rock_mut(&mut self, x: i32, y: i32) -> Option<&mut Rock> {
         self.rocks.get_mut(&(x, y))
     }
 

@@ -283,15 +283,15 @@ public class HealthCheckServer implements AutoCloseable {
      * Health check result.
      */
     public record HealthCheck(boolean healthy, Map<String, Object> details) {
-        public static HealthCheck healthy() {
+        public static HealthCheck up() {
             return new HealthCheck(true, Map.of());
         }
 
-        public static HealthCheck healthy(Map<String, Object> details) {
+        public static HealthCheck up(Map<String, Object> details) {
             return new HealthCheck(true, details);
         }
 
-        public static HealthCheck unhealthy(String reason) {
+        public static HealthCheck down(String reason) {
             return new HealthCheck(false, Map.of("reason", reason));
         }
     }

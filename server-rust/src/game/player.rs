@@ -22,6 +22,9 @@ pub struct Player {
     pub online: bool,
     pub in_combat: bool,
     pub last_tick: u64,
+    pub walking_queue: Vec<Position>,
+    pub appearance_changed: bool,
+    pub player_index: u16,
 }
 
 impl Player {
@@ -40,12 +43,31 @@ impl Player {
             online: true,
             in_combat: false,
             last_tick: 0,
+            walking_queue: Vec::new(),
+            appearance_changed: true,
+            player_index: 0,
         }
     }
 
     /// Process player tick.
     pub async fn tick(&mut self) {
         self.last_tick += 1;
+
+        // Process walking queue
+        if let Some(next_pos) = self.walking_queue.first().cloned() {
+            let dx = (next_pos.x - self.position.x).signum();
+            let dy = (next_pos.y - self.position.y).signum();
+
+            if dx != 0 || dy != 0 {
+                self.direction = Direction::from_offset(dx, dy);
+                self.position = Position::new(self.position.x + dx, self.position.y + dy);
+            }
+
+            // Remove waypoint if reached
+            if self.position == next_pos {
+                self.walking_queue.remove(0);
+            }
+        }
 
         // Process fatigue recovery if sleeping
         if self.settings.sleeping && self.fatigue > 0 {
@@ -57,7 +79,7 @@ impl Player {
     pub fn calculate_combat_level(&mut self) {
         let attack = self.skills.level(SkillId::Attack) as f64;
         let strength = self.skills.level(SkillId::Strength) as f64;
-        let defense = self.skills.level(SkillId::Defense) as f64;
+        let defense = self.skills.level(SkillId::Defence) as f64;
         let hits = self.skills.level(SkillId::Hits) as f64;
         let ranged = self.skills.level(SkillId::Ranged) as f64;
         let prayer = self.skills.level(SkillId::Prayer) as f64;
@@ -98,7 +120,7 @@ impl Player {
             skill,
             SkillId::Attack
                 | SkillId::Strength
-                | SkillId::Defense
+                | SkillId::Defence
                 | SkillId::Hits
                 | SkillId::Ranged
                 | SkillId::Prayer
@@ -135,7 +157,7 @@ impl Entity for Player {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SkillId {
     Attack = 0,
-    Defense = 1,
+    Defence = 1,
     Strength = 2,
     Hits = 3,
     Ranged = 4,
@@ -149,7 +171,7 @@ pub enum SkillId {
     Crafting = 12,
     Smithing = 13,
     Mining = 14,
-    Herblaw = 15,
+    Herblore = 15,
     Agility = 16,
     Thieving = 17,
 }
@@ -220,6 +242,10 @@ impl Inventory {
             .filter(|i| i.id == item_id)
             .map(|i| i.amount)
             .sum()
+    }
+
+    pub fn items(&self) -> &Vec<Option<Item>> {
+        &self.items
     }
 }
 

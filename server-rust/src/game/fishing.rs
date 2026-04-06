@@ -133,7 +133,7 @@ pub fn calculate_catch_chance(fishing_level: u8, fish_difficulty: u8) -> f64 {
 }
 
 /// Select which fish to catch based on level.
-pub fn select_fish(fishing_level: u8, available_fish: &[&FishDef]) -> Option<&FishDef> {
+pub fn select_fish<'a>(fishing_level: u8, available_fish: &'a [&'a FishDef]) -> Option<&'a FishDef> {
     // Filter fish the player can catch
     let catchable: Vec<_> = available_fish
         .iter()
@@ -168,7 +168,7 @@ pub struct FishingManager {
     /// Fish definitions by ID.
     fish_defs: HashMap<u32, FishDef>,
     /// Fishing spots by location.
-    spots: HashMap<(u16, u16), FishingSpot>,
+    spots: HashMap<(i32, i32), FishingSpot>,
 }
 
 impl FishingManager {
@@ -194,7 +194,7 @@ impl FishingManager {
     }
 
     /// Get fishing spot at location.
-    pub fn spot_at(&self, x: u16, y: u16) -> Option<&FishingSpot> {
+    pub fn spot_at(&self, x: i32, y: i32) -> Option<&FishingSpot> {
         self.spots.get(&(x, y))
     }
 

@@ -15,6 +15,12 @@ actor NetworkClient {
     var onDisconnected: (() -> Void)?
     var onError: ((Error) -> Void)?
 
+    // MARK: - Callback Setters
+
+    func setOnPacketReceived(_ handler: ((Packet) -> Void)?) {
+        onPacketReceived = handler
+    }
+
     enum NetworkError: Error, LocalizedError {
         case notConnected
         case connectionFailed(String)
@@ -215,8 +221,12 @@ struct Packet {
 
 /// Packet reader for extracting data from packets.
 struct PacketReader {
-    private var data: Data
-    private var position = 0
+    var data: Data
+    var position = 0
+
+    // Bit-reading state
+    private var bitPosition = 0
+    private var isBitMode = false
 
     init(_ packet: Packet) {
         self.data = packet.payload
@@ -281,6 +291,44 @@ struct PacketReader {
         position += count
         return bytes
     }
+
+    // MARK: - Bit Reading
+
+    mutating func startBitReading() {
+        bitPosition = position * 8
+        isBitMode = true
+    }
+
+    mutating func finishBitReading() {
+        position = (bitPosition + 7) / 8
+        isBitMode = false
+    }
+
+    var hasMoreBits: Bool {
+        return bitPosition < data.count * 8
+    }
+
+    mutating func readBits(_ numBits: Int) -> Int? {
+        guard isBitMode else { return nil }
+        var result = 0
+        for _ in 0..<numBits {
+            guard bitPosition < data.count * 8 else { return nil }
+            let byteIndex = bitPosition / 8
+            let bitIndex = 7 - (bitPosition % 8)
+            result = (result << 1) | Int((data[byteIndex] >> bitIndex) & 1)
+            bitPosition += 1
+        }
+        return result
+    }
+
+    mutating func readSignedBits(_ numBits: Int) -> Int? {
+        guard let value = readBits(numBits) else { return nil }
+        let signBit = 1 << (numBits - 1)
+        if value >= signBit {
+            return value - (signBit << 1)
+        }
+        return value
+    }
 }
 
 /// Packet builder for constructing packets.
@@ -318,6 +366,15 @@ struct PacketBuilder {
             data.append(bytes)
         }
         data.append(0) // Null terminator
+    }
+
+    /// Writes a string terminated with a linefeed (0x0A) instead of null.
+    /// Required for the server's getString() which reads until byte 10.
+    mutating func writeLinefeedString(_ value: String) {
+        if let bytes = value.data(using: .utf8) {
+            data.append(bytes)
+        }
+        data.append(0x0A) // Linefeed terminator
     }
 
     mutating func writeBytes(_ bytes: Data) {

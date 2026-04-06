@@ -1,6 +1,7 @@
 //! Skills module for player skill management.
 
 use super::player::SkillId;
+pub use super::player::SkillId as SkillType;
 use std::collections::HashMap;
 
 /// Experience table for levels 1-99.
@@ -53,6 +54,11 @@ impl Skills {
         *self.levels.get(&skill).unwrap_or(&1)
     }
 
+    /// Alias for `level()` — get the base level of a skill.
+    pub fn get_level(&self, skill: SkillId) -> u8 {
+        self.level(skill)
+    }
+
     /// Get the current level of a skill (may be boosted/drained).
     pub fn current_level(&self, skill: SkillId) -> u8 {
         *self.current_levels.get(&skill).unwrap_or(&1)
@@ -66,16 +72,18 @@ impl Skills {
     /// Add experience to a skill.
     pub fn add_experience(&mut self, skill: SkillId, exp: u32) -> bool {
         let current_exp = self.experience.entry(skill).or_insert(0);
-        let old_level = self.level_for_experience(*current_exp);
-
-        *current_exp = current_exp.saturating_add(exp);
+        let mut new_exp = current_exp.saturating_add(exp);
 
         // Cap at max experience
-        if *current_exp > 13034431 {
-            *current_exp = 13034431;
+        if new_exp > 13034431 {
+            new_exp = 13034431;
         }
 
-        let new_level = self.level_for_experience(*current_exp);
+        let old_exp = *current_exp;
+        *current_exp = new_exp;
+
+        let old_level = level_for_experience(old_exp);
+        let new_level = level_for_experience(new_exp);
 
         // Level up
         if new_level > old_level {
@@ -109,16 +117,6 @@ impl Skills {
         }
     }
 
-    /// Get level for given experience amount.
-    fn level_for_experience(&self, exp: u32) -> u8 {
-        for (level, &required) in EXPERIENCE_TABLE.iter().enumerate() {
-            if exp < required {
-                return level as u8;
-            }
-        }
-        99
-    }
-
     /// Get experience required for a level.
     pub fn experience_for_level(level: u8) -> u32 {
         if level == 0 || level > 99 {
@@ -141,7 +139,7 @@ impl Skills {
     pub fn combat_level(&self) -> u32 {
         let attack = self.level(SkillId::Attack) as f64;
         let strength = self.level(SkillId::Strength) as f64;
-        let defense = self.level(SkillId::Defense) as f64;
+        let defense = self.level(SkillId::Defence) as f64;
         let hits = self.level(SkillId::Hits) as f64;
         let ranged = self.level(SkillId::Ranged) as f64;
         let prayer = self.level(SkillId::Prayer) as f64;
@@ -162,10 +160,20 @@ impl Default for Skills {
     }
 }
 
+/// Get level for given experience amount.
+fn level_for_experience(exp: u32) -> u8 {
+    for (level, &required) in EXPERIENCE_TABLE.iter().enumerate() {
+        if exp < required {
+            return level as u8;
+        }
+    }
+    99
+}
+
 /// All skill IDs.
 const ALL_SKILLS: [SkillId; 18] = [
     SkillId::Attack,
-    SkillId::Defense,
+    SkillId::Defence,
     SkillId::Strength,
     SkillId::Hits,
     SkillId::Ranged,
@@ -179,7 +187,7 @@ const ALL_SKILLS: [SkillId; 18] = [
     SkillId::Crafting,
     SkillId::Smithing,
     SkillId::Mining,
-    SkillId::Herblaw,
+    SkillId::Herblore,
     SkillId::Agility,
     SkillId::Thieving,
 ];

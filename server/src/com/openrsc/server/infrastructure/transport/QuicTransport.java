@@ -8,6 +8,7 @@ import io.netty.incubator.codec.quic.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -34,8 +35,9 @@ public class QuicTransport implements AutoCloseable {
     private QuicSslContext createSslContext() {
         try {
             return QuicSslContextBuilder.forServer(
-                    settings.getCertificatePath(),
-                    settings.getPrivateKeyPath())
+                    new File(settings.getCertificatePath()),
+                    null,
+                    new File(settings.getPrivateKeyPath()))
                 .applicationProtocols("openrsc/1.0")
                 .build();
         } catch (Exception e) {
@@ -123,9 +125,9 @@ public class QuicTransport implements AutoCloseable {
                 .streamHandler(new ChannelInboundHandlerAdapter())
                 .remoteAddress(new InetSocketAddress(host, port))
                 .connect()
-                .addListener((ChannelFuture f) -> {
+                .addListener(f -> {
                     if (f.isSuccess()) {
-                        future.complete((QuicChannel) f.channel());
+                        future.complete((QuicChannel) f.getNow());
                         LOGGER.info("Connected to QUIC server at {}:{}", host, port);
                     } else {
                         future.completeExceptionally(f.cause());
@@ -149,9 +151,9 @@ public class QuicTransport implements AutoCloseable {
             : QuicStreamType.UNIDIRECTIONAL;
 
         connection.createStream(streamType, new ChannelInboundHandlerAdapter())
-            .addListener((ChannelFuture f) -> {
+            .addListener(f -> {
                 if (f.isSuccess()) {
-                    future.complete((QuicStreamChannel) f.channel());
+                    future.complete((QuicStreamChannel) f.getNow());
                 } else {
                     future.completeExceptionally(f.cause());
                 }

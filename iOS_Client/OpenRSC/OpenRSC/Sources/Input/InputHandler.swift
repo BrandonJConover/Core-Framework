@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Handles touch input and gestures.
 /// Equivalent to Android's InputImpl.
+@MainActor
 final class InputHandler: ObservableObject {
     weak var gameClient: GameClient?
 
@@ -20,39 +21,64 @@ final class InputHandler: ObservableObject {
     // Timing
     private var lastTapTime: Date?
     private var longPressTimer: Timer?
+    private var lastPanTranslation: CGSize = .zero
+    private var lastPinchScale: CGFloat = 1
+    private var hasDragged = false
+
+    private let tapMovementThreshold: CGFloat = 12
 
     init(gameClient: GameClient? = nil) {
         self.gameClient = gameClient
     }
 
     /// Converts screen coordinates to game coordinates.
-    func screenToGame(x: CGFloat, y: CGFloat, viewSize: CGSize) -> (Int, Int) {
+    func screenToGame(
+        x: CGFloat,
+        y: CGFloat,
+        viewSize: CGSize,
+        origin: CGPoint = .zero
+    ) -> (Int, Int) {
+        guard viewSize.width > 0, viewSize.height > 0 else {
+            return (0, 0)
+        }
+
         let scaleX = CGFloat(GameClient.gameWidth) / viewSize.width
         let scaleY = CGFloat(GameClient.gameHeight) / viewSize.height
 
-        let gameX = Int(x * scaleX)
-        let gameY = Int(y * scaleY)
+        let viewportX = min(max(x + origin.x, 0), viewSize.width)
+        let viewportY = min(max(y + origin.y, 0), viewSize.height)
 
-        return (gameX, gameY)
+        let gameX = Int((viewportX * scaleX).rounded())
+        let gameY = Int((viewportY * scaleY).rounded())
+
+        return (
+            min(max(gameX, 0), GameClient.gameWidth - 1),
+            min(max(gameY, 0), GameClient.gameHeight - 1)
+        )
     }
 
     // MARK: - Touch Handling
 
-    func onTouchBegan(at location: CGPoint, in viewSize: CGSize) {
-        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize)
+    func onTouchBegan(at location: CGPoint, in viewSize: CGSize, origin: CGPoint = .zero) {
+        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize, origin: origin)
         mouseX = gameX
         mouseY = gameY
         isPressed = true
+        hasDragged = false
+        lastPanTranslation = .zero
+        lastPinchScale = 1
 
         // Start long press timer
         longPressTimer?.invalidate()
         longPressTimer = Timer.scheduledTimer(withTimeInterval: longPressDelay, repeats: false) { [weak self] _ in
-            self?.onLongPress()
+            Task { @MainActor [weak self] in
+                self?.onLongPress()
+            }
         }
     }
 
-    func onTouchMoved(at location: CGPoint, in viewSize: CGSize) {
-        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize)
+    func onTouchMoved(at location: CGPoint, in viewSize: CGSize, origin: CGPoint = .zero) {
+        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize, origin: origin)
         mouseX = gameX
         mouseY = gameY
 
@@ -60,24 +86,32 @@ final class InputHandler: ObservableObject {
         longPressTimer?.invalidate()
     }
 
-    func onTouchEnded(at location: CGPoint, in viewSize: CGSize) {
-        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize)
+    func onTouchEnded(at location: CGPoint, in viewSize: CGSize, origin: CGPoint = .zero) {
+        let (gameX, gameY) = screenToGame(x: location.x, y: location.y, viewSize: viewSize, origin: origin)
         mouseX = gameX
         mouseY = gameY
         isPressed = false
 
         longPressTimer?.invalidate()
 
-        if !isLongPress {
+        if !isLongPress && !hasDragged {
             onTap(x: gameX, y: gameY)
         }
         isLongPress = false
+        hasDragged = false
+        lastPanTranslation = .zero
+        lastPinchScale = 1
+        gameClient?.finishCameraGesture()
     }
 
     func onTouchCancelled() {
         isPressed = false
         isLongPress = false
+        hasDragged = false
+        lastPanTranslation = .zero
+        lastPinchScale = 1
         longPressTimer?.invalidate()
+        gameClient?.finishCameraGesture()
     }
 
     // MARK: - Gesture Handling
@@ -103,17 +137,42 @@ final class InputHandler: ObservableObject {
     }
 
     func onPan(translation: CGSize, viewSize: CGSize) {
-        guard swipeToRotate else { return }
+        guard swipeToRotate || swipeToZoom else { return }
 
-        let deltaX = Float(translation.width / viewSize.width) * 100
-        let deltaY = Float(translation.height / viewSize.height) * 100
+        let movement = hypot(translation.width, translation.height)
+        if movement >= tapMovementThreshold {
+            hasDragged = true
+        }
 
+        let incrementalTranslation = CGSize(
+            width: translation.width - lastPanTranslation.width,
+            height: translation.height - lastPanTranslation.height
+        )
+        lastPanTranslation = translation
+
+        guard hasDragged else { return }
+
+        let deltaX = swipeToRotate ? Float(incrementalTranslation.width / viewSize.width) * 100 : 0
+        let deltaY = swipeToZoom ? Float(incrementalTranslation.height / viewSize.height) * 100 : 0
+
+        guard deltaX != 0 || deltaY != 0 else { return }
         gameClient?.handlePan(deltaX: deltaX, deltaY: deltaY)
     }
 
     func onPinch(scale: CGFloat) {
         guard swipeToZoom else { return }
-        gameClient?.handlePinch(scale: Float(scale))
+        let incrementalScale = scale / max(lastPinchScale, 0.001)
+        lastPinchScale = scale
+
+        guard incrementalScale.isFinite, incrementalScale > 0 else { return }
+
+        hasDragged = true
+        gameClient?.handlePinch(scale: Float(incrementalScale))
+    }
+
+    func onPinchEnded() {
+        lastPinchScale = 1
+        gameClient?.finishCameraGesture()
     }
 
     // MARK: - Keyboard Input
@@ -123,13 +182,13 @@ final class InputHandler: ObservableObject {
 
         switch key {
         case "←":
-            client.cameraRotation = (client.cameraRotation - 8) & 255
+            client.stepCameraRotation(-1)
         case "→":
-            client.cameraRotation = (client.cameraRotation + 8) & 255
+            client.stepCameraRotation(1)
         case "↑":
-            client.cameraZoom = min(255, client.cameraZoom + 8)
+            client.stepCameraZoom(1)
         case "↓":
-            client.cameraZoom = max(0, client.cameraZoom - 8)
+            client.stepCameraZoom(-1)
         default:
             // Handle text input
             break
@@ -141,36 +200,51 @@ final class InputHandler: ObservableObject {
 
 struct GameGestureModifier: ViewModifier {
     @ObservedObject var inputHandler: InputHandler
-    let viewSize: CGSize
+    let viewportSize: CGSize
+    let inputOrigin: CGPoint
 
     func body(content: Content) -> some View {
         content
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        if value.translation == .zero {
-                            inputHandler.onTouchBegan(at: value.location, in: viewSize)
-                        } else {
-                            inputHandler.onTouchMoved(at: value.location, in: viewSize)
-                            inputHandler.onPan(translation: value.translation, viewSize: viewSize)
+                        if !inputHandler.isPressed {
+                            inputHandler.onTouchBegan(at: value.location, in: viewportSize, origin: inputOrigin)
+                        }
+                        if value.translation != .zero {
+                            inputHandler.onTouchMoved(at: value.location, in: viewportSize, origin: inputOrigin)
+                            inputHandler.onPan(translation: value.translation, viewSize: viewportSize)
                         }
                     }
                     .onEnded { value in
-                        inputHandler.onTouchEnded(at: value.location, in: viewSize)
+                        inputHandler.onTouchEnded(at: value.location, in: viewportSize, origin: inputOrigin)
                     }
             )
-            .gesture(
+            .simultaneousGesture(
                 MagnificationGesture()
                     .onChanged { scale in
                         inputHandler.onPinch(scale: scale)
+                    }
+                    .onEnded { _ in
+                        inputHandler.onPinchEnded()
                     }
             )
     }
 }
 
 extension View {
-    func gameGestures(_ handler: InputHandler, viewSize: CGSize) -> some View {
-        modifier(GameGestureModifier(inputHandler: handler, viewSize: viewSize))
+    func gameGestures(
+        _ handler: InputHandler,
+        viewportSize: CGSize,
+        inputOrigin: CGPoint = .zero
+    ) -> some View {
+        modifier(
+            GameGestureModifier(
+                inputHandler: handler,
+                viewportSize: viewportSize,
+                inputOrigin: inputOrigin
+            )
+        )
     }
 }
 

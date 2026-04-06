@@ -114,6 +114,12 @@ final class SoundManager: @unchecked Sendable {
         await playById(sound.rawValue)
     }
 
+    /// Play a sound by name.
+    func playByName(_ name: String) async {
+        // TODO: implement name-based sound lookup
+        print("playByName: \(name)")
+    }
+
     /// Play a sound by server ID.
     func playById(_ soundId: Int) async {
         await withCheckedContinuation { continuation in

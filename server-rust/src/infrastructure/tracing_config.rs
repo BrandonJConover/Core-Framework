@@ -1,5 +1,5 @@
 use anyhow::Result;
-use opentelemetry::trace::TracerProvider;
+// TracerProvider trait no longer needed since install_batch returns Tracer directly
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{runtime, trace as sdktrace};
 use tracing_subscriber::layer::SubscriberExt;
@@ -23,7 +23,7 @@ impl TracingConfig {
             .tracing()
             .with_exporter(exporter)
             .with_trace_config(
-                sdktrace::config()
+                sdktrace::Config::default()
                     .with_sampler(sdktrace::Sampler::TraceIdRatioBased(config.sample_rate))
                     .with_resource(opentelemetry_sdk::Resource::new(vec![
                         opentelemetry::KeyValue::new("service.name", config.service_name.clone()),
@@ -32,9 +32,8 @@ impl TracingConfig {
             )
             .install_batch(runtime::Tokio)?;
 
-        // Create OpenTelemetry layer
-        let tracer = tracer_provider.tracer("openrsc-server");
-        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+        // install_batch returns a Tracer directly
+        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer_provider);
 
         // Set up subscriber with both fmt and OpenTelemetry layers
         tracing_subscriber::registry()

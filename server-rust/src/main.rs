@@ -7,9 +7,13 @@ mod security;
 mod session;
 
 use anyhow::Result;
-use tracing::{info, Level};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::RwLock;
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use game::server::{ServerState, TICK_DURATION_MS};
 use infrastructure::InfrastructureManager;
 
 #[tokio::main]
@@ -29,15 +33,45 @@ async fn main() -> Result<()> {
     let config = infrastructure::config::ServerConfig::load()?;
     info!("Configuration loaded for world: {}", config.world_name);
 
-    // Initialize infrastructure
+    // Initialize infrastructure (metrics, redis, tracing, discovery)
     let mut infrastructure = InfrastructureManager::new(config.clone());
     infrastructure.initialize().await?;
+    info!("Infrastructure initialized");
 
-    info!("Infrastructure initialized successfully");
+    // Create shared server state
+    let server_state = Arc::new(RwLock::new(ServerState::new()));
+    {
+        let mut state = server_state.write().await;
+        state.initialize().await?;
+    }
+    info!("Game state initialized");
 
-    // Start network listeners
+    // Spawn game tick loop
+    let tick_state = server_state.clone();
+    let tick_handle = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_millis(TICK_DURATION_MS));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
+        loop {
+            interval.tick().await;
+
+            let shutting_down = {
+                let mut state = tick_state.write().await;
+                state.tick().await;
+                state.shutting_down
+            };
+
+            if shutting_down {
+                info!("Game loop shutting down");
+                break;
+            }
+        }
+    });
+
+    // Start network listeners (blocks until shutdown)
+    let network_state = server_state.clone();
     let network_handle = tokio::spawn(async move {
-        network::start_server(&config).await
+        network::start_server(&config, network_state).await
     });
 
     // Wait for shutdown signal
@@ -47,12 +81,21 @@ async fn main() -> Result<()> {
         }
         result = network_handle => {
             if let Err(e) = result {
-                tracing::error!("Network server error: {}", e);
+                error!("Network server error: {}", e);
             }
         }
     }
 
-    // Cleanup
+    // Signal game loop to stop
+    {
+        let mut state = server_state.write().await;
+        state.shutting_down = true;
+    }
+
+    // Wait for game loop to finish
+    let _ = tick_handle.await;
+
+    // Cleanup infrastructure
     infrastructure.shutdown().await?;
     info!("Server shutdown complete");
 

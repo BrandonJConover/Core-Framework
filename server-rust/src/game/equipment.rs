@@ -56,7 +56,9 @@ impl EquipmentSlot {
             EquipSlot::Hands => Some(EquipmentSlot::Hands),
             EquipSlot::Feet => Some(EquipmentSlot::Feet),
             EquipSlot::Ring => Some(EquipmentSlot::Ring),
-            EquipSlot::Ammo => Some(EquipmentSlot::Ammo),
+            EquipSlot::Ammo | EquipSlot::Arrows => Some(EquipmentSlot::Ammo),
+            EquipSlot::Gloves => Some(EquipmentSlot::Hands),
+            EquipSlot::Boots => Some(EquipmentSlot::Feet),
             EquipSlot::None => None,
         }
     }
@@ -378,9 +380,7 @@ mod tests {
     use super::*;
 
     fn test_repo() -> ItemRepository {
-        let mut repo = ItemRepository::new();
-        repo.load_defaults();
-        repo
+        ItemRepository::new()
     }
 
     #[test]

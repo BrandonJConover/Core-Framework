@@ -6,7 +6,7 @@ use tracing::{debug, info, warn};
 
 use super::entity::Position;
 use super::item::ItemId;
-use super::skills::{SkillType, Skills};
+use super::skills::Skills;
 
 /// Rune item IDs for spell requirements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -86,7 +86,7 @@ pub enum SpellCategory {
 }
 
 /// Rune requirement for a spell.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RuneRequirement {
     pub rune_type: RuneType,
     pub amount: u32,
@@ -183,7 +183,7 @@ impl SpellDefBuilder {
         self
     }
 
-    pub fn teleport(mut self, x: u16, y: u16) -> Self {
+    pub fn teleport(mut self, x: i32, y: i32) -> Self {
         self.def.teleport_destination = Some(Position { x, y, plane: 0 });
         self.def.category = SpellCategory::Teleport;
         self

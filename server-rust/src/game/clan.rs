@@ -380,7 +380,7 @@ impl ClanManager {
 
         let clan = self.clans.get_mut(&clan_id).ok_or("Clan not found")?;
 
-        if !clan.has_invite(&player_id) {
+        if !clan.has_invite(player_id) {
             return Err("Player does not have an invite");
         }
 

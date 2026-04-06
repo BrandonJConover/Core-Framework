@@ -76,6 +76,13 @@ sha2 = "0.10"
 hmac = "0.12"
 constant_time_eq = "0.3"
 
+# Encoding
+base64 = "0.22"
+hex = "0.4"
+
+# Futures
+futures = "0.3"
+
 [dev-dependencies]
 tokio-test = "0.4"
 criterion = { version = "0.5", features = ["html_reports"] }

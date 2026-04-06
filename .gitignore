@@ -110,7 +110,7 @@ Client_Base/Cache/credentials.txt
 Android_Client/import-summary.txt
 Android_Client/.idea/
 
-.github/
+# .github/ -- workflows tracked in git
 
 PC_Launcher/OpenRSC.jar
 PC_Launcher/Cache/
