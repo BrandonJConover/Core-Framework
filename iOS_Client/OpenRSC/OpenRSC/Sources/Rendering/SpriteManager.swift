@@ -226,6 +226,7 @@ final class SpriteManager {
         case compass
         case checkMark
         case xMark
+        case equipTab
 
         var spriteIndex: Int {
             switch self {
@@ -249,6 +250,8 @@ final class SpriteManager {
                 return SpriteManager.spriteMedia + 27
             case .xMark:
                 return SpriteManager.spriteMedia + 28
+            case .equipTab:
+                return SpriteManager.spriteMedia + 7
             }
         }
     }

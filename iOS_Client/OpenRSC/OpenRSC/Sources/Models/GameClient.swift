@@ -7,6 +7,14 @@ struct DuelSettings {
     var disallowWeapons: Bool = false
 }
 
+enum MenuContext {
+    case none
+    case npc(index: Int)
+    case player(index: Int)
+    case groundItem(itemId: Int, x: Int, y: Int)
+    case world(x: Int, y: Int)
+}
+
 /// Main game client that manages game state.
 /// Complete implementation matching server protocol.
 @MainActor
@@ -154,6 +162,7 @@ final class GameClient: ObservableObject {
     @Published var showingMenu: Bool = false
     @Published var menuOptions: [String] = []
     @Published var menuPosition: CGPoint = .zero
+    @Published var menuContext: MenuContext = .none
     @Published var currentTab: Int = 0
     @Published var errorMessage: String?
     @Published var isMembersWorld: Bool = false
@@ -472,6 +481,8 @@ final class GameClient: ObservableObject {
     func playerPublicChat(index: Int, icon: Int, message: String) {
         if let player = players[index] {
             addChatMessage(sender: player.username, message: message)
+            player.chatMessage = message
+            player.chatMessageExpiry = Date().addingTimeInterval(4.0)
         }
     }
 
@@ -479,9 +490,13 @@ final class GameClient: ObservableObject {
         if let player = players[index] {
             player.currentHits = curHits
             player.maxHits = maxHits
+            player.damageDisplay = Int(damage)
+            player.damageExpiry = Date().addingTimeInterval(1.5)
         } else if index == localPlayer?.index {
             localPlayer?.currentHits = curHits
             localPlayer?.maxHits = maxHits
+            localPlayer?.damageDisplay = Int(damage)
+            localPlayer?.damageExpiry = Date().addingTimeInterval(1.5)
         }
     }
 
@@ -546,12 +561,18 @@ final class GameClient: ObservableObject {
 
     func npcChat(index: Int, recipientIndex: Int, message: String) {
         addServerMessage(message)
+        if let npc = npcs[index] {
+            npc.chatMessage = message
+            npc.chatMessageExpiry = Date().addingTimeInterval(4.0)
+        }
     }
 
     func npcDamage(index: Int, damage: Int, curHits: Int, maxHits: Int) {
         if let npc = npcs[index] {
             npc.currentHits = curHits
             npc.maxHits = maxHits
+            npc.damageDisplay = Int(damage)
+            npc.damageExpiry = Date().addingTimeInterval(1.5)
         }
     }
 
@@ -713,8 +734,10 @@ final class GameClient: ObservableObject {
         } else if let player = findPlayerAt(worldX: worldX, worldY: worldY) {
             showContextMenu(for: player, at: CGPoint(x: x, y: y))
         } else if let groundItem = findGroundItemAt(worldX: worldX, worldY: worldY) {
+            menuContext = .groundItem(itemId: groundItem.itemId, x: groundItem.x, y: groundItem.y)
             Task { try? await pickupItem(groundItem) }
         } else {
+            menuContext = .world(x: worldX, y: worldY)
             Task { try? await walkTo(x: worldX, y: worldY) }
         }
     }
@@ -725,14 +748,18 @@ final class GameClient: ObservableObject {
         let worldY = world.y
 
         var options: [String] = ["Walk here"]
-        if findNpcAt(worldX: worldX, worldY: worldY) != nil {
+
+        if let npc = findNpcAt(worldX: worldX, worldY: worldY) {
             options.insert(contentsOf: ["Talk-to", "Attack", "Examine"], at: 0)
-        }
-        if findPlayerAt(worldX: worldX, worldY: worldY) != nil {
+            menuContext = .npc(index: npc.index)
+        } else if let player = findPlayerAt(worldX: worldX, worldY: worldY) {
             options.insert(contentsOf: ["Follow", "Trade with", "Attack"], at: 0)
-        }
-        if findGroundItemAt(worldX: worldX, worldY: worldY) != nil {
+            menuContext = .player(index: player.index)
+        } else if let groundItem = findGroundItemAt(worldX: worldX, worldY: worldY) {
             options.insert(contentsOf: ["Take", "Examine"], at: 0)
+            menuContext = .groundItem(itemId: groundItem.itemId, x: groundItem.x, y: groundItem.y)
+        } else {
+            menuContext = .world(x: worldX, y: worldY)
         }
 
         menuOptions = options
@@ -839,12 +866,14 @@ final class GameClient: ObservableObject {
     private func showContextMenu(for npc: Npc, at position: CGPoint) {
         menuOptions = ["Talk-to NPC", "Attack NPC", "Examine NPC"]
         menuPosition = position
+        menuContext = .npc(index: npc.index)
         showingMenu = true
     }
 
     private func showContextMenu(for player: Player, at position: CGPoint) {
         menuOptions = ["Follow \(player.username)", "Trade with \(player.username)", "Attack \(player.username)"]
         menuPosition = position
+        menuContext = .player(index: player.index)
         showingMenu = true
     }
 
@@ -1174,6 +1203,39 @@ final class GameClient: ObservableObject {
         b.writeShort(UInt16(slot))
         try await networkClient.send(b.build(opcode: 170))
     }
+
+    // MARK: - Menu Action Execution
+
+    func onMenuOptionSelected(index: Int) {
+        showingMenu = false
+        let context = menuContext
+        menuContext = .none
+        Task {
+            switch context {
+            case .npc(let i):
+                switch index {
+                case 0: try? await talkToNpc(npcIndex: i)
+                case 1: try? await attackNpc(npcIndex: i)
+                default: break
+                }
+            case .player(let i):
+                switch index {
+                case 0: try? await followPlayer(playerIndex: i)
+                case 1: try? await sendTradeWith(playerIndex: i)
+                case 2: try? await attackPlayer(playerIndex: i)
+                default: break
+                }
+            case .groundItem(let id, let x, let y):
+                if let item = groundItems.first(where: { $0.itemId == id && $0.x == x && $0.y == y }) {
+                    try? await pickupItem(item)
+                }
+            case .world(let x, let y):
+                try? await walkTo(x: x, y: y)
+            case .none:
+                break
+            }
+        }
+    }
 }
 
 // MARK: - Game Models
@@ -1190,6 +1252,10 @@ final class Player: ObservableObject, Identifiable {
     @Published var animation: Int = 0
     @Published var currentHits: Int = 10
     @Published var maxHits: Int = 10
+    var chatMessage: String? = nil
+    var chatMessageExpiry: Date? = nil
+    var damageDisplay: Int? = nil
+    var damageExpiry: Date? = nil
 
     init(index: Int, username: String, x: Int, y: Int) {
         self.index = index
@@ -1219,6 +1285,10 @@ final class Npc: ObservableObject, Identifiable {
     @Published var animation: Int = 0
     @Published var currentHits: Int = 10
     @Published var maxHits: Int = 10
+    var chatMessage: String? = nil
+    var chatMessageExpiry: Date? = nil
+    var damageDisplay: Int? = nil
+    var damageExpiry: Date? = nil
 
     init(index: Int, npcId: Int, x: Int, y: Int) {
         self.index = index
@@ -1832,6 +1902,12 @@ extension GameClient {
                     } else {
                         self.drawNpcShape(npc, x: sx, y: sy)
                     }
+                    self.drawEntityOverlays(
+                        x: sx, y: sy,
+                        currentHits: npc.currentHits, maxHits: npc.maxHits,
+                        chatMessage: npc.chatMessage, chatMessageExpiry: npc.chatMessageExpiry,
+                        damageDisplay: npc.damageDisplay, damageExpiry: npc.damageExpiry
+                    )
                 }
             )
         }
@@ -1851,6 +1927,12 @@ extension GameClient {
                     } else {
                         self.drawPlayerShape(player, x: sx, y: sy, isLocal: false)
                     }
+                    self.drawEntityOverlays(
+                        x: sx, y: sy,
+                        currentHits: player.currentHits, maxHits: player.maxHits,
+                        chatMessage: player.chatMessage, chatMessageExpiry: player.chatMessageExpiry,
+                        damageDisplay: player.damageDisplay, damageExpiry: player.damageExpiry
+                    )
                 }
             )
         }
@@ -1870,6 +1952,12 @@ extension GameClient {
                     } else {
                         self.drawPlayerShape(player, x: sx, y: sy, isLocal: true)
                     }
+                    self.drawEntityOverlays(
+                        x: sx, y: sy,
+                        currentHits: player.currentHits, maxHits: player.maxHits,
+                        chatMessage: player.chatMessage, chatMessageExpiry: player.chatMessageExpiry,
+                        damageDisplay: player.damageDisplay, damageExpiry: player.damageExpiry
+                    )
                 }
             )
         }
@@ -1882,6 +1970,171 @@ extension GameClient {
         }
         for command in commands {
             command.draw()
+        }
+    }
+
+    // MARK: - Entity Overlays (health bars, chat bubbles, damage numbers)
+
+    /// Draws health bar, chat bubble text, and damage number for an entity at screen position (x, y).
+    private func drawEntityOverlays(
+        x: Int, y: Int,
+        currentHits: Int, maxHits: Int,
+        chatMessage: String?, chatMessageExpiry: Date?,
+        damageDisplay: Int?, damageExpiry: Date?
+    ) {
+        // --- Health bar ---
+        if maxHits > 0 {
+            let ratio = Float(max(0, currentHits)) / Float(maxHits)
+            let barW = 28
+            let filled = Int((Float(barW) * ratio).rounded())
+            let barX = x - barW / 2
+            let barY = y - 58
+            // Dark background
+            fillRectInBuffer(x: barX - 1, y: barY - 1, width: barW + 2, height: 5, color: 0xFF111111)
+            // Empty portion (dark red background)
+            fillRectInBuffer(x: barX, y: barY, width: barW, height: 3, color: 0xFF660000)
+            // Filled portion
+            if filled > 0 {
+                let barColor: UInt32 = ratio > 0.5 ? 0xFF00CC00 : (ratio > 0.25 ? 0xFFFFAA00 : 0xFFCC0000)
+                fillRectInBuffer(x: barX, y: barY, width: filled, height: 3, color: barColor)
+            }
+        }
+
+        // --- Chat bubble ---
+        let now = Date()
+        if let msg = chatMessage, let expiry = chatMessageExpiry, now < expiry {
+            let maxChars = 20
+            let display = msg.count > maxChars ? String(msg.prefix(maxChars)) + "…" : msg
+            let charW = 4
+            let charH = 6
+            let padding = 2
+            let bubbleW = display.count * (charW + 1) + padding * 2
+            let bubbleH = charH + padding * 2
+            let bubbleX = x - bubbleW / 2
+            let bubbleY = y - 70 - bubbleH
+            // Background
+            fillRectInBuffer(x: bubbleX - 1, y: bubbleY - 1, width: bubbleW + 2, height: bubbleH + 2, color: 0xFF000000)
+            fillRectInBuffer(x: bubbleX, y: bubbleY, width: bubbleW, height: bubbleH, color: 0xFF222222)
+            // Text
+            drawTextInBuffer(display, x: bubbleX + padding, y: bubbleY + padding, color: 0xFFFFFF00, charW: charW, charH: charH)
+        }
+
+        // --- Damage number ---
+        if let dmg = damageDisplay, let expiry = damageExpiry, now < expiry {
+            let text = "\(dmg)"
+            let charW = 4
+            let charH = 6
+            let textW = text.count * (charW + 1)
+            let dmgX = x + 6 - textW / 2
+            let dmgY = y - 68
+            // Shadow
+            drawTextInBuffer(text, x: dmgX + 1, y: dmgY + 1, color: 0xFF000000, charW: charW, charH: charH)
+            // Text
+            drawTextInBuffer(text, x: dmgX, y: dmgY, color: 0xFFFF4444, charW: charW, charH: charH)
+        }
+    }
+
+    // MARK: - Minimal bitmap text renderer
+
+    /// 4×6 bitmap font — printable ASCII 0x20–0x7E.
+    /// Each character is encoded as 6 rows of 4-bit column masks (LSB = left-most pixel).
+    private static let bitmapFont4x6: [Character: [UInt8]] = {
+        var f: [Character: [UInt8]] = [:]
+        // Space
+        f[" "] = [0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+        // Digits
+        f["0"] = [0x6, 0x9, 0x9, 0x9, 0x9, 0x6]
+        f["1"] = [0x2, 0x6, 0x2, 0x2, 0x2, 0x7]
+        f["2"] = [0x6, 0x9, 0x1, 0x2, 0x4, 0xF]
+        f["3"] = [0x6, 0x9, 0x2, 0x1, 0x9, 0x6]
+        f["4"] = [0x1, 0x3, 0x5, 0x9, 0xF, 0x1]
+        f["5"] = [0xF, 0x8, 0xE, 0x1, 0x9, 0x6]
+        f["6"] = [0x6, 0x8, 0xE, 0x9, 0x9, 0x6]
+        f["7"] = [0xF, 0x1, 0x2, 0x4, 0x4, 0x4]
+        f["8"] = [0x6, 0x9, 0x6, 0x9, 0x9, 0x6]
+        f["9"] = [0x6, 0x9, 0x9, 0x7, 0x1, 0x6]
+        // Letters (uppercase A-Z)
+        f["A"] = [0x6, 0x9, 0x9, 0xF, 0x9, 0x9]
+        f["B"] = [0xE, 0x9, 0xE, 0x9, 0x9, 0xE]
+        f["C"] = [0x6, 0x9, 0x8, 0x8, 0x9, 0x6]
+        f["D"] = [0xE, 0x9, 0x9, 0x9, 0x9, 0xE]
+        f["E"] = [0xF, 0x8, 0xE, 0x8, 0x8, 0xF]
+        f["F"] = [0xF, 0x8, 0xE, 0x8, 0x8, 0x8]
+        f["G"] = [0x6, 0x9, 0x8, 0xB, 0x9, 0x6]
+        f["H"] = [0x9, 0x9, 0xF, 0x9, 0x9, 0x9]
+        f["I"] = [0xE, 0x4, 0x4, 0x4, 0x4, 0xE]
+        f["J"] = [0x7, 0x1, 0x1, 0x1, 0x9, 0x6]
+        f["K"] = [0x9, 0xA, 0xC, 0xA, 0xA, 0x9]
+        f["L"] = [0x8, 0x8, 0x8, 0x8, 0x8, 0xF]
+        f["M"] = [0x9, 0xF, 0xF, 0x9, 0x9, 0x9]
+        f["N"] = [0x9, 0xD, 0xB, 0x9, 0x9, 0x9]
+        f["O"] = [0x6, 0x9, 0x9, 0x9, 0x9, 0x6]
+        f["P"] = [0xE, 0x9, 0x9, 0xE, 0x8, 0x8]
+        f["Q"] = [0x6, 0x9, 0x9, 0x9, 0xB, 0x7]
+        f["R"] = [0xE, 0x9, 0x9, 0xE, 0xA, 0x9]
+        f["S"] = [0x6, 0x9, 0x4, 0x2, 0x9, 0x6]
+        f["T"] = [0xE, 0x4, 0x4, 0x4, 0x4, 0x4]
+        f["U"] = [0x9, 0x9, 0x9, 0x9, 0x9, 0x6]
+        f["V"] = [0x9, 0x9, 0x9, 0x9, 0x6, 0x6]
+        f["W"] = [0x9, 0x9, 0x9, 0xF, 0xF, 0x9]
+        f["X"] = [0x9, 0x9, 0x6, 0x6, 0x9, 0x9]
+        f["Y"] = [0x9, 0x9, 0x6, 0x4, 0x4, 0x4]
+        f["Z"] = [0xF, 0x1, 0x2, 0x4, 0x8, 0xF]
+        // Lowercase a-z
+        f["a"] = [0x0, 0x0, 0x6, 0x1, 0x7, 0x7]
+        f["b"] = [0x8, 0x8, 0xE, 0x9, 0x9, 0xE]
+        f["c"] = [0x0, 0x0, 0x6, 0x8, 0x8, 0x6]
+        f["d"] = [0x1, 0x1, 0x7, 0x9, 0x9, 0x7]
+        f["e"] = [0x0, 0x0, 0x6, 0xF, 0x8, 0x6]
+        f["f"] = [0x2, 0x4, 0xE, 0x4, 0x4, 0x4]
+        f["g"] = [0x0, 0x7, 0x9, 0x7, 0x1, 0x6]
+        f["h"] = [0x8, 0x8, 0xE, 0x9, 0x9, 0x9]
+        f["i"] = [0x0, 0x4, 0x0, 0x4, 0x4, 0x6]
+        f["j"] = [0x0, 0x2, 0x0, 0x2, 0x2, 0xC]
+        f["k"] = [0x8, 0x9, 0xA, 0xC, 0xA, 0x9]
+        f["l"] = [0x4, 0x4, 0x4, 0x4, 0x4, 0x2]
+        f["m"] = [0x0, 0x0, 0xA, 0xF, 0x9, 0x9]
+        f["n"] = [0x0, 0x0, 0xE, 0x9, 0x9, 0x9]
+        f["o"] = [0x0, 0x0, 0x6, 0x9, 0x9, 0x6]
+        f["p"] = [0x0, 0xE, 0x9, 0xE, 0x8, 0x8]
+        f["q"] = [0x0, 0x7, 0x9, 0x7, 0x1, 0x1]
+        f["r"] = [0x0, 0x0, 0xA, 0xC, 0x8, 0x8]
+        f["s"] = [0x0, 0x0, 0x6, 0x4, 0x2, 0xC]
+        f["t"] = [0x4, 0x4, 0xE, 0x4, 0x4, 0x2]
+        f["u"] = [0x0, 0x0, 0x9, 0x9, 0x9, 0x7]
+        f["v"] = [0x0, 0x0, 0x9, 0x9, 0x6, 0x6]
+        f["w"] = [0x0, 0x0, 0x9, 0x9, 0xF, 0x6]
+        f["x"] = [0x0, 0x0, 0x9, 0x6, 0x6, 0x9]
+        f["y"] = [0x0, 0x9, 0x9, 0x7, 0x1, 0x6]
+        f["z"] = [0x0, 0x0, 0xF, 0x2, 0x4, 0xF]
+        // Punctuation
+        f["."] = [0x0, 0x0, 0x0, 0x0, 0x0, 0x4]
+        f[","] = [0x0, 0x0, 0x0, 0x0, 0x2, 0x4]
+        f["!"] = [0x4, 0x4, 0x4, 0x4, 0x0, 0x4]
+        f["?"] = [0x6, 0x9, 0x2, 0x4, 0x0, 0x4]
+        f[":"] = [0x0, 0x4, 0x0, 0x0, 0x4, 0x0]
+        f["'"] = [0x4, 0x4, 0x0, 0x0, 0x0, 0x0]
+        f["-"] = [0x0, 0x0, 0x0, 0xF, 0x0, 0x0]
+        f["+"] = [0x0, 0x4, 0xE, 0x4, 0x0, 0x0]
+        f["…"] = [0x0, 0x0, 0x0, 0x0, 0xA, 0xA]
+        return f
+    }()
+
+    /// Renders a string into the frameBuffer using the 4×6 bitmap font.
+    private func drawTextInBuffer(_ text: String, x: Int, y: Int, color: UInt32, charW: Int = 4, charH: Int = 6) {
+        var cx = x
+        for ch in text {
+            let glyph = Self.bitmapFont4x6[ch] ?? Self.bitmapFont4x6["?"] ?? []
+            let rows = min(glyph.count, charH)
+            for row in 0..<rows {
+                let bits = glyph[row]
+                for col in 0..<charW {
+                    if (bits >> col) & 1 == 1 {
+                        setPixelInBuffer(x: cx + col, y: y + row, color: color)
+                    }
+                }
+            }
+            cx += charW + 1
         }
     }
 

@@ -7,6 +7,8 @@ private enum GamePanel {
     case skills
     case magic
     case settings
+    case equipment
+    case minimap
 }
 
 private enum SocialListTab: String, CaseIterable, Identifiable {
@@ -16,7 +18,7 @@ private enum SocialListTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-private enum ClassicPalette {
+enum ClassicPalette {
     static let shell = Color(red: 0.11, green: 0.11, blue: 0.12)
     static let shellInset = Color(red: 0.20, green: 0.20, blue: 0.22)
     static let panel = Color(red: 0.79, green: 0.79, blue: 0.76)
@@ -124,6 +126,14 @@ struct GameView: View {
                         .position(x: panelX, y: viewportRect.midY)
                         .zIndex(4)
                 }
+
+                tradeDuelOverlay(uiScale: uiScale)
+                modalOverlays(uiScale: uiScale)
+
+                if gameClient.showingMenu {
+                    contextMenuOverlay(uiScale: uiScale, viewportRect: viewportRect)
+                        .zIndex(10)
+                }
             }
             .ignoresSafeArea()
             .onAppear {
@@ -144,7 +154,7 @@ struct GameView: View {
                 onClose: closePanels
             )
         case .inventory:
-            InventoryView(items: gameClient.inventory, uiScale: uiScale, onClose: closePanels)
+            InventoryView(items: gameClient.inventory, gameClient: gameClient, uiScale: uiScale, onClose: closePanels)
         case .skills:
             SkillsView(
                 skills: gameClient.skills,
@@ -155,14 +165,98 @@ struct GameView: View {
             )
         case .magic:
             MagicPanel(
+                gameClient: gameClient,
                 magicLevel: gameClient.skills.first(where: { $0.name == "Magic" })?.currentLevel ?? 1,
                 prayerLevel: gameClient.skills.first(where: { $0.name == "Prayer" })?.currentLevel ?? 1,
                 uiScale: uiScale,
                 onClose: closePanels
             )
         case .settings:
-            SettingsPanel(uiScale: uiScale, onClose: closePanels)
+            SettingsPanel(gameClient: gameClient, uiScale: uiScale, onClose: closePanels)
+        case .equipment:
+            EquipmentPanel(gameClient: gameClient, uiScale: uiScale, onClose: closePanels)
+        case .minimap:
+            MinimapPanel(gameClient: gameClient, uiScale: uiScale, onClose: closePanels)
         }
+    }
+
+    @ViewBuilder
+    private func tradeDuelOverlay(uiScale: CGFloat) -> some View {
+        if gameClient.showingTrade && !gameClient.showingTradeConfirm {
+            TradeView(gameClient: gameClient, uiScale: uiScale).zIndex(5)
+        } else if gameClient.showingTradeConfirm {
+            TradeConfirmView(gameClient: gameClient, uiScale: uiScale).zIndex(5)
+        } else if gameClient.showingDuel && !gameClient.showingDuelConfirm {
+            DuelView(gameClient: gameClient, uiScale: uiScale).zIndex(5)
+        } else if gameClient.showingDuelConfirm {
+            DuelConfirmView(gameClient: gameClient, uiScale: uiScale).zIndex(5)
+        }
+    }
+
+    @ViewBuilder
+    private func modalOverlays(uiScale: CGFloat) -> some View {
+        if gameClient.showingBank {
+            BankOverlayView(gameClient: gameClient, uiScale: uiScale).zIndex(6)
+        } else if gameClient.showingShop {
+            ShopOverlayView(gameClient: gameClient, uiScale: uiScale).zIndex(6)
+        } else if gameClient.showingDialogue {
+            DialogueOverlayView(gameClient: gameClient, uiScale: uiScale).zIndex(6)
+        }
+        if gameClient.showingSleepScreen {
+            SleepScreenView(gameClient: gameClient, uiScale: uiScale).zIndex(7)
+        }
+    }
+
+    @ViewBuilder
+    private func contextMenuOverlay(uiScale: CGFloat, viewportRect: CGRect) -> some View {
+        // Dismiss background
+        Color.black.opacity(0.001)
+            .ignoresSafeArea()
+            .contentShape(Rectangle())
+            .onTapGesture {
+                gameClient.showingMenu = false
+                gameClient.menuContext = .none
+            }
+
+        // Menu popup positioned near tap location
+        let rawPos = gameClient.menuPosition
+        let menuWidth: CGFloat = 180 * uiScale
+        let menuItemHeight: CGFloat = 36 * uiScale
+        let menuHeight = CGFloat(gameClient.menuOptions.count) * menuItemHeight + 8 * uiScale
+
+        let clampedX = min(max(rawPos.x + viewportRect.minX, menuWidth / 2 + 8),
+                           viewportRect.maxX - menuWidth / 2 - 8)
+        let clampedY = min(max(rawPos.y + viewportRect.minY, menuHeight / 2 + 8),
+                           viewportRect.maxY - menuHeight / 2 - 8)
+
+        VStack(spacing: 0) {
+            ForEach(gameClient.menuOptions.indices, id: \.self) { i in
+                Button(action: {
+                    gameClient.onMenuOptionSelected(index: i)
+                }) {
+                    Text(gameClient.menuOptions[i])
+                        .font(.system(size: 13 * uiScale, weight: .medium))
+                        .foregroundColor(ClassicPalette.text)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10 * uiScale)
+                        .frame(height: menuItemHeight)
+                }
+                .background(i % 2 == 0 ? ClassicPalette.panel : ClassicPalette.panelAlt)
+
+                if i < gameClient.menuOptions.count - 1 {
+                    Divider().background(ClassicPalette.panelBorder)
+                }
+            }
+        }
+        .frame(width: menuWidth)
+        .background(ClassicPalette.panel)
+        .overlay(
+            RoundedRectangle(cornerRadius: 4 * uiScale)
+                .stroke(ClassicPalette.panelBorder, lineWidth: 1)
+        )
+        .cornerRadius(4 * uiScale)
+        .shadow(color: .black.opacity(0.4), radius: 6, x: 2, y: 2)
+        .position(x: clampedX, y: clampedY)
     }
 
     private func togglePanel(_ panel: GamePanel) {
@@ -537,7 +631,9 @@ private struct TabButtonsView: View {
         (.inventory, .bagTab),
         (.skills, .skillsTab),
         (.magic, .spellTab),
-        (.settings, .settingsTab)
+        (.settings, .settingsTab),
+        (.equipment, .equipTab),
+        (.minimap, .minimapTab)
     ]
 
     var body: some View {
@@ -681,6 +777,7 @@ private struct ClassicGuiSpriteView: View {
 
 struct SettingsPanel: View {
     @EnvironmentObject private var gameState: GameState
+    @ObservedObject var gameClient: GameClient
     let uiScale: CGFloat
     let onClose: () -> Void
 
@@ -723,6 +820,19 @@ struct SettingsPanel: View {
                         SettingsBullet(text: "Zoom is limited to the original-style mobile-safe range.", uiScale: uiScale)
                         SettingsBullet(text: "Viewport stays aspect-fit to the device instead of stretching.", uiScale: uiScale)
                     }
+                }
+
+                settingsSection(title: "Combat Style") {
+                    Picker("Combat Style", selection: Binding(
+                        get: { gameClient.combatStyle },
+                        set: { style in Task { try? await gameClient.sendCombatStyle(style) } }
+                    )) {
+                        Text("Controlled").tag(0)
+                        Text("Aggressive").tag(1)
+                        Text("Accurate").tag(2)
+                        Text("Defensive").tag(3)
+                    }
+                    .pickerStyle(.segmented)
                 }
             }
         )
@@ -871,6 +981,7 @@ private struct SocialEmptyState: View {
 /// Inventory panel.
 struct InventoryView: View {
     let items: [InventoryItem]
+    let gameClient: GameClient
     let uiScale: CGFloat
     let onClose: () -> Void
 
@@ -887,7 +998,7 @@ struct InventoryView: View {
             content: LazyVGrid(columns: columns, spacing: 4 * uiScale) {
                 ForEach(0..<30, id: \.self) { index in
                     if index < items.count {
-                        InventorySlot(item: items[index], uiScale: uiScale)
+                        InventorySlot(item: items[index], slotIndex: index, gameClient: gameClient, uiScale: uiScale)
                     } else {
                         EmptySlot(uiScale: uiScale)
                     }
@@ -899,6 +1010,8 @@ struct InventoryView: View {
 
 struct InventorySlot: View {
     let item: InventoryItem
+    let slotIndex: Int
+    let gameClient: GameClient
     let uiScale: CGFloat
 
     private var itemImage: UIImage? {
@@ -937,6 +1050,14 @@ struct InventorySlot: View {
             }
         }
         .frame(width: 36 * uiScale, height: 36 * uiScale)
+        .contextMenu {
+            Button("Equip/Use") {
+                Task { try? await gameClient.equipItem(slot: slotIndex) }
+            }
+            Button("Drop", role: .destructive) {
+                Task { try? await gameClient.dropItem(slot: slotIndex) }
+            }
+        }
     }
 
     private func formatAmount(_ n: Int) -> String {
@@ -1093,6 +1214,7 @@ private struct ClassicPrayer {
 }
 
 struct MagicPanel: View {
+    @ObservedObject var gameClient: GameClient
     let magicLevel: Int
     let prayerLevel: Int
     let uiScale: CGFloat
@@ -1190,24 +1312,38 @@ struct MagicPanel: View {
 
                     ScrollView {
                         VStack(alignment: .leading, spacing: 4 * uiScale) {
-                            ForEach(Self.prayers, id: \.name) { prayer in
+                            ForEach(Array(Self.prayers.enumerated()), id: \.offset) { prayerIndex, prayer in
                                 let canUse = prayerLevel >= prayer.level
-                                HStack(spacing: 4 * uiScale) {
-                                    Text("Lv.\(prayer.level)")
-                                        .font(.system(size: 9 * uiScale, weight: .bold, design: .monospaced))
-                                        .foregroundColor(canUse ? ClassicPalette.accent : ClassicPalette.mutedText)
-                                        .frame(width: 30 * uiScale, alignment: .leading)
-                                    Text(prayer.name)
-                                        .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
-                                        .foregroundColor(canUse ? .white : ClassicPalette.mutedText)
+                                let isActive = prayerIndex < gameClient.activePrayers.count && gameClient.activePrayers[prayerIndex]
+                                Button(action: {
+                                    Task {
+                                        try? await gameClient.sendPrayerToggle(
+                                            prayerId: prayerIndex,
+                                            active: !(prayerIndex < gameClient.activePrayers.count && gameClient.activePrayers[prayerIndex])
+                                        )
+                                    }
+                                }) {
+                                    HStack(spacing: 4 * uiScale) {
+                                        Text("Lv.\(prayer.level)")
+                                            .font(.system(size: 9 * uiScale, weight: .bold, design: .monospaced))
+                                            .foregroundColor(canUse ? ClassicPalette.accent : ClassicPalette.mutedText)
+                                            .frame(width: 30 * uiScale, alignment: .leading)
+                                        Text(prayer.name)
+                                            .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                                            .foregroundColor(canUse ? .white : ClassicPalette.mutedText)
+                                    }
+                                    .padding(.vertical, 2 * uiScale)
+                                    .padding(.horizontal, 4 * uiScale)
+                                    .background(
+                                        isActive
+                                            ? RoundedRectangle(cornerRadius: 3 * uiScale).fill(ClassicPalette.accent.opacity(0.35))
+                                            : canUse
+                                                ? RoundedRectangle(cornerRadius: 3 * uiScale).fill(Color.white.opacity(0.06))
+                                                : nil
+                                    )
                                 }
-                                .padding(.vertical, 2 * uiScale)
-                                .padding(.horizontal, 4 * uiScale)
-                                .background(
-                                    canUse
-                                        ? RoundedRectangle(cornerRadius: 3 * uiScale).fill(Color.white.opacity(0.06))
-                                        : nil
-                                )
+                                .buttonStyle(.plain)
+                                .disabled(!canUse)
                             }
                         }
                     }
@@ -1237,4 +1373,410 @@ struct MagicPanel: View {
 #Preview {
     GameView(gameClient: GameClient(networkClient: NetworkClient()))
         .environmentObject(GameState())
+}
+
+struct EquipmentPanel: View {
+    @ObservedObject var gameClient: GameClient
+    let uiScale: CGFloat
+    let onClose: () -> Void
+
+    // RSC equipment slot positions and their names.
+    // Slot indices match wornEquipment array positions.
+    private let slots: [(index: Int, name: String, row: Int, col: Int)] = [
+        (0,  "Head",   0, 1),
+        (1,  "Cape",   1, 0),
+        (2,  "Neck",   1, 1),
+        (3,  "Weapon", 2, 0),
+        (4,  "Body",   2, 1),
+        (5,  "Shield", 2, 2),
+        (6,  "Legs",   3, 1),
+        (7,  "Hands",  4, 0),
+        (8,  "Feet",   4, 1),
+        (9,  "Ring",   4, 2),
+        (10, "Ammo",   1, 2),
+    ]
+
+    var body: some View {
+        ClassicPanelContainer(
+            title: "Equipment",
+            guiPart: .equipTab,
+            uiScale: uiScale,
+            onClose: onClose,
+            content: equipmentGrid
+        )
+    }
+
+    private var equipmentGrid: some View {
+        let cellSize: CGFloat = 44 * uiScale
+        let gridWidth = cellSize * 3 + 8 * uiScale * 2
+        return ZStack {
+            ForEach(slots, id: \.index) { slot in
+                equipmentSlotView(slot: slot, cellSize: cellSize)
+                    .position(
+                        x: CGFloat(slot.col) * cellSize + cellSize / 2,
+                        y: CGFloat(slot.row) * cellSize + cellSize / 2
+                    )
+            }
+        }
+        .frame(width: gridWidth, height: cellSize * 5)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func equipmentSlotView(slot: (index: Int, name: String, row: Int, col: Int), cellSize: CGFloat) -> some View {
+        let itemId = slot.index < gameClient.wornEquipment.count ? gameClient.wornEquipment[slot.index] : -1
+
+        Button(action: {
+            if itemId >= 0 {
+                Task { try? await gameClient.unequipItem(slot: slot.index) }
+            }
+        }) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 3 * uiScale)
+                    .fill(itemId >= 0 ? ClassicPalette.panel : ClassicPalette.panelAlt.opacity(0.5))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3 * uiScale)
+                            .stroke(ClassicPalette.panelBorder.opacity(0.6), lineWidth: 1)
+                    )
+
+                if itemId >= 0,
+                   let sprite = SpriteManager.shared.getItemSprite(itemId: itemId),
+                   let img = SpriteManager.shared.imageForSprite(sprite) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .interpolation(.none)
+                        .scaledToFit()
+                        .padding(3 * uiScale)
+                } else if itemId >= 0 {
+                    Text("#\(itemId)")
+                        .font(.system(size: 8 * uiScale, design: .monospaced))
+                        .foregroundColor(ClassicPalette.text)
+                } else {
+                    Text(slot.name)
+                        .font(.system(size: 7 * uiScale, design: .monospaced))
+                        .foregroundColor(ClassicPalette.mutedText)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(width: cellSize - 2 * uiScale, height: cellSize - 2 * uiScale)
+        }
+        .disabled(itemId < 0)
+        .buttonStyle(.plain)
+    }
+}
+
+struct BankOverlayView: View {
+    @ObservedObject var gameClient: GameClient
+    let uiScale: CGFloat
+
+    private let columns = [GridItem(.adaptive(minimum: 40), spacing: 4)]
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.55).ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Bank").font(.system(size: 14 * uiScale, weight: .bold)).foregroundColor(.yellow)
+                    Spacer()
+                    Button("Close") {
+                        Task { try? await gameClient.sendBankClose() }
+                    }
+                    .font(.system(size: 11 * uiScale)).foregroundColor(.white)
+                    .padding(.horizontal, 8 * uiScale).padding(.vertical, 4 * uiScale)
+                    .background(Color.red.opacity(0.8)).cornerRadius(4 * uiScale)
+                }
+                .padding(8 * uiScale)
+                .background(ClassicPalette.shell)
+
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 4) {
+                        ForEach(gameClient.bankItems) { item in
+                            Button(action: {
+                                Task { try? await gameClient.sendBankWithdraw(slot: item.slot, amount: 1) }
+                            }) {
+                                VStack(spacing: 1) {
+                                    Text("#\(item.itemId)")
+                                        .font(.system(size: 9 * uiScale))
+                                        .foregroundColor(ClassicPalette.text)
+                                    Text(item.amount > 1 ? "\(item.amount)" : " ")
+                                        .font(.system(size: 8 * uiScale))
+                                        .foregroundColor(.yellow)
+                                }
+                                .frame(width: 40 * uiScale, height: 40 * uiScale)
+                                .background(ClassicPalette.panel)
+                                .cornerRadius(2 * uiScale)
+                            }
+                        }
+                    }
+                    .padding(6 * uiScale)
+                }
+                .frame(maxHeight: 220 * uiScale)
+                .background(ClassicPalette.panelAlt)
+            }
+            .background(ClassicPalette.shell)
+            .cornerRadius(8 * uiScale)
+            .overlay(RoundedRectangle(cornerRadius: 8 * uiScale).stroke(ClassicPalette.panelBorder, lineWidth: 1))
+            .frame(width: 300 * uiScale)
+            .shadow(radius: 8)
+        }
+    }
+}
+
+struct ShopOverlayView: View {
+    @ObservedObject var gameClient: GameClient
+    let uiScale: CGFloat
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.55).ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Shop").font(.system(size: 14 * uiScale, weight: .bold)).foregroundColor(.yellow)
+                    Spacer()
+                    Button("Close") {
+                        Task { try? await gameClient.sendShopClose() }
+                    }
+                    .font(.system(size: 11 * uiScale)).foregroundColor(.white)
+                    .padding(.horizontal, 8 * uiScale).padding(.vertical, 4 * uiScale)
+                    .background(Color.red.opacity(0.8)).cornerRadius(4 * uiScale)
+                }
+                .padding(8 * uiScale)
+                .background(ClassicPalette.shell)
+
+                ScrollView {
+                    VStack(spacing: 3) {
+                        ForEach(Array(gameClient.shopItems.enumerated()), id: \.offset) { idx, item in
+                            HStack {
+                                Text("Item #\(item.itemId)")
+                                    .font(.system(size: 11 * uiScale)).foregroundColor(ClassicPalette.text)
+                                Text("x\(item.amount)")
+                                    .font(.system(size: 10 * uiScale)).foregroundColor(.gray)
+                                Spacer()
+                                Text("\(item.price) gp")
+                                    .font(.system(size: 10 * uiScale)).foregroundColor(.yellow)
+                                Button("Buy") {
+                                    Task { try? await gameClient.sendShopBuy(itemId: item.itemId, amount: 1) }
+                                }
+                                .font(.system(size: 10 * uiScale)).foregroundColor(.white)
+                                .padding(.horizontal, 6 * uiScale).padding(.vertical, 3 * uiScale)
+                                .background(Color.green.opacity(0.8)).cornerRadius(3 * uiScale)
+                            }
+                            .padding(.horizontal, 8 * uiScale).padding(.vertical, 3 * uiScale)
+                            .background(idx % 2 == 0 ? ClassicPalette.panel : ClassicPalette.panelAlt)
+                        }
+                    }
+                }
+                .frame(maxHeight: 220 * uiScale)
+            }
+            .background(ClassicPalette.shell)
+            .cornerRadius(8 * uiScale)
+            .overlay(RoundedRectangle(cornerRadius: 8 * uiScale).stroke(ClassicPalette.panelBorder, lineWidth: 1))
+            .frame(width: 300 * uiScale)
+            .shadow(radius: 8)
+        }
+    }
+}
+
+struct DialogueOverlayView: View {
+    @ObservedObject var gameClient: GameClient
+    let uiScale: CGFloat
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+            VStack(spacing: 0) {
+                Text("Choose an option:")
+                    .font(.system(size: 13 * uiScale, weight: .bold)).foregroundColor(.yellow)
+                    .padding(8 * uiScale).frame(maxWidth: .infinity)
+                    .background(ClassicPalette.shell)
+
+                VStack(spacing: 2) {
+                    ForEach(Array(gameClient.dialogueOptions.enumerated()), id: \.offset) { index, option in
+                        Button(action: {
+                            Task { try? await gameClient.sendDialogueAnswer(optionIndex: index) }
+                            gameClient.hideDialogue()
+                        }) {
+                            Text(option)
+                                .font(.system(size: 12 * uiScale))
+                                .foregroundColor(ClassicPalette.text)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10 * uiScale).padding(.vertical, 6 * uiScale)
+                                .background(ClassicPalette.panel)
+                        }
+                    }
+                }
+                .padding(4 * uiScale)
+                .background(ClassicPalette.panelAlt)
+            }
+            .background(ClassicPalette.shell)
+            .cornerRadius(8 * uiScale)
+            .overlay(RoundedRectangle(cornerRadius: 8 * uiScale).stroke(ClassicPalette.panelBorder, lineWidth: 1))
+            .frame(width: 260 * uiScale)
+            .shadow(radius: 8)
+        }
+    }
+}
+
+struct SleepScreenView: View {
+    @ObservedObject var gameClient: GameClient
+    let uiScale: CGFloat
+    @State private var sleepwordInput: String = ""
+    @State private var showWrongMessage: Bool = false
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 16 * uiScale) {
+                Text("You have fallen asleep")
+                    .font(.system(size: 16 * uiScale, weight: .bold)).foregroundColor(.white)
+
+                if let imageData = gameClient.sleepCaptchaImage,
+                   let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable().scaledToFit()
+                        .frame(height: 60 * uiScale)
+                        .border(Color.white, width: 1)
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 200 * uiScale, height: 60 * uiScale)
+                        .overlay(Text("Sleep word image").font(.system(size: 10 * uiScale)).foregroundColor(.gray))
+                }
+
+                Text("Type the word shown above:")
+                    .font(.system(size: 12 * uiScale)).foregroundColor(.white)
+
+                TextField("", text: $sleepwordInput)
+                    .font(.system(size: 14 * uiScale))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.black)
+                    .padding(8 * uiScale)
+                    .background(Color.white)
+                    .cornerRadius(4 * uiScale)
+                    .frame(width: 160 * uiScale)
+                    .onSubmit { submitSleepword() }
+
+                if showWrongMessage {
+                    Text("Incorrect word, try again.")
+                        .font(.system(size: 11 * uiScale)).foregroundColor(.red)
+                }
+
+                Button(action: submitSleepword) {
+                    Text("Wake Up")
+                        .font(.system(size: 13 * uiScale, weight: .semibold)).foregroundColor(.white)
+                        .padding(.horizontal, 20 * uiScale).padding(.vertical, 8 * uiScale)
+                        .background(Color.blue).cornerRadius(6 * uiScale)
+                }
+            }
+            .padding(24 * uiScale)
+        }
+        .onChange(of: gameClient.incorrectSleepwordAttempt) { newVal in
+            if newVal {
+                showWrongMessage = true
+                sleepwordInput = ""
+            }
+        }
+    }
+
+    private func submitSleepword() {
+        let word = sleepwordInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !word.isEmpty else { return }
+        Task { try? await gameClient.sendSleepword(word) }
+        sleepwordInput = ""
+    }
+}
+
+struct MinimapPanel: View {
+    @ObservedObject var gameClient: GameClient
+    let uiScale: CGFloat
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Map")
+                    .font(.system(size: 13 * uiScale, weight: .bold))
+                    .foregroundColor(ClassicPalette.accent)
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10 * uiScale, weight: .bold))
+                        .foregroundColor(ClassicPalette.mutedText)
+                }
+            }
+            .padding(.horizontal, 8 * uiScale)
+            .padding(.vertical, 6 * uiScale)
+            .background(ClassicPalette.shell)
+
+            Canvas { context, size in
+                let tileSize = size.width / 80.0  // 40 tiles each side
+                let cx = Double(gameClient.cameraX)
+                let cy = Double(gameClient.cameraY)
+                let px = size.width / 2
+                let py = size.height / 2
+
+                // Background
+                context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(red: 0.05, green: 0.12, blue: 0.05)))
+
+                // Grid lines (light)
+                var gridPath = Path()
+                let step = tileSize * 10
+                var x = px.truncatingRemainder(dividingBy: step)
+                while x < size.width { gridPath.move(to: CGPoint(x: x, y: 0)); gridPath.addLine(to: CGPoint(x: x, y: size.height)); x += step }
+                var y = py.truncatingRemainder(dividingBy: step)
+                while y < size.height { gridPath.move(to: CGPoint(x: 0, y: y)); gridPath.addLine(to: CGPoint(x: size.width, y: y)); y += step }
+                context.stroke(gridPath, with: .color(Color.white.opacity(0.08)), lineWidth: 0.5)
+
+                // Ground items (green dots, small)
+                for item in gameClient.groundItems {
+                    let dx = (Double(item.x) - cx) * tileSize
+                    let dy = (Double(item.y) - cy) * tileSize
+                    let dotRect = CGRect(x: px + dx - 1.5, y: py + dy - 1.5, width: 3, height: 3)
+                    context.fill(Path(ellipseIn: dotRect), with: .color(.green))
+                }
+
+                // NPCs (red dots)
+                for (_, npc) in gameClient.npcs {
+                    let dx = (Double(npc.x) - cx) * tileSize
+                    let dy = (Double(npc.y) - cy) * tileSize
+                    let dotRect = CGRect(x: px + dx - 2, y: py + dy - 2, width: 4, height: 4)
+                    context.fill(Path(ellipseIn: dotRect), with: .color(.red))
+                }
+
+                // Other players (yellow dots)
+                for (_, player) in gameClient.players {
+                    let dx = (Double(player.x) - cx) * tileSize
+                    let dy = (Double(player.y) - cy) * tileSize
+                    let dotRect = CGRect(x: px + dx - 2, y: py + dy - 2, width: 4, height: 4)
+                    context.fill(Path(ellipseIn: dotRect), with: .color(.yellow))
+                }
+
+                // Local player (white dot, center)
+                context.fill(Path(ellipseIn: CGRect(x: px - 4, y: py - 4, width: 8, height: 8)), with: .color(.white))
+                context.fill(Path(ellipseIn: CGRect(x: px - 2, y: py - 2, width: 4, height: 4)), with: .color(Color(red: 0.2, green: 0.5, blue: 1.0)))
+
+                // Compass N label
+                context.draw(Text("N").font(.system(size: 9)).foregroundColor(.white), at: CGPoint(x: size.width - 8, y: 8))
+            }
+            .frame(height: 180 * uiScale)
+            .clipShape(RoundedRectangle(cornerRadius: 4 * uiScale))
+            .background(Color(red: 0.05, green: 0.12, blue: 0.05))
+            .padding(6 * uiScale)
+            .background(ClassicPalette.panelAlt)
+
+            // Coordinates display
+            HStack {
+                Text("X: \(gameClient.cameraX)  Y: \(gameClient.cameraY)")
+                    .font(.system(size: 10 * uiScale, weight: .regular).monospaced())
+                    .foregroundColor(ClassicPalette.mutedText)
+            }
+            .padding(.vertical, 4 * uiScale)
+            .frame(maxWidth: .infinity)
+            .background(ClassicPalette.shell)
+        }
+        .background(ClassicPalette.panel)
+        .cornerRadius(6 * uiScale)
+        .overlay(RoundedRectangle(cornerRadius: 6 * uiScale).stroke(ClassicPalette.panelBorder, lineWidth: 1))
+    }
 }
