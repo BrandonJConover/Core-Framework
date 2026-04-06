@@ -1506,7 +1506,7 @@ extension GameClient {
         )
 
         // 7. Render 3D scene
-        sc.endRSScene()
+        sc.endScene()
 
         // 8. Copy pixel data to frameBuffer for Metal upload
         frameBuffer = gc.pixelData
