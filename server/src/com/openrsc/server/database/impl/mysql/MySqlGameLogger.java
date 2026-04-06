@@ -99,10 +99,9 @@ public final class MySqlGameLogger extends GameLogger {
 	protected void runQuery(final Query query) {
 		try {
 			if (query != null) {
-				if (query instanceof ResultQuery) {
-					final ResultQuery rq = (ResultQuery) query;
+				if (query instanceof ResultQuery rq) {
 					try (final PreparedStatement statement = rq.prepareStatement(getDatabase().getConnection().getConnection());
-						 final ResultSet result = statement.executeQuery();) {
+						 final ResultSet result = statement.executeQuery()) {
 						rq.onResult(result);
 					}
 				} else {

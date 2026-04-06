@@ -154,3 +154,21 @@ server/ipbans.temp
 
 # Rust build output
 server-rust/target/
+
+# Gradle build output
+server/bin/
+
+# iOS / Xcode
+iOS_Client/OpenRSC/.build/
+iOS_Client/OpenRSC/OpenRSC.xcodeproj/project.xcworkspace/xcuserdata/
+iOS_Client/OpenRSC/OpenRSC.xcodeproj/xcuserdata/
+xcuserdata/
+DerivedData/
+*.xcscmblueprint
+*.xccheckout
+
+# Planning docs
+docs/
+
+# macOS
+.DS_Store

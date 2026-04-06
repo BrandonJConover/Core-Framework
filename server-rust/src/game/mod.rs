@@ -2,6 +2,7 @@
 //! Contains game-specific logic like player management, world state, and game mechanics.
 
 pub mod action;
+pub mod achievement;
 pub mod agility;
 pub mod auth;
 pub mod bank;
@@ -11,6 +12,8 @@ pub mod combat;
 pub mod cooking;
 pub mod crafting;
 pub mod database;
+pub mod dialogue;
+pub mod drop_table;
 pub mod duel;
 pub mod entity;
 pub mod equipment;
@@ -30,6 +33,7 @@ pub mod party;
 pub mod pathfinding;
 pub mod player;
 pub mod prayer;
+pub mod protocol;
 pub mod quest;
 pub mod ranged;
 pub mod runecrafting;
