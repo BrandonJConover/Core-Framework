@@ -1,0 +1,7 @@
+/Users/brandonjconover/Documents/GitHub/Core-Framework/server-rust/target/debug/deps/opentelemetry_semantic_conventions-55511da39d2b9132.d: /Users/brandonjconover/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opentelemetry-semantic-conventions-0.13.0/src/lib.rs /Users/brandonjconover/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opentelemetry-semantic-conventions-0.13.0/src/resource.rs /Users/brandonjconover/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opentelemetry-semantic-conventions-0.13.0/src/trace.rs
+
+/Users/brandonjconover/Documents/GitHub/Core-Framework/server-rust/target/debug/deps/libopentelemetry_semantic_conventions-55511da39d2b9132.rmeta: /Users/brandonjconover/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opentelemetry-semantic-conventions-0.13.0/src/lib.rs /Users/brandonjconover/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opentelemetry-semantic-conventions-0.13.0/src/resource.rs /Users/brandonjconover/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opentelemetry-semantic-conventions-0.13.0/src/trace.rs
+
+/Users/brandonjconover/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opentelemetry-semantic-conventions-0.13.0/src/lib.rs:
+/Users/brandonjconover/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opentelemetry-semantic-conventions-0.13.0/src/resource.rs:
+/Users/brandonjconover/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opentelemetry-semantic-conventions-0.13.0/src/trace.rs:

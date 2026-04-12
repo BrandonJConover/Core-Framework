@@ -1,0 +1,3 @@
+module OpenRSC {
+    header "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/include/OpenRSC-Swift.h"
+}

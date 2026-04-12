@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCTests.build/master.swiftdeps"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/Tests/OpenRSCTests.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCTests.build/OpenRSCTests.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCTests.build/OpenRSCTests.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCTests.build/OpenRSCTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCTests.build/OpenRSCTests.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCTests.build/OpenRSCTests.dia"
+  }
+}

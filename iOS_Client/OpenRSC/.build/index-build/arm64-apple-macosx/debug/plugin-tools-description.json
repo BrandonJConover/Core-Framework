@@ -1,0 +1,928 @@
+{
+  "builtTestProducts" : [
+    {
+      "binaryPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.xctest/Contents/MacOS/OpenRSCPackageTests",
+      "packagePath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC",
+      "productName" : "OpenRSCPackageTests"
+    }
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.OpenRSC-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/sources",
+      "importPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/App/OpenRSCApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Audio/SoundManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Input/InputHandler.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/EntityDefinitions.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/GameClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/ItemDefinitions.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/NetworkClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/PacketHandler.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/SecureNetworkClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/FastMath.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GameRenderer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GraphicsController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/LandscapeArchiveReader.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/ModelArchiveLoader.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Polygon.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/RSModel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scanline.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scene.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Shader.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteArchiveReader.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/World.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Utils/MobileOptimizations.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/DuelView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameContainerView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/TradeView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "OpenRSC",
+      "moduleOutputPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules/OpenRSC.swiftmodule",
+      "objects" : [
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/OpenRSCApp.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SoundManager.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/InputHandler.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/EntityDefinitions.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameClient.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ItemDefinitions.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/NetworkClient.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/PacketHandler.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SecureNetworkClient.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/FastMath.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameRenderer.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GraphicsController.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/LandscapeArchiveReader.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ModelArchiveLoader.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Polygon.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/RSModel.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scanline.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scene.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Shader.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteArchiveReader.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteManager.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/World.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/MobileOptimizations.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/DuelView.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameContainerView.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameView.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/TradeView.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/include/OpenRSC-Swift.h",
+        "-swift-version",
+        "5",
+        "-Xfrontend",
+        "-experimental-lazy-typecheck",
+        "-Xfrontend",
+        "-experimental-skip-all-function-bodies",
+        "-Xfrontend",
+        "-experimental-allow-module-with-compiler-errors",
+        "-Xfrontend",
+        "-empty-abi-descriptor",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "openrsc"
+      ],
+      "outputFileMapPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules/OpenRSC.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : true,
+      "sources" : [
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/App/OpenRSCApp.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Audio/SoundManager.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Input/InputHandler.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/EntityDefinitions.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/GameClient.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/ItemDefinitions.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/NetworkClient.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/PacketHandler.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/SecureNetworkClient.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/FastMath.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GameRenderer.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GraphicsController.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/LandscapeArchiveReader.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/ModelArchiveLoader.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Polygon.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/RSModel.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scanline.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scene.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Shader.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteArchiveReader.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteManager.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/World.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Utils/MobileOptimizations.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/DuelView.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameContainerView.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameView.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/TradeView.swift"
+      ],
+      "tempsPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.OpenRSCPackageTests-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/sources",
+      "importPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.derived/runner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules/OpenRSCTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "OpenRSCPackageTests",
+      "moduleOutputPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules/OpenRSCPackageTests.swiftmodule",
+      "objects" : [
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/runner.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/include/OpenRSCPackageTests-Swift.h",
+        "-Xfrontend",
+        "-experimental-lazy-typecheck",
+        "-Xfrontend",
+        "-experimental-skip-all-function-bodies",
+        "-Xfrontend",
+        "-experimental-allow-module-with-compiler-errors",
+        "-Xfrontend",
+        "-empty-abi-descriptor",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "openrsc"
+      ],
+      "outputFileMapPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules/OpenRSCPackageTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : true,
+      "sources" : [
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.derived/runner.swift"
+      ],
+      "tempsPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.OpenRSCTests-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCTests.build/sources",
+      "importPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/Tests/OpenRSCTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules/OpenRSC.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "OpenRSCTests",
+      "moduleOutputPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules/OpenRSCTests.swiftmodule",
+      "objects" : [
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCTests.build/OpenRSCTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "5",
+        "-Xfrontend",
+        "-experimental-lazy-typecheck",
+        "-Xfrontend",
+        "-experimental-skip-all-function-bodies",
+        "-Xfrontend",
+        "-experimental-allow-module-with-compiler-errors",
+        "-Xfrontend",
+        "-empty-abi-descriptor",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "openrsc"
+      ],
+      "outputFileMapPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules/OpenRSCTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : true,
+      "sources" : [
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/Tests/OpenRSCTests.swift"
+      ],
+      "tempsPath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCTests.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "OpenRSC" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "OpenRSC",
+      "-package-name",
+      "openrsc",
+      "-c",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/App/OpenRSCApp.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Audio/SoundManager.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Input/InputHandler.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/EntityDefinitions.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/GameClient.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/ItemDefinitions.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/NetworkClient.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/PacketHandler.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/SecureNetworkClient.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/FastMath.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GameRenderer.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GraphicsController.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/LandscapeArchiveReader.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/ModelArchiveLoader.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Polygon.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/RSModel.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scanline.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scene.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Shader.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteArchiveReader.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteManager.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/World.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Utils/MobileOptimizations.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/DuelView.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameContainerView.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameView.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/TradeView.swift",
+      "-I",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/include/OpenRSC-Swift.h",
+      "-swift-version",
+      "5",
+      "-Xfrontend",
+      "-experimental-lazy-typecheck",
+      "-Xfrontend",
+      "-experimental-skip-all-function-bodies",
+      "-Xfrontend",
+      "-experimental-allow-module-with-compiler-errors",
+      "-Xfrontend",
+      "-empty-abi-descriptor",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "openrsc",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "OpenRSCPackageTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "OpenRSCPackageTests",
+      "-package-name",
+      "openrsc",
+      "-c",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.derived/runner.swift",
+      "-I",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/include/OpenRSCPackageTests-Swift.h",
+      "-Xfrontend",
+      "-experimental-lazy-typecheck",
+      "-Xfrontend",
+      "-experimental-skip-all-function-bodies",
+      "-Xfrontend",
+      "-experimental-allow-module-with-compiler-errors",
+      "-Xfrontend",
+      "-empty-abi-descriptor",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "openrsc",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "OpenRSCTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "OpenRSCTests",
+      "-package-name",
+      "openrsc",
+      "-c",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/Tests/OpenRSCTests.swift",
+      "-I",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "5",
+      "-Xfrontend",
+      "-experimental-lazy-typecheck",
+      "-Xfrontend",
+      "-experimental-skip-all-function-bodies",
+      "-Xfrontend",
+      "-experimental-allow-module-with-compiler-errors",
+      "-Xfrontend",
+      "-empty-abi-descriptor",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "openrsc",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "OpenRSC" : [
+
+    ],
+    "OpenRSCPackageTests" : [
+      "OpenRSCTests",
+      "OpenRSC"
+    ],
+    "OpenRSCTests" : [
+      "OpenRSC"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/App/OpenRSCApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Audio/SoundManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Input/InputHandler.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/EntityDefinitions.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/GameClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/ItemDefinitions.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/NetworkClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/PacketHandler.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/SecureNetworkClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/FastMath.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GameRenderer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GraphicsController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/LandscapeArchiveReader.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/ModelArchiveLoader.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Polygon.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/RSModel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scanline.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scene.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Shader.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteArchiveReader.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/World.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Utils/MobileOptimizations.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/DuelView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameContainerView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/TradeView.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/sources"
+    },
+    "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.derived/runner.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/sources"
+    },
+    "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/Tests/OpenRSCTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSCTests.build/sources"
+    },
+    "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}

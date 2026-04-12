@@ -1,0 +1,194 @@
+{
+  "": {
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/master.swiftdeps"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/App/OpenRSCApp.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/OpenRSCApp.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/OpenRSCApp.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/OpenRSCApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/OpenRSCApp.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/OpenRSCApp.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Audio/SoundManager.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SoundManager.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SoundManager.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SoundManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SoundManager.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SoundManager.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Input/InputHandler.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/InputHandler.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/InputHandler.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/InputHandler~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/InputHandler.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/InputHandler.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/EntityDefinitions.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/EntityDefinitions.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/EntityDefinitions.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/EntityDefinitions~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/EntityDefinitions.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/EntityDefinitions.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/GameClient.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameClient.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameClient.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameClient.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameClient.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Models/ItemDefinitions.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ItemDefinitions.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ItemDefinitions.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ItemDefinitions~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ItemDefinitions.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ItemDefinitions.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/NetworkClient.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/NetworkClient.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/NetworkClient.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/NetworkClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/NetworkClient.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/NetworkClient.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/PacketHandler.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/PacketHandler.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/PacketHandler.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/PacketHandler~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/PacketHandler.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/PacketHandler.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/SecureNetworkClient.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SecureNetworkClient.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SecureNetworkClient.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SecureNetworkClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SecureNetworkClient.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SecureNetworkClient.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/FastMath.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/FastMath.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/FastMath.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/FastMath~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/FastMath.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/FastMath.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GameRenderer.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameRenderer.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameRenderer.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameRenderer~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameRenderer.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameRenderer.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GraphicsController.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GraphicsController.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GraphicsController.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GraphicsController~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GraphicsController.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GraphicsController.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/LandscapeArchiveReader.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/LandscapeArchiveReader.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/LandscapeArchiveReader.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/LandscapeArchiveReader~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/LandscapeArchiveReader.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/LandscapeArchiveReader.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/ModelArchiveLoader.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ModelArchiveLoader.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ModelArchiveLoader.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ModelArchiveLoader~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ModelArchiveLoader.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/ModelArchiveLoader.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Polygon.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Polygon.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Polygon.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Polygon~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Polygon.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Polygon.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/RSModel.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/RSModel.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/RSModel.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/RSModel~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/RSModel.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/RSModel.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scanline.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scanline.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scanline.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scanline~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scanline.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scanline.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Scene.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scene.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scene.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scene~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scene.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Scene.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/Shader.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Shader.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Shader.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Shader~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Shader.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/Shader.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteArchiveReader.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteArchiveReader.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteArchiveReader.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteArchiveReader~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteArchiveReader.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteArchiveReader.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/SpriteManager.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteManager.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteManager.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteManager.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/SpriteManager.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/World.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/World.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/World.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/World~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/World.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/World.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Utils/MobileOptimizations.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/MobileOptimizations.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/MobileOptimizations.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/MobileOptimizations~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/MobileOptimizations.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/MobileOptimizations.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/DuelView.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/DuelView.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/DuelView.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/DuelView~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/DuelView.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/DuelView.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameContainerView.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameContainerView.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameContainerView.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameContainerView~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameContainerView.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameContainerView.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameView.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameView.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameView.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameView~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameView.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/GameView.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/TradeView.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/TradeView.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/TradeView.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/TradeView~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/TradeView.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/index-build/arm64-apple-macosx/debug/OpenRSC.build/TradeView.dia"
+  }
+}
