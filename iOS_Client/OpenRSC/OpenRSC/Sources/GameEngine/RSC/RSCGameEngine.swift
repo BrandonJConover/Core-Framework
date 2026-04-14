@@ -146,12 +146,143 @@ final class RSCGameEngine: ObservableObject {
     // MARK: - Input handling
 
     private func handleTap(x: Int, y: Int) {
-        // Build walk-to-point packet and send
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.walkToPoint.rawValue))
             buf.putShort(x)
             buf.putShort(y)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    // MARK: - Combat actions
+
+    func attackNPC(serverIndex: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.npcAttack.rawValue))
+            buf.putShort(serverIndex)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func attackPlayer(serverIndex: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.playerAttack.rawValue))
+            buf.putShort(serverIndex)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func setCombatStyle(_ style: Int) {
+        worldState.combatStyle = style
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.combatStyleChange.rawValue))
+            buf.putByte(style)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func talkToNPC(serverIndex: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.npcTalkTo.rawValue))
+            buf.putShort(serverIndex)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    // MARK: - Chat
+
+    func sendChatMessage(_ text: String) {
+        worldState.addChat(sender: worldState.localPlayerName, text: text, isLocal: true)
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.chatMessage.rawValue))
+            buf.putString(text)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func sendPrivateMessage(to recipient: String, text: String) {
+        worldState.addChat(sender: "To \(recipient)", text: text, isLocal: true, isPrivate: true)
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.privateMessage.rawValue))
+            buf.putString(recipient)
+            buf.putString(text)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func sendServerCommand(_ command: String) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.command.rawValue))
+            buf.putString(command)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    // MARK: - Inventory actions
+
+    func equipItem(slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemEquip.rawValue))
+            buf.putShort(slot)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func unequipItem(slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemUnequip.rawValue))
+            buf.putShort(slot)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func dropItem(slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemDrop.rawValue))
+            buf.putShort(slot)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func useItem(slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemCommand.rawValue))
+            buf.putShort(slot)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func pickupGroundItem(x: Int, y: Int, itemId: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.groundItemTake.rawValue))
+            buf.putShort(x)
+            buf.putShort(y)
+            buf.putShort(itemId)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
