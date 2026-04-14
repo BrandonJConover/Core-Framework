@@ -16,6 +16,20 @@
           "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC_OpenRSC.bundle/Shaders.metal"
         }
       ]
+    },
+    "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC_OpenRSC.bundle/WebClient" : {
+      "inputs" : [
+        {
+          "kind" : "directory",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/WebClient"
+        }
+      ],
+      "outputs" : [
+        {
+          "kind" : "directory",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC_OpenRSC.bundle/WebClient"
+        }
+      ]
     }
   },
   "explicitTargetDependencyImportCheckingMode" : {
@@ -85,6 +99,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GraphicsController.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/MetalRenderer.swift"
         },
         {
@@ -94,6 +112,14 @@
         {
           "kind" : "file",
           "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/HUDView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/LocalHTTPServer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/WebGameView.swift"
         },
         {
           "kind" : "file",
@@ -148,9 +174,12 @@
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/RSCLoginHandler.swift.o",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/RSCOpcodes.swift.o",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/TCPConnection.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/GraphicsController.swift.o",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/MetalRenderer.swift.o",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/GameView.swift.o",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/HUDView.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/LocalHTTPServer.swift.o",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/WebGameView.swift.o",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/GameSelectorView.swift.o",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/ServerBrowserView.swift.o",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/LoginView.swift.o",
@@ -259,6 +288,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/GraphicsController.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/MetalRenderer.swift.o"
         },
         {
@@ -268,6 +301,14 @@
         {
           "kind" : "file",
           "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/HUDView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/LocalHTTPServer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSC.build/WebGameView.swift.o"
         },
         {
           "kind" : "file",
@@ -312,9 +353,12 @@
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/RSC/RSCLoginHandler.swift",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/RSC/RSCOpcodes.swift",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/RSC/TCPConnection.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GraphicsController.swift",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/MetalRenderer.swift",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/GameView.swift",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/HUDView.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/LocalHTTPServer.swift",
+        "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/WebGameView.swift",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameSelector/GameSelectorView.swift",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameSelector/ServerBrowserView.swift",
         "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Login/LoginView.swift",
@@ -349,9 +393,12 @@
       "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/RSC/RSCLoginHandler.swift",
       "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/RSC/RSCOpcodes.swift",
       "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Network/RSC/TCPConnection.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GraphicsController.swift",
       "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/MetalRenderer.swift",
       "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/GameView.swift",
       "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/HUDView.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/LocalHTTPServer.swift",
+      "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/WebGameView.swift",
       "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameSelector/GameSelectorView.swift",
       "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/GameSelector/ServerBrowserView.swift",
       "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Login/LoginView.swift",
@@ -485,6 +532,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/GraphicsController.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Rendering/MetalRenderer.swift"
         },
         {
@@ -494,6 +545,14 @@
         {
           "kind" : "file",
           "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/HUDView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/LocalHTTPServer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/OpenRSC/Sources/Views/Game/WebGameView.swift"
         },
         {
           "kind" : "file",
