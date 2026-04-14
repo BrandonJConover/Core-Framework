@@ -884,8 +884,11 @@ public class ActionSender {
 		configs.add((byte) (server.getConfig().DISABLE_MINIMAP_ROTATION ? 1 : 0)); // 84
 		configs.add((byte) (server.getConfig().ALLOW_BEARDED_LADIES ? 1 : 0)); // 85
 		configs.add((byte) (server.getConfig().PRIDE_MONTH ? 1 : 0)); // 86
-		configs.add(Crypto.getPublicExponent().toString()); // 87
-		configs.add(Crypto.getPublicModulus().toString()); // 88
+		// Convert RSA keys to hex format with even number of digits (as expected by mudclient)
+		String expHex = Crypto.getPublicExponent().toString(16);
+		configs.add(expHex.length() % 2 == 1 ? "0" + expHex : expHex); // 87
+		String modHex = Crypto.getPublicModulus().toString(16);
+		configs.add(modHex.length() % 2 == 1 ? "0" + modHex : modHex); // 88
 
 		struct.configs = configs;
 		struct.setOpcode(OpcodeOut.SEND_SERVER_CONFIGS);
