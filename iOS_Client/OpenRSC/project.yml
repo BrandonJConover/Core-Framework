@@ -1,0 +1,62 @@
+name: OpenRSC
+
+options:
+  bundleIdPrefix: com.openrsc
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    ENABLE_BITCODE: NO
+    DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+
+targets:
+  OpenRSC:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: OpenRSC/Sources
+        excludes:
+          - "**/.DS_Store"
+          - "Rendering/Shaders.metal"
+    resources:
+      - path: OpenRSC/Sources/WebClient
+        type: folder
+    info:
+      path: OpenRSC/Info.plist
+      properties:
+        CFBundleDisplayName: OpenRSC
+        CFBundleIdentifier: com.openrsc.client
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "0.1.0"
+        UILaunchStoryboardName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsArbitraryLoadsInWebContent: true
+          NSAllowsLocalNetworking: true
+        UIRequiresFullScreen: false
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openrsc.client
+        PRODUCT_NAME: OpenRSC
+        INFOPLIST_FILE: OpenRSC/Info.plist
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        ENABLE_PREVIEWS: YES
+        METAL_COMPILER_FLAGS: ""
+        MTL_ENABLE_DEBUG_INFO: INCLUDE_SOURCE

@@ -52,7 +52,7 @@ struct ServerBrowserView: View {
                             ServerRow(server: server)
                                 .listRowBackground(Color(hex: "#2a2a2a"))
                                 .onTapGesture {
-                                    appState.currentView = .login(server)
+                                    appState.currentView = .game(server)
                                 }
                         }
                         .onDelete { offsets in

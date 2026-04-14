@@ -57,10 +57,26 @@ final class RSCWorldState: ObservableObject {
     @Published var inventory: [RSCInventoryItem] = []
     @Published var skills: [RSCSkill] = []
     @Published var serverName: String = ""
+    @Published var serverWelcomeMessage: String = ""
+    @Published var playerCount: Int = 0
+    @Published var playerMax: Int = 0
+    @Published var isMembersWorld: Bool = false
+    @Published var fatigue: Int = 0
+    @Published var isDead: Bool = false
 
     func addChat(sender: String, text: String, isLocal: Bool = false) {
         let msg = RSCChatMessage(sender: sender, text: text, isLocal: isLocal)
         chatMessages.append(msg)
         if chatMessages.count > 100 { chatMessages.removeFirst() }
+    }
+
+    func updateExperience(skill: Int, xp: Int) {
+        guard skill >= 0 && skill < skills.count else { return }
+        skills[skill].experience = xp
+    }
+
+    func updateStatCurrent(skill: Int, level: Int) {
+        guard skill >= 0 && skill < skills.count else { return }
+        skills[skill].level = level
     }
 }

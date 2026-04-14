@@ -4,11 +4,13 @@ import SwiftUI
 struct OpenRSCApp: App {
     @StateObject private var appState = AppState()
 
-    var body: some Scene {
+    var body: WindowGroup<AnyView> {
         WindowGroup {
-            RootView()
-                .environmentObject(appState)
-                .preferredColorScheme(.dark)
+            AnyView(
+                RootView()
+                    .environmentObject(appState)
+                    .preferredColorScheme(.dark)
+            )
         }
     }
 }

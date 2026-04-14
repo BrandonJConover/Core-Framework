@@ -1,0 +1,561 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0431A2EC99EFE1BBCDBE0895 /* apple-touch-icon.svg in Resources */ = {isa = PBXBuildFile; fileRef = B7BD0B19729CDF71F03B5447 /* apple-touch-icon.svg */; };
+		056348FA1DEC564CF4D734D0 /* RSCLoginHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D4A8C89190272EFC205D26A /* RSCLoginHandler.swift */; };
+		0950957DF00260DAA0754C38 /* OpenRSCApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5969C636EE8BFAC20BDCE024 /* OpenRSCApp.swift */; };
+		0B5B96679272F4061595F185 /* ServerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82C6EF63288E0ECBA6862BC3 /* ServerProfile.swift */; };
+		1F05133FAB0524EC26661315 /* GraphicsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C023BDFCCE3322E38787E6 /* GraphicsController.swift */; };
+		3014C9952753A6CE34CE0042 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85989A2D185A0C6B9D712DC5 /* RegisterView.swift */; };
+		378B96EA683C267A82C4C8AA /* TouchTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38223850597085ADCA3EE8A3 /* TouchTranslator.swift */; };
+		38C33FA876898935E129638B /* index-DPxhQ9EC.css in Resources */ = {isa = PBXBuildFile; fileRef = A780EECE5BBD73BA205B35EF /* index-DPxhQ9EC.css */; };
+		3AA1A652B3144AB124C777AA /* ByteBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62F92BCAA91ED7CB2C887F6F /* ByteBuffer.swift */; };
+		3D751413D47F84684101DEC1 /* Polygon.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2188BC35B6FD7A3DFDBCA4 /* Polygon.swift */; };
+		48198E65F85056BF3CD2BCE6 /* ModelArchiveLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9F6A909F89CE0F94742AF5 /* ModelArchiveLoader.swift */; };
+		4EDFD6C354CB77D0C3011728 /* RSCWorldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CBD0EBDD0DAD78E31727091 /* RSCWorldState.swift */; };
+		5D992464CE94A9E8AD9FE4FE /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA34960346994775CDF265C /* LoginView.swift */; };
+		64AB02B55EB3EBA6BE73D300 /* Scanline.swift in Sources */ = {isa = PBXBuildFile; fileRef = D37E5A4EBD7022529B04B92A /* Scanline.swift */; };
+		6B141925187BB265598AE4E2 /* ISAACCipher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63B049FFEB87A145A0D3F9BC /* ISAACCipher.swift */; };
+		7234C13A3B9833C90E81C8CF /* Scene.swift in Sources */ = {isa = PBXBuildFile; fileRef = F01562B77A1FF9666EF960FB /* Scene.swift */; };
+		79FBC4B39E4291EA3889A584 /* FastMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79470D5C002A690DB639638F /* FastMath.swift */; };
+		7B1AFF5AF426F6B8B55346E7 /* favicon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 7F059D08510016EE9C23C859 /* favicon.svg */; };
+		7DEDBC075AAE1EA8F6D35A82 /* GameSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5F4767C4E2C9162C1DF5F3 /* GameSelectorView.swift */; };
+		7E5BDCCBB1306E8972868C16 /* index.html in Resources */ = {isa = PBXBuildFile; fileRef = ACC19C12416DD918116AC57B /* index.html */; };
+		87B26B2F490394943F28B68D /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A609DE488849FEB3D6CB9E47 /* MetalRenderer.swift */; };
+		89A587E1B70A0CBC5632E006 /* RSCGameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24A98D60D91F8BC96E8BD27 /* RSCGameEngine.swift */; };
+		8D061CA1AC54B0CBBD451140 /* RSCOpcodes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A1905E095D026FE16EA83 /* RSCOpcodes.swift */; };
+		9BF9A498F47DACC733867A2D /* WebGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */; };
+		9FE977A0B299BF34656DCDF5 /* index-B-lwQOZr.js in Resources */ = {isa = PBXBuildFile; fileRef = 35A3B6BD53AB87263F430D4E /* index-B-lwQOZr.js */; };
+		A19DE57B3E32A6C6541C11D6 /* HUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00878BEFAD27286B1E048F3B /* HUDView.swift */; };
+		A2FEAD959F5162454E49F9CE /* RSCPacketHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A06C782469867C78107848F /* RSCPacketHandler.swift */; };
+		A90CABFEADA63166A315C892 /* LocalHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BDDB02A754C67CF7D8CEC0D /* LocalHTTPServer.swift */; };
+		AFB05CAF0757B4C1C741DCBF /* EntityDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABDC850EF4975AC38D6C8306 /* EntityDefinitions.swift */; };
+		B8725914B85D1E9DFE630D12 /* RSModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EAAA291551DD814CD0DA0F3 /* RSModel.swift */; };
+		CBF2C9E8D5FADE352A16BF9B /* Shader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 690046C4CF8B28809E819546 /* Shader.swift */; };
+		CC7E01957E9CC492C4A17597 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA10602CA01E71FF2E52EF /* AppState.swift */; };
+		D52601860204DA30D7B28639 /* TCPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990619EF9FCF13064CD17511 /* TCPConnection.swift */; };
+		E3F13C70A5D6B3E05C6615BE /* GameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C3A69581252F63EC5EAA1E /* GameView.swift */; };
+		E6742B1D452C43AB4926C8A9 /* World.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F001E360C5E37BAE24BD54 /* World.swift */; };
+		EB5AA1EDEB883B4B339EC1B2 /* GameProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7A50354B450F1785FDA303 /* GameProtocol.swift */; };
+		F434395EB6BF20DBAC76710C /* ServerBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C61DBD09EB20B0BF2CC077 /* ServerBrowserView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		00878BEFAD27286B1E048F3B /* HUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDView.swift; sourceTree = "<group>"; };
+		2BDDB02A754C67CF7D8CEC0D /* LocalHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHTTPServer.swift; sourceTree = "<group>"; };
+		35A3B6BD53AB87263F430D4E /* index-B-lwQOZr.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "index-B-lwQOZr.js"; sourceTree = "<group>"; };
+		38223850597085ADCA3EE8A3 /* TouchTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchTranslator.swift; sourceTree = "<group>"; };
+		43C023BDFCCE3322E38787E6 /* GraphicsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphicsController.swift; sourceTree = "<group>"; };
+		47C3A69581252F63EC5EAA1E /* GameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameView.swift; sourceTree = "<group>"; };
+		4EAAA291551DD814CD0DA0F3 /* RSModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSModel.swift; sourceTree = "<group>"; };
+		5969C636EE8BFAC20BDCE024 /* OpenRSCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRSCApp.swift; sourceTree = "<group>"; };
+		5CBD0EBDD0DAD78E31727091 /* RSCWorldState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCWorldState.swift; sourceTree = "<group>"; };
+		5D5705B24E1415694C5BFC19 /* OpenRSC.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenRSC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		62F92BCAA91ED7CB2C887F6F /* ByteBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ByteBuffer.swift; sourceTree = "<group>"; };
+		63B049FFEB87A145A0D3F9BC /* ISAACCipher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ISAACCipher.swift; sourceTree = "<group>"; };
+		690046C4CF8B28809E819546 /* Shader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shader.swift; sourceTree = "<group>"; };
+		79470D5C002A690DB639638F /* FastMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastMath.swift; sourceTree = "<group>"; };
+		7A06C782469867C78107848F /* RSCPacketHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCPacketHandler.swift; sourceTree = "<group>"; };
+		7B4A1905E095D026FE16EA83 /* RSCOpcodes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCOpcodes.swift; sourceTree = "<group>"; };
+		7D4A8C89190272EFC205D26A /* RSCLoginHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCLoginHandler.swift; sourceTree = "<group>"; };
+		7F059D08510016EE9C23C859 /* favicon.svg */ = {isa = PBXFileReference; path = favicon.svg; sourceTree = "<group>"; };
+		82C6EF63288E0ECBA6862BC3 /* ServerProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerProfile.swift; sourceTree = "<group>"; };
+		85989A2D185A0C6B9D712DC5 /* RegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterView.swift; sourceTree = "<group>"; };
+		86C61DBD09EB20B0BF2CC077 /* ServerBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerBrowserView.swift; sourceTree = "<group>"; };
+		8DBA10602CA01E71FF2E52EF /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebGameView.swift; sourceTree = "<group>"; };
+		990619EF9FCF13064CD17511 /* TCPConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCPConnection.swift; sourceTree = "<group>"; };
+		99F001E360C5E37BAE24BD54 /* World.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = World.swift; sourceTree = "<group>"; };
+		9F7A50354B450F1785FDA303 /* GameProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameProtocol.swift; sourceTree = "<group>"; };
+		A609DE488849FEB3D6CB9E47 /* MetalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalRenderer.swift; sourceTree = "<group>"; };
+		A780EECE5BBD73BA205B35EF /* index-DPxhQ9EC.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = "index-DPxhQ9EC.css"; sourceTree = "<group>"; };
+		ABDC850EF4975AC38D6C8306 /* EntityDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntityDefinitions.swift; sourceTree = "<group>"; };
+		ACC19C12416DD918116AC57B /* index.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = index.html; sourceTree = "<group>"; };
+		AFA34960346994775CDF265C /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		B7BD0B19729CDF71F03B5447 /* apple-touch-icon.svg */ = {isa = PBXFileReference; path = "apple-touch-icon.svg"; sourceTree = "<group>"; };
+		BF2188BC35B6FD7A3DFDBCA4 /* Polygon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polygon.swift; sourceTree = "<group>"; };
+		C24A98D60D91F8BC96E8BD27 /* RSCGameEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCGameEngine.swift; sourceTree = "<group>"; };
+		CA9F6A909F89CE0F94742AF5 /* ModelArchiveLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelArchiveLoader.swift; sourceTree = "<group>"; };
+		D37E5A4EBD7022529B04B92A /* Scanline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scanline.swift; sourceTree = "<group>"; };
+		DB5F4767C4E2C9162C1DF5F3 /* GameSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSelectorView.swift; sourceTree = "<group>"; };
+		F01562B77A1FF9666EF960FB /* Scene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scene.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		14BFB150E52CE5887FD9D2C4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5D5705B24E1415694C5BFC19 /* OpenRSC.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		26ABAB5919F1BD537A0A4B1E /* Game */ = {
+			isa = PBXGroup;
+			children = (
+				47C3A69581252F63EC5EAA1E /* GameView.swift */,
+				00878BEFAD27286B1E048F3B /* HUDView.swift */,
+				2BDDB02A754C67CF7D8CEC0D /* LocalHTTPServer.swift */,
+				9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */,
+			);
+			path = Game;
+			sourceTree = "<group>";
+		};
+		5138393423EBA38325AF3D1C /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				5969C636EE8BFAC20BDCE024 /* OpenRSCApp.swift */,
+				26ABAB5919F1BD537A0A4B1E /* Game */,
+				E315A776BCB043D7824B75B4 /* GameSelector */,
+				530C8C7EB5A9EEB1675B5E3C /* Login */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		530C8C7EB5A9EEB1675B5E3C /* Login */ = {
+			isa = PBXGroup;
+			children = (
+				AFA34960346994775CDF265C /* LoginView.swift */,
+				85989A2D185A0C6B9D712DC5 /* RegisterView.swift */,
+			);
+			path = Login;
+			sourceTree = "<group>";
+		};
+		54AECF1C079786293C209611 /* assets */ = {
+			isa = PBXGroup;
+			children = (
+				35A3B6BD53AB87263F430D4E /* index-B-lwQOZr.js */,
+				A780EECE5BBD73BA205B35EF /* index-DPxhQ9EC.css */,
+			);
+			path = assets;
+			sourceTree = "<group>";
+		};
+		699C5C185BD323A5162E5836 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				8DBA10602CA01E71FF2E52EF /* AppState.swift */,
+				ABDC850EF4975AC38D6C8306 /* EntityDefinitions.swift */,
+				82C6EF63288E0ECBA6862BC3 /* ServerProfile.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		6CC986A78088F1B0AC60103F /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				38223850597085ADCA3EE8A3 /* TouchTranslator.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
+		6CE1BB6E2A812FA0B34E7ED0 /* OpenRSC */ = {
+			isa = PBXGroup;
+			children = (
+				EEB3325A965B51B67539C863 /* Sources */,
+			);
+			path = OpenRSC;
+			sourceTree = "<group>";
+		};
+		895121D16231378E8175AD0F /* WebClient */ = {
+			isa = PBXGroup;
+			children = (
+				B7BD0B19729CDF71F03B5447 /* apple-touch-icon.svg */,
+				7F059D08510016EE9C23C859 /* favicon.svg */,
+				ACC19C12416DD918116AC57B /* index.html */,
+				54AECF1C079786293C209611 /* assets */,
+			);
+			path = WebClient;
+			sourceTree = "<group>";
+		};
+		9A075E32A6F0E4BD527998DA /* RSC */ = {
+			isa = PBXGroup;
+			children = (
+				C24A98D60D91F8BC96E8BD27 /* RSCGameEngine.swift */,
+				7A06C782469867C78107848F /* RSCPacketHandler.swift */,
+				5CBD0EBDD0DAD78E31727091 /* RSCWorldState.swift */,
+			);
+			path = RSC;
+			sourceTree = "<group>";
+		};
+		AE48DCA49FA0A56E68FB6864 = {
+			isa = PBXGroup;
+			children = (
+				6CE1BB6E2A812FA0B34E7ED0 /* OpenRSC */,
+				14BFB150E52CE5887FD9D2C4 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BA24992C9D30600FD094A500 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				9F7A50354B450F1785FDA303 /* GameProtocol.swift */,
+				D209D9539355735E75BDCB65 /* RSC */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		CC20FD5EAF8C4477E6070BEC /* Rendering */ = {
+			isa = PBXGroup;
+			children = (
+				79470D5C002A690DB639638F /* FastMath.swift */,
+				43C023BDFCCE3322E38787E6 /* GraphicsController.swift */,
+				A609DE488849FEB3D6CB9E47 /* MetalRenderer.swift */,
+				CA9F6A909F89CE0F94742AF5 /* ModelArchiveLoader.swift */,
+				BF2188BC35B6FD7A3DFDBCA4 /* Polygon.swift */,
+				4EAAA291551DD814CD0DA0F3 /* RSModel.swift */,
+				D37E5A4EBD7022529B04B92A /* Scanline.swift */,
+				F01562B77A1FF9666EF960FB /* Scene.swift */,
+				690046C4CF8B28809E819546 /* Shader.swift */,
+				99F001E360C5E37BAE24BD54 /* World.swift */,
+			);
+			path = Rendering;
+			sourceTree = "<group>";
+		};
+		D209D9539355735E75BDCB65 /* RSC */ = {
+			isa = PBXGroup;
+			children = (
+				62F92BCAA91ED7CB2C887F6F /* ByteBuffer.swift */,
+				63B049FFEB87A145A0D3F9BC /* ISAACCipher.swift */,
+				7D4A8C89190272EFC205D26A /* RSCLoginHandler.swift */,
+				7B4A1905E095D026FE16EA83 /* RSCOpcodes.swift */,
+				990619EF9FCF13064CD17511 /* TCPConnection.swift */,
+			);
+			path = RSC;
+			sourceTree = "<group>";
+		};
+		DA666C262DAE6D64BC51373A /* GameEngine */ = {
+			isa = PBXGroup;
+			children = (
+				9A075E32A6F0E4BD527998DA /* RSC */,
+			);
+			path = GameEngine;
+			sourceTree = "<group>";
+		};
+		E315A776BCB043D7824B75B4 /* GameSelector */ = {
+			isa = PBXGroup;
+			children = (
+				DB5F4767C4E2C9162C1DF5F3 /* GameSelectorView.swift */,
+				86C61DBD09EB20B0BF2CC077 /* ServerBrowserView.swift */,
+			);
+			path = GameSelector;
+			sourceTree = "<group>";
+		};
+		EEB3325A965B51B67539C863 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				DA666C262DAE6D64BC51373A /* GameEngine */,
+				6CC986A78088F1B0AC60103F /* Input */,
+				699C5C185BD323A5162E5836 /* Models */,
+				BA24992C9D30600FD094A500 /* Network */,
+				CC20FD5EAF8C4477E6070BEC /* Rendering */,
+				5138393423EBA38325AF3D1C /* Views */,
+				895121D16231378E8175AD0F /* WebClient */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		24C87ADC8A795C0A7A2949E7 /* OpenRSC */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B8B47ADBC563D9AFEB8ED8B3 /* Build configuration list for PBXNativeTarget "OpenRSC" */;
+			buildPhases = (
+				27EBD023E308F40C21193944 /* Sources */,
+				C619CAAC18FDD0E65217EADB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenRSC;
+			packageProductDependencies = (
+			);
+			productName = OpenRSC;
+			productReference = 5D5705B24E1415694C5BFC19 /* OpenRSC.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		EC9B59AFAC52230A8ED17EBE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = E991FBBDD18D9E0080C835BA /* Build configuration list for PBXProject "OpenRSC" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = AE48DCA49FA0A56E68FB6864;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 14BFB150E52CE5887FD9D2C4 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				24C87ADC8A795C0A7A2949E7 /* OpenRSC */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C619CAAC18FDD0E65217EADB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0431A2EC99EFE1BBCDBE0895 /* apple-touch-icon.svg in Resources */,
+				7B1AFF5AF426F6B8B55346E7 /* favicon.svg in Resources */,
+				9FE977A0B299BF34656DCDF5 /* index-B-lwQOZr.js in Resources */,
+				38C33FA876898935E129638B /* index-DPxhQ9EC.css in Resources */,
+				7E5BDCCBB1306E8972868C16 /* index.html in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		27EBD023E308F40C21193944 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC7E01957E9CC492C4A17597 /* AppState.swift in Sources */,
+				3AA1A652B3144AB124C777AA /* ByteBuffer.swift in Sources */,
+				AFB05CAF0757B4C1C741DCBF /* EntityDefinitions.swift in Sources */,
+				79FBC4B39E4291EA3889A584 /* FastMath.swift in Sources */,
+				EB5AA1EDEB883B4B339EC1B2 /* GameProtocol.swift in Sources */,
+				7DEDBC075AAE1EA8F6D35A82 /* GameSelectorView.swift in Sources */,
+				E3F13C70A5D6B3E05C6615BE /* GameView.swift in Sources */,
+				1F05133FAB0524EC26661315 /* GraphicsController.swift in Sources */,
+				A19DE57B3E32A6C6541C11D6 /* HUDView.swift in Sources */,
+				6B141925187BB265598AE4E2 /* ISAACCipher.swift in Sources */,
+				A90CABFEADA63166A315C892 /* LocalHTTPServer.swift in Sources */,
+				5D992464CE94A9E8AD9FE4FE /* LoginView.swift in Sources */,
+				87B26B2F490394943F28B68D /* MetalRenderer.swift in Sources */,
+				48198E65F85056BF3CD2BCE6 /* ModelArchiveLoader.swift in Sources */,
+				0950957DF00260DAA0754C38 /* OpenRSCApp.swift in Sources */,
+				3D751413D47F84684101DEC1 /* Polygon.swift in Sources */,
+				89A587E1B70A0CBC5632E006 /* RSCGameEngine.swift in Sources */,
+				056348FA1DEC564CF4D734D0 /* RSCLoginHandler.swift in Sources */,
+				8D061CA1AC54B0CBBD451140 /* RSCOpcodes.swift in Sources */,
+				A2FEAD959F5162454E49F9CE /* RSCPacketHandler.swift in Sources */,
+				4EDFD6C354CB77D0C3011728 /* RSCWorldState.swift in Sources */,
+				B8725914B85D1E9DFE630D12 /* RSModel.swift in Sources */,
+				3014C9952753A6CE34CE0042 /* RegisterView.swift in Sources */,
+				64AB02B55EB3EBA6BE73D300 /* Scanline.swift in Sources */,
+				7234C13A3B9833C90E81C8CF /* Scene.swift in Sources */,
+				F434395EB6BF20DBAC76710C /* ServerBrowserView.swift in Sources */,
+				0B5B96679272F4061595F185 /* ServerProfile.swift in Sources */,
+				CBF2C9E8D5FADE352A16BF9B /* Shader.swift in Sources */,
+				D52601860204DA30D7B28639 /* TCPConnection.swift in Sources */,
+				378B96EA683C267A82C4C8AA /* TouchTranslator.swift in Sources */,
+				9BF9A498F47DACC733867A2D /* WebGameView.swift in Sources */,
+				E6742B1D452C43AB4926C8A9 /* World.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		049B56CBD7E5DE9CC1007A5D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = OpenRSC/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				METAL_COMPILER_FLAGS = "";
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openrsc.client;
+				PRODUCT_NAME = OpenRSC;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		37199F560FEDFD34750BDBA1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_BITCODE = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		CE637B97BF584A09F5DAC67B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_BITCODE = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		FA7932B86FE406FC72DCD8B2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = OpenRSC/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				METAL_COMPILER_FLAGS = "";
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openrsc.client;
+				PRODUCT_NAME = OpenRSC;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B8B47ADBC563D9AFEB8ED8B3 /* Build configuration list for PBXNativeTarget "OpenRSC" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				049B56CBD7E5DE9CC1007A5D /* Debug */,
+				FA7932B86FE406FC72DCD8B2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E991FBBDD18D9E0080C835BA /* Build configuration list for PBXProject "OpenRSC" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				37199F560FEDFD34750BDBA1 /* Debug */,
+				CE637B97BF584A09F5DAC67B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = EC9B59AFAC52230A8ED17EBE /* Project object */;
+}

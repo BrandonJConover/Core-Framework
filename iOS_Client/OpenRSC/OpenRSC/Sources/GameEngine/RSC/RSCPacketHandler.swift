@@ -36,6 +36,26 @@ final class RSCPacketHandler {
         case 156: // loadStats + experience
             handleLoadStats(buf: buf, ws: ws)
 
+        case 33:  // UPDATE_XP
+            let skill = buf.getByte()
+            let xp = buf.get32()
+            ws.updateExperience(skill: skill, xp: xp)
+
+        case 159: // UPDATE_STAT
+            let skill = buf.getByte()
+            let level = buf.getByte()
+            ws.updateStatCurrent(skill: skill, level: level)
+
+        case 5:   // QUEST_STATUS
+            let _ = buf.getShort() // questId
+            let _ = buf.getByte()  // status
+
+        case 83:  // DISPLAY_DEATH_SCREEN
+            ws.isDead = true
+
+        case 114: // SET_FATIGUE
+            ws.fatigue = buf.getShort()
+
         case 149: // connectionMessage (login/logout notice)
             let _ = buf.getString() // player name
             let _ = buf.getByte()   // logged in flag
@@ -54,12 +74,18 @@ final class RSCPacketHandler {
     // MARK: - Packet parsers (matching PacketHandler.java methods)
 
     private func handleServerConfig(buf: ByteBuffer, ws: RSCWorldState) {
-        let count = buf.getShort()
-        for _ in 0..<count {
-            let key = buf.getString()
-            let value = buf.getString()
-            if key == "SERVER_NAME" { ws.serverName = value }
-        }
+        // Opcode 19: SEND_SERVER_CONFIGS
+        // Structure (from PayloadCustomGenerator.java):
+        // - string serverName
+        // - string serverWelcomeMessage
+        // - short playerCount
+        // - short playerMax
+        // - byte isMembersWorld
+        ws.serverName = buf.getString()
+        ws.serverWelcomeMessage = buf.getString()
+        ws.playerCount = buf.getShort()
+        ws.playerMax = buf.getShort()
+        ws.isMembersWorld = buf.getByte() != 0
     }
 
     private func handleShowPlayers(buf: ByteBuffer, ws: RSCWorldState) {

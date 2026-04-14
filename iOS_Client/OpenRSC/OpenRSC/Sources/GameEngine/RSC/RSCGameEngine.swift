@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import MetalKit
 
 // Coordinates the RSC game loop: networking, packet handling, world state, and rendering.
 // Matches the role of GameActivity.java + RSCBitmapSurfaceView on Android.
@@ -16,6 +17,17 @@ final class RSCGameEngine: ObservableObject {
 
     // Pixels rendered each tick — initially all black.
     private var pixelData = [Int32](repeating: 0, count: MetalRenderer.gameWidth * MetalRenderer.gameHeight)
+
+    // 3D rendering pipeline
+    private var graphics: GraphicsController?
+    private var scene: Scene?
+    private var world: World?
+    private var cameraX: Int32 = 0
+    private var cameraY: Int32 = 0
+    private var cameraZ: Int32 = 0
+    private var cameraRotation: Int32 = 0
+    private var cameraPitch: Int32 = 64
+    private var cameraZoom: Int32 = 250
 
     init() {
         packetHandler.worldState = worldState
@@ -38,6 +50,17 @@ final class RSCGameEngine: ObservableObject {
     // Connect to server and send login packet.
     func start(server: ServerProfile, appState: AppState) async {
         do {
+            // Initialize 3D rendering pipeline
+            let graphics = GraphicsController(width: Int32(MetalRenderer.gameWidth), height: Int32(MetalRenderer.gameHeight), spriteCount: 5000)
+            let scene = Scene(graphics: graphics, modelCount: 25000, polyCount: 50000, spriteCount: 5000)
+            let world = World(scene: scene, graphics: graphics)
+            try ModelArchiveLoader.shared.loadModels(from: "")
+
+            self.graphics = graphics
+            self.scene = scene
+            self.world = world
+
+            // Connect to server
             try await connection.connect(host: server.host, port: UInt16(server.port))
             let loginData = RSCLoginHandler.encodeLogin(
                 username: server.lastUsername,
@@ -78,24 +101,46 @@ final class RSCGameEngine: ObservableObject {
         renderer?.updatePixels(pixelData)
     }
 
-    // Simple placeholder renderer — draws player position as a white dot.
-    // Replace this with Scene.java port for authentic RSC rendering.
+    // 3D renderer using Scene/World pipeline (TODO: enable after fixing Scene/World)
     private func renderWorld() {
-        let w = MetalRenderer.gameWidth
-        let h = MetalRenderer.gameHeight
-
-        // Fill background
+        // Placeholder: fill with dark background
         for i in 0..<pixelData.count {
-            pixelData[i] = Int32(bitPattern: 0xFF1a1a1a)
+            pixelData[i] = Int32(bitPattern: 0xFF1a1a2e)
         }
 
-        // Draw a dot at the local player's position (scaled to canvas)
-        let px = min(max(worldState.localPlayerX % w, 0), w - 1)
-        let py = min(max(worldState.localPlayerY % h, 0), h - 1)
-        let idx = py * w + px
-        if idx >= 0 && idx < pixelData.count {
-            pixelData[idx] = Int32(bitPattern: 0xFFFFFFFF)
+        // TODO: Uncomment when Scene/World compile
+        /*
+        // Update camera from world state
+        cameraX = Int32(worldState.localPlayerX)
+        cameraY = Int32(0)  // Elevation handled by world.getElevation()
+        cameraZ = Int32(worldState.localPlayerY)
+
+        // Set camera in scene
+        scene?.setCamera(
+            centerX: cameraX,
+            centerY: cameraY,
+            centerZ: cameraZ,
+            xRot: cameraPitch * 4,
+            yRot: cameraRotation * 4,
+            zRot: 0,
+            offset: cameraZoom * 2
+        )
+
+        // Load terrain for current region if needed
+        if let world = world {
+            let regionX = Int(cameraX) / 96
+            let regionZ = Int(cameraZ) / 96
+            world.loadSections(worldX: regionX, worldZ: regionZ, plane: 0)
         }
+
+        // Render the scene
+        scene?.endScene(1)
+
+        // Copy rendered pixels to output buffer
+        if let graphics = graphics {
+            pixelData = graphics.pixelData
+        }
+        */
     }
 
     // MARK: - Input handling
