@@ -1,0 +1,99 @@
+plugins {
+    id "application"
+    id "java"
+}
+
+group "org.openrsc"
+version "1.0-SNAPSHOT"
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+application {
+    mainClass = "com.openrsc.server.Server"
+    applicationDefaultJvmArgs = [
+        '-DcoloredLogging=true',
+        '-Dconf=default',
+        '--enable-preview',
+        '-XX:+UseZGC',
+        '-XX:+ZGenerational',
+        '-Xms512m',
+        '-Xmx2g'
+    ]
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs "src"
+            srcDirs "plugins"
+        }
+    }
+}
+
+dependencies {
+    // Discord (JDA only available locally)
+    implementation files("lib/JDA-4.0.0_55-withDependencies.jar")
+    implementation "com.vdurmont:emoji-java:5.1.1"
+    implementation "org.gitlab4j:gitlab4j-api:6.0.0-rc.6"
+
+    // Database
+    implementation "com.mysql:mysql-connector-j:9.1.0"
+    implementation "org.xerial:sqlite-jdbc:3.47.1.0"
+
+    // Serialization
+    implementation "com.thoughtworks.xstream:xstream:1.4.20"
+    implementation "xpp3:xpp3:1.1.4c"
+
+    // Concurrency
+    implementation "com.lmax:disruptor:4.0.0"
+
+    // Apache Commons
+    implementation "org.apache.commons:commons-lang3:3.17.0"
+    implementation "org.apache.commons:commons-compress:1.27.1"
+    implementation "commons-codec:commons-codec:1.17.1"
+
+    // Logging (Log4j 2.x)
+    implementation "org.apache.logging.log4j:log4j-api:2.24.3"
+    implementation "org.apache.logging.log4j:log4j-core:2.24.3"
+    implementation "org.apache.logging.log4j:log4j-iostreams:2.24.3"
+    implementation "org.apache.logging.log4j:log4j-slf4j2-impl:2.24.3"
+
+    // JSON
+    implementation "org.json:json:20240303"
+
+    // Google
+    implementation "com.google.guava:guava:33.4.0-jre"
+    implementation "com.google.inject:guice:7.0.0"
+
+    // Networking
+    implementation "io.netty:netty-all:4.1.116.Final"
+
+    // Testing
+    testImplementation "org.junit.jupiter:junit-jupiter-api:5.11.4"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.11.4"
+}
+
+ant.importBuild("build.xml")
+
+run {
+    dependsOn compile_plugins
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-Xlint:deprecation'
+}

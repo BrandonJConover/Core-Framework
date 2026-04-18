@@ -1,0 +1,26 @@
+.java-version
+!.gitignore
+
+# Build outputs
+bin/
+build/
+buildplugins/
+core.jar
+plugins.jar
+
+# Runtime outputs
+logs/*.log
+logs/*.log.gz
+logs/pcaps/*.pcap
+logs/pcaps/*.pcap.gz
+
+# Generated avatars (except .gitsave marker)
+avatars/*
+!avatars/.gitsave
+
+# Stray files
+/failureaccess-*.jar
+
+# IDE
+.idea/
+*.iml.backup

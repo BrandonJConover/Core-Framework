@@ -87,7 +87,16 @@ public class ActionSender {
 			if (p != null)
 				player.write(p);
 		} catch (GameNetworkException gne) {
-			throw new GameNetworkException(gne);
+			// do nothing, the player just doesn't get the packet (possibly logged out) & script this is called from can continue
+			String username, clientVersion;
+			if (player != null) {
+				username = player.getUsername();
+				clientVersion = "%d".formatted(player.getClientVersion());
+			} else {
+				username = "<null>";
+				clientVersion = "<unknown>";
+			}
+			LOGGER.warn("GameNetworkException for player " + username + " with client version " + clientVersion + " on opcode " + opcode.name());
 		}
 	}
 
@@ -258,7 +267,7 @@ public class ActionSender {
 				if (item.getNoted() && !player.isUsingCustomClient()) {
 					String itemName = item.getDef(player.getWorld()).getName();
 					player.playerServerMessage(MessageType.QUEST,
-						String.format("@ran@Please Confirm: @whi@Other player is staking @gre@%d @yel@%s", item.getAmount(), itemName));
+						"@ran@Please Confirm: @whi@Other player is staking @gre@%d @yel@%s".formatted(item.getAmount(), itemName));
 				}
 				if (struct.opponentNoted != null) {
 					struct.opponentNoted[i] = item.getNoted() ? 1 : 0;
@@ -344,7 +353,7 @@ public class ActionSender {
 				if (item.getNoted() && !player.isUsingCustomClient()) {
 					String itemName = item.getDef(player.getWorld()).getName();
 					player.playerServerMessage(MessageType.QUEST,
-						String.format("@whi@Other player is staking @gre@%d @yel@%s", item.getAmount(), itemName));
+						"@whi@Other player is staking @gre@%d @yel@%s".formatted(item.getAmount(), itemName));
 				}
 				if (struct.noted != null) {
 					struct.noted[i] = item.getNoted() ? 1 : 0;
@@ -863,11 +872,6 @@ public class ActionSender {
 		configs.add((byte) (server.getConfig().DISABLE_MINIMAP_ROTATION ? 1 : 0)); // 84
 		configs.add((byte) (server.getConfig().ALLOW_BEARDED_LADIES ? 1 : 0)); // 85
 		configs.add((byte) (server.getConfig().PRIDE_MONTH ? 1 : 0)); // 86
-		// Convert RSA keys to hex format with even number of digits (as expected by mudclient)
-		String expHex = Crypto.getPublicExponent().toString(16);
-		configs.add(expHex.length() % 2 == 1 ? "0" + expHex : expHex); // 87
-		String modHex = Crypto.getPublicModulus().toString(16);
-		configs.add(modHex.length() % 2 == 1 ? "0" + modHex : modHex); // 88
 
 		struct.configs = configs;
 		struct.setOpcode(OpcodeOut.SEND_SERVER_CONFIGS);
@@ -1641,6 +1645,9 @@ public class ActionSender {
 			return;
 		}
 
+		boolean bothPlayersSupportAllItems = true;
+		int unhandledItemId = 0;
+
 		TradeConfirmStruct struct = new TradeConfirmStruct();
 		struct.targetPlayer = with.getUsername();
 
@@ -1649,7 +1656,7 @@ public class ActionSender {
 		struct.opponentTradeCount = tradedSize;
 		struct.opponentCatalogIDs = new int[tradedSize];
 		struct.opponentAmounts = new int[tradedSize];
-		if (player.getConfig().WANT_BANK_NOTES) {
+		if (player.getConfig().WANT_BANK_NOTES && player.isUsingCustomClient()) {
 			struct.opponentNoted = new int[tradedSize];
 		}
 		i = 0;
@@ -1658,7 +1665,7 @@ public class ActionSender {
 			if (item.getNoted() && !player.isUsingCustomClient()) {
 				String itemName = item.getDef(player.getWorld()).getName();
 				player.playerServerMessage(MessageType.QUEST,
-					String.format("@ran@Please Confirm: @whi@Other player is offering @gre@%d @yel@%s", item.getAmount(), itemName));
+					"@ran@Please Confirm: @whi@Other player is offering @gre@%d @yel@%s".formatted(item.getAmount(), itemName));
 			}
 			if (struct.opponentNoted != null) {
 				struct.opponentNoted[i] = item.getNoted() ? 1 : 0;
@@ -1677,19 +1684,23 @@ public class ActionSender {
 		i = 0;
 		for (Item item : player.getTrade().getTradeOffer().getItems()) {
 			struct.myCatalogIDs[i] = item.getCatalogId();
+			if (item.getCatalogId() > player.getClientLimitations().maxItemId || item.getCatalogId() > with.getClientLimitations().maxItemId) {
+				bothPlayersSupportAllItems = false;
+				unhandledItemId = item.getCatalogId();
+				break;
+			}
 			if (struct.myNoted != null) {
 				struct.myNoted[i] = item.getNoted() ? 1 : 0;
 			}
 			struct.myAmounts[i] = item.getAmount();
 			i++;
 		}
-
-		try {
+		if (bothPlayersSupportAllItems) {
 			tryFinalizeAndSendPacket(OpcodeOut.SEND_TRADE_OPEN_CONFIRM, struct, player);
-		} catch (GameNetworkException gne) {
-			// an unsupported catalog id was received for authentic client
-			sendMessage(player, String.format("Cannot handle inauthentic item ID %s", gne.getExposedDetail()));
-			sendMessage(with, String.format("Other player cannot handle inauthentic item ID %s", gne.getExposedDetail()));
+		} else {
+			// an unsupported catalog id was received by an outdated or authentic client
+			sendMessage(player, "At least one player cannot handle item ID %s".formatted(unhandledItemId));
+			sendMessage(with, "At least one player cannot handle item ID %s".formatted(unhandledItemId));
 			player.getTrade().setTradeActive(false);
 			with.getTrade().setTradeActive(false);
 			sendTradeWindowClose(player);
@@ -1740,7 +1751,7 @@ public class ActionSender {
 				if (item.getNoted() && !player.isUsingCustomClient()) {
 					String itemName = item.getDef(player.getWorld()).getName();
 					player.playerServerMessage(MessageType.QUEST,
-						String.format("@whi@Other player offered @gre@%d @yel@%s", item.getAmount(), itemName));
+						"@whi@Other player offered @gre@%d @yel@%s".formatted(item.getAmount(), itemName));
 				}
 				if (struct.opponentNoted != null) {
 					struct.opponentNoted[i] = item.getNoted() ? 1 : 0;
@@ -1802,7 +1813,7 @@ public class ActionSender {
 				struct.amount = item.getDef(player.getWorld()).isStackable() || item.getNoted() ?
 					displayableStack(player, item.getAmount()) : 0;
 			} else {
-				LOGGER.warn(String.format("Null item in %s's inventory! (slot %d)", player.getUsername(), slot ));
+				LOGGER.warn("Null item in %s's inventory! (slot %d)".formatted(player.getUsername(), slot ));
 				struct.catalogID = 0;
 				struct.wielded = 0;
 				struct.amount = 0;
@@ -2140,7 +2151,7 @@ public class ActionSender {
 	public static void sendOnlineList(Player player, ArrayList<Player> players, ArrayList<String> locations, int online, final boolean retroClientListsAll) {
 	    if (!player.isUsingCustomClient()) {
 			if (player.getClientLimitations().supportsMessageBox) {
-				StringBuilder onlinePlayers = new StringBuilder(String.format("@lre@Players online @gre@(%d) %%", online));
+				var onlinePlayers = new StringBuilder("@lre@Players online @gre@(%d) %%".formatted(online));
 				for (int i = 0; i < players.size(); i++) {
 					onlinePlayers.append("@whi@");
 					onlinePlayers.append(players.get(i).getUsername());
@@ -2167,7 +2178,7 @@ public class ActionSender {
 				int playersToList = Math.min(players.size(), retroClientListsAll ? EntityList.DEFAULT_CAPACITY : playerLimit);
 				int messagesSent = 0;
 
-				StringBuilder onlinePlayers = new StringBuilder();
+				var onlinePlayers = new StringBuilder();
 				int colorLength = 0;
 				for (int i = 0; i < playersToList; i++) {
 					onlinePlayers.append("@whi@");
