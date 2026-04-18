@@ -42,4 +42,43 @@
         <jar basedir="${build}" destfile="${jar}"/>
         <delete dir="${build}"/>
     </target>
+
+    <property name="confFile" value="local"/>
+    <property name="coloredLogging" value="true"/>
+
+    <target name="runserverzgc">
+        <echo message="Using Java 21+ ZGC launch arguments (generational ZGC is default from Java 24)"/>
+        <java classname="com.openrsc.server.Server" fork="true">
+            <arg value="${confFile}.conf"/>
+            <jvmarg line="-Xms800M -Xmx2048M -XX:+UseZGC --enable-native-access=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow -DcoloredLogging=${coloredLogging}"/>
+            <classpath>
+                <pathelement location="${jar}"/>
+                <pathelement location="plugins.jar"/>
+                <fileset dir="${lib}" includes="*.jar"/>
+            </classpath>
+        </java>
+    </target>
+
+    <target name="runserver">
+        <echo message="Using Java 21 G1GC launch arguments"/>
+        <java classname="com.openrsc.server.Server" fork="true">
+            <arg value="${confFile}.conf"/>
+            <jvmarg line="-Xms800M -Xmx2048M -XX:+UseG1GC -XX:MaxGCPauseMillis=100 --enable-native-access=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow -DcoloredLogging=${coloredLogging}"/>
+            <classpath>
+                <pathelement location="${jar}"/>
+                <pathelement location="plugins.jar"/>
+                <fileset dir="${lib}" includes="*.jar"/>
+            </classpath>
+        </java>
+    </target>
+
+    <target name="compile">
+        <antcall target="compile_core"/>
+        <antcall target="compile_plugins"/>
+    </target>
+
+    <target name="compile-and-run">
+        <antcall target="compile"/>
+        <antcall target="runserver"/>
+    </target>
 </project>
