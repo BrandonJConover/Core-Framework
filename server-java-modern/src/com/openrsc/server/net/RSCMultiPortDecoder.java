@@ -52,7 +52,9 @@ public final class RSCMultiPortDecoder extends ByteToMessageDecoder implements A
 	}
 
 	private void addWebHandlerStack(ChannelHandlerContext ctx) {
-		ctx.pipeline().addFirst(new OptionalSslHandler(this.server.getSSLContext()));
+		if (this.server.getSSLContext() != null) {
+			ctx.pipeline().addFirst(new OptionalSslHandler(this.server.getSSLContext()));
+		}
 		ctx.pipeline().addBefore(Server.rscConnectionHandlerId, "httpcodec", new HttpServerCodec());
 		ctx.pipeline().addBefore(Server.rscConnectionHandlerId, "aggregator", new HttpObjectAggregator(65536));
 		ctx.pipeline().addBefore(Server.rscConnectionHandlerId, "httphandler", new HttpRequestHandler("/"));
