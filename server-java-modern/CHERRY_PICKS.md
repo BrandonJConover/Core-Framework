@@ -668,10 +668,19 @@ The following changes were found to ALREADY be present in server-java-modern/ fr
 - javax.inject-1 + aopalliance-1.0 (Guice 6 runtime deps)
 
 ### Runtime Verification (smoke test)
-Server boots fully in 4.9 seconds and listens on both ports:
+Server boots fully in ~2.2 seconds with ZGC and listens on both ports:
 - TCP 43594 (native game protocol)
 - WS 43494 (web client)
 Loaded: 836 NPC definitions, 1593 item definitions, 50 quests, 9 minigames, 454 plugin handlers, 1019 grounditems. Game ticks running.
+
+**Automated smoke test suite** in `smoke_test.sh`:
+- Boots the server, waits for port binding
+- TCP 43594 accepts connection
+- WS 43494 completes HTTP upgrade to WebSocket (101 Switching Protocols)
+- Server stays alive after malformed input
+- No `NullPointerException`/`DecoderException` in server log
+
+**Regression caught by this test suite:** Netty 4.1.119's `OptionalSslHandler` rejects null `SslContext` where 4.1.33 silently accepted it, which would have broken the entire web client. Fixed in `RSCMultiPortDecoder.addWebHandlerStack` (commit 5ad9b3f14). Compilation succeeded — the NPE only fired on actual client connection.
 
 ### JDA 4 → 5 Migration (completed)
 Replaced JDA-4.0.0_55-withDependencies.jar fat-jar with JDA 5.2.1 + 11 explicit transitive deps. Eliminated the cosmetic SLF4J StaticLoggerBinder warning.
