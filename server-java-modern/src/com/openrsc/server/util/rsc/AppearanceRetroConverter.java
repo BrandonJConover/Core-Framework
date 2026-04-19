@@ -10,7 +10,7 @@ import java.util.Map;
  * Mapping class from modern to "retro" (May 2001) appearance id
  * */
 public class AppearanceRetroConverter {
-	private static final Map<Integer, Integer> map = new HashMap<Integer, Integer>() {{
+	private static final Map<Integer, Integer> map = new HashMap<>() {{
 		put(AppearanceId.NOTHING.id(), AppearanceId38.NOTHING.id());
 		put(AppearanceId.SHORT_HAIR.id(), AppearanceId38.SHORT_HAIR.id());
 		put(AppearanceId.MALE_BODY.id(), AppearanceId38.MALE_BODY.id());

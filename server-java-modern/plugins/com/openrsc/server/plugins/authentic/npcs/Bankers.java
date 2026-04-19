@@ -201,7 +201,7 @@ public class Bankers implements TalkNpcTrigger, OpNpcTrigger, UseNpcTrigger {
 			delay(1);
 			player.playerServerMessage(MessageType.QUEST, "The Banker flips the paper over to examine the other side.");
 			delay(4);
-			npcsay(player, npc, String.format("Ohhh, it's %d noted %s", item.getAmount(), item.getDef(player.getWorld()).getName()));
+			npcsay(player, npc, "Ohhh, it's %d noted %s".formatted(item.getAmount(), item.getDef(player.getWorld()).getName()));
 			npcsay(player, npc, "I can take these from you.");
 			say(player, npc, "Thankyou");
 
@@ -211,7 +211,7 @@ public class Bankers implements TalkNpcTrigger, OpNpcTrigger, UseNpcTrigger {
 						player.playerServerMessage(MessageType.QUEST, "The "
 							+ item.getAmount() + " "
 							+ item.getDef(player.getWorld()).getName()
-							+ String.format(" %s added to your bank", item.getAmount() == 1 ? "is" : "are"));
+							+ " %s added to your bank".formatted(item.getAmount() == 1 ? "is" : "are"));
 					} else {
 						npcsay(player, npc, "...");
 						npcsay(player, npc, "actually nevermind. idk what happened but i can't do it right now.");

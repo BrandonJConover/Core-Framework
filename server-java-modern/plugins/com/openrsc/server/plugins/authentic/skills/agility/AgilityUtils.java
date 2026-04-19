@@ -12,27 +12,27 @@ public class AgilityUtils {
 	public static void completedObstacle(Player player, int id, Set<Integer> obstacles, Integer lastObstacle, int bonus) {
 		if (player.getAttribute("obstaclesDone") == null) {
 			if (id == lastObstacle) {
-				player.setAttribute("obstaclesDone", new HashSet<Integer>());
+				player.setAttribute("obstaclesDone", new HashSet<>());
 			}
 			else {
-				player.setAttribute("obstaclesDone", new HashSet<Integer>(Arrays.asList(id)));
+				player.setAttribute("obstaclesDone", new HashSet<>(Arrays.asList(id)));
 			}
 		} else {
-			Set<Integer> obstaclesDone = player.getAttribute("obstaclesDone", new HashSet<Integer>());
+			Set<Integer> obstaclesDone = player.getAttribute("obstaclesDone", new HashSet<>());
 			if (obstacles.contains(id)) {
 				obstaclesDone.add(id);
 				player.setAttribute("obstaclesDone", obstaclesDone);
 			}
 			else if (id == lastObstacle && obstaclesDone.containsAll(obstacles)) {
 				player.incExp(Skill.AGILITY.id(), bonus, true);
-				player.setAttribute("obstaclesDone", new HashSet<Integer>());
+				player.setAttribute("obstaclesDone", new HashSet<>());
 			}
 		}
 	}
 
 	public static boolean hasDoneObstacle(Player player, int id, Set<Integer> obstacles) {
 		return player.getAttribute("obstaclesDone") != null
-				&& player.getAttribute("obstaclesDone", new HashSet<Integer>()).contains(id);
+				&& player.getAttribute("obstaclesDone", new HashSet<>()).contains(id);
 	}
 
 	// old method - where order matters

@@ -25,7 +25,7 @@ public class GnomeAgilityCourse implements OpLocTrigger {
 	private static final int PIPE = 654;
 
 	//private static int[] obstacleOrder = {BALANCE_LOG, NET, WATCH_TOWER, ROPE_SWING, LANDING, SECOND_NET, PIPE};
-	private static Set<Integer> obstacles = new HashSet<Integer>(Arrays.asList(BALANCE_LOG, NET, WATCH_TOWER, ROPE_SWING, LANDING, SECOND_NET));
+	private static Set<Integer> obstacles = new HashSet<>(Arrays.asList(BALANCE_LOG, NET, WATCH_TOWER, ROPE_SWING, LANDING, SECOND_NET));
 	private static Integer lastObstacle = PIPE;
 
 	@Override

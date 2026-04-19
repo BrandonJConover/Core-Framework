@@ -243,15 +243,15 @@ public final class SuperModerator implements CommandTrigger {
 	private void queryIPBans(Player player, String command, String[] args) {
 		Map<String, Long> bannedIPs = player.getWorld().getServer().getPacketFilter().getIpBans();
 		if (player.getClientLimitations().supportsMessageBox) {
-			StringBuilder bans = new StringBuilder(String.format("Banned IPs (%d)", bannedIPs.size()) +" % %");
+			StringBuilder bans = new StringBuilder("Banned IPs (%d)".formatted(bannedIPs.size()) +" % %");
 			for (Map.Entry<String, Long> entry : bannedIPs.entrySet()) {
 				bans.append("IP: ").append(entry.getKey()).append(" - Unban Date: ").append((entry.getValue() == -1) ? "Never" : DateFormat.getInstance().format(entry.getValue())).append("%");
 			}
 			ActionSender.sendBox(player, bans.toString(), true);
 		} else {
-			player.playerServerMessage(MessageType.QUEST, String.format("Banned IPs (%d)", bannedIPs.size()));
+			player.playerServerMessage(MessageType.QUEST, "Banned IPs (%d)".formatted(bannedIPs.size()));
 			for (Map.Entry<String, Long> entry : bannedIPs.entrySet()) {
-				player.playerServerMessage(MessageType.QUEST, String.format("IP: %s - Unban Date: %s", entry.getKey(), ((entry.getValue() == -1) ? "Never" : DateFormat.getInstance().format(entry.getValue()))));
+				player.playerServerMessage(MessageType.QUEST, "IP: %s - Unban Date: %s".formatted(entry.getKey(), ((entry.getValue() == -1) ? "Never" : DateFormat.getInstance().format(entry.getValue()))));
 			}
 		}
 	}

@@ -117,7 +117,7 @@ public final class Apothecary implements
 
 		// Disabled experience elixir due to not being functional at this time
 
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		options.add("Can you make a strength potion?");
 		options.add("Do you know a potion to make hair fall out?");
 		options.add("Have you got any good potions to give way?");

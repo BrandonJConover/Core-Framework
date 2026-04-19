@@ -39,7 +39,7 @@ public class SheepHerder implements QuestInterface, TalkNpcTrigger,
 
 	private final int BASE_TICK = 640;
 
-	private static final HashMap<Npc, RestartableDelayedEvent> npcEventMap = new HashMap<Npc, RestartableDelayedEvent>();
+	private static final HashMap<Npc, RestartableDelayedEvent> npcEventMap = new HashMap<>();
 
 	@Override
 	public int getQuestId() {

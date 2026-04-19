@@ -28,7 +28,7 @@ public class BarbarianAgilityCourse implements OpBoundTrigger,
 	private static final int HANDHOLDS = 679;
 
 	//private static final int[] obstacleOrder = {SWING, LOG, NET, LEDGE, LOW_WALL, LOW_WALL2};
-	private static Set<Integer> obstacles = new HashSet<Integer>(Arrays.asList(SWING, LOG, NET, LEDGE, LOW_WALL));
+	private static Set<Integer> obstacles = new HashSet<>(Arrays.asList(SWING, LOG, NET, LEDGE, LOW_WALL));
 	private static Integer lastObstacle = LOW_WALL2;
 
 	@Override

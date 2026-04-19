@@ -55,8 +55,8 @@ public class FishingTrawler extends DelayedEvent {
 	private int currentCleanTries;
 
 	private GameObject[] leaks = new GameObject[14];
-	private CopyOnWriteArrayList<Player> players = new CopyOnWriteArrayList<Player>();
-	private CopyOnWriteArrayList<Player> unteledPlayers = new CopyOnWriteArrayList<Player>();
+	private CopyOnWriteArrayList<Player> players = new CopyOnWriteArrayList<>();
+	private CopyOnWriteArrayList<Player> unteledPlayers = new CopyOnWriteArrayList<>();
 	private String[] murphys_messages_ship1 = new String[]{"That's the stuff, fill those holes",
 		"it's a fierce sea today traveller", "check those nets"};
 	private String[] murphys_messages_ship2 = new String[]{"we're going under", "we'll all end up in a watery grave",

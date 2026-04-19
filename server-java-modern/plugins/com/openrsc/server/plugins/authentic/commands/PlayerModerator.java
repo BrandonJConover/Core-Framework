@@ -151,7 +151,7 @@ public final class PlayerModerator implements CommandTrigger {
 
 				final List<LinkedPlayer> linkedPlayers;
 				try {
-					linkedPlayers = new ArrayList<LinkedPlayer>(Arrays.asList(
+					linkedPlayers = new ArrayList<>(Arrays.asList(
 						player.getWorld().getServer().getDatabase().linkedPlayers(playerIps.loginIp, playerIps.creationIp)
 					));
 				} catch (final GameDatabaseException ex) {

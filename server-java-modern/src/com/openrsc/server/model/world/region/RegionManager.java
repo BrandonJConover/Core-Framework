@@ -48,7 +48,7 @@ public class RegionManager {
 	 * @return The collection of local players.
 	 */
 	public Collection<Player> getLocalPlayers(final Entity entity) {
-		final LinkedHashSet<Player> localPlayers = new LinkedHashSet<Player>();
+		final LinkedHashSet<Player> localPlayers = new LinkedHashSet<>();
 		for (final Region region : getVisibleRegions(entity.getLocation())) {
 			for (final Player player : region.getPlayers()) {
 				if (player.withinRange(entity)) {
@@ -78,7 +78,7 @@ public class RegionManager {
 	}
 
 	public Collection<GameObject> getLocalObjects(final Mob entity) {
-		LinkedHashSet<GameObject> localObjects = new LinkedHashSet<GameObject>();
+		LinkedHashSet<GameObject> localObjects = new LinkedHashSet<>();
 		for (final Iterator<Region> region = getVisibleRegions(entity.getLocation()).iterator(); region.hasNext(); ) {
 			Collection<GameObject> objects = region.next().getGameObjects();
 			synchronized (objects) {
@@ -100,7 +100,7 @@ public class RegionManager {
 	}
 
 	public Collection<GroundItem> getLocalGroundItems(final Mob entity) {
-		final LinkedHashSet<GroundItem> localItems = new LinkedHashSet<GroundItem>();
+		final LinkedHashSet<GroundItem> localItems = new LinkedHashSet<>();
 		for (final Region region : getVisibleRegions(entity.getLocation())) {
 			for (final GroundItem o : region.getGroundItems()) {
 				if (o.getLocation().withinGridRange(entity.getLocation(), getWorld().getServer().getConfig().VIEW_DISTANCE)) {
@@ -169,7 +169,7 @@ public class RegionManager {
 		final int regionX = location.getX() / Constants.REGION_SIZE;
 		final int regionY = location.getY() / Constants.REGION_SIZE;
 
-		final LinkedHashSet<Region> surrounding = new LinkedHashSet<Region>();
+		final LinkedHashSet<Region> surrounding = new LinkedHashSet<>();
 		surrounding.add(getRegionFromSectorCoordinates(regionX, regionY));
 		final int[] xMod = {-1, +1, -1, 0, +1, 0, -1, +1};
 		final int[] yMod = {-1, +1, 0, -1, 0, +1, +1, -1};

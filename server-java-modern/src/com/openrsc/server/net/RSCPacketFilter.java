@@ -461,7 +461,7 @@ public class RSCPacketFilter {
 	public void addLoggedInPlayer(final String hostAddress, final Long playerHash) {
 		synchronized(loggedInTracker) {
 			if(!loggedInTracker.containsKey(hostAddress)) {
-				loggedInTracker.put(hostAddress, new HashSet<Long>() {{ add(playerHash); }});
+				loggedInTracker.put(hostAddress, new HashSet<>() {{ add(playerHash); }});
 			} else {
 				Set<Long> players = loggedInTracker.get(hostAddress);
 				players.add(playerHash);

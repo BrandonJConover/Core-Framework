@@ -71,7 +71,7 @@ public class ALumbridgeCarol implements OpInvTrigger, TalkNpcTrigger, UseInvTrig
 		ItemId.GREENDYE.id()
 	};
 
-	private static final HashMap<Integer, Integer> dyeToSweater = new HashMap<Integer, Integer>() {{
+	private static final HashMap<Integer, Integer> dyeToSweater = new HashMap<>() {{
 		put(ItemId.REDDYE.id(), ItemId.RED_CHRISTMAS_SWEATER.id());
 		put(ItemId.YELLOWDYE.id(), ItemId.YELLOW_CHRISTMAS_SWEATER.id());
 		put(ItemId.BLUEDYE.id(), ItemId.BLUE_CHRISTMAS_SWEATER.id());
@@ -176,7 +176,7 @@ public class ALumbridgeCarol implements OpInvTrigger, TalkNpcTrigger, UseInvTrig
 								}
 			}
 			case LETTER_DELIVERY -> {
-				ArrayList<String> options = new ArrayList<String>();
+				ArrayList<String> options = new ArrayList<>();
 								options.add("Where can I find the recepient again?");
 								options.add("Wait a minute...");
 								if (!ifheld(ItemId.APOLOGY_LETTER.id(), 1)) {

@@ -151,7 +151,7 @@ public class Fishing implements OpLocTrigger, UseLocTrigger {
 			return;
 		}
 
-		List<ObjectFishDef> fishLst = new ArrayList<ObjectFishDef>();
+		List<ObjectFishDef> fishLst = new ArrayList<>();
 
 		for (int i = 0; i < trials; i++) {
 			doBigNetFishingRoll(fishLst, bigNet, level);
@@ -194,7 +194,7 @@ public class Fishing implements OpLocTrigger, UseLocTrigger {
 			return;
 		}
 
-		List<ObjectFishDef> fishLst = new ArrayList<ObjectFishDef>();
+		List<ObjectFishDef> fishLst = new ArrayList<>();
 		GameObject obj = player.getViewArea().getGameObject(object.getID(), object.getX(), object.getY());
 
 		ObjectFishDef aFishDef;

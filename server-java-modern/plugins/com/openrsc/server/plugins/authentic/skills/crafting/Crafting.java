@@ -859,7 +859,7 @@ public class Crafting implements UseInvTrigger,
 	}
 
 	private void doSilverJewelry(final Item item, final Player player) {
-		AtomicReference<String> reply = new AtomicReference<String>();
+		AtomicReference<String> reply = new AtomicReference<>();
 
 		// select type
 		ArrayList<String> options = new ArrayList<>();
@@ -956,7 +956,7 @@ public class Crafting implements UseInvTrigger,
 
 		int reqLvl, exp;
 		Item result;
-		AtomicReference<String> msg = new AtomicReference<String>();
+		AtomicReference<String> msg = new AtomicReference<>();
 		switch (type) {
 			case 1:
 				result = new Item(ItemId.UNFIRED_POT.id(), 1);
@@ -1025,7 +1025,7 @@ public class Crafting implements UseInvTrigger,
 	private void doPotteryFiring(final Item item, final Player player) {
 		int reqLvl, xp;
 		Item result;
-		AtomicReference<String> msg = new AtomicReference<String>();
+		AtomicReference<String> msg = new AtomicReference<>();
 		switch (ItemId.getById(item.getCatalogId())) {
 			case UNFIRED_POT:
 				result = new Item(ItemId.POT.id(), 1);

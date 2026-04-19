@@ -1017,7 +1017,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 
 	@Override
 	public PlayerRecoveryQuestions queryPlayerRecoveryData(final int playerId, final String tableName) throws GameDatabaseException {
-		final HashMap<String, String> queries = new HashMap<String, String>(){{
+		final HashMap<String, String> queries = new HashMap<>(){{
 			put("player_recovery", getMySqlQueries().playerRecoveryInfo); // attempt recovery (forgot password)
 			put("player_change_recovery", getMySqlQueries().playerChangeRecoveryInfo); // set or change recovery (ingame)
 		}};
@@ -1055,7 +1055,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 
 	@Override
 	public void queryInsertPlayerRecoveryData(final int playerId, final PlayerRecoveryQuestions recoveryQuestions, final String tableName) throws GameDatabaseException {
-		final HashMap<String, String> queries = new HashMap<String, String>(){{
+		final HashMap<String, String> queries = new HashMap<>(){{
 			put("player_recovery", getMySqlQueries().newPlayerRecoveryInfo);
 			put("player_change_recovery", getMySqlQueries().newPlayerChangeRecoveryInfo);
 		}};
@@ -1757,8 +1757,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 		// Step 3: Remove friends not in the new list
 		if (!existingFriends.isEmpty()) {
 			if (!newFriendHashes.isEmpty()) {
-				String deleteQuery = String.format(
-					getMySqlQueries().save_DeleteFriendsExcept,
+				String deleteQuery = getMySqlQueries().save_DeleteFriendsExcept.formatted(
 					String.join(",", Collections.nCopies(newFriendHashes.size(), "?"))
 				);
 				try (PreparedStatement deleteStatement = getConnection().prepareStatement(deleteQuery)) {
@@ -1963,7 +1962,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 	@Override
 	public void querySavePlayerMaxSkill(final int playerId, final int skillId, final int level) throws GameDatabaseException {
 		final String skillName = getServer().getConstants().getSkills().skills.get(skillId).getShortName().toLowerCase();
-		final String query = String.format(getMySqlQueries().updateMaxStat, skillName);
+		final String query = getMySqlQueries().updateMaxStat.formatted(skillName);
 		try (final PreparedStatement statement = getConnection().prepareStatement(query)) {
 			statement.setInt(1, level);
 			statement.setInt(2, playerId);
@@ -1978,7 +1977,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 	@Override
 	public void querySavePlayerExpCapped(final int playerId, final int skillId, final long dateCapped) throws GameDatabaseException {
 		final String skillName = getServer().getConstants().getSkills().skills.get(skillId).getShortName().toLowerCase();
-		final String query = String.format(getMySqlQueries().updateExpCapped, skillName);
+		final String query = getMySqlQueries().updateExpCapped.formatted(skillName);
 		try (final PreparedStatement statement = getConnection().prepareStatement(query)) {
 			statement.setLong(1, dateCapped);
 			statement.setInt(2, playerId);

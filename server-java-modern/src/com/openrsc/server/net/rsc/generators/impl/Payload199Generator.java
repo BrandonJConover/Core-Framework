@@ -29,7 +29,7 @@ import java.util.Map;
  * Contemporary open source clients for 199 include TBoT by RichyT.
  * **/
 public class Payload199Generator implements PayloadGenerator<OpcodeOut> {
-	private static final Map<OpcodeOut, Integer> opcodes = new HashMap<OpcodeOut, Integer>() {{
+	private static final Map<OpcodeOut, Integer> opcodes = new HashMap<>() {{
 		put(OpcodeOut.SEND_SERVER_MESSAGE, 3);
 		put(OpcodeOut.SEND_LOGOUT_REQUEST_CONFIRM, 208);
 		put(OpcodeOut.SEND_CANT_LOGOUT, 102);

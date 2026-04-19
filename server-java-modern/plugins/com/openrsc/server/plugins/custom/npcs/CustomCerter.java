@@ -30,7 +30,7 @@ public class CustomCerter implements TalkNpcTrigger {
 
 		npcsay("Hello I'm " + npcName, "Welcome to my certificate stall");
 
-		final ArrayList<String> options = new ArrayList<String>();
+		final ArrayList<String> options = new ArrayList<>();
 		if (!player.getCertOptOut()) {
 			options.add("I'd like to certificate some things please");
 		}
@@ -92,7 +92,7 @@ public class CustomCerter implements TalkNpcTrigger {
 	}
 
 	private ArrayList<String> getCertableItemNames(Player player, int[] itemsCerted) {
-		ArrayList<String> certableItemNames = new ArrayList<String>();
+		ArrayList<String> certableItemNames = new ArrayList<>();
 
 		for (int item : itemsCerted) {
 			certableItemNames.add((new Item(item).getDef(player.getWorld()).getName()));

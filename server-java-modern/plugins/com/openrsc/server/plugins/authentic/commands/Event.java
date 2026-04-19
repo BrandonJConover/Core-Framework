@@ -293,8 +293,8 @@ public final class Event implements CommandTrigger {
 		switch (args.length) {
 			case 1 -> {
 				args = new String[] {
-									String.format("%d", absoluteCoordinate.getX()),
-									String.format("%d", absoluteCoordinate.getY()),
+									"%d".formatted(absoluteCoordinate.getX()),
+									"%d".formatted(absoluteCoordinate.getY()),
 								};
 								teleportCommand(player, command, args);
 								return;
@@ -302,21 +302,21 @@ public final class Event implements CommandTrigger {
 			case 2 -> {
 				if (secondArgIsPlayer) {
 									args = new String[] {
-										String.format("%d", absoluteCoordinate.getX()),
-									String.format("%d", absoluteCoordinate.getY()),
+										"%d".formatted(absoluteCoordinate.getX()),
+									"%d".formatted(absoluteCoordinate.getY()),
 										args[1]
 									};
 								} else {
-									args[0] = String.format("%d", absoluteCoordinate.getX());
-									args[1] = String.format("%d", absoluteCoordinate.getY());
+									args[0] = "%d".formatted(absoluteCoordinate.getX());
+									args[1] = "%d".formatted(absoluteCoordinate.getY());
 								}
 								teleportCommand(player, command, args);
 								return;
 			}
 			case 3 -> {
 				args[0] = args[2];
-								args[1] = String.format("%d", absoluteCoordinate.getX());
-								args[2] = String.format("%d", absoluteCoordinate.getY());
+								args[1] = "%d".formatted(absoluteCoordinate.getX());
+								args[2] = "%d".formatted(absoluteCoordinate.getY());
 								teleportCommand(player, command, args);
 								return;
 			}

@@ -19,7 +19,7 @@ public class Lily implements TalkNpcTrigger {
 		npcsay("Hello my lovely!",
             "How can I help you?");
 
-        ArrayList<String> options = new ArrayList<String>();
+        ArrayList<String> options = new ArrayList<>();
         options.add("What are you doing here?");
         options.add("Could you tell me about harvesting?");
         if (Functions.config().WANT_CUSTOM_SPRITES) { // This should always be true if harvesting is active

@@ -21,7 +21,7 @@ import java.util.Map;
  * RSC Protocol-38 Generator for Outgoing Packets from respective Protocol Independent Structs
  * **/
 public class Payload38Generator implements PayloadGenerator<OpcodeOut> {
-	private static final Map<OpcodeOut, Integer> opcodeMap = new HashMap<OpcodeOut, Integer>() {{
+	private static final Map<OpcodeOut, Integer> opcodeMap = new HashMap<>() {{
 		put(OpcodeOut.SEND_SERVER_MESSAGE, 8);
 		put(OpcodeOut.SEND_FRIEND_LIST, 23);
 		put(OpcodeOut.SEND_FRIEND_UPDATE, 24);

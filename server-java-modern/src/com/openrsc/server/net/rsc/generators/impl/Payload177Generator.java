@@ -26,7 +26,7 @@ import java.util.Map;
  * RSC Protocol-177 Generator for Outgoing Packets from respective Protocol Independent Structs
  * **/
 public class Payload177Generator implements PayloadGenerator<OpcodeOut> {
-	private static final Map<OpcodeOut, Integer> opcodeMap = new HashMap<OpcodeOut, Integer>() {{
+	private static final Map<OpcodeOut, Integer> opcodeMap = new HashMap<>() {{
 		put(OpcodeOut.SEND_PLAYER_COORDS, 255);
 		put(OpcodeOut.SEND_GROUND_ITEM_HANDLER, 254);
 		put(OpcodeOut.SEND_SCENERY_HANDLER, 253);

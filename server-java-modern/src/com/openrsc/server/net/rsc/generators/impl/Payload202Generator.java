@@ -31,7 +31,7 @@ import java.util.Map;
  * mudclient202.jar was released on 2005-08-03 and was in active use for 3 months.
  * **/
 public class Payload202Generator implements PayloadGenerator<OpcodeOut> {
-	private static final Map<OpcodeOut, Integer> opcodes202 = new HashMap<OpcodeOut, Integer>() {{
+	private static final Map<OpcodeOut, Integer> opcodes202 = new HashMap<>() {{
 		put(OpcodeOut.SEND_LOGOUT_REQUEST_CONFIRM, 222); // done
 		put(OpcodeOut.SEND_QUESTS, 224); // done
 		put(OpcodeOut.SEND_DUEL_OPPONENTS_ITEMS, 63); // done

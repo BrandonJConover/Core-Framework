@@ -11,8 +11,8 @@ public class UpdateFlags {
 	/**
 	 * Do we require action bubble update for players around?
 	 */
-	private AtomicReference<Bubble> actionBubble = new AtomicReference<Bubble>();
-	private AtomicReference<BubbleNpc> actionBubbleNpc = new AtomicReference<BubbleNpc>();
+	private AtomicReference<Bubble> actionBubble = new AtomicReference<>();
+	private AtomicReference<BubbleNpc> actionBubbleNpc = new AtomicReference<>();
 	/**
 	 * Has our appearance changed since last major update?
 	 */
@@ -20,7 +20,7 @@ public class UpdateFlags {
 	/**
 	 * Do we need to display chat message for players around?
 	 */
-	private AtomicReference<ChatMessage> chatMessage = new AtomicReference<ChatMessage>();
+	private AtomicReference<ChatMessage> chatMessage = new AtomicReference<>();
 
 	/**
 	 * Is this chat message from a plugin?
@@ -30,24 +30,24 @@ public class UpdateFlags {
 	/**
 	 * Do we need to update npc Wields for players around?
 	 */
-	private AtomicReference<Wield> wield = new AtomicReference<Wield>();
-	private AtomicReference<Wield> wield2 = new AtomicReference<Wield>();
+	private AtomicReference<Wield> wield = new AtomicReference<>();
+	private AtomicReference<Wield> wield2 = new AtomicReference<>();
 	/**
 	 * Do we need to update npc skulls for players around?
 	 */
-	private AtomicReference<Skull> skull = new AtomicReference<Skull>();
+	private AtomicReference<Skull> skull = new AtomicReference<>();
 	/**
 	 * Do we need to get damage update for players around?
 	 */
-	private AtomicReference<Damage> damage = new AtomicReference<Damage>();
+	private AtomicReference<Damage> damage = new AtomicReference<>();
 	/**
 	 * Do we need to get hp update for players around?
 	 */
-	private AtomicReference<HpUpdate> hpUpdate = new AtomicReference<HpUpdate>();
+	private AtomicReference<HpUpdate> hpUpdate = new AtomicReference<>();
 	/**
 	 * Has this player fired a projectile?
 	 */
-	private AtomicReference<Projectile> projectile = new AtomicReference<Projectile>();
+	private AtomicReference<Projectile> projectile = new AtomicReference<>();
 
 	public AtomicReference<Bubble> getActionBubble() {
 		return actionBubble;

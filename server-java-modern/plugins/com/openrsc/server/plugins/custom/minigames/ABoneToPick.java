@@ -179,7 +179,7 @@ public class ABoneToPick implements TimedEventTrigger, TalkNpcTrigger, KillNpcTr
 				npcsay(player, npc, "I call this device a \"Bonecrusher\"",
 					"It will allow you to crush bones down to basically nothing",
 					"I will need your help gathering the components though");
-				ArrayList<String> choices = new ArrayList<String>();
+				ArrayList<String> choices = new ArrayList<>();
 				choices.add("What do you need?");
 				choices.add("I don't have time for this");
 				if (player.getQuestStage(Quest.ERNEST_THE_CHICKEN.id()) == Quests.QUEST_STAGE_COMPLETED) {

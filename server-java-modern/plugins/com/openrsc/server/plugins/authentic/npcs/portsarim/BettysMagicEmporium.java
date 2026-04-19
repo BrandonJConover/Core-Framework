@@ -45,7 +45,7 @@ public final class BettysMagicEmporium extends AbstractShop {
 		if (npc.getID() == NpcId.BETTY.id()) {
 			npcsay("Welcome to the magic emporium");
 
-			ArrayList<String> options = new ArrayList<String>();
+			ArrayList<String> options = new ArrayList<>();
 			options.add("Can I see your wares?");
 			options.add("Sorry I'm not into magic");
 

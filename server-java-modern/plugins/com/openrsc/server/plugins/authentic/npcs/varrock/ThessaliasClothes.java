@@ -76,7 +76,7 @@ public final class ThessaliasClothes extends AbstractShop implements TakeObjTrig
 			prideCape = player.getCarriedItems().hasCatalogID(ItemId.CAPE_OF_INCLUSION.id()) || player.getBank().countId(ItemId.CAPE_OF_INCLUSION.id()) > 0;
 		}
 
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 
 		String optionScythe = "I have lost my scythe can I get another one please?";
 		if (player.getCache().hasKey("scythe") && !scythe) {

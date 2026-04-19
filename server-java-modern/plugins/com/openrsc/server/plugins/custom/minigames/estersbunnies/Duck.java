@@ -23,7 +23,7 @@ public class Duck implements TalkNpcTrigger {
 			npcsay("Hello, my friend");
 			npcsay("How can I be of assistance?");
 
-			ArrayList<String> options = new ArrayList<String>();
+			ArrayList<String> options = new ArrayList<>();
 			options.add("Please impart me your wisdom");
 
 			if (Functions.config().ESTERS_BUNNIES_EVENT) {

@@ -47,7 +47,7 @@ public class CombatOdysseyData {
 					JSONObject reward = rewards.getJSONObject(j);
 					int itemId = reward.getInt("itemId");
 					int amount = reward.getInt("amount");
-					Pair<Integer, Integer> rewardPair = new ImmutablePair<Integer, Integer>(itemId, amount);
+					Pair<Integer, Integer> rewardPair = new ImmutablePair<>(itemId, amount);
 					rewardList.add(rewardPair);
 				}
 

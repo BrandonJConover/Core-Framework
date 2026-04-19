@@ -348,7 +348,7 @@ public class Drinkables implements OpInvTrigger {
 		}
 
 		if (player.getCarriedItems().remove(item) == -1) return;
-		player.message(String.format("You drink some of your %s potion", skillName));
+		player.message("You drink some of your %s potion".formatted(skillName));
 
 		addstat(player, affectedStat, modifier, percentageIncrease);
 

@@ -30,7 +30,7 @@ import java.util.Map;
  * username hash to select a login server.
  * **/
 public class Payload196Generator implements PayloadGenerator<OpcodeOut> {
-	private static final Map<OpcodeOut, Integer> opcodes = new HashMap<OpcodeOut, Integer>() {{
+	private static final Map<OpcodeOut, Integer> opcodes = new HashMap<>() {{
 		put(OpcodeOut.SEND_SERVER_MESSAGE, 53);
 		put(OpcodeOut.SEND_LOGOUT_REQUEST_CONFIRM, 183);
 		put(OpcodeOut.SEND_CANT_LOGOUT, 36);

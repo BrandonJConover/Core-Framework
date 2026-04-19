@@ -19,7 +19,7 @@ public class BrotherJered implements TalkNpcTrigger, UseNpcTrigger {
 
 	@Override
 	public void onTalkNpc(Player player, Npc npc) {
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		options.add("What can you do to help a bold adventurer like myself?");
 		options.add("Praise be to Saradomin");
 		if (config().WANT_CUSTOM_SPRITES) {

@@ -26,7 +26,7 @@ public final class DukeOfLumbridge implements
 
 		npcsay(player, n, "Greetings welcome to my castle");
 
-		ArrayList<String> menu = new ArrayList<String>();
+		ArrayList<String> menu = new ArrayList<>();
 
 		String quests = "Have you any quests for me?";
 		String money = "Where can I find money?";

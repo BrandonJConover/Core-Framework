@@ -121,11 +121,11 @@ public final class Player extends Mob {
 	private int appearanceID;
 	private HashMap<Long, Integer> knownPlayersAppearanceIDs = new HashMap<>();
 	private long lastCommand;
-	private LinkedHashSet<Player> localPlayers = new LinkedHashSet<Player>();
-	private LinkedHashSet<Npc> localNpcs = new LinkedHashSet<Npc>();
-	private LinkedHashSet<GameObject> localObjects = new LinkedHashSet<GameObject>();
-	private LinkedHashSet<GameObject> localWallObjects = new LinkedHashSet<GameObject>();
-	private LinkedHashSet<GroundItem> localGroundItems = new LinkedHashSet<GroundItem>();
+	private LinkedHashSet<Player> localPlayers = new LinkedHashSet<>();
+	private LinkedHashSet<Npc> localNpcs = new LinkedHashSet<>();
+	private LinkedHashSet<GameObject> localObjects = new LinkedHashSet<>();
+	private LinkedHashSet<GameObject> localWallObjects = new LinkedHashSet<>();
+	private LinkedHashSet<GroundItem> localGroundItems = new LinkedHashSet<>();
 	private ArrayDeque<Point> locationsToClear = new ArrayDeque<>();
 	private String currentIP = "0.0.0.0";
 	private int incorrectSleepTries = 0;

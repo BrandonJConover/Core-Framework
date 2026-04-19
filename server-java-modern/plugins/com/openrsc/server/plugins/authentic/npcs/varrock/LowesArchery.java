@@ -47,7 +47,7 @@ public final class LowesArchery extends AbstractShop {
 		npcsay("Welcome to Lowe's Archery Store",
 			"Do you want to see my wares?");
 
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		options.add("Yes please");
 		options.add("No, I prefer to bash things close up");
 

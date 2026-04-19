@@ -18,7 +18,7 @@ import static com.openrsc.server.plugins.Functions.*;
 
 public class LegendsQuestHolyWater implements OpInvTrigger, UseInvTrigger {
 
-	private static final HashMap<Player, RestartableDelayedEvent> playerEventMap = new HashMap<Player, RestartableDelayedEvent>();
+	private static final HashMap<Player, RestartableDelayedEvent> playerEventMap = new HashMap<>();
 
 	@Override
 	public boolean blockUseInv(Player player, Integer invIndex, Item item1, Item item2) {

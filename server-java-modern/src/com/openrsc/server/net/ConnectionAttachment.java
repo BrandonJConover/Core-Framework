@@ -7,17 +7,17 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class ConnectionAttachment {
 
-	public AtomicReference<Player> player = new AtomicReference<Player>();
+	public AtomicReference<Player> player = new AtomicReference<>();
 
-	public AtomicReference<ISAACContainer> ISAAC = new AtomicReference<ISAACContainer>();
+	public AtomicReference<ISAACContainer> ISAAC = new AtomicReference<>();
 
-	public AtomicReference<Short> authenticClient = new AtomicReference<Short>();
+	public AtomicReference<Short> authenticClient = new AtomicReference<>();
 
-	public AtomicReference<PcapLogger> pcapLogger = new AtomicReference<PcapLogger>();
+	public AtomicReference<PcapLogger> pcapLogger = new AtomicReference<>();
 
-	public AtomicReference<Integer> sessionId = new AtomicReference<Integer>();
-	public AtomicReference<Boolean> canSendSessionId = new AtomicReference<Boolean>();
-	public AtomicReference<Boolean> isLongSessionId = new AtomicReference<Boolean>();
-	public AtomicReference<Boolean> isWebSocket = new AtomicReference<Boolean>(false);
+	public AtomicReference<Integer> sessionId = new AtomicReference<>();
+	public AtomicReference<Boolean> canSendSessionId = new AtomicReference<>();
+	public AtomicReference<Boolean> isLongSessionId = new AtomicReference<>();
+	public AtomicReference<Boolean> isWebSocket = new AtomicReference<>(false);
 
 }

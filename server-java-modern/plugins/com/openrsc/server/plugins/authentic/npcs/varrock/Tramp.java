@@ -28,7 +28,7 @@ public class Tramp implements TalkNpcTrigger {
 		}
 		npcsay(player, n, "Spare some change guv?");
 
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		options.add("Sorry I haven't got any");
 		options.add("Go get a job");
 		options.add("Ok here you go");

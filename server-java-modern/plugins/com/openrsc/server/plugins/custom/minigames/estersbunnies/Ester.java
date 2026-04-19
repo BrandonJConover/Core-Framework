@@ -64,7 +64,7 @@ public class Ester implements TalkNpcTrigger, MiniGameInterface {
 				case 2:
 					npcsay("Oh my this is so stressful",
 						"How's it coming along? Have you found my bunnies?");
-					ArrayList<String> options = new ArrayList<String>();
+					ArrayList<String> options = new ArrayList<>();
 					options.add("About those riddles");
 					options.add("Who is that man upstairs?");
 

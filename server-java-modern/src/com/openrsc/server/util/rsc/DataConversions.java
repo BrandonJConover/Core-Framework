@@ -167,7 +167,7 @@ public final class DataConversions {
 
 	private static String toHex(byte[] bytes) {
 		// change below to lower or uppercase X to control case of output
-		return String.format("%0" + (bytes.length << 1) + "x", new BigInteger(1, bytes));
+		return ("%0" + (bytes.length << 1) + "x").formatted(new BigInteger(1, bytes));
 	}
 
 	public static boolean isValidEmailAddress(String email) {

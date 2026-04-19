@@ -510,7 +510,7 @@ public final class Admins implements CommandTrigger {
 
 	private void fakeCrystalChest(Player player, String[] args) {
 		String loot;
-		HashMap<String, Integer> allLoot = new HashMap<String, Integer>();
+		HashMap<String, Integer> allLoot = new HashMap<>();
 
 		int maxAttempts = Integer.parseInt(args[0]);
 

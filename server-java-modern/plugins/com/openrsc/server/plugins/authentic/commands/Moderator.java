@@ -817,7 +817,7 @@ public final class Moderator implements CommandTrigger {
 		long timeMoved = System.currentTimeMillis() - targetPlayer.getLastMoved();
 		long timeOnline = System.currentTimeMillis() - targetPlayer.getCurrentLogin();
 		final RSCPacketFilter filter = player.getWorld().getServer().getPacketFilter();
-		final Map<String, String> playerInfo = new LinkedHashMap<String, String>(){{
+		final Map<String, String> playerInfo = new LinkedHashMap<>(){{
 			put("@gre@Name:@whi@", targetPlayer.getUsername());
 			put("@gre@Group:@whi@", Integer.toString(targetPlayer.getGroupID()));
 			put("@gre@Group ID:@whi@", Group.GROUP_NAMES.get(targetPlayer.getGroupID()) + " (" + targetPlayer.getGroupID() + ")");

@@ -153,7 +153,7 @@ public class Thieving implements OpLocTrigger, OpNpcTrigger, OpBoundTrigger {
 	public void handleChestThieving(Player player, GameObject obj) {
 		int reqtemp = 1;
 		int respawnTimetmep = 0;
-		ArrayList<LootItem> loottemp = new ArrayList<LootItem>();
+		ArrayList<LootItem> loottemp = new ArrayList<>();
 		Point teleLoctemp = null;
 		int xptemp = 0;
 		switch (obj.getID()) {
@@ -203,7 +203,7 @@ public class Thieving implements OpLocTrigger, OpNpcTrigger, OpBoundTrigger {
 		final int xp = xptemp;
 		player.message("You search the chest for traps");
 		boolean makeChestStuck = config().LOOTED_CHESTS_STUCK;
-		AtomicReference<GameObject> tempChest = new AtomicReference<GameObject>();
+		AtomicReference<GameObject> tempChest = new AtomicReference<>();
 		if (player.getSkills().getLevel(Skill.THIEVING.id()) < req) {
 			player.message("You find nothing");
 			return;
@@ -280,7 +280,7 @@ public class Thieving implements OpLocTrigger, OpNpcTrigger, OpBoundTrigger {
 	}
 
 	private ArrayList<LootItem> getLootAsList(LootItem... lootItem) {
-		ArrayList<LootItem> l = new ArrayList<LootItem>();
+		ArrayList<LootItem> l = new ArrayList<>();
 		for (LootItem loot : lootItem) {
 			l.add(loot);
 		}
@@ -354,7 +354,7 @@ public class Thieving implements OpLocTrigger, OpNpcTrigger, OpBoundTrigger {
 			say(player, npc, "Err...sorry");
 			return;
 		}
-		final ArrayList<LootItem> lootTable = new ArrayList<LootItem>(pickpocket.getLootTable());
+		final ArrayList<LootItem> lootTable = new ArrayList<>(pickpocket.getLootTable());
 		String thievedMobName = npc.getDef().getName().toLowerCase();
 		//gnome local, child, trainer, waiter and barman all known as gnome for the thiev messages
 		//yanille watchman known simply as watchman
@@ -816,7 +816,7 @@ public class Thieving implements OpLocTrigger, OpNpcTrigger, OpBoundTrigger {
 			this.xp = xp;
 			this.requiredLevel = req;
 			this.shoutMessage = shoutMessage;
-			lootTable = new ArrayList<LootItem>();
+			lootTable = new ArrayList<>();
 			for (LootItem lootItem : possibleLoot) {
 				lootTable.add(lootItem);
 			}
@@ -868,7 +868,7 @@ public class Thieving implements OpLocTrigger, OpNpcTrigger, OpBoundTrigger {
 			this.setRequiredLevel(req);
 			this.ownerID = ownerID;
 			this.setLootPrefix(lootPrefix);
-			lootTable = new ArrayList<LootItem>();
+			lootTable = new ArrayList<>();
 			for (LootItem lootItem : loot) {
 				lootTable.add(lootItem);
 			}

@@ -269,7 +269,7 @@ public class ErnestTheChicken implements QuestInterface,
 			switch (player.getQuestStage(this)) {
 				case -1:
 				case 0:
-					ArrayList<String> choices = new ArrayList<String>();
+					ArrayList<String> choices = new ArrayList<>();
 					choices.add("What does this machine do?");
 					choices.add("Is this your house?");
 					if (config().A_BONE_TO_PICK) {

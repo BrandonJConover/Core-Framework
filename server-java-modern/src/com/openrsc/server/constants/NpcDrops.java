@@ -1655,7 +1655,7 @@ public class NpcDrops {
 	private void initializeBadLuckMitigation() {
 		badLuckMitigation = new BadLuckMitigation();
 		badLuckMitigation.addItem(kbdTableCustom.getDropTableId(), ItemId.DRAGON_2_HANDED_SWORD.id(),
-			new HashMap<Integer, Integer>(){{
+			new HashMap<>(){{
 				put(2000, 0);
 				put(2500, 2);
 				put(3000, 9);

@@ -829,7 +829,7 @@ public final class Development implements CommandTrigger {
 		fishingDefs.put("tunaSwordfish3", player.getWorld().getServer().getEntityHandler().getObjectFishingDef(557, 0));
 		fishingDefs.put("lavaeel", player.getWorld().getServer().getEntityHandler().getObjectFishingDef(271, 0));
 
-		HashMap<Integer,Integer> results = new HashMap<Integer, Integer>();
+		HashMap<Integer,Integer> results = new HashMap<>();
 		for (int i = 0; i < trials; i++) {
 			ObjectFishDef fish = fishingDefs.get(args[0]).fishingAttemptResult(Integer.parseInt(args[1]));
 			int result = -1;

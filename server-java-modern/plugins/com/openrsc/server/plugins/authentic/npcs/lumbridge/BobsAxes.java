@@ -46,7 +46,7 @@ public final class BobsAxes extends AbstractShop {
 	public void onTalkNpc(final Player player, final Npc npc) {
 		npcsay("Hello. How can I help you?");
 
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		options.add("Give me a quest!");
 		options.add("Have you anything to sell?");
 

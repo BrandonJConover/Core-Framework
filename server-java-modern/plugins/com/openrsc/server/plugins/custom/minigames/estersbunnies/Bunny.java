@@ -14,7 +14,7 @@ import static com.openrsc.server.plugins.RuneScript.*;
 
 public class Bunny implements TalkNpcTrigger {
 
-	HashMap<BunnyEnum, Integer> bunnyMap = new HashMap<BunnyEnum, Integer>(){{
+	HashMap<BunnyEnum, Integer> bunnyMap = new HashMap<>(){{
 		put(BunnyEnum.MUSA_POINT, ItemId.RABBITS_FOOT_ONE.id());
 		put(BunnyEnum.LUMBRIDGE, ItemId.RABBITS_FOOT_TWO.id());
 		put(BunnyEnum.AL_KHARID, ItemId.RABBITS_FOOT_THREE.id());
@@ -40,7 +40,7 @@ public class Bunny implements TalkNpcTrigger {
 			// Figure out which bunny we're talking to.
 			final BunnyEnum bunny = getWhichBunny(npc);
 
-			ArrayList<String> options = new ArrayList<String>();
+			ArrayList<String> options = new ArrayList<>();
 
 			final String youCanTalk = "You can talk?";
 			final String whyDidYouRun = "Why did you run away?";

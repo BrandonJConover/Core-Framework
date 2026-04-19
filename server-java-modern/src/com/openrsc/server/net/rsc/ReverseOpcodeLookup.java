@@ -10,7 +10,7 @@ import java.util.Map;
  * client version isn't know
  */
 public class ReverseOpcodeLookup {
-	private static final Map<Integer, OpcodeIn> reverseMap = new HashMap<Integer, OpcodeIn>() {{
+	private static final Map<Integer, OpcodeIn> reverseMap = new HashMap<>() {{
 		put(0, OpcodeIn.LOGIN);
 		put(2, OpcodeIn.REGISTER_ACCOUNT);
 		put(4, OpcodeIn.FORGOT_PASSWORD);

@@ -22,7 +22,7 @@ import java.util.Map;
  * RSC Protocol-235 Generator for Outgoing Packets from respective Protocol Independent Structs
  * **/
 public class Payload235Generator implements PayloadGenerator<OpcodeOut> {
-	private static final Map<OpcodeOut, Integer> opcodeMap = new HashMap<OpcodeOut, Integer>() {{
+	private static final Map<OpcodeOut, Integer> opcodeMap = new HashMap<>() {{
 		put(OpcodeOut.SEND_LOGOUT_REQUEST_CONFIRM, 4);
 		put(OpcodeOut.SEND_QUESTS, 5);
 		put(OpcodeOut.SEND_DUEL_OPPONENTS_ITEMS, 6);

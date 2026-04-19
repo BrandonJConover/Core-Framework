@@ -25,7 +25,7 @@ public class Certer implements TalkNpcTrigger, UseNpcTrigger {
 	//sidney smith is in its own file
 
 	// For custom content, use item on certer
-	public final static HashMap<Integer, int[]> certerTable = new HashMap<Integer, int[]>() {{
+	public final static HashMap<Integer, int[]> certerTable = new HashMap<>() {{
 		// Fish
 		put(NpcId.NILES.id(), new int[]{ItemId.SWORDFISH.id(), ItemId.RAW_SWORDFISH.id(),
 			ItemId.LOBSTER.id(), ItemId.RAW_LOBSTER.id()});
@@ -67,7 +67,7 @@ public class Certer implements TalkNpcTrigger, UseNpcTrigger {
 			ItemId.MANTA_RAY.id(), ItemId.SEA_TURTLE.id()});
 	}};
 
-	public static HashMap<Integer, Integer> certToItemIds = new HashMap<Integer, Integer>(){{
+	public static HashMap<Integer, Integer> certToItemIds = new HashMap<>(){{
 		put(ItemId.SWORDFISH_CERTIFICATE.id(),ItemId.SWORDFISH.id());
 		put(ItemId.RAW_SWORDFISH_CERTIFICATE.id(), ItemId.RAW_SWORDFISH.id());
 		put(ItemId.LOBSTER_CERTIFICATE.id(), ItemId.LOBSTER.id());
@@ -449,7 +449,7 @@ public class Certer implements TalkNpcTrigger, UseNpcTrigger {
 
 		mes(npc, "You hand " + npcName + " your " + certItemName);
 		delay(3);
-		mes(npc, String.format("%s hands you %d %s bank certificates", npcName, amountToGet, newItemName));
+		mes(npc, "%s hands you %d %s bank certificates".formatted(npcName, amountToGet, newItemName));
 		delay(3);
 		if (player.getCarriedItems().remove(new Item(item.getCatalogId(), amountHeld)) != -1) {
 			player.getCarriedItems().getInventory().add(itemToGet);

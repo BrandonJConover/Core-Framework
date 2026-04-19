@@ -147,7 +147,7 @@ public class CommunityInstructor implements TalkNpcTrigger {
 	 * @return The array of options to use for the multi menu
 	 */
 	private ArrayList<String> createMultiMenu(String justSelected) {
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		// Add the authentic options
 		options.add(HOW_TO_COMMUNICATE);
 		options.add(ARE_THERE_RULES);

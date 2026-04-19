@@ -463,7 +463,7 @@ public class ScorpionCatcher implements QuestInterface, TalkNpcTrigger,
 
 		if (player.getQuestStage(this) == 2) {
 
-			List<Integer> cages = new ArrayList<Integer>(Arrays.asList(
+			List<Integer> cages = new ArrayList<>(Arrays.asList(
 				ItemId.SCORPION_CAGE_NONE.id(), ItemId.SCORPION_CAGE_ONE.id(), ItemId.SCORPION_CAGE_TWO.id(), ItemId.SCORPION_CAGE_THREE.id(),
 				ItemId.SCORPION_CAGE_ONE_TWO.id(), ItemId.SCORPION_CAGE_ONE_THREE.id(), ItemId.SCORPION_CAGE_TWO_THREE.id()
 			));

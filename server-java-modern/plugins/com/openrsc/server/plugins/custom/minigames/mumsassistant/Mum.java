@@ -33,7 +33,7 @@ public class Mum implements TalkNpcTrigger, MiniGameInterface {
 			stage = 0;
 		}
 
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		String sweater = "I've lost my Christmas sweater";
 		String christmas = "Did you used to date the Duke?";
 		String hello = "Hello mother, how are you today?";

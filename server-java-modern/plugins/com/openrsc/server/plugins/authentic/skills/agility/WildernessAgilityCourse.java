@@ -23,7 +23,7 @@ public class WildernessAgilityCourse implements OpLocTrigger {
 	private static final int LEDGE = 708;
 	private static final int VINE = 709;
 
-	private static Set<Integer> obstacles = new HashSet<Integer>(Arrays.asList(WILD_PIPE, WILD_ROPESWING, STONE, LEDGE));
+	private static Set<Integer> obstacles = new HashSet<>(Arrays.asList(WILD_PIPE, WILD_ROPESWING, STONE, LEDGE));
 	private static Integer lastObstacle = VINE;
 
 	@Override

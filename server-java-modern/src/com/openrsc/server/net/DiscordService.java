@@ -53,13 +53,13 @@ public class DiscordService implements Runnable{
 	private static final int WATCHLIST_MAX_SIZE = 10;
 	private ScheduledExecutorService scheduledExecutor;
 
-	private final Queue<String> staffCommandRequests = new ConcurrentLinkedQueue<String>();
-	private final Queue<String> generalLogs = new ConcurrentLinkedQueue<String>();
-	private final Queue<String> auctionRequests = new ConcurrentLinkedQueue<String>();
-	private final Queue<String> monitoringRequests = new ConcurrentLinkedQueue<String>();
-	private final Queue<DiscordEmbed> reportAbuseRequests = new ConcurrentLinkedQueue<DiscordEmbed>();
-	private final Queue<DiscordEmbed> naughtyWordsRequests = new ConcurrentLinkedQueue<DiscordEmbed>();
-	private final Queue<DiscordEmbed> downtimeReports = new ConcurrentLinkedQueue<DiscordEmbed>();
+	private final Queue<String> staffCommandRequests = new ConcurrentLinkedQueue<>();
+	private final Queue<String> generalLogs = new ConcurrentLinkedQueue<>();
+	private final Queue<String> auctionRequests = new ConcurrentLinkedQueue<>();
+	private final Queue<String> monitoringRequests = new ConcurrentLinkedQueue<>();
+	private final Queue<DiscordEmbed> reportAbuseRequests = new ConcurrentLinkedQueue<>();
+	private final Queue<DiscordEmbed> naughtyWordsRequests = new ConcurrentLinkedQueue<>();
+	private final Queue<DiscordEmbed> downtimeReports = new ConcurrentLinkedQueue<>();
 
 	private static final Logger LOGGER = LogManager.getLogger();
 	private long monitoringLastUpdate = 0;
@@ -382,7 +382,7 @@ public class DiscordService implements Runnable{
 				? "%d x %s, priced at %d coins each, auctioned by %s."
 				: "%d x %s, priced at %d coins, auctioned by %s.";
 
-		final String addMessage = String.format(pluralHandlerMessage,
+		final String addMessage = pluralHandlerMessage.formatted(
 				addItem.getAmount(),
 				getServer().getEntityHandler().getItemDef(addItem.getCatalogID()).getName(),
 				addItem.getPrice() / addItem.getAmount(),

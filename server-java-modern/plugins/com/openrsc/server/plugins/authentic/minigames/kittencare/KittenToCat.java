@@ -205,7 +205,7 @@ public class KittenToCat implements MiniGameInterface, CatGrowthTrigger, DropObj
 			kittenHunger += changeHunger;
 			kittenLoneliness += changeLoneliness;
 
-			List<String> messages = new ArrayList<String>();
+			List<String> messages = new ArrayList<>();
 			// hungry and lonely
 			if (tHunger && tLoneliness) {
 				messages = KittenMessageSolver.messagesCombined(kittenHunger, kittenLoneliness);

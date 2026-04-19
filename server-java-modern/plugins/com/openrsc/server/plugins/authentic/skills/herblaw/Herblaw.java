@@ -44,7 +44,7 @@ public class Herblaw implements OpInvTrigger, UseInvTrigger {
 
 	final int LOW = 0;
 	final int HIGH = 1;
-	final HashMap<Integer, int[]> oilPerFish = new HashMap<Integer, int[]>(){{
+	final HashMap<Integer, int[]> oilPerFish = new HashMap<>(){{
 		put(ItemId.RAW_TROUT.id(), new int[]{0, 1});
 		put(ItemId.RAW_COD.id(), new int[]{1, 1});
 		put(ItemId.RAW_PIKE.id(), new int[]{1, 1});
@@ -501,7 +501,7 @@ public class Herblaw implements OpInvTrigger, UseInvTrigger {
 		if (unfinishedID != def.getUnfinishedID()) {
 			return;
 		}
-		final AtomicReference<Item> bubbleItem = new AtomicReference<Item>();
+		final AtomicReference<Item> bubbleItem = new AtomicReference<>();
 		bubbleItem.set(null);
 
 		// Shaman potion constraint

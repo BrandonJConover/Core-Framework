@@ -117,7 +117,7 @@ public class DoctorOrbon implements TalkNpcTrigger {
 			"the plague spreads faster than a common cold");
 
 		// Set up dialog choices
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		options.add("The plague? tell me more");
 		options.add("Ok i'll be careful");
 		if (config().WANT_CUSTOM_SPRITES) {

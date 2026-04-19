@@ -10,7 +10,7 @@ public class Poison {
 
 	public Poison(Constants constants) {
 		this.constants = constants;
-		npcData = new HashMap<Integer, Integer>() {{
+		npcData = new HashMap<>() {{
 			put(NpcId.POISON_SCORPION.id(), 38);
 			put(NpcId.POISON_SPIDER.id(), 68);
 			put(NpcId.DUNGEON_SPIDER.id(), 38);

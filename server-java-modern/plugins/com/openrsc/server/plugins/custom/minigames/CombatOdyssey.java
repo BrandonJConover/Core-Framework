@@ -704,7 +704,7 @@ public class CombatOdyssey implements DropObjTrigger, KillNpcTrigger, OpInvTrigg
 
 		// Try to get a new task
 		int newTaskId = DataConversions.random(0, tierData.getTotalTasks() - 1);
-		ArrayList<Integer> triedTasks = new ArrayList<Integer>();
+		ArrayList<Integer> triedTasks = new ArrayList<>();
 
 		// If the player has already done this task, we need to keep looping until we get one we haven't done yet
 		while (isTaskAlreadyComplete(player, newTaskId)) {

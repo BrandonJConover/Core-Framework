@@ -19,9 +19,9 @@ public abstract class Entity {
 
 	private int index;
 
-	private final AtomicReference<Point> location = new AtomicReference<Point>();
+	private final AtomicReference<Point> location = new AtomicReference<>();
 
-	private final AtomicReference<Region> region = new AtomicReference<Region>();
+	private final AtomicReference<Region> region = new AtomicReference<>();
 
 	private boolean removed = false;
 

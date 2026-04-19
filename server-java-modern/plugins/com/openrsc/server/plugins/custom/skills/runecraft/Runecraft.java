@@ -80,7 +80,7 @@ public class Runecraft implements OpLocTrigger, UseLocTrigger, UseInvTrigger {
 		ItemId.ENFEEBLED_BLOOD_TALISMAN.id(),
 	};
 
-	HashMap<Integer, Integer> talismanIds = new HashMap<Integer, Integer>() {{
+	HashMap<Integer, Integer> talismanIds = new HashMap<>() {{
 		put(ItemId.FIRE_RUNE.id(), ItemId.FIRE_TALISMAN.id());
 		put(ItemId.WATER_RUNE.id(), ItemId.WATER_TALISMAN.id());
 		put(ItemId.AIR_RUNE.id(), ItemId.AIR_TALISMAN.id());
@@ -98,7 +98,7 @@ public class Runecraft implements OpLocTrigger, UseLocTrigger, UseInvTrigger {
 
 	int LEVEL_INDEX = 0;
 	int EXP_INDEX = 1;
-	HashMap<Integer, int[]> talismanInformation = new HashMap<Integer, int[]>() {{
+	HashMap<Integer, int[]> talismanInformation = new HashMap<>() {{
 		put(ItemId.AIR_TALISMAN.id(), new int[]{1, 16});
 		put(ItemId.MIND_TALISMAN.id(), new int[]{2, 18});
 		put(ItemId.WATER_TALISMAN.id(), new int[]{5, 20});
@@ -126,7 +126,7 @@ public class Runecraft implements OpLocTrigger, UseLocTrigger, UseInvTrigger {
 	final int LAW_ALTAR = 1208;
 	final int DEATH_ALTAR = 1210;
 	final int BLOOD_ALTAR = 1212;
-	HashMap<Integer, int[]> altarTalismans = new HashMap<Integer, int[]>() {{
+	HashMap<Integer, int[]> altarTalismans = new HashMap<>() {{
 		put(AIR_ALTAR, new int[]{
 			ItemId.AIR_TALISMAN.id(),
 			ItemId.CURSED_AIR_TALISMAN.id(),

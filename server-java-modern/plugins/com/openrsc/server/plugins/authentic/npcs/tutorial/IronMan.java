@@ -117,7 +117,7 @@ public class IronMan implements
 		} else if (player.isIronMan(IronmanMode.Hardcore.id())) {
 			greeting = "Hail, Hardcore Ironman!";
 		} else {
-			greeting = String.format("Hello, %s. We're the Ironman tutors.", player.getUsername());
+			greeting = "Hello, %s. We're the Ironman tutors.".formatted(player.getUsername());
 		}
 
 		npcsay(player, npc, greeting);

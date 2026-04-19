@@ -360,7 +360,7 @@ public class MageArena implements MiniGameInterface, TalkNpcTrigger, KillNpcTrig
 				int reciprocalSlope = (int) Math.floor(1.0 / (0.06 - (0.01 / 48.0) * getMaxLevel(getOwner(), Skill.HITS.id())));
 				// what is the lvl "shift" per new transformation to calculate dmg
 				int shiftPerPhase = (int) Math.round((0.004 * getMaxLevel(getOwner(), Skill.HITS.id()) + 0.4) * reciprocalSlope);
-				ArrayList<String[]> messages = new ArrayList<String[]>() {
+				ArrayList<String[]> messages = new ArrayList<>() {
 					{
 						add(new String[]{"@yel@kolodion: roooaar", "claws grab you from below"});
 						add(new String[]{"@yel@kolodion: aaarrgghhh", "@yel@kolodion: feel the power of the elements", "you are hit by a lightning bolt"});

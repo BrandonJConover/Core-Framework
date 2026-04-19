@@ -83,7 +83,7 @@ public class KnightsSword implements QuestInterface, TalkNpcTrigger,
 	private void vyvinDialogue(final Player player, final Npc n) {
 		say(player, n, "Hello");
 		npcsay(player, n, "Greetings traveller");
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		options.add("Do you have anything to trade?");
 		options.add("Why are there so many knights in this city?");
 		if (config().WANT_CUSTOM_SPRITES) {

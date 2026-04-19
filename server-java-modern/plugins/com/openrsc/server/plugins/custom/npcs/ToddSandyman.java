@@ -18,7 +18,7 @@ public class ToddSandyman implements TalkNpcTrigger {
 		npcsay("Hey, get out of here!",
 			"You'll just get yourself hurt");
 
-		ArrayList<String> options = new ArrayList<String>();
+		ArrayList<String> options = new ArrayList<>();
 		options.add("Alright fine!");
 		options.add("Can you make some planks for me?");
 		if (Functions.config().A_BONE_TO_PICK

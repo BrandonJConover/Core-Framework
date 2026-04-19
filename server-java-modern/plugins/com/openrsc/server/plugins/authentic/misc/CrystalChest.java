@@ -44,7 +44,7 @@ public class CrystalChest implements OpLocTrigger, UseLocTrigger {
 			changeloc(obj, respawnTime, CRYSTAL_CHEST_OPEN);
 			player.message("You find some treasure in the chest");
 
-			ArrayList<Item> loot = new ArrayList<Item>();
+			ArrayList<Item> loot = new ArrayList<>();
 			loot.add(new Item(ItemId.UNCUT_DRAGONSTONE.id(), 1));
 			int percent = DataConversions.random(0, 10000);
 			if (percent < 26) {
