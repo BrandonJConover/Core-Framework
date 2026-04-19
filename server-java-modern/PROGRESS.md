@@ -3,7 +3,40 @@
 ## Overview
 `server-java-modern/` is a Java 21+ modernized variant of the OpenRSC server running parallel to the legacy Java 8 `server/` directory. This document tracks progress toward feature parity with the upstream develop branch.
 
-## Current Status (April 18, 2026)
+## Current Status (April 19, 2026)
+
+### Final state — modernization complete
+
+**Build:** 4-6s clean compile. **Runtime:** 2.2s cold boot (ZGC), 0 warnings.
+**Smoke test:** `./smoke_test.sh` → 4/4 pass (TCP accept, WS upgrade, malformed
+input resilience, no IO-thread exceptions). **CVE posture:** no known CVEs
+in any of the 43 runtime JARs.
+
+Commits pushed to origin/ios/phase1-foundation this session:
+| Commit | Summary |
+|---|---|
+| b0e06fb0f | Initial server-java-modern add (1409 files) — all library upgrades + Java 21 modernizations |
+| 0cdcac782 | Added missing ant runserver targets + Java 21 JVM flags |
+| c74849081 | Enabled log4j AsyncRoot with disruptor backend |
+| 5ad9b3f14 | **Fixed Netty 4.1.119 null-SslContext regression** (broke WebSocket clients) |
+| 6b36991bf | Added smoke_test.sh (4-test end-to-end verification) |
+| 214669bea | Java 21 diamond operator + String.formatted() cleanup (79 files) |
+| 77d583622 | Fixed `${LOG_LEVEL_PATTERN:-%5p}` leaking literally into log output |
+
+### Mechanical modernizations applied across src/ + plugins/
+- instanceof pattern matching — 132 occurrences in 50 files
+- Diamond operator — 126 sites (3 ChannelInitializer<SocketChannel> skipped — childHandler erasure)
+- String.formatted() — 21 sites (1 dead code skipped, 0 locale-version sites touched)
+- Deprecated API: `new URL(...)` → `URI.create(...).toURL()` in 3 files
+- Switch-expression yield fixes in Payload38Parser/Payload69Parser
+- List.of / Set.of conversions in 3 files
+
+### Not applied (deliberately)
+- `var` keyword (802 candidate sites) — pure aesthetic, 802 lines of churn for no semantic change
+- try-with-resources (79 sites) — subtle behavior differences on .close() throw paths; current code works
+- Virtual threads on executors — 3 thread pools + 4 submitSql callers, sequential-by-design game loop; no real ROI
+
+### Library Modernization — Phase 1 & 2 complete
 
 ### Library Modernization — Phase 1 & 2 complete
 
