@@ -54,10 +54,10 @@
     </Appenders>
 
     <Loggers>
-        <Root level="info">
+        <AsyncRoot level="info" includeLocation="false">
             <AppenderRef ref="ConsoleAppender"/>
             <AppenderRef ref="RoutingAppender"/>
-        </Root>
+        </AsyncRoot>
     </Loggers>
 
 </Configuration>
