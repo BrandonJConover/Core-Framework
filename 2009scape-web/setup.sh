@@ -39,6 +39,14 @@ if [ -d "$SCRIPT_DIR/client-patch/osrs" ]; then
     find "$SCRIPT_DIR/client-patch/osrs" -name '*.ts' -type f | wc -l | xargs -I{} echo "    {} TypeScript files overlaid"
 fi
 
+# Root-level client patches (index.html, wasm/Cargo.toml, etc.). Keep this as a
+# mirror of upstream client-relative paths so the cloned client stays disposable.
+if [ -d "$SCRIPT_DIR/client-patch/root" ]; then
+    echo "  Overlaying client-patch/root/ onto client/ (path-mirror)..."
+    cp -R "$SCRIPT_DIR/client-patch/root/." "$SCRIPT_DIR/client/"
+    find "$SCRIPT_DIR/client-patch/root" -type f | wc -l | xargs -I{} echo "    {} root-level files overlaid"
+fi
+
 # Legacy flat-layout support (old top-level Configuration.ts / Login530.ts /
 # PacketConstants.ts at client-patch/ root). Skipped if osrs/ subtree exists,
 # since those files are now in client-patch/osrs/.

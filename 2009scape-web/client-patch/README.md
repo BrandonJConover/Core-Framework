@@ -9,6 +9,11 @@ Files mirror the path they overlay in the upstream client. `setup.sh` does a
 `cp -R client-patch/osrs/. client/osrs/` so new files land alongside their
 upstream peers and modifications overwrite cleanly.
 
+Root-level upstream client patches live in `client-patch/root/` and are copied
+with the same mirror semantics onto `client/`. This currently patches
+`index.html` (for the legacy `window.__exports` global expected by the Parcel
+bundle) and the tiny Rust/WASM crate so local builds work on modern Rust.
+
 ```
 client-patch/osrs/
 ├── Configuration.ts          # SERVER_ADDRESS, GAME_PORT (43601)
