@@ -1,6 +1,7 @@
 import { Rasterizer } from "../../media/Rasterizer";
 import { Buffer } from "../../net/Buffer";
 import { Archive } from "../Archive";
+import { Font530 } from "./FontLoader530";
 
 export class TypeFace extends Rasterizer {
     public characterPixels: number[][] = ((s) => { const a = []; while (s-- > 0) { a.push(null); } return a; })(256);
@@ -27,6 +28,18 @@ export class TypeFace extends Rasterizer {
         const dataFile = archive.getFile(archiveName + ".dat");
         const indexFile = archive.getFile("index.dat");
         if (!dataFile || !indexFile) {
+            const fonts530 = (globalThis as any).fonts530 as { [name: string]: Font530 } | null;
+            const font530 = fonts530 && fonts530[archiveName.toLowerCase()];
+            if (font530) {
+                this.characterDefaultHeight = font530.characterDefaultHeight;
+                this.characterPixels = font530.characterPixels.map((p) => p.slice());
+                this.characterWidths = font530.characterWidths.slice();
+                this.characterHeights = font530.characterHeights.slice();
+                this.characterXOffsets = font530.characterXOffsets.slice();
+                this.characterYOffsets = font530.characterYOffsets.slice();
+                this.characterScreenWidths = font530.characterScreenWidths.slice();
+                return;
+            }
             this.characterDefaultHeight = 8;
             for (let c = 0; c < 256; c++) {
                 this.characterPixels[c] = [0];

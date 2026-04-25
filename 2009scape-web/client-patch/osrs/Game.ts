@@ -45,6 +45,7 @@ import { BufferedConnection } from "./net/BufferedConnection";
 import { Configuration } from "./Configuration";
 import { Js5Cache } from "./Js5Cache";
 import { SpriteLoader530 } from "./cache/media/SpriteLoader530";
+import { FontLoader530 } from "./cache/media/FontLoader530";
 import { ISAACCipher } from "./net/ISAACCipher";
 import { LinkedList } from "./util/LinkedList";
 import { PacketConstants } from "./util/PacketConstants";
@@ -12149,6 +12150,9 @@ export class Game extends GameShell {
                 (globalThis as any).js5Cache = js5Cache;
                 console.log("Js5Cache initialized");
                 await this.preloadSprites530(js5Cache);
+                // idx13 font metrics need a guarded/offline decode pass before startup can
+                // safely preload them. The adapter is in FontLoader530; keep startup on the
+                // verified sprite path until the idx13 sector path is hardened.
             }
             const present = extraIdxNumbers.filter((n) => extraIdx[n] != null);
             console.log("530 extra indexes loaded: " + present.join(","));
@@ -12176,6 +12180,30 @@ export class Game extends GameShell {
         if (sprites.name_icons) sprites.mod_icons = sprites.name_icons;
         (globalThis as any).sprites530 = sprites;
         console.log("530 sprites decoded: " + Object.keys(sprites).join(","));
+    }
+
+    async preloadFonts530(js5Cache: Js5Cache) {
+        const fonts: { [name: string]: any } = {};
+        const sprites = (globalThis as any).sprites530 || {};
+        for (const name of ["p11_full", "p12_full", "b12_full"]) {
+            try {
+                const groupId = await this.withTimeout(js5Cache.getGroupId(8, name), 1000);
+                const metrics = groupId >= 0 ? await this.withTimeout(js5Cache.getFileBytes(13, groupId, 0), 1000) : null;
+                const font = metrics && sprites[name] ? FontLoader530.decode(metrics, sprites[name]) : null;
+                if (font) fonts[name] = font;
+            } catch (e) {
+                // Keep startup resilient while the 530 font bridge matures.
+            }
+        }
+        (globalThis as any).fonts530 = fonts;
+        console.log("530 fonts decoded: " + Object.keys(fonts).join(","));
+    }
+
+    async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+        return await Promise.race([
+            promise,
+            new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+        ]);
     }
 
     async prepareTitleBackground() {
