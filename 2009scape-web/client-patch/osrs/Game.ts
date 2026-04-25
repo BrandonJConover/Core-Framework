@@ -43,6 +43,7 @@ import { SignLink } from "./util/SignLink";
 import { PacketHandler530 } from "./PacketHandler530";
 import { BufferedConnection } from "./net/BufferedConnection";
 import { Configuration } from "./Configuration";
+import { Js5Cache } from "./Js5Cache";
 import { ISAACCipher } from "./net/ISAACCipher";
 import { LinkedList } from "./util/LinkedList";
 import { PacketConstants } from "./util/PacketConstants";
@@ -12137,6 +12138,16 @@ export class Game extends GameShell {
             }
             (this as any).extraStoreData = extraIdx;
             (this as any).cacheMain = main;
+            if (extraIdx[255]) {
+                const indexBuffers: (ArrayBuffer | null)[] = [];
+                for (const n of extraIdxNumbers) {
+                    if (n !== 255) { indexBuffers[n] = extraIdx[n]; }
+                }
+                const js5Cache = new Js5Cache(main, indexBuffers, extraIdx[255]);
+                (this as any).js5Cache = js5Cache;
+                (globalThis as any).js5Cache = js5Cache;
+                console.log("Js5Cache initialized");
+            }
             const present = extraIdxNumbers.filter((n) => extraIdx[n] != null);
             console.log("530 extra indexes loaded: " + present.join(","));
         }
