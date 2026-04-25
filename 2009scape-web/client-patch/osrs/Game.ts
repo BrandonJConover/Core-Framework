@@ -12097,6 +12097,7 @@ export class Game extends GameShell {
     }
 
     async initStores() {
+        // Required for the existing 377 client codepath — stores[0..4]
         const promises = await Promise.all([
             this.getFile(cacheData.main_file_cache),
             this.getFile(cacheIndices.main_file_cache[0]),
@@ -12108,8 +12109,8 @@ export class Game extends GameShell {
         const main = promises[0];
         // Cache sector header byte-7 (archive id) is 1-indexed for 377 (stored as type+1)
         // but 0-indexed for 530. Sector 1 in 530 caches is a master-index sentinel with
-        // byte-7 = 0xFF, so peek sector 2's byte-7 instead — that's a real idx0 sector
-        // and reflects the cache's archive-id convention reliably.
+        // byte-7 = 0xFF, so peek sector 2's byte-7 — that's a real idx0 sector and
+        // reflects the cache's archive-id convention reliably.
         const mainU8 = new Uint8Array(main);
         const SECTOR = 520;
         const probeByte = mainU8.byteLength > 2 * SECTOR + 7 ? (mainU8[2 * SECTOR + 7] & 0xFF) : -1;
@@ -12120,6 +12121,25 @@ export class Game extends GameShell {
             this.stores.push(new Index(type + archiveIdOffset, 0x927c0, main, promises[1 + type]));
         }
         console.log("stores initialized");
+
+        // Phase 1 prep: when running against a 530 cache, opportunistically load any
+        // additional indexes that exist (idx5..idx28, idx255). These power the
+        // Js5Cache facade so future loaders (Sprites, Fonts, Widgets) can fetch real
+        // content instead of stubs. Missing files just resolve to null and are skipped.
+        if (is530Cache) {
+            const extraIdxNumbers = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 255];
+            const extraIdx: { [n: number]: ArrayBuffer | null } = {};
+            for (const n of extraIdxNumbers) {
+                const url = (cacheIndices.main_file_cache as any)[n];
+                if (url == null) { extraIdx[n] = null; continue; }
+                try { extraIdx[n] = await this.getFile(url); }
+                catch (e) { extraIdx[n] = null; }
+            }
+            (this as any).extraStoreData = extraIdx;
+            (this as any).cacheMain = main;
+            const present = extraIdxNumbers.filter((n) => extraIdx[n] != null);
+            console.log("530 extra indexes loaded: " + present.join(","));
+        }
     }
 
     async prepareTitleBackground() {
