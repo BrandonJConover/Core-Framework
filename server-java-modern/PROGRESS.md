@@ -3,7 +3,17 @@
 ## Overview
 `server-java-modern/` is a Java 21+ modernized variant of the OpenRSC server running parallel to the legacy Java 8 `server/` directory. This document tracks progress toward feature parity with the upstream develop branch.
 
-## Current Status (April 19, 2026)
+## Current Status (April 24, 2026)
+
+### Pending uncommitted changes (5 files, ~21 line edits)
+Java 11+ idiom modernization applied but NOT YET committed/verified:
+- `Stream.collect(Collectors.toList())` → `Stream.toList()` (Java 16+) — 5 sites in PatchApplier, NamedParameterQuery, RSCPacketFilter, Functions, Server
+- `.trim().isEmpty()` → `.isBlank()` (Java 11) — 7 sites in SpellHandler, Server, RecoveryChangeRequest, Admins
+- `new String(Files.readAllBytes(path))` → `Files.readString(path)` (Java 11) — 9 sites in JDBCPatchApplier, WorldPopulator, CombatOdysseyData, EntityHandler
+
+**Build:** passes. **Runtime:** can't currently verify — host disk is at 100% capacity, causing JVM init to hang reading a ResourceBundle Properties file. Investigation paused until disk space is freed.
+
+### Earlier status (April 19, 2026)
 
 ### Final state — modernization complete
 

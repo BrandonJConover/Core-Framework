@@ -73,13 +73,13 @@ public class RecoveryChangeRequest extends LoginExecutorProcess{
 			boolean containsAllInfo = true;
 
 			for(int i = 0; i < getQuestions().length; i++) {
-				if (getQuestions()[i] == null || getQuestions()[i].trim().isEmpty()) {
+				if (getQuestions()[i] == null || getQuestions()[i].isBlank()) {
 					containsAllInfo = false;
 				}
 			}
 
 			for(int i = 0; i < getAnswers().length; i++) {
-				if (getAnswers()[i] == null || getAnswers()[i].trim().isEmpty()) {
+				if (getAnswers()[i] == null || getAnswers()[i].isBlank()) {
 					containsAllInfo = false;
 				}
 			}

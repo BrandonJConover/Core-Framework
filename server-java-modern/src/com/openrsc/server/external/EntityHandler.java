@@ -244,7 +244,7 @@ public final class EntityHandler {
 
 	private void loadNpcs(String filename) {
 		try {
-			JSONObject object = new JSONObject(new String(Files.readAllBytes(Paths.get(filename))));
+			JSONObject object = new JSONObject(Files.readString(Paths.get(filename)));
 			JSONArray npcDefs = object.getJSONArray(JSONObject.getNames(object)[0]);
 			for (int i = 0; i < npcDefs.length(); i++) {
 				NPCDef def = new NPCDef();
@@ -289,7 +289,7 @@ public final class EntityHandler {
 
 	private void loadPatchNpcs(String filename) {
 		try {
-			JSONObject object = new JSONObject(new String(Files.readAllBytes(Paths.get(filename))));
+			JSONObject object = new JSONObject(Files.readString(Paths.get(filename)));
 			JSONArray npcPatchDefs = object.getJSONArray(JSONObject.getNames(object)[0]);
 			for (int i = 0; i < npcPatchDefs.length(); i++) {
 				JSONObject npc = npcPatchDefs.getJSONObject(i);
@@ -368,7 +368,7 @@ public final class EntityHandler {
 
 	private void loadItems(String filename) {
 		try {
-			JSONObject object = new JSONObject(new String(Files.readAllBytes(Paths.get(filename))));
+			JSONObject object = new JSONObject(Files.readString(Paths.get(filename)));
 			JSONArray itemDefs = object.getJSONArray(JSONObject.getNames(object)[0]);
 			for (int i = 0; i < itemDefs.length(); i++) {
 				JSONObject item = itemDefs.getJSONObject(i);
@@ -409,7 +409,7 @@ public final class EntityHandler {
 
 	private void loadPatchItems(String filename) {
 		try {
-			JSONObject object = new JSONObject(new String(Files.readAllBytes(Paths.get(filename))));
+			JSONObject object = new JSONObject(Files.readString(Paths.get(filename)));
 			JSONArray itemPatchDefs = object.getJSONArray(JSONObject.getNames(object)[0]);
 			for (int i = 0; i < itemPatchDefs.length(); i++) {
 				JSONObject item = itemPatchDefs.getJSONObject(i);

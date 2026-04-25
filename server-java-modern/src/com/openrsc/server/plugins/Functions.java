@@ -1206,7 +1206,7 @@ public class Functions {
 
 		@SuppressWarnings("unchecked")
 		T result = (T) base.getClass().getDeclaredConstructor().newInstance();
-		List<Field> fields = getAllFields(base.getClass()).stream().filter(f -> !f.getName().equals("serialVersionUID")).collect(Collectors.toList());
+		List<Field> fields = getAllFields(base.getClass()).stream().filter(f -> !f.getName().equals("serialVersionUID")).toList();
 		boolean accessibleChange = false;
 		Object fieldOfDiff, fieldOfBase;
 		for (Object fieldObj : fields) {

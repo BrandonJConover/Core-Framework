@@ -42,7 +42,7 @@ public class NamedParameterQuery {
     }
 
     public String fillArrayParameter(String parameter, List<?> objects) {
-        List<String> asStrings = objects.stream().map(this::resolveValue).collect(Collectors.toList());
+        List<String> asStrings = objects.stream().map(this::resolveValue).toList();
         String joined = String.join(",", asStrings);
         return fillFromValue(parameter, joined);
     }

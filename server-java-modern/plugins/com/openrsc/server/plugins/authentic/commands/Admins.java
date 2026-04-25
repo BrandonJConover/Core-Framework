@@ -3430,17 +3430,17 @@ public final class Admins implements CommandTrigger {
 			return;
 		}
 
-		if (player.getConfig().SSL_SERVER_CERT_PATH.trim().isEmpty() && player.getConfig().SSL_SERVER_KEY_PATH.trim().isEmpty()) {
+		if (player.getConfig().SSL_SERVER_CERT_PATH.isBlank() && player.getConfig().SSL_SERVER_KEY_PATH.isBlank()) {
 			player.message("Websocket certificate & private key file paths are not configured in connections.conf");
 			return;
 		}
 
-		if (player.getConfig().SSL_SERVER_CERT_PATH.trim().isEmpty()) {
+		if (player.getConfig().SSL_SERVER_CERT_PATH.isBlank()) {
 			player.message("Websocket certificate file path is not configured in connections.conf");
 			return;
 		}
 
-		if (player.getConfig().SSL_SERVER_KEY_PATH.trim().isEmpty()) {
+		if (player.getConfig().SSL_SERVER_KEY_PATH.isBlank()) {
 			player.message("Websocket private key file path is not configured in connections.conf");
 			return;
 		}

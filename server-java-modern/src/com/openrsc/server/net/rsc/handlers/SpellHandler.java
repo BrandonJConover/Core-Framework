@@ -634,7 +634,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 		player.playSound("spellok");
 		// don't display a message if message is null (example superheat)
 		if (message != null) {
-			player.playerServerMessage(MessageType.QUEST, message.trim().isEmpty() ? "Cast spell successfully" : message);
+			player.playerServerMessage(MessageType.QUEST, message.isBlank() ? "Cast spell successfully" : message);
 		}
 		if (giveExp) player.incExp(getMagicId(player, spell), spell.getExp(), true);
 		player.setCastTimer();

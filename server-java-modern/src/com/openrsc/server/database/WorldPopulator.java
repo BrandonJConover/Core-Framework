@@ -326,7 +326,7 @@ public final class WorldPopulator {
 
 	private void loadNpcLocs(String filename) {
 		try {
-			JSONObject object = new JSONObject(new String(Files.readAllBytes(Paths.get(filename))));
+			JSONObject object = new JSONObject(Files.readString(Paths.get(filename)));
 			JSONArray locDefs = object.getJSONArray(JSONObject.getNames(object)[0]);
 			JSONObject locObj, start, min, max;
 			for (int i = 0; i < locDefs.length(); i++) {
@@ -361,7 +361,7 @@ public final class WorldPopulator {
 
 	private void loadItemLocs(String filename) {
 		try {
-			JSONObject object = new JSONObject(new String(Files.readAllBytes(Paths.get(filename))));
+			JSONObject object = new JSONObject(Files.readString(Paths.get(filename)));
 			JSONArray locDefs = object.getJSONArray(JSONObject.getNames(object)[0]);
 			JSONObject locObj, pos;
 			for (int i = 0; i < locDefs.length(); i++) {
@@ -389,7 +389,7 @@ public final class WorldPopulator {
 
 	private void loadGameObjLocs(String filename, LocType type) {
 		try {
-			JSONObject object = new JSONObject(new String(Files.readAllBytes(Paths.get(filename))));
+			JSONObject object = new JSONObject(Files.readString(Paths.get(filename)));
 			JSONArray locDefs = object.getJSONArray(JSONObject.getNames(object)[0]);
 			JSONObject locObj, pos;
 			for (int i = 0; i < locDefs.length(); i++) {

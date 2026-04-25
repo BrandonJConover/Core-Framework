@@ -61,7 +61,7 @@ public abstract class PatchApplier {
                     .sorted(Map.Entry.comparingByKey())
                     .filter(Objects::nonNull)
                     .map(Pair::getValue)
-                    .collect(Collectors.toList());
+                    .toList();
         } else {
             throw new PatchApplicationException(
                     MessageFormat.format(

@@ -193,7 +193,7 @@ public class Server implements Runnable {
 			List<String> configurationFiles = new ArrayList<>();
 			Optional.ofNullable(System.getProperty("conf")).ifPresent(files -> {
 				configurationFiles.addAll(
-						Arrays.stream(files.split(",")).map(file -> file + ".conf").collect(Collectors.toList())
+						Arrays.stream(files.split(",")).map(file -> file + ".conf").toList()
 				);
 			});
 
@@ -445,7 +445,7 @@ public class Server implements Runnable {
 				final Server serverOwner = this;
 
 				if (getConfig().WANT_FEATURE_WEBSOCKETS) {
-					if (!getConfig().SSL_SERVER_CERT_PATH.trim().isEmpty() && !getConfig().SSL_SERVER_KEY_PATH.trim().isEmpty()) {
+					if (!getConfig().SSL_SERVER_CERT_PATH.isBlank() && !getConfig().SSL_SERVER_KEY_PATH.isBlank()) {
 						LOGGER.info("Loading Websockets SSL cert...");
 						try {
 							setSSLContext(loadWebsocketSSLFiles(getConfig().SSL_SERVER_CERT_PATH, getConfig().SSL_SERVER_KEY_PATH, null));

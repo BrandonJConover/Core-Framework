@@ -95,7 +95,7 @@ public class JDBCPatchApplier extends PatchApplier {
                     false,
                     true
             );
-            String content = new String(Files.readAllBytes(file.toPath()));
+            String content = Files.readString(file.toPath());
             content = content.replaceAll("_PREFIX_", tablePrefix);
             scriptRunner.runScript(new StringReader(content));
         } catch (Exception ex) {

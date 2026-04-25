@@ -29,7 +29,7 @@ public class CombatOdysseyData {
 	public void load() {
 		try {
 			String filename = getWorld().getServer().getConfig().CONFIG_DIR + "/defs/extras/CombatOdyssey.json";
-			JSONObject object = new JSONObject(new String(Files.readAllBytes(Paths.get(filename))));
+			JSONObject object = new JSONObject(Files.readString(Paths.get(filename)));
 			JSONArray tiers = object.getJSONArray(JSONObject.getNames(object)[0]);
 
 			// Loop through each tier
