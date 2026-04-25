@@ -53,6 +53,32 @@ Verified via Playwright:
 - 530 cache loads without error: `startUp()` completes through all markers including `Widget.load`
 - Auto-detects cache format (peeks sector 2 byte 7 → 0=530, non-zero=377)
 
+## Local → Hetzner login path
+
+For local development against the WireGuard-hosted server:
+
+```bash
+cd 2009scape-web
+scripts/use-530-cache.sh
+scripts/set-client-server.sh 10.8.0.1
+cd client && npm run build
+npx serve dist -l tcp://127.0.0.1:8600
+```
+
+If the browser opens `ws://10.8.0.1:43601/` but never receives a frame after
+sending the first 2-byte login handshake, check the Hetzner server reactor:
+
+```bash
+cd 2009scape-web
+scripts/check-hetzner-login-path.sh
+```
+
+The expected raw TCP probe response from `10.8.0.1:43600` is 9 bytes beginning
+with `00`. If this hangs, the `2009scape-server` container may still show as
+`Up` while its `NioReactor` thread has died (observed after a Java heap
+`OutOfMemoryError`). Restarting `server` and `websockify` in
+`/opt/2009scape-web` restores the WebSocket login path.
+
 ## What's deferred
 
 - Real fonts/sprites from idx8/idx13 — currently stubbed to blank
