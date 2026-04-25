@@ -44,6 +44,7 @@ import { PacketHandler530 } from "./PacketHandler530";
 import { BufferedConnection } from "./net/BufferedConnection";
 import { Configuration } from "./Configuration";
 import { Js5Cache } from "./Js5Cache";
+import { SpriteLoader530 } from "./cache/media/SpriteLoader530";
 import { ISAACCipher } from "./net/ISAACCipher";
 import { LinkedList } from "./util/LinkedList";
 import { PacketConstants } from "./util/PacketConstants";
@@ -12147,10 +12148,34 @@ export class Game extends GameShell {
                 (this as any).js5Cache = js5Cache;
                 (globalThis as any).js5Cache = js5Cache;
                 console.log("Js5Cache initialized");
+                await this.preloadSprites530(js5Cache);
             }
             const present = extraIdxNumbers.filter((n) => extraIdx[n] != null);
             console.log("530 extra indexes loaded: " + present.join(","));
         }
+    }
+
+    async preloadSprites530(js5Cache: Js5Cache) {
+        const spriteNames = [
+            "p11_full", "p12_full", "b12_full",
+            "mapfunction", "hitmarks", "hitbar_default",
+            "headicons_pk", "headicons_prayer", "hint_headicons", "hint_mapmarkers",
+            "mapflag", "cross", "mapdots", "scrollbar", "name_icons",
+            "floorshadows", "compass", "hint_mapedge"
+        ];
+        const sprites: { [name: string]: any[] } = {};
+        for (const name of spriteNames) {
+            try {
+                const decoded = await SpriteLoader530.loadNamed(js5Cache, name);
+                if (decoded && decoded.length > 0) sprites[name] = decoded;
+            } catch (e) {
+                // Keep startup resilient while the 530 asset bridge is being ported.
+            }
+        }
+        // Best-effort aliases from 377 archive names to rt4 sprite group names.
+        if (sprites.name_icons) sprites.mod_icons = sprites.name_icons;
+        (globalThis as any).sprites530 = sprites;
+        console.log("530 sprites decoded: " + Object.keys(sprites).join(","));
     }
 
     async prepareTitleBackground() {

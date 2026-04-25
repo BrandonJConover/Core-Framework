@@ -2,6 +2,7 @@
 import { Rasterizer } from "../../media/Rasterizer";
 import { Buffer } from "../../net/Buffer";
 import { Archive } from "../Archive";
+import { Sprite530 } from "./SpriteLoader530";
 
 export class IndexedImage extends Rasterizer {
     public pixels: number[];
@@ -35,6 +36,19 @@ export class IndexedImage extends Rasterizer {
         const dataFile = archive.getFile(archiveName + ".dat");
         const indexFile = archive.getFile("index.dat");
         if (!dataFile || !indexFile) {
+            const sprites530 = (globalThis as any).sprites530 as { [name: string]: Sprite530[] } | null;
+            const sprite530 = sprites530 && sprites530[archiveName.toLowerCase()] && sprites530[archiveName.toLowerCase()][offset];
+            if (sprite530) {
+                this.pixels = sprite530.pixels.slice();
+                this.palette = sprite530.palette.slice();
+                this.width = sprite530.width;
+                this.height = sprite530.height;
+                this.xDrawOffset = sprite530.xOffset;
+                this.yDrawOffset = sprite530.yOffset;
+                this.maxWidth = sprite530.maxWidth;
+                this.maxHeight = sprite530.maxHeight;
+                return;
+            }
             this.pixels = [0];
             this.palette = [0];
             this.width = 1;

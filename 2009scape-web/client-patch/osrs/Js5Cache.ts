@@ -441,6 +441,54 @@ export class Js5Cache {
         return files[fileId] || null;
     }
 
+    /**
+     * RT4/Js5 name hash used by JagString.getHash(). Names are looked up lower-case
+     * by the reference client before hashing. This is different from the older 377
+     * archive filename hash (`hash * 61 + c - 32`) still used by Archive.ts.
+     */
+    static nameHash(name: string): number {
+        let hash = 0;
+        const lower = name.toLowerCase();
+        for (let i = 0; i < lower.length; i++) {
+            hash = (lower.charCodeAt(i) + Math.imul(hash, 31)) | 0;
+        }
+        return hash;
+    }
+
+    async getGroupId(idxNum: number, groupName: string): Promise<number> {
+        const meta = await this.getMeta(idxNum);
+        if (!meta || !meta.groupNameHashes) return -1;
+        const hash = Js5Cache.nameHash(groupName);
+        for (let groupId = 0; groupId < meta.groupNameHashes.length; groupId++) {
+            if (meta.groupNameHashes[groupId] === hash) return groupId;
+        }
+        return -1;
+    }
+
+    async getFileId(idxNum: number, groupId: number, fileName: string): Promise<number> {
+        const meta = await this.getMeta(idxNum);
+        if (!meta || !meta.fileNameHashes || !meta.fileNameHashes[groupId]) return -1;
+        const hash = Js5Cache.nameHash(fileName);
+        const hashes = meta.fileNameHashes[groupId]!;
+        for (let fileId = 0; fileId < hashes.length; fileId++) {
+            if (hashes[fileId] === hash) return fileId;
+        }
+        return -1;
+    }
+
+    async getNamedGroupBytes(idxNum: number, groupName: string): Promise<Uint8Array | null> {
+        const groupId = await this.getGroupId(idxNum, groupName);
+        return groupId >= 0 ? this.getGroupBytes(idxNum, groupId) : null;
+    }
+
+    async getNamedFileBytes(idxNum: number, groupName: string, fileName: string = ""): Promise<Uint8Array | null> {
+        const groupId = await this.getGroupId(idxNum, groupName);
+        if (groupId < 0) return null;
+        if (!fileName) return this.getFileBytes(idxNum, groupId, 0);
+        const fileId = await this.getFileId(idxNum, groupId, fileName);
+        return fileId >= 0 ? this.getFileBytes(idxNum, groupId, fileId) : null;
+    }
+
     capacityOf(idxNum: number): number {
         const idx = this.indexes[idxNum];
         return idx ? idx.capacity() : 0;
