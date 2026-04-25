@@ -1,0 +1,66 @@
+services:
+  # ── MariaDB for 2009scape ──
+  db:
+    image: mariadb:11.4-noble
+    container_name: 2009scape-db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./db:/var/lib/mysql
+      - ./2009scape/Server/db_exports/global.sql:/docker-entrypoint-initdb.d/global.sql
+    env_file:
+      - mysql.env
+
+  # ── 2009scape game server (rev 530) ──
+  server:
+    build: ./2009scape
+    container_name: 2009scape-server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Kotlin compiler needs more heap than the default 256m on ARM64
+      - MAVEN_OPTS=-Xmx2G -Xms512M
+    volumes:
+      - bcache:/app/Server/target
+      - mcache:/root/.m2
+      - ./2009scape/Server/data:/app/Server/data
+      - ./config:/app/Server/worldprops
+    ports:
+      - "0.0.0.0:43600:43595"  # Game TCP (43600 external — server binds 43594+worldId=43595)
+
+  # ── WebSocket-to-TCP proxy ──
+  # Bridges browser WebSocket → game server raw TCP
+  websockify:
+    image: python:3.11-slim
+    container_name: 2009scape-ws-proxy
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "0.0.0.0:43601:43601"
+    command: >
+      bash -c "pip install -q websockify && websockify 0.0.0.0:43601 server:43595"
+
+  # ── Web client (static files) ──
+  client:
+    image: nginx:alpine
+    container_name: 2009scape-web-client
+    restart: unless-stopped
+    depends_on:
+      - websockify
+    ports:
+      - "0.0.0.0:8500:80"
+    volumes:
+      - ./client/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  bcache:
+  mcache:
