@@ -5,7 +5,7 @@ enum AppView {
     case selector
     case serverBrowser(GameType)
     case login(ServerProfile)
-    case game(ServerProfile)
+    case game(ServerProfile, String, String)  // server, username, password
 }
 
 @MainActor

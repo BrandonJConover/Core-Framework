@@ -15,21 +15,47 @@ final class RSCLoginHandler {
     static let clientVersion = 10009
 
     // Builds the RSC login packet (opcode 0).
-    // Matches Network_Socket.java encodeLogin flow:
-    //   byte reconnecting=0, int clientVersion, lf-string user, lf-string pass,
-    //   long uid (8 bytes random), 23 zero bytes padding.
+    // Matches inauthentic client path in LoginPacketHandler.java:466-573.
+    // Server requires payload >= 38 bytes after opcode (RSCProtocolDecoder.java:131).
+    // After basic fields, server reads ClientLimitations if bytes remain (line 482).
     static func encodeLogin(username: String, password: String) -> Data {
         let buf = ByteBuffer()
         buf.newPacket(opcode: Int(RSCOutOpcode.login.rawValue))
         buf.putByte(0)                             // reconnecting = false
-        buf.putInt(clientVersion)
-        buf.putString(username)
-        buf.putString(password)
-        // 8-byte UID (random, stored per-device in production)
+        buf.putInt(clientVersion)                   // 4-byte client version
+        buf.putString(username)                     // username + 0x0A terminator
+        buf.putString(password)                     // password + 0x0A terminator
         let uid = Int64.random(in: Int64.min...Int64.max)
-        buf.putLong(uid)
-        // 23 zero bytes — ensures packet length >= 38 for inauthentic path threshold
-        for _ in 0..<23 { buf.putByte(0) }
+        buf.putLong(uid)                            // 8-byte UID
+
+        // ClientLimitations — tells server what this client supports.
+        // Must send ALL fields or NONE. Server reads them sequentially
+        // if packet.getReadableBytes() > 0 (LoginPacketHandler.java:482-505).
+        // Use large values so server doesn't limit what it sends us.
+        buf.putShort(1143)                          // maxAnimationId (short)
+        buf.putInt(1290)                            // maxItemId (int)
+        buf.putInt(794)                             // maxNpcId (int)
+        buf.putInt(1188)                            // maxSceneryId (int)
+        buf.putShort(28)                            // maxPrayerId (short)
+        buf.putShort(33)                            // maxSpellId (short)
+        buf.putByte(18)                             // maxSkillId (byte)
+        buf.putShort(12)                            // maxRoofId (short)
+        buf.putShort(17)                            // maxTextureId (short)
+        buf.putShort(127)                           // maxTileId (short)
+        buf.putInt(348)                             // maxBoundaryId (int)
+        buf.putByte(3)                              // maxTeleBubbleId (byte)
+        buf.putShort(36)                            // maxProjectileSprite (short)
+        buf.putInt(10)                              // maxSkinColor (int)
+        buf.putInt(11)                              // maxHairColor (int)
+        buf.putInt(15)                              // maxClothingColor (int)
+        buf.putShort(50)                            // maxQuestId (short)
+        buf.putInt(39)                              // numberOfSounds (int)
+        buf.putByte(1)                              // supportsModSprites (byte)
+        buf.putByte(5)                              // maxDialogueOptions (byte)
+        buf.putInt(192)                             // maxBankItems (int)
+        buf.putString("")                           // mapHash (empty string + \n)
+        buf.putByte(0)                              // isAndroidClient = false
+
         return buf.finishPacket()
     }
 

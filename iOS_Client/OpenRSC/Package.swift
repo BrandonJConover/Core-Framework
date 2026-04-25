@@ -21,7 +21,16 @@ let package = Package(
             path: "OpenRSC/Sources",
             resources: [
                 .process("Rendering/Shaders.metal"),
-                .copy("WebClient")
+                .copy("WebClient"),
+                .copy("../Resources")
+            ]
+        ),
+        .testTarget(
+            name: "OpenRSCTests",
+            dependencies: ["OpenRSC"],
+            path: "Tests/RenderTest",
+            resources: [
+                .copy("Fixtures")
             ]
         ),
     ]

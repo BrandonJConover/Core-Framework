@@ -99,8 +99,8 @@ struct LoginView: View {
     private func login() {
         isLoggingIn = true
         appState.loginError = ""
-        // Actual login handled by RSCGameEngine — navigate to game view, engine connects and logs in
-        appState.currentView = .game(server)
+        // Navigate to game view — engine connects and logs in with these credentials
+        appState.currentView = .game(server, username, password)
         isLoggingIn = false
     }
 }

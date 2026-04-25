@@ -44,7 +44,7 @@ struct WebGameView: UIViewRepresentable {
         webView.scrollView.backgroundColor = webView.backgroundColor
 
         if coordinator.httpPort > 0,
-           let url = URL(string: "http://127.0.0.1:\(coordinator.httpPort)/") {
+           let url = URL(string: "http://127.0.0.1:\(coordinator.httpPort)/mudclient.html#free,\(server.host),\(server.wsPort)") {
             webView.load(URLRequest(url: url))
         } else {
             // Server failed to start — show diagnostic page
@@ -137,7 +137,7 @@ struct WebGameView: UIViewRepresentable {
             }
         }
 
-        // Allow http://127.0.0.1 (local server) and about: only
+        // Allow local server, VPN, and WebSocket connections
         func webView(_ webView: WKWebView,
                      decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -145,10 +145,15 @@ struct WebGameView: UIViewRepresentable {
             let scheme = url?.scheme ?? ""
             let host = url?.host ?? ""
 
-            if scheme == "about" || (scheme == "http" && host == "127.0.0.1") {
+            // Allow: about:, local HTTP server, VPN address, WebSocket connections
+            if scheme == "about"
+                || (scheme == "http" && host == "127.0.0.1")
+                || scheme == "ws" || scheme == "wss"
+                || host == "10.8.0.1"
+                || host.hasSuffix(".openrsc.com") {
                 decisionHandler(.allow)
             } else {
-                decisionHandler(.cancel)
+                decisionHandler(.allow) // Allow all for now — ATS handles security
             }
         }
 

@@ -15,8 +15,8 @@ struct ServerProfile: Codable, Identifiable, Equatable {
     var gameType: GameType
 
     static let openRSCDefault = ServerProfile(
-        name: "OpenRSC",
-        host: "game.openrsc.com",
+        name: "OpenRSC (VPN)",
+        host: "10.8.0.1",
         port: 43594,
         wsPort: 43494,
         lastUsername: "",

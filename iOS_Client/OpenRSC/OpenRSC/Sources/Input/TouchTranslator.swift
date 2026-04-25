@@ -13,7 +13,7 @@ final class TouchTranslator {
     var onPan:       ((CGFloat, CGFloat) -> Void)?  // dx, dy
     var onPinch:     ((CGFloat) -> Void)?       // scale factor
 
-    private var viewSize: CGSize = .zero
+    private(set) var viewSize: CGSize = .zero
 
     func setViewSize(_ size: CGSize) {
         viewSize = size

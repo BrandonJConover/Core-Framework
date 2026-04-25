@@ -137,6 +137,52 @@ final class ByteBuffer {
 
     var bytesRemaining: Int { max(0, writePos - readPos) }
 
+    // MARK: - Bit-level reading (port of RSBuffer_Bits.java)
+    // Used by opcodes 191 (player coords), 79 (NPC coords), 48 (scenery), 91 (boundaries)
+
+    private(set) var bitHead: Int = 0
+
+    /// Lookup table for bit masks: bitwiseMask[n] = (1 << n) - 1
+    private static let bitwiseMask: [Int] = {
+        var m = [Int](repeating: 0, count: 33)
+        for i in 0..<33 { m[i] = (1 << i) - 1 }
+        return m
+    }()
+
+    /// Begin bit-level reading at current read position (RSBuffer_Bits.startBitAccess)
+    func startBitAccess() {
+        bitHead = readPos * 8
+    }
+
+    /// Read `count` bits from the buffer (RSBuffer_Bits.getBitMask)
+    func getBitMask(_ count: Int) -> Int {
+        var remaining = count
+        var bytePos = bitHead >> 3
+        var bitsLeft = 8 - (bitHead & 7)
+        bitHead += count
+        var result = 0
+
+        while remaining > bitsLeft {
+            result += (Int(data[bytePos]) & ByteBuffer.bitwiseMask[bitsLeft]) << (remaining - bitsLeft)
+            remaining -= bitsLeft
+            bitsLeft = 8
+            bytePos += 1
+        }
+
+        if remaining == bitsLeft {
+            result += Int(data[bytePos]) & ByteBuffer.bitwiseMask[bitsLeft]
+        } else {
+            result += (Int(data[bytePos]) >> (bitsLeft - remaining)) & ByteBuffer.bitwiseMask[remaining]
+        }
+
+        return result
+    }
+
+    /// End bit-level reading, advance read position (RSBuffer_Bits.endBitAccess)
+    func endBitAccess() {
+        readPos = (bitHead + 7) / 8
+    }
+
     // MARK: - Private
 
     private func ensureCapacity(_ needed: Int) {

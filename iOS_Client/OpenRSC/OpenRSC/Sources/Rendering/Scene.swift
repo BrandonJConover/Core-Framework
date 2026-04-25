@@ -62,7 +62,13 @@ final class Scene {
     var m_gb: [Int32]  // sprite width
     var m_Q: [Int32]   // sprite height
     var m_Ob: [Int32]  // sprite indices
+    var m_mask1: [Int32]  // colorMask1 (gray-pixel tint)
+    var m_mask2: [Int32]  // colorMask2 (white-axis-pixel tint)
+    var m_flip: [Bool]    // mirrorX flag for direction 5/6/7
     var m_n: Int = 0   // sprite count
+
+    // Debug
+    var debugFrameCount = 0
 
     // Diffuse light direction
     var diffuseLightX: Int32 = 0
@@ -94,6 +100,9 @@ final class Scene {
         self.m_gb = [Int32](repeating: 0, count: spriteCount)
         self.m_Q = [Int32](repeating: 0, count: spriteCount)
         self.m_Ob = [Int32](repeating: 0, count: spriteCount)
+        self.m_mask1 = [Int32](repeating: 0, count: spriteCount)
+        self.m_mask2 = [Int32](repeating: 0, count: spriteCount)
+        self.m_flip = [Bool](repeating: false, count: spriteCount)
 
         // Initialize texture database
         self.resourceDatabase = [[Int32]?](repeating: nil, count: 50)
@@ -134,15 +143,25 @@ final class Scene {
     // MARK: - Sprite management
 
     func drawSprite(var1: Int32, var2: Int32, var3: Int32, var4: Int32, var5: Int32, var6: Int32, var7: Int32) {
-        guard m_n < m_Ob.count else { return }
+        drawSpriteTinted(depth: var1, x: var2, y: var3, width: var4, height: var5,
+                         spriteIdx: var6, mask1: 0, mask2: 0, mirrorX: false)
+    }
 
-        // Register sprite position and dimensions
-        m_ob[m_n] = var1  // depth
-        m_Eb[m_n] = var2  // x
-        m_Fb[m_n] = var3  // y
-        m_gb[m_n] = var4  // width
-        m_Q[m_n] = var5   // height
-        m_Ob[m_n] = var6  // sprite index
+    /// Register a billboard with optional 2-mask color tinting. mask1 tints gray
+    /// pixels (hair/top/bottom layer color), mask2 tints white-axis pixels (skin
+    /// color). 0 means no tint for that channel.
+    func drawSpriteTinted(depth: Int32, x: Int32, y: Int32, width: Int32, height: Int32,
+                          spriteIdx: Int32, mask1: Int32, mask2: Int32, mirrorX: Bool) {
+        guard m_n < m_Ob.count else { return }
+        m_ob[m_n] = depth
+        m_Eb[m_n] = x
+        m_Fb[m_n] = y
+        m_gb[m_n] = width
+        m_Q[m_n] = height
+        m_Ob[m_n] = spriteIdx
+        m_mask1[m_n] = mask1
+        m_mask2[m_n] = mask2
+        m_flip[m_n] = mirrorX
         m_n += 1
     }
 
@@ -150,27 +169,100 @@ final class Scene {
         m_n = 0
     }
 
+    /// Project a single world-space point through the current camera. Returns
+    /// screen-space (x, y) and camera-space depth (z). Depth < zTop means the
+    /// point is behind/near the camera and should be skipped. Mirrors the math
+    /// in RSModel.rotate1024 line 548+.
+    func projectPoint(worldX: Int32, worldY: Int32, worldZ: Int32) -> (screenX: Int32, screenY: Int32, depth: Int32) {
+        var x = worldX &- rot1024_off_x
+        var y = worldY &- rot1024_off_y
+        var z = worldZ &- rot1024_off_z
+
+        let rotY = Int(cameraProjY)
+        let rotZ = Int(cameraProjZ)
+        let rotX = Int(cameraProjX)
+
+        if cameraProjZ != 0 {
+            let sn = FastMath.trigTable1024[rotZ]
+            let cs = FastMath.trigTable1024[rotZ + 1024]
+            let tmp = (y &* sn &+ cs &* x) >> 15
+            y = (y &* cs &- x &* sn) >> 15
+            x = tmp
+        }
+        if cameraProjY != 0 {
+            let sn = FastMath.trigTable1024[rotY]
+            let cs = FastMath.trigTable1024[rotY + 1024]
+            let tmp = (cs &* x &+ z &* sn) >> 15
+            z = (cs &* z &- x &* sn) >> 15
+            x = tmp
+        }
+        if cameraProjX != 0 {
+            let sn = FastMath.trigTable1024[rotX]
+            let cs = FastMath.trigTable1024[rotX + 1024]
+            let tmp = (y &* cs &- sn &* z) >> 15
+            z = (sn &* y &+ cs &* z) >> 15
+            y = tmp
+        }
+
+        let sx: Int32
+        let sy: Int32
+        if z < rot1024_zTop {
+            sx = x << rot1024_vp_src
+            sy = y << rot1024_vp_src
+        } else {
+            sx = (x << rot1024_vp_src) / z
+            sy = (y << rot1024_vp_src) / z
+        }
+        return (sx + m_A, sy + m_wb, z)
+    }
+
     // MARK: - Camera setup
 
+    // Viewport scale parameter (matches Java rot1024_vp_src = 8)
+    var rot1024_vp_src: Int32 = 8
+    var rot1024_zTop: Int32 = 20  // Near plane — lower = more visible tiles
+
     func setCamera(centerX: Int32, centerY: Int32, centerZ: Int32, xRot: Int32, yRot: Int32, zRot: Int32, offset: Int32) {
-        // Set camera position
-        cameraProjX = centerX
-        cameraProjY = centerY
-        cameraProjZ = centerZ
+        // Matches Java Scene.java:2930 exactly
+        let zr = Int(zRot & 1023)
+        let xr = Int(xRot & 1023)
+        let yr = Int(yRot & 1023)
 
-        // Set camera rotation in 1024-scale
-        rot1024_off_x = xRot / 4
-        rot1024_off_y = yRot / 4
-        rot1024_off_z = zRot
+        cameraProjZ = Int32(1024 - zr) & 1023
+        cameraProjX = Int32(1024 - xr) & 1023
+        cameraProjY = Int32(1024 - yr) & 1023
 
-        // Compute frustum bounds
-        let fov = 512  // field of view
-        Scene.frustumMinX = -Int32(fov)
-        Scene.frustumMaxX = Int32(fov)
-        Scene.frustumMinY = -Int32(fov)
-        Scene.frustumMaxY = Int32(fov)
-        Scene.frustumNearZ = 50
-        Scene.frustumFarZ = 10000
+        var offX: Int32 = 0
+        var offY: Int32 = 0
+        var offZ: Int32 = offset
+
+        if xr != 0 {
+            let sin = FastMath.trigTable1024[xr]
+            let cos = FastMath.trigTable1024[xr + 1024]
+            let tmp = (cos &* offY &- sin &* offset) >> 15
+            offZ = (sin &* offY &+ offset &* cos) >> 15
+            offY = tmp
+        }
+
+        if yr != 0 {
+            let sin = FastMath.trigTable1024[yr]
+            let cos = FastMath.trigTable1024[yr + 1024]
+            let tmp = (offX &* cos &+ offZ &* sin) >> 15
+            offZ = (cos &* offZ &- sin &* offX) >> 15
+            offX = tmp
+        }
+
+        if zr != 0 {
+            let cos = FastMath.trigTable1024[zr + 1024]
+            let sin = FastMath.trigTable1024[zr]
+            let tmp = (offX &* cos &+ sin &* offY) >> 15
+            offY = (offY &* cos &- sin &* offX) >> 15
+            offX = tmp
+        }
+
+        rot1024_off_z = centerZ &- offZ
+        rot1024_off_y = centerY &- offY
+        rot1024_off_x = centerX &- offX
     }
 
     // MARK: - Rendering
@@ -179,57 +271,94 @@ final class Scene {
         // Clear framebuffer
         graphics.blackScreen()
 
-        // Transform all models to camera space
+        // Compute frustum extents (matches Java Scene.java:2557-2580)
+        let var7 = m_A &* fogLandscapeDistance >> rot1024_vp_src
+        let var8 = fogLandscapeDistance &* m_wb >> rot1024_vp_src
+
+        Scene.frustumFarZ = 0; Scene.frustumNearZ = 0
+        Scene.frustumMaxX = 0; Scene.frustumMinX = 0
+        Scene.frustumMinY = 0; Scene.frustumMaxY = 0
+
+        updateFrustum(fogLandscapeDistance, -var7, -var8)
+        updateFrustum(fogLandscapeDistance, -var7, var8)
+        updateFrustum(fogLandscapeDistance, var7, -var8)
+        updateFrustum(fogLandscapeDistance, var7, var8)
+        updateFrustum(0, -m_A, -m_wb)
+        updateFrustum(0, -m_A, m_wb)
+        updateFrustum(0, m_A, -m_wb)
+        updateFrustum(0, m_A, m_wb)
+
+        Scene.frustumNearZ += rot1024_off_y
+        Scene.frustumMinX += rot1024_off_z
+        Scene.frustumFarZ += rot1024_off_y
+        Scene.frustumMaxY += rot1024_off_x
+        Scene.frustumMaxX += rot1024_off_z
+        Scene.frustumMinY += rot1024_off_x
+
+        // Transform all models to camera space (matches Java Scene.java:2585-2588)
         for i in 0..<modelCount {
             guard let model = models[i] else { continue }
-
-            // Apply camera transform
             model.rotate1024(
-                yOffset: 0,
-                vParamSrc: 0,
-                xOffset: cameraProjX,
-                zOffset: cameraProjZ,
-                rotY: rot1024_off_y,
-                rotZ: rot1024_off_z,
-                rotX: rot1024_off_x,
-                zTop: 5
+                yOffset: rot1024_off_y,
+                vParamSrc: rot1024_vp_src,
+                xOffset: rot1024_off_x,
+                zOffset: rot1024_off_z,
+                rotY: cameraProjY,
+                rotZ: cameraProjZ,
+                rotX: cameraProjX,
+                zTop: rot1024_zTop
             )
         }
 
-        // Collect visible faces into polygon list
+        // Collect visible faces into polygon list (with Z culling)
         m_zb = 0
+        var totalFaces = 0
+        var zCulled = 0
+        var screenCulled = 0
+        var modelSkipped = 0
         for i in 0..<modelCount {
             guard let model = models[i] else { continue }
+            if !model.m_dc { modelSkipped += 1; continue }
 
-            for faceIdx in 0..<Int(model.faceCount) {
+            for faceIdx in 0..<Int(model.faceHead) {
                 guard m_zb < polygons.count else { break }
+
+                let indices = model.faceIndices[faceIdx]
+                let count = model.faceIndexCount[faceIdx]
+                guard count >= 3 else { continue }
+                totalFaces += 1
+
+                // Z-cull: skip if all vertices are behind the near plane
+                var anyVisible = false
+                for vi in 0..<Int(count) {
+                    let vIdx = Int(indices[vi])
+                    if vIdx < model.vertZRot.count && model.vertZRot[vIdx] >= rot1024_zTop {
+                        anyVisible = true
+                        break
+                    }
+                }
+                if !anyVisible { zCulled += 1; continue }
 
                 let poly = polygons[m_zb]
                 poly.model = model
                 poly.faceID = Int32(faceIdx)
 
-                // Compute face normal (simplified)
-                let indices = model.faceIndices[faceIdx]
-                let count = model.faceIndexCount[faceIdx]
+                let v0 = Int(indices[0])
+                let v1 = Int(indices[1])
+                let v2 = Int(indices[2])
 
-                if count >= 3 {
-                    let v0 = Int(indices[0])
-                    let v1 = Int(indices[1])
-                    let v2 = Int(indices[2])
+                guard v0 < model.vertXRot.count && v1 < model.vertXRot.count && v2 < model.vertXRot.count else { continue }
 
-                    let x1 = model.vertXRot[v1] - model.vertXRot[v0]
-                    let y1 = model.vertYRot[v1] - model.vertYRot[v0]
-                    let z1 = model.vertZRot[v1] - model.vertZRot[v0]
-
-                    let x2 = model.vertXRot[v2] - model.vertXRot[v0]
-                    let y2 = model.vertYRot[v2] - model.vertYRot[v0]
-                    let z2 = model.vertZRot[v2] - model.vertZRot[v0]
-
-                    // Cross product for normal
-                    poly.normalX = Int32((y1 &* z2) &- (z1 &* y2)) / 16384
-                    poly.normalY = Int32((z1 &* x2) &- (x1 &* z2)) / 16384
-                    poly.normalZ = Int32((x1 &* y2) &- (y1 &* x2)) / 16384
-                }
+                // Cross product for face normal
+                let nx1 = model.vertXRot[v1] &- model.vertXRot[v0]
+                let ny1 = model.vertYRot[v1] &- model.vertYRot[v0]
+                let nz1 = model.vertZRot[v1] &- model.vertZRot[v0]
+                let nx2 = model.vertXRot[v2] &- model.vertXRot[v0]
+                let ny2 = model.vertYRot[v2] &- model.vertYRot[v0]
+                let nz2 = model.vertZRot[v2] &- model.vertZRot[v0]
+                poly.normalX = ((ny1 &* nz2) &- (nz1 &* ny2)) >> 14
+                poly.normalY = ((nz1 &* nx2) &- (nx1 &* nz2)) >> 14
+                poly.normalZ = ((nx1 &* ny2) &- (ny1 &* nx2)) >> 14
 
                 poly.minZ = model.minZ
                 poly.maxZ = model.maxZ
@@ -238,34 +367,116 @@ final class Scene {
                 poly.minP6 = 999999
                 poly.maxP6 = -999999
 
-                // Compute bounding box
+                // Compute bounding box and average depth
+                var avgZ: Int32 = 0
                 for j in 0..<Int(count) {
                     let vIdx = Int(indices[j])
-                    let x = model.vertexParam6[vIdx]
-                    let y = model.vertexParam2[vIdx]
+                    guard vIdx < model.vertexParam6.count else { continue }
+                    let x = model.vertexParam6[vIdx] + m_A
+                    let y = model.vertexParam2[vIdx] + m_wb
 
                     if x < poly.minP6 { poly.minP6 = x }
                     if x > poly.maxP6 { poly.maxP6 = x }
                     if y < poly.minP2 { poly.minP2 = y }
                     if y > poly.maxP2 { poly.maxP2 = y }
+                    avgZ += model.vertZRot[vIdx]
+                }
+                poly.m_t = avgZ / count  // average Z depth for sorting
+
+                // Skip off-screen polygons
+                if !(poly.maxP6 > 0 && poly.minP6 < graphics.width2 &&
+                     poly.maxP2 > 0 && poly.minP2 < graphics.height2) {
+                    screenCulled += 1
+                    continue
                 }
 
                 m_zb += 1
             }
         }
 
-        // Simple depth sort (painter's algorithm)
-        // Sort polygons by max Z (back to front)
-        let sortedIndices = (0..<m_zb).sorted { i, j in
-            polygons[i].maxZ < polygons[j].maxZ
+        // Debug log (first few frames only)
+        debugFrameCount += 1
+        if debugFrameCount <= 5 {
+            print("[Scene] total=\(totalFaces) zCulled=\(zCulled) screenCulled=\(screenCulled) visible=\(m_zb) modelSkip=\(modelSkipped)")
+            if totalFaces > 0 && m_zb == 0 {
+                // Sample first face's vertex data to debug
+                if let model = models[0] {
+                    let fi = model.faceIndices[0]
+                    let v0 = Int(fi[0])
+                    if v0 < model.vertZRot.count {
+                        print("[Scene] sample v0: xRot=\(model.vertXRot[v0]) yRot=\(model.vertYRot[v0]) zRot=\(model.vertZRot[v0]) p6=\(model.vertexParam6[v0]) p2=\(model.vertexParam2[v0])")
+                    }
+                }
+            }
         }
 
-        // Rasterize polygons in sorted order
+        // Depth sort: back to front (painter's algorithm)
+        let sortedIndices = (0..<m_zb).sorted { i, j in
+            self.polygons[i].m_t > self.polygons[j].m_t  // larger Z = farther = draw first
+        }
+
+        // Rasterize polygons — use direct quad fill for terrain (faster and more reliable than scanline for small quads)
         for idx in sortedIndices {
             let poly = polygons[idx]
             guard let model = poly.model else { continue }
+            let fIdx = Int(poly.faceID)
+            guard fIdx < model.faceIndices.count else { continue }
 
-            rasterizePolygon(poly, model)
+            let indices = model.faceIndices[fIdx]
+            let count = Int(model.faceIndexCount[fIdx])
+            guard count >= 3 else { continue }
+
+            // Get color
+            let texFront = model.faceTextureFront[fIdx]
+            let color: Int32
+            if texFront < -1 || texFront > 100000 {
+                color = texFront
+            } else {
+                let brightness = Int32(model.faceDiffuseLight[fIdx] & 0xFF)
+                color = brightness > 0 ? ((brightness << 16) | (brightness << 8) | brightness) | Int32(bitPattern: 0xFF000000) : Int32(bitPattern: 0xFF404040)
+            }
+
+            // Get screen coordinates for all vertices (clamped to reasonable range)
+            var screenPts = [(x: Int, y: Int)]()
+            let maxCoord = Int(graphics.width2) * 4  // allow some off-screen for edge cases
+            for vi in 0..<count {
+                let vIdx = Int(indices[vi])
+                guard vIdx < model.vertexParam6.count else { continue }
+                let sx = max(-maxCoord, min(maxCoord, Int(model.vertexParam6[vIdx] + m_A)))
+                let sy = max(-maxCoord, min(maxCoord, Int(model.vertexParam2[vIdx] + m_wb)))
+                screenPts.append((x: sx, y: sy))
+            }
+            guard screenPts.count >= 3 else { continue }
+
+            // Fill the polygon's bounding box with its color
+            // For small terrain tiles at isometric zoom, bbox fill is accurate and fast
+            let minY = max(0, Int(poly.minP2))
+            let maxY = min(Int(graphics.height2) - 1, Int(poly.maxP2))
+            let minX = max(0, Int(poly.minP6))
+            let maxX = min(Int(graphics.width2) - 1, Int(poly.maxP6))
+            guard minY <= maxY && minX <= maxX else { continue }
+
+            let w = Int(graphics.width2)
+            for y in minY...maxY {
+                let rowBase = y * w
+                for x in minX...maxX {
+                    graphics.pixelData[rowBase + x] = color
+                }
+            }
+        }
+
+        if debugFrameCount <= 5 && m_zb > 0 {
+            // Find actual min/max across ALL visible polygons
+            var globalMinX: Int32 = 99999, globalMaxX: Int32 = -99999
+            var globalMinY: Int32 = 99999, globalMaxY: Int32 = -99999
+            for i in 0..<m_zb {
+                let p = polygons[i]
+                if p.minP6 < globalMinX { globalMinX = p.minP6 }
+                if p.maxP6 > globalMaxX { globalMaxX = p.maxP6 }
+                if p.minP2 < globalMinY { globalMinY = p.minP2 }
+                if p.maxP2 > globalMaxY { globalMaxY = p.maxP2 }
+            }
+            print("[Scene] \(m_zb) polys, screen range: x=\(globalMinX)..\(globalMaxX) y=\(globalMinY)..\(globalMaxY) (screen=\(graphics.width2)x\(graphics.height2))")
         }
 
         // Render sprites (billboards)
@@ -276,14 +487,24 @@ final class Scene {
             let spriteH = m_Q[i]
             let spriteIdx = Int(m_Ob[i])
 
-            graphics.drawEntity(
-                index: spriteIdx,
-                x: spriteX,
-                y: spriteY,
-                width: spriteW,
-                height: spriteH,
-                perspective: 0
-            )
+            let mask1 = m_mask1[i]
+            let mask2 = m_mask2[i]
+            let mirror = m_flip[i]
+            if mask1 != 0 || mask2 != 0 {
+                graphics.drawEntityTinted(
+                    index: spriteIdx,
+                    x: spriteX, y: spriteY,
+                    width: spriteW, height: spriteH,
+                    mask1: mask1, mask2: mask2, mirrorX: mirror
+                )
+            } else {
+                graphics.drawEntity(
+                    index: spriteIdx,
+                    x: spriteX, y: spriteY,
+                    width: spriteW, height: spriteH,
+                    perspective: 0
+                )
+            }
         }
     }
 
@@ -297,10 +518,9 @@ final class Scene {
         let count = Int(model.faceIndexCount[faceIdx])
         guard count >= 3 else { return }
 
-        // Backface culling: skip if orientation (dot product) is positive
-        if poly.orientation > 0 {
-            return
-        }
+        // Backface culling: skip faces pointing away from camera
+        // poly.orientation is not computed by the pipeline, so skip this check
+        // to avoid culling all faces (orientation defaults to 0)
 
         let texFront = model.faceTextureFront[faceIdx]
         let hasTexture = texFront >= 0 && texFront < Int32(resourceDatabase.count)
@@ -316,6 +536,7 @@ final class Scene {
         // Clear scanline buffer for this polygon
         let minY = Int(max(0, poly.minP2))
         let maxY = Int(min(Int32(m_x.count - 1), poly.maxP2))
+        guard minY <= maxY else { return }
 
         for y in minY...maxY {
             m_x[y].m_d = Int32.max
@@ -341,10 +562,11 @@ final class Scene {
     private func walkEdge(model: RSModel, v0: Int, v1: Int) {
         guard v0 < model.vertexParam2.count && v1 < model.vertexParam2.count else { return }
 
-        let x0 = model.vertexParam6[v0]
-        let y0 = model.vertexParam2[v0]
-        let x1 = model.vertexParam6[v1]
-        let y1 = model.vertexParam2[v1]
+        // vertexParam6/vertexParam2 are centered at 0 — offset to screen coordinates
+        let x0 = model.vertexParam6[v0] + m_A
+        let y0 = model.vertexParam2[v0] + m_wb
+        let x1 = model.vertexParam6[v1] + m_A
+        let y1 = model.vertexParam2[v1] + m_wb
 
         let minY = Int(min(y0, y1))
         let maxY = Int(max(y0, y1))
@@ -354,7 +576,7 @@ final class Scene {
         let yStart = max(0, minY)
         let yEnd = min(m_x.count - 1, maxY)
 
-        if yStart > yEnd { return }
+        guard yStart <= yEnd else { return }
 
         let dy = y1 - y0
         let dx = x1 - x0
@@ -369,34 +591,35 @@ final class Scene {
             }
         } else {
             // Bresenham-like edge walk
-            let yDir = if y1 > y0 { 1 } else { -1 }
+            let absDy = abs(dy)
+            guard absDy > 0 else { return }
+            let yDir: Int32 = y1 > y0 ? 1 : -1
             var x = x0
             var error: Int32 = 0
 
-            for step in 0...abs(dy) {
-                let y = y0 + Int32(step) * Int32(yDir)
+            for step in 0...Int(absDy) {
+                let y = y0 + Int32(step) &* yDir
                 if y >= 0 && y < Int32(m_x.count) {
                     m_x[Int(y)].m_d = min(m_x[Int(y)].m_d, x)
                     m_x[Int(y)].m_k = max(m_x[Int(y)].m_k, x)
                 }
 
                 error += abs(dx)
-                if error * 2 >= abs(dy) {
-                    let xDir = if x1 > x0 { 1 } else { -1 }
-                    x += Int32(xDir)
-                    error -= abs(dy)
+                if error * 2 >= absDy {
+                    let xDir: Int32 = x1 > x0 ? 1 : -1
+                    x += xDir
+                    error -= absDy
                 }
             }
         }
     }
 
     private func rasterizeTextured(_ poly: Polygon, _ model: RSModel, _ indices: [Int32], _ count: Int, _ texturePixels: [Int32]) {
-        // Textured rendering: for now, fill with a light color
-        // Full perspective-correct texture mapping would require complex setup with shader
         let minY = Int(max(0, poly.minP2))
         let maxY = Int(min(Int32(m_x.count - 1), poly.maxP2))
+        guard minY <= maxY else { return }
 
-        let color: Int32 = Int32(bitPattern: 0xFFAAAAAA)  // Light gray for textured faces
+        let color: Int32 = Int32(bitPattern: 0xFFAAAAAA)
 
         for y in minY...maxY {
             let scanline = m_x[y]
@@ -412,16 +635,21 @@ final class Scene {
     }
 
     private func rasterizeFlat(_ poly: Polygon, _ model: RSModel, _ indices: [Int32], _ count: Int) {
-        // Get diffuse light
         let faceIdx = Int(poly.faceID)
-        let diffuse = model.faceDiffuseLight[faceIdx]
-        let brightness = Int32(diffuse & 0xFF)
 
-        // Simple color based on brightness
-        let color = ((brightness << 16) | (brightness << 8) | brightness) | Int32(bitPattern: 0xFF000000)
+        let texFront = model.faceTextureFront[faceIdx]
+        let color: Int32
+        if texFront < -1 || texFront > 100000 {
+            color = texFront  // Packed ARGB from terrain
+        } else {
+            let diffuse = model.faceDiffuseLight[faceIdx]
+            let brightness = Int32(diffuse & 0xFF)
+            color = ((brightness << 16) | (brightness << 8) | brightness) | Int32(bitPattern: 0xFF000000)
+        }
 
         let minY = Int(max(0, poly.minP2))
         let maxY = Int(min(Int32(m_x.count - 1), poly.maxP2))
+        guard minY <= maxY else { return }
 
         for y in minY...maxY {
             let scanline = m_x[y]
@@ -446,6 +674,45 @@ final class Scene {
     func resourceToColor(_ resource: Int32) -> Int32 {
         // Palette lookup (simplified)
         return resource
+    }
+
+    // Matches Java Scene.java:566 setFrustum(int x, int y, int z, boolean)
+    private func updateFrustum(_ x: Int32, _ y: Int32, _ z: Int32) {
+        var fx = x; var fy = y; var fz = z
+
+        let cpx = Int(cameraProjX & 1023)
+        let cpy = Int(cameraProjY & 1023)
+        let cpz = Int(cameraProjZ & 1023)
+
+        // Apply camera rotation to frustum point
+        if cpx != 0 {
+            let sin = FastMath.trigTable1024[cpx]
+            let cos = FastMath.trigTable1024[cpx + 1024]
+            let tmp = (fy &* cos &- fz &* sin) >> 15
+            fz = (fy &* sin &+ fz &* cos) >> 15
+            fy = tmp
+        }
+        if cpy != 0 {
+            let sin = FastMath.trigTable1024[cpy]
+            let cos = FastMath.trigTable1024[cpy + 1024]
+            let tmp = (fz &* sin &+ fx &* cos) >> 15
+            fz = (fz &* cos &- fx &* sin) >> 15
+            fx = tmp
+        }
+        if cpz != 0 {
+            let sin = FastMath.trigTable1024[cpz]
+            let cos = FastMath.trigTable1024[cpz + 1024]
+            let tmp = (fy &* sin &+ fx &* cos) >> 15
+            fy = (fy &* cos &- fx &* sin) >> 15
+            fx = tmp
+        }
+
+        if fx < Scene.frustumMinY { Scene.frustumMinY = fx }
+        if fx > Scene.frustumMaxY { Scene.frustumMaxY = fx }
+        if fy < Scene.frustumNearZ { Scene.frustumNearZ = fy }
+        if fy > Scene.frustumFarZ { Scene.frustumFarZ = fy }
+        if fz < Scene.frustumMinX { Scene.frustumMinX = fz }
+        if fz > Scene.frustumMaxX { Scene.frustumMaxX = fz }
     }
 
     func setDiffuseDir(x: Int32, y: Int32, z: Int32) {

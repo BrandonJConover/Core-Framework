@@ -1,0 +1,19 @@
+{
+  "": {
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/primary.swiftdeps"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/Tests/RenderTest/main.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/main.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/main.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/main.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/main.dia"
+  },
+  "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/DerivedSources/resource_bundle_accessor.swift": {
+    "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/resource_bundle_accessor.d",
+    "object": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/resource_bundle_accessor.swift.o",
+    "swiftmodule": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/resource_bundle_accessor~partial.swiftmodule",
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/resource_bundle_accessor.swiftdeps",
+    "diagnostics": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/RenderTest.build/resource_bundle_accessor.dia"
+  }
+}

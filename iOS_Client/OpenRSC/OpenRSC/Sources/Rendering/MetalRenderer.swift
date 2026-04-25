@@ -3,47 +3,84 @@ import MetalKit
 import SwiftUI
 
 // Renders a 512x334 pixel buffer (Java ARGB Int32 array) to the screen via Metal.
-// Same architecture as RSCBitmapSurfaceView.java on Android:
-//   game engine writes pixelData -> upload to MTLTexture -> blit full-screen.
-final class MetalRenderer: NSObject, MTKViewDelegate {
+final class MetalRenderer: NSObject, MTKViewDelegate, ObservableObject {
     static let gameWidth  = 512
     static let gameHeight = 334
 
-    private let device: MTLDevice
-    private let commandQueue: MTLCommandQueue
+    private var device: MTLDevice?
+    private var commandQueue: MTLCommandQueue?
     private var pipelineState: MTLRenderPipelineState?
     private var gameTexture: MTLTexture?
 
-    // Pixel data buffer written by the game engine each frame.
-    // Format: Java ARGB (0xAARRGGBB) — converted to RGBA on upload.
-    private var pixelData = [UInt32](repeating: 0xFF000000, count: gameWidth * gameHeight)
+    private var pixelData = [UInt8](repeating: 0, count: gameWidth * gameHeight * 4)
     private var pixelsDirty = false
     private let lock = NSLock()
+    private var updateCount = 0
 
-    init?(metalDevice: MTLDevice) {
-        self.device = metalDevice
-        guard let queue = metalDevice.makeCommandQueue() else { return nil }
+    // Metal shader source compiled at runtime (avoids SPM bundle issues)
+    private static let shaderSource = """
+    #include <metal_stdlib>
+    using namespace metal;
+
+    struct VertexOut {
+        float4 position [[position]];
+        float2 texCoord;
+    };
+
+    vertex VertexOut vertexShader(uint vid [[vertex_id]]) {
+        const float2 positions[6] = {
+            {-1,  1}, { 1,  1}, {-1, -1},
+            {-1, -1}, { 1,  1}, { 1, -1}
+        };
+        const float2 texCoords[6] = {
+            {0, 0}, {1, 0}, {0, 1},
+            {0, 1}, {1, 0}, {1, 1}
+        };
+        VertexOut out;
+        out.position = float4(positions[vid], 0, 1);
+        out.texCoord = texCoords[vid];
+        return out;
+    }
+
+    fragment float4 fragmentShader(VertexOut in [[stage_in]],
+                                    texture2d<float> tex [[texture(0)]]) {
+        constexpr sampler s(filter::nearest, address::clamp_to_edge);
+        return tex.sample(s, in.texCoord);
+    }
+    """
+
+    func setup(device: MTLDevice) {
+        self.device = device
+        guard let queue = device.makeCommandQueue() else {
+            print("[Metal] Failed to create command queue")
+            return
+        }
         self.commandQueue = queue
-        super.init()
-        setupPipeline()
-        setupTexture()
+        setupPipeline(device: device)
+        setupTexture(device: device)
     }
 
     // Called by RSCGameEngine with the raw pixelData int array each frame.
-    // Matches Android: mudclient.getSurface().pixelData → Bitmap.setPixels()
     func updatePixels(_ pixels: [Int32]) {
         lock.lock()
         defer { lock.unlock() }
-        for (i, p) in pixels.enumerated() where i < pixelData.count {
-            let argb = UInt32(bitPattern: p)
-            let a = (argb >> 24) & 0xFF
-            let r = (argb >> 16) & 0xFF
-            let g = (argb >> 8)  & 0xFF
-            let b =  argb        & 0xFF
-            // Pack as RGBA for Metal texture (.rgba8Unorm)
-            pixelData[i] = (a << 24) | (b << 16) | (g << 8) | r
+
+        let count = min(pixels.count, MetalRenderer.gameWidth * MetalRenderer.gameHeight)
+        for i in 0..<count {
+            let argb = UInt32(bitPattern: pixels[i])
+            let base = i * 4
+            // RGBA byte order for .rgba8Unorm texture
+            pixelData[base]     = UInt8((argb >> 16) & 0xFF) // R
+            pixelData[base + 1] = UInt8((argb >> 8)  & 0xFF) // G
+            pixelData[base + 2] = UInt8( argb        & 0xFF) // B
+            pixelData[base + 3] = UInt8((argb >> 24) & 0xFF) // A
         }
         pixelsDirty = true
+
+        updateCount += 1
+        if updateCount <= 3 || updateCount % 200 == 0 {
+            print("[Metal] Frame \(updateCount), pipeline=\(pipelineState != nil) texture=\(gameTexture != nil)")
+        }
     }
 
     // MARK: - MTKViewDelegate
@@ -55,12 +92,12 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
               let descriptor = view.currentRenderPassDescriptor,
               let pipeline = pipelineState,
               let texture = gameTexture,
-              let cmdBuffer = commandQueue.makeCommandBuffer() else { return }
+              let cmdBuffer = commandQueue?.makeCommandBuffer() else { return }
 
         lock.lock()
         if pixelsDirty {
             let region = MTLRegionMake2D(0, 0, MetalRenderer.gameWidth, MetalRenderer.gameHeight)
-            pixelData.withUnsafeBytes { ptr in
+            pixelData.withUnsafeBufferPointer { ptr in
                 texture.replace(region: region, mipmapLevel: 0,
                                 withBytes: ptr.baseAddress!,
                                 bytesPerRow: MetalRenderer.gameWidth * 4)
@@ -81,20 +118,29 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
 
     // MARK: - Setup
 
-    private func setupPipeline() {
-        guard let library = device.makeDefaultLibrary(),
-              let vertFn = library.makeFunction(name: "vertexShader"),
-              let fragFn = library.makeFunction(name: "fragmentShader") else { return }
+    private func setupPipeline(device: MTLDevice) {
+        // Compile shader from source at runtime (avoids SPM resource bundle issues)
+        do {
+            let library = try device.makeLibrary(source: MetalRenderer.shaderSource, options: nil)
+            guard let vertFn = library.makeFunction(name: "vertexShader"),
+                  let fragFn = library.makeFunction(name: "fragmentShader") else {
+                print("[Metal] Failed to find shader functions")
+                return
+            }
 
-        let desc = MTLRenderPipelineDescriptor()
-        desc.vertexFunction = vertFn
-        desc.fragmentFunction = fragFn
-        desc.colorAttachments[0].pixelFormat = .bgra8Unorm
+            let desc = MTLRenderPipelineDescriptor()
+            desc.vertexFunction = vertFn
+            desc.fragmentFunction = fragFn
+            desc.colorAttachments[0].pixelFormat = .bgra8Unorm
 
-        pipelineState = try? device.makeRenderPipelineState(descriptor: desc)
+            pipelineState = try device.makeRenderPipelineState(descriptor: desc)
+            print("[Metal] Pipeline created successfully")
+        } catch {
+            print("[Metal] Pipeline setup failed: \(error)")
+        }
     }
 
-    private func setupTexture() {
+    private func setupTexture(device: MTLDevice) {
         let desc = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .rgba8Unorm,
             width: MetalRenderer.gameWidth,
@@ -102,14 +148,18 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
             mipmapped: false
         )
         desc.usage = [.shaderRead, .shaderWrite]
+        #if os(macOS)
+        desc.storageMode = .managed
+        #else
         desc.storageMode = .shared
+        #endif
         gameTexture = device.makeTexture(descriptor: desc)
+        print("[Metal] Texture created: \(gameTexture != nil)")
     }
 }
 
-// SwiftUI wrapper for the MTKView (iOS only)
+// SwiftUI wrapper for the MTKView
 #if canImport(UIKit)
-import SwiftUI
 struct MetalViewRepresentable: UIViewRepresentable {
     let engine: RSCGameEngine
 
@@ -121,9 +171,8 @@ struct MetalViewRepresentable: UIViewRepresentable {
         view.preferredFramesPerSecond = 30
         view.backgroundColor = .black
         if let dev = view.device {
-            let renderer = MetalRenderer(metalDevice: dev)
-            view.delegate = renderer
-            engine.renderer = renderer
+            engine.renderer.setup(device: dev)
+            view.delegate = engine.renderer
         }
         return view
     }

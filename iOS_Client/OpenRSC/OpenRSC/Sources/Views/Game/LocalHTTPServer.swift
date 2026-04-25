@@ -77,7 +77,11 @@ final class LocalHTTPServer {
     private func respond(to requestData: Data, on connection: NWConnection) {
         let path = parsePath(from: requestData)
         let relativePath = path == "/" || path.isEmpty ? "index.html" : String(path.dropFirst())
-        let fileURL = Bundle.main.bundleURL.appendingPathComponent(relativePath)
+
+        // WebClient is bundled as a folder reference — try WebClient/ subdir first, then bundle root
+        let webClientURL = Bundle.main.bundleURL.appendingPathComponent("WebClient").appendingPathComponent(relativePath)
+        let rootURL = Bundle.main.bundleURL.appendingPathComponent(relativePath)
+        let fileURL = FileManager.default.fileExists(atPath: webClientURL.path) ? webClientURL : rootURL
 
         guard FileManager.default.fileExists(atPath: fileURL.path),
               let body = try? Data(contentsOf: fileURL) else {
@@ -137,6 +141,8 @@ final class LocalHTTPServer {
         case "woff":         return "font/woff"
         case "woff2":        return "font/woff2"
         case "ttf":          return "font/ttf"
+        case "wasm":         return "application/wasm"
+        case "data":         return "application/octet-stream"
         case "webmanifest":  return "application/manifest+json"
         default:             return "application/octet-stream"
         }

@@ -1,6 +1,6 @@
 {
   "": {
-    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/master.swiftdeps"
+    "swift-dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/primary.swiftdeps"
   },
   "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCPackageTests.derived/runner.swift": {
     "dependencies": "/Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC/.build/arm64-apple-macosx/debug/OpenRSCPackageTests.build/runner.d",

@@ -424,6 +424,62 @@ final class GraphicsController {
         drawSpriteScaled(sprite: sprite, x: x, y: y, destWidth: width, destHeight: height)
     }
 
+    /// Tinted character-layer blit. Ports the gray/white-axis mask logic from
+    /// Java GraphicsController.plot_trans_scale_with_2_masks (line 1007+):
+    ///   - Source pixels with R==G==B (gray) get tinted by mask1 (multiplicative).
+    ///   - Source pixels with R==255 && G==B (white axis) get tinted by mask2.
+    ///   - Other colors pass through unchanged.
+    /// Transparent pixels (alpha=0 or full-zero) are skipped. No scaling — the
+    /// sprite is blit at its native size; horizontal mirror is handled.
+    func drawEntityTinted(index: Int, x: Int32, y: Int32, width: Int32, height: Int32,
+                          mask1: Int32, mask2: Int32, mirrorX: Bool) {
+        guard index >= 0 && index < sprites.count, let sprite = sprites[index] else { return }
+        let m1 = mask1 == 0 ? Int32(0xFFFFFF) : mask1
+        let m2 = mask2 == 0 ? Int32(0xFFFFFF) : mask2
+        let m1R = (Int(m1) >> 16) & 0xFF, m1G = (Int(m1) >> 8) & 0xFF, m1B = Int(m1) & 0xFF
+        let m2R = (Int(m2) >> 16) & 0xFF, m2G = (Int(m2) >> 8) & 0xFF, m2B = Int(m2) & 0xFF
+
+        let sw = Int(sprite.width); let sh = Int(sprite.height)
+        let dw = Int(width2); let dh = Int(height2)
+
+        for sy in 0..<sh {
+            let dy = Int(y) + sy
+            if dy < 0 || dy >= dh { continue }
+            let rowBase = dy * dw
+            for sx in 0..<sw {
+                let srcX = mirrorX ? (sw - 1 - sx) : sx
+                let pixel = sprite.pixels[sy * sw + srcX]
+                // RSC sprites are stored as 24-bit RGB with no alpha byte:
+                // pixel == 0 (full black) signals transparency. Don't reject on
+                // alpha == 0 — every non-transparent pixel has alpha = 0 on disk.
+                if pixel == 0 { continue }
+
+                let dx = Int(x) + sx
+                if dx < 0 || dx >= dw { continue }
+
+                var r = (Int(pixel) >> 16) & 0xFF
+                var g = (Int(pixel) >> 8) & 0xFF
+                var b = Int(pixel) & 0xFF
+
+                if r == g && g == b {
+                    // Gray pixel — tint with mask1 (e.g. hair/top/bottom layer color)
+                    r = (r * m1R) >> 8
+                    g = (g * m1G) >> 8
+                    b = (b * m1B) >> 8
+                } else if r == 255 && g == b {
+                    // White-axis pixel — tint with mask2 (skin color)
+                    r = (r * m2R) >> 8
+                    g = (g * m2G) >> 8
+                    b = (b * m2B) >> 8
+                }
+                // else: pass through unchanged
+
+                let outARGB = Int32(bitPattern: UInt32(0xFF000000) | (UInt32(r) << 16) | (UInt32(g) << 8) | UInt32(b))
+                pixelData[rowBase + dx] = outARGB
+            }
+        }
+    }
+
     // MARK: - drawSpriteScaled  (plot_scale_black_mask path)
 
     /// Scaled sprite blit where pixel colour 0 is transparent (black mask).

@@ -37,7 +37,14 @@ final class World {
 
         // Initialize collision and elevation
         self.collisionFlags = [[Int]](repeating: [Int](repeating: 0, count: 96), count: 96)
-        self.tileElevationCache = [[Int]](repeating: [Int](repeating: 0, count: 96), count: 96)
+        // Synthetic terrain elevation for visual testing
+        var elevation = [[Int]](repeating: [Int](repeating: 0, count: 96), count: 96)
+        for z in 0..<96 {
+            for x in 0..<96 {
+                elevation[z][x] = Int((sin(Double(x) * 0.3) + cos(Double(z) * 0.2)) * 20)
+            }
+        }
+        self.tileElevationCache = elevation
 
         // Build color-to-resource palette (simplified)
         self.colorToResource = [Int](repeating: 0, count: 256)
@@ -69,56 +76,76 @@ final class World {
         generateLandscapeModel(plane: plane)
     }
 
+    // Reference to landscape loader for real terrain data
+    var landscapeLoader: LandscapeLoader?
+
     func generateLandscapeModel(plane: Int) {
         // Build ground mesh from tile data
         // Each tile is 128×128 game units
+        // Uses real landscape data from LandscapeLoader
 
         let tileSize: Int32 = 128
-        let meshSize = 8  // 8×8 tiles per model (64 tiles total)
 
-        // Create a single landscape model for this plane
-        let model = RSModel()
+        // Create landscape model for visible area around player
+        // Render 32x32 tiles (1024 faces, 4096 verts) for performance
+        let viewSize = 32
+        let model = RSModel(vertexCount: Int32(viewSize * viewSize * 4 + 100), faceCount: Int32(viewSize * viewSize + 100))
 
-        // Build vertices and faces for all 8×8 tiles in this plane
+        // Compute the absolute sector coordinates from the current position
+        let absBaseX = currentBaseX  // These should be in sector-space
+        let absBaseZ = currentBaseZ
+
         var faceCount = 0
+        let half = viewSize / 2
 
-        for tileY in 0..<8 {
-            for tileX in 0..<8 {
-                // Get tile data (simplified)
-                let tileId = (tileY * 8 + tileX) % 25  // Use first 25 tile definitions
+        for tileZ in (-half)..<half {
+            for tileX in (-half)..<half {
+                let worldTX = absBaseX + tileX
+                let worldTZ = absBaseZ + tileZ
 
-                // Get tile definition color
-                let tileDef = EntityDefinitions.getTileDef(tileId)
-                let color = tileDef?.colour ?? Int32(bitPattern: 0xFF808080)
+                var color: Int32
+                var elev: Int32 = 0
 
-                // Skip transparent tiles
-                if color == Scene.TRANSPARENT {
-                    continue
+                if let loader = landscapeLoader, loader.isLoaded,
+                   let tile = loader.getTile(worldX: worldTX, worldZ: worldTZ, plane: plane) {
+                    color = LandscapeLoader.tileColor(overlay: tile.groundOverlay, texture: tile.groundTexture, elevation: tile.groundElevation)
+                    elev = Int32(tile.groundElevation)
+                } else {
+                    let tileDef = EntityDefinitions.getTileDef((tileZ * 96 + tileX) % 25)
+                    color = tileDef?.colour ?? Int32(bitPattern: 0xFF808080)
                 }
 
-                // Build quad for this tile with real elevation at each corner
+                // Skip transparent tiles
+                if color == Scene.TRANSPARENT { continue }
+
+                // Build quad using tile-relative coordinates (relative to player, like Java client)
+                // tileX/tileZ are already relative offsets from -half to +half
                 let baseX = Int32(tileX) * tileSize
-                let baseZ = Int32(tileY) * tileSize
+                let baseZ = Int32(tileZ) * tileSize
+                let y = -elev * 3  // Scale elevation
 
-                // Get elevation at each corner of the tile quad
-                let e0 = Int32(-getElevation(x: Int(baseX), z: Int(baseZ)) * 128)
-                let e1 = Int32(-getElevation(x: Int(baseX + tileSize), z: Int(baseZ)) * 128)
-                let e2 = Int32(-getElevation(x: Int(baseX + tileSize), z: Int(baseZ + tileSize)) * 128)
-                let e3 = Int32(-getElevation(x: Int(baseX), z: Int(baseZ + tileSize)) * 128)
+                // 4 vertices for quad — use direct array access (skip duplicate search for speed)
+                let vi = model.vertHead
+                guard vi + 3 < model.vertexCount2 else { continue }
+                model.vertX[Int(vi)] = baseX;     model.vertY[Int(vi)] = y;     model.vertZ[Int(vi)] = baseZ
+                model.vertX[Int(vi+1)] = baseX + tileSize; model.vertY[Int(vi+1)] = y; model.vertZ[Int(vi+1)] = baseZ
+                model.vertX[Int(vi+2)] = baseX + tileSize; model.vertY[Int(vi+2)] = y; model.vertZ[Int(vi+2)] = baseZ + tileSize
+                model.vertX[Int(vi+3)] = baseX;   model.vertY[Int(vi+3)] = y;   model.vertZ[Int(vi+3)] = baseZ + tileSize
+                model.vertHead += 4
+                let v0 = vi; let v1 = vi + 1; let v2 = vi + 2; let v3 = vi + 3
 
-                // 4 vertices for quad with real elevation
-                let v0 = model.insertVertex(x: baseX, y: e0, z: baseZ)
-                let v1 = model.insertVertex(x: baseX + tileSize, y: e1, z: baseZ)
-                let v2 = model.insertVertex(x: baseX + tileSize, y: e2, z: baseZ + tileSize)
-                let v3 = model.insertVertex(x: baseX, y: e3, z: baseZ + tileSize)
-
-                // Face
+                // Face with color as front texture
                 let faceIndices: [Int32] = [v0, v1, v2, v3]
-                model.insertFace(count: 4, indices: faceIndices, texFront: -1, texBack: -1)
+                model.insertFace(count: 4, indices: faceIndices, texFront: color, texBack: -1)
 
                 faceCount += 1
             }
         }
+
+        print("[World] Generated landscape: \(faceCount) faces, \(model.vertHead) verts")
+
+        // Force full bounding box recalculation (m_Yb=2 sets bounds to ±9999999)
+        model.m_Yb = 2
 
         // Add model to scene
         modelLandscapeGrid[plane] = model

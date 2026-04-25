@@ -23,9 +23,7 @@ targets:
         excludes:
           - "**/.DS_Store"
           - "Rendering/Shaders.metal"
-    resources:
-      - path: OpenRSC/Sources/WebClient
-        type: folder
+          - "WebClient/**"
     info:
       path: OpenRSC/Info.plist
       properties:
@@ -58,5 +56,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         IPHONEOS_DEPLOYMENT_TARGET: "16.0"
         ENABLE_PREVIEWS: YES
-        METAL_COMPILER_FLAGS: ""
         MTL_ENABLE_DEBUG_INFO: INCLUDE_SOURCE
+        DEVELOPMENT_TEAM: MJAYYU2WWD
+        CODE_SIGN_IDENTITY: "iPhone Developer"
+        CODE_SIGN_STYLE: Automatic

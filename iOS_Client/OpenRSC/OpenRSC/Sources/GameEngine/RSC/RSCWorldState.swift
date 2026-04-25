@@ -10,11 +10,33 @@ struct RSCPlayer: Identifiable {
 }
 
 struct RSCNPC: Identifiable {
-    let id: Int
+    var id: Int
     var x: Int
     var y: Int
     var npcId: Int
     var name: String
+    var currentHp: Int = 0
+    var maxHp: Int = 0
+    var damageTaken: Int = 0
+    var combatTimeout: Int = 0
+    var message: String = ""
+    var messageTimeout: Int = 0
+}
+
+struct RSCGameObject: Identifiable {
+    var id: String { "\(x)_\(y)_\(objectId)" }
+    var x: Int
+    var y: Int
+    var objectId: Int
+    var direction: Int
+}
+
+struct RSCWallObject: Identifiable {
+    var id: String { "\(x)_\(y)_\(wallId)_\(direction)" }
+    var x: Int
+    var y: Int
+    var wallId: Int
+    var direction: Int
 }
 
 struct RSCGroundItem: Identifiable {
@@ -90,6 +112,8 @@ final class RSCWorldState: ObservableObject {
     @Published var players: [RSCPlayer] = []
     @Published var npcs: [RSCNPC] = []
     @Published var groundItems: [RSCGroundItem] = []
+    @Published var gameObjects: [RSCGameObject] = []
+    @Published var wallObjects: [RSCWallObject] = []
     @Published var chatMessages: [RSCChatMessage] = []
     @Published var inventory: [RSCInventoryItem] = []
     @Published var equipment: [RSCEquipmentSlot] = []
@@ -102,6 +126,89 @@ final class RSCWorldState: ObservableObject {
     @Published var isMembersWorld: Bool = false
     @Published var fatigue: Int = 0
     @Published var isDead: Bool = false
+
+    // Bank state (opcode 42 showBank, 203 closeBank)
+    @Published var bankOpen: Bool = false
+    @Published var bankItems: [(id: Int, amount: Int)] = []
+    var bankMaxItems: Int = 0
+
+    // Shop state (opcode 101 showShop, 137 closeShop)
+    @Published var shopOpen: Bool = false
+    @Published var shopItems: [(id: Int, stock: Int, price: Int)] = []
+    var shopType: Int = 0
+
+    // Dialogue state (opcode 245 showOptionsMenu, 252 disableOptionsMenu)
+    @Published var dialogueOpen: Bool = false
+    @Published var dialogueOptions: [String] = []
+
+    // Trade state
+    @Published var tradeOpen: Bool = false
+    @Published var tradeConfirmOpen: Bool = false
+    @Published var tradePartnerName: String = ""
+    @Published var tradeAccepted: Bool = false
+    @Published var tradePartnerAccepted: Bool = false
+    @Published var tradeMyOffer: [(id: Int, amount: Int)] = []
+    @Published var tradeTheirOffer: [(id: Int, amount: Int)] = []
+
+    // Friends/Ignore
+    @Published var friendsList: [(name: String, online: Bool)] = []
+    @Published var ignoreList: [String] = []
+
+    // XP drop notifications
+    struct XPDrop: Identifiable {
+        let id = UUID()
+        let skill: String
+        let amount: Int
+        let timestamp: Date
+    }
+    @Published var xpDrops: [XPDrop] = []
+
+    func addXPDrop(skillId: Int, amount: Int) {
+        let names = ["Attack","Defense","Strength","Hits","Ranged","Prayer","Magic","Cooking",
+                     "Woodcut","Fletching","Fishing","Firemaking","Crafting","Smithing","Mining",
+                     "Herblaw","Agility","Thieving"]
+        let name = skillId < names.count ? names[skillId] : "Skill"
+        xpDrops.append(XPDrop(skill: name, amount: amount, timestamp: Date()))
+        // Remove old drops (older than 3 seconds)
+        let cutoff = Date().addingTimeInterval(-3)
+        xpDrops.removeAll { $0.timestamp < cutoff }
+    }
+
+    // Quest journal
+    @Published var quests: [(id: Int, name: String, stage: Int)] = []
+
+    // Character appearance creation
+    @Published var showAppearanceChange: Bool = false
+
+    // Duel state
+    @Published var duelOpen: Bool = false
+    @Published var duelConfirmOpen: Bool = false
+    @Published var duelOpponentName: String = ""
+    @Published var duelMyStake: [(id: Int, amount: Int)] = []
+    @Published var duelTheirStake: [(id: Int, amount: Int)] = []
+    @Published var duelSettings: [Bool] = [false, false, false, false] // retreat, magic, prayer, weapons
+    @Published var duelAccepted: Bool = false
+    @Published var duelOpponentAccepted: Bool = false
+
+    // Sleep/fatigue state
+    @Published var isSleeping: Bool = false
+    @Published var sleepFatigue: Int = 0
+    @Published var sleepStatusText: String = ""
+
+    // Context menu state
+    @Published var contextMenuOpen: Bool = false
+    @Published var contextMenuTitle: String = ""
+    @Published var contextMenuActions: [(label: String, icon: String, action: () -> Void)] = []
+
+    // World region data (from opcode 25 loadArea)
+    var playerServerIndex: Int = 0
+    var worldOffsetX: Int = 0
+    var worldOffsetZ: Int = 0
+    var requestedPlane: Int = 0
+    var loadingArea: Bool = false
+    // midRegionBase computed from player position
+    var midRegionBaseX: Int { ((localPlayerX + 24) / 48) * 48 - 48 }
+    var midRegionBaseZ: Int { ((localPlayerY + 24) / 48) * 48 - 48 }
 
     // Combat state
     @Published var inCombat: Bool = false

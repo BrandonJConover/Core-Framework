@@ -2,15 +2,19 @@ import Foundation
 import Network
 
 // Raw TCP connection using Network.framework NWConnection.
-// Reads RSC-framed packets: [UInt16 length (big-endian), byte opcode, payload...]
-// where length counts the opcode byte + payload bytes.
+// Matches Java client Network_Base.java / Network_Socket.java:
+//   Incoming: [2-byte BE frameSize][opcode][payload] where frameSize includes the 2 header bytes
+//   Java subtracts 2 from frameSize to get opcode+payload length
+//   Login response is a single raw byte (not framed)
 final class TCPConnection: @unchecked Sendable {
     var onPacket: ((UInt8, Data) -> Void)?
     var onDisconnect: (() -> Void)?
+    var onLoginResponse: ((UInt8) -> Void)?
 
     private var connection: NWConnection?
-    private var receiveBuffer = Data()
+    private var inBuffer = [UInt8]()
     private let queue = DispatchQueue(label: "com.openrsc.tcp", qos: .userInitiated)
+    private var awaitingLoginResponse = false
 
     func connect(host: String, port: UInt16) async throws {
         let nwHost = NWEndpoint.Host(host)
@@ -19,14 +23,23 @@ final class TCPConnection: @unchecked Sendable {
         self.connection = conn
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            var resumed = false
             conn.stateUpdateHandler = { [weak self] state in
                 switch state {
                 case .ready:
+                    guard !resumed else { return }
+                    resumed = true
                     continuation.resume()
-                    self?.startReceiving()
+                    self?.scheduleReceive()
                 case .failed(let err):
+                    guard !resumed else { return }
+                    resumed = true
                     continuation.resume(throwing: err)
                 case .cancelled:
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: POSIXError(.ECONNABORTED))
+                    }
                     let cb = self?.onDisconnect
                     Task { @MainActor in cb?() }
                 default:
@@ -50,49 +63,99 @@ final class TCPConnection: @unchecked Sendable {
         }
     }
 
+    func expectLoginResponse() {
+        awaitingLoginResponse = true
+    }
+
     func disconnect() {
         connection?.cancel()
         connection = nil
-        receiveBuffer.removeAll()
+        inBuffer.removeAll()
     }
 
-    // MARK: - Private
+    // MARK: - Receive loop
 
-    private func startReceiving() {
+    private func scheduleReceive() {
         guard let conn = connection else { return }
         conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] content, _, isComplete, error in
             guard let self else { return }
+
             if let data = content, !data.isEmpty {
-                self.receiveBuffer.append(data)
-                self.processBuffer()
+                // Append raw bytes to our buffer
+                data.withUnsafeBytes { ptr in
+                    self.inBuffer.append(contentsOf: ptr.bindMemory(to: UInt8.self))
+                }
+                print("[TCP] Recv \(data.count) bytes (buffer now \(self.inBuffer.count))")
+                self.drainBuffer()
             }
+
             if isComplete || error != nil {
+                print("[TCP] Connection closed: complete=\(isComplete) err=\(String(describing: error))")
                 Task { @MainActor in self.onDisconnect?() }
                 return
             }
-            self.startReceiving()
+
+            // Schedule next receive
+            self.scheduleReceive()
         }
     }
 
-    // Drains receiveBuffer, parsing RSC framed packets.
-    // Frame format: [byte hi, byte lo] = length, then `length` bytes (first byte = opcode).
-    private func processBuffer() {
-        while receiveBuffer.count >= 2 {
-            let hi = Int(receiveBuffer[0])
-            let lo = Int(receiveBuffer[1])
-            let length = (hi << 8) | lo
+    // MARK: - Packet parsing (matches Network_Base.readIncomingPacket)
 
-            guard length > 0, receiveBuffer.count >= 2 + length else { break }
+    private func drainBuffer() {
+        // 1) Login response: single raw byte, no frame header
+        if awaitingLoginResponse && !inBuffer.isEmpty {
+            let b = inBuffer.removeFirst()
+            awaitingLoginResponse = false
+            print("[TCP] Login response: \(b)")
+            let cb = onLoginResponse
+            Task { @MainActor in cb?(b) }
+        }
 
-            let opcode = receiveBuffer[2]
-            let payload = length > 1 ? receiveBuffer.subdata(in: 3..<(2 + length)) : Data()
-            receiveBuffer.removeFirst(2 + length)
+        // 2) Framed packets: [2-byte BE frameSize][opcode][payload...]
+        //    frameSize includes the 2 header bytes (server writes buffer.capacity which is payload+3)
+        //    Java client: incomingPacketLength = read2bytes(); incomingPacketLength -= 2;
+        //    Then reads incomingPacketLength bytes (first byte = opcode, rest = payload)
+        var parsed = 0
+        while inBuffer.count >= 2 {
+            let frameSize = (Int(inBuffer[0]) << 8) | Int(inBuffer[1])
+            let payloadLen = frameSize - 2  // matches Java: incomingPacketLength -= 2
 
+            if payloadLen <= 0 || frameSize > 65536 {
+                // Bad frame — skip these 2 bytes
+                print("[TCP] Bad frame size \(frameSize), skipping")
+                inBuffer.removeFirst(2)
+                continue
+            }
+
+            // Need all frameSize bytes (2 header + payloadLen)
+            guard inBuffer.count >= frameSize else {
+                break // partial packet, wait for more data
+            }
+
+            // Extract opcode (first byte after header) and payload
+            let opcode = inBuffer[2]
+            let payload: Data
+            if payloadLen > 1 {
+                payload = Data(inBuffer[3..<frameSize])
+            } else {
+                payload = Data()
+            }
+
+            // Remove consumed bytes
+            inBuffer.removeFirst(frameSize)
+            parsed += 1
+
+            // Dispatch to handler on main thread
             let op = opcode
             let pl = payload
             Task { @MainActor in
                 self.onPacket?(op, pl)
             }
+        }
+
+        if parsed > 0 {
+            print("[TCP] Parsed \(parsed) packet(s), \(inBuffer.count) remaining")
         }
     }
 }

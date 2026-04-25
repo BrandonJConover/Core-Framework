@@ -67,7 +67,7 @@ final class RSModel {
     var m_dc: Bool = true
     var m_hc: Int32 = 0
     private var m_Kb: Bool = false
-    private var m_Yb: Int32 = 1
+    var m_Yb: Int32 = 1
     private var m_zb: [Int8] = []
     private var m_b: Bool = false
     private var m_c: Bool = false
@@ -107,7 +107,7 @@ final class RSModel {
 
     // MARK: - Misc internal state
     private var maxFaceDimension: Int32 = 12345678
-    private var vertexCount2: Int32 = 0
+    var vertexCount2: Int32 = 0
     private var m_hb: Int32 = 0
 
     // =========================================================================
