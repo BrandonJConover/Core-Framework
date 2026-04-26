@@ -9,7 +9,7 @@ import Foundation
 // Java `>>>` (unsigned right shift) is handled via unsignedRightShift32() or
 // by casting through UInt32.
 
-final class Scene {
+final class RSScene {
 
     static let TRANSPARENT = 12345678
 
@@ -307,9 +307,9 @@ final class Scene {
         // Generate darkened mip levels (3 additional copies)
         for i in 0..<ptr {
             let c = texData[i]
-            texData[ptr + i]       = Int32(truncatingIfNeeded: Int(c) - Scene.unsignedRightShift32(Int(c), 3)) & 0xF8F8FF
-            texData[ptr * 2 + i]   = Int32(truncatingIfNeeded: Int(c) - Scene.unsignedRightShift32(Int(c), 2)) & 0xF8F8FF
-            texData[ptr * 3 + i]   = Int32(truncatingIfNeeded: Int(c) - Scene.unsignedRightShift32(Int(c), 3) - Scene.unsignedRightShift32(Int(c), 2)) & 0xF8F8FF
+            texData[ptr + i]       = Int32(truncatingIfNeeded: Int(c) - RSScene.unsignedRightShift32(Int(c), 3)) & 0xF8F8FF
+            texData[ptr * 2 + i]   = Int32(truncatingIfNeeded: Int(c) - RSScene.unsignedRightShift32(Int(c), 2)) & 0xF8F8FF
+            texData[ptr * 3 + i]   = Int32(truncatingIfNeeded: Int(c) - RSScene.unsignedRightShift32(Int(c), 3) - RSScene.unsignedRightShift32(Int(c), 2)) & 0xF8F8FF
         }
 
         resourceDatabase[index] = texData
@@ -319,7 +319,7 @@ final class Scene {
 
     /// Converts a palette/texture index to an RGB color. Corresponds to Java resourceToColor.
     func resourceToColor(_ resource: Int) -> Int {
-        if resource == Scene.TRANSPARENT {
+        if resource == RSScene.TRANSPARENT {
             return 0
         }
 
@@ -1379,8 +1379,8 @@ final class Scene {
         let var21 = m_wb + (m_Nb - 1)
 
         var var22 = 0, var23 = 0, var24 = 0, var25 = 0
-        var var26 = Scene.TRANSPARENT
-        var var27 = -Scene.TRANSPARENT
+        var var26 = RSScene.TRANSPARENT
+        var var27 = -RSScene.TRANSPARENT
 
         if var12 != var14 {
             if var12 >= var14 {
@@ -1405,8 +1405,8 @@ final class Scene {
         }
 
         var var28 = 0, var29 = 0, var30 = 0, var31 = 0
-        var var32 = Scene.TRANSPARENT
-        var var33 = -Scene.TRANSPARENT
+        var var32 = RSScene.TRANSPARENT
+        var var33 = -RSScene.TRANSPARENT
 
         if var12 != var13 {
             var29 = (var16 - var15 << 8) / (var13 - var12)
@@ -1431,8 +1431,8 @@ final class Scene {
         }
 
         var var34 = 0, var35 = 0, var36 = 0, var37 = 0
-        var var38 = Scene.TRANSPARENT
-        var var39 = -Scene.TRANSPARENT
+        var var38 = RSScene.TRANSPARENT
+        var var39 = -RSScene.TRANSPARENT
 
         if var14 != var13 {
             if var14 > var13 {
@@ -1531,7 +1531,7 @@ final class Scene {
 
         // Edge 0: var15 <-> var12
         var var25 = 0, var26 = 0, var27 = 0, var28 = 0
-        var var29 = Scene.TRANSPARENT, var30 = -Scene.TRANSPARENT
+        var var29 = RSScene.TRANSPARENT, var30 = -RSScene.TRANSPARENT
         if var15 != var12 {
             var26 = (var19 - var16 << 8) / (var15 - var12)
             var28 = (var23 - var20 << 8) / (var15 - var12)
@@ -1546,7 +1546,7 @@ final class Scene {
 
         // Edge 1: var12 <-> var13
         var var31 = 0, var32 = 0, var33 = 0, var34 = 0
-        var var35 = Scene.TRANSPARENT, var36 = -Scene.TRANSPARENT
+        var var35 = RSScene.TRANSPARENT, var36 = -RSScene.TRANSPARENT
         if var12 != var13 {
             var34 = (var21 - var20 << 8) / (var13 - var12)
             if var13 <= var12 {
@@ -1561,7 +1561,7 @@ final class Scene {
 
         // Edge 2: var13 <-> var14
         var var37 = 0, var38 = 0, var39 = 0, var40 = 0
-        var var55 = Scene.TRANSPARENT, var42 = -Scene.TRANSPARENT
+        var var55 = RSScene.TRANSPARENT, var42 = -RSScene.TRANSPARENT
         if var14 != var13 {
             var40 = (var22 - var21 << 8) / (var14 - var13)
             if var14 <= var13 {
@@ -1576,7 +1576,7 @@ final class Scene {
 
         // Edge 3: var14 <-> var15
         var var43 = 0, var44 = 0, var45 = 0, var46 = 0
-        var var47 = Scene.TRANSPARENT, var48 = -Scene.TRANSPARENT
+        var var47 = RSScene.TRANSPARENT, var48 = -RSScene.TRANSPARENT
         if var15 != var14 {
             var46 = (var23 - var22 << 8) / (var15 - var14)
             if var14 >= var15 {
@@ -2407,7 +2407,7 @@ final class Scene {
                     texID = mdl.faceTextureBack[face]
                 }
 
-                if texID != Scene.TRANSPARENT {
+                if texID != RSScene.TRANSPARENT {
                     var zSum = 0
                     for v in 0..<vertCount {
                         zSum += mdl.vertZRot[indices[v]]
@@ -2499,7 +2499,7 @@ final class Scene {
                 var vertCount = mdl.faceIndexCount[face]
                 var lightBase = 0
 
-                if mdl.faceDiffuseLight[face] != Scene.TRANSPARENT {
+                if mdl.faceDiffuseLight[face] != RSScene.TRANSPARENT {
                     if poly.orientation < 0 {
                         lightBase = mdl.diffuseParam1 - mdl.faceDiffuseLight[face]
                     } else {
@@ -2516,7 +2516,7 @@ final class Scene {
                     m_Vb[v] = mdl.vertYRot[vIdx]
                     m_J[v] = mdl.vertZRot[vIdx]
 
-                    if mdl.faceDiffuseLight[face] == Scene.TRANSPARENT {
+                    if mdl.faceDiffuseLight[face] == RSScene.TRANSPARENT {
                         if poly.orientation < 0 {
                             lightBase = mdl.diffuseParam1 + Int(mdl.vertLightOther[vIdx]) - mdl.vertDiffuseLight[vIdx]
                         } else {
@@ -2622,9 +2622,9 @@ final class Scene {
         let size = 4096
         for i in 0..<size {
             let c = texData[i]
-            texData[size + i] = Int32(truncatingIfNeeded: Int(c) - Scene.unsignedRightShift32(Int(c), 3)) & 0xF8F8FF
-            texData[size * 2 + i] = Int32(truncatingIfNeeded: Int(c) - Scene.unsignedRightShift32(Int(c), 2)) & 0xF8F8FF
-            texData[size * 3 + i] = Int32(truncatingIfNeeded: Int(c) - Scene.unsignedRightShift32(Int(c), 3) - Scene.unsignedRightShift32(Int(c), 2)) & 0xF8F8FF
+            texData[size + i] = Int32(truncatingIfNeeded: Int(c) - RSScene.unsignedRightShift32(Int(c), 3)) & 0xF8F8FF
+            texData[size * 2 + i] = Int32(truncatingIfNeeded: Int(c) - RSScene.unsignedRightShift32(Int(c), 2)) & 0xF8F8FF
+            texData[size * 3 + i] = Int32(truncatingIfNeeded: Int(c) - RSScene.unsignedRightShift32(Int(c), 3) - RSScene.unsignedRightShift32(Int(c), 2)) & 0xF8F8FF
         }
 
         resourceDatabase[index] = texData
