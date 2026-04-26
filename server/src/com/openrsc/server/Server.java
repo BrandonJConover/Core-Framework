@@ -102,7 +102,7 @@ public class Server implements Runnable {
 	private EventLoopGroup workerGroupWs;
 	private EventLoopGroup bossGroupWs;
 
-	private final AtomicBoolean running = new AtomicBoolean(false);
+	private volatile AtomicBoolean running = new AtomicBoolean(false);
 	private boolean restarting = false;
 	private boolean shuttingDown = false;
 
@@ -128,7 +128,7 @@ public class Server implements Runnable {
 	private final Map<Integer, Integer> outgoingCountPerPacketOpcode = new HashMap<>();
 	private int privateMessagesSent = 0;
 
-	private volatile int maxItemId;
+	private volatile long maxItemId;
 
 	private final ListeningExecutorService sqlLoggingThreadPool;
 	private final ListeningExecutorService sqlThreadPool;
@@ -226,7 +226,7 @@ public class Server implements Runnable {
 				try {
 					Thread.sleep(1000);
 				} catch (final InterruptedException e) {
-					LOGGER.catching(e);
+					e.printStackTrace();
 				}
 
 				for (final Server server : serversList.values()) {
@@ -275,7 +275,8 @@ public class Server implements Runnable {
 		final boolean wantDiscordStaffCommands = getConfig().WANT_DISCORD_STAFF_COMMANDS;
 		final boolean wantDiscordNaughtyWordsUpdates = getConfig().WANT_DISCORD_NAUGHTY_WORDS_UPDATES;
 		final boolean wantDiscordDowntimeReports = getConfig().WANT_DISCORD_DOWNTIME_REPORTS;
-		discordService = wantDiscordBot || wantDiscordAuctionUpdates || wantDiscordMonitoringUpdates || wantDiscordReportAbuseUpdates || wantDiscordStaffCommands || wantDiscordNaughtyWordsUpdates || wantDiscordDowntimeReports ? new DiscordService(this) : null;
+		final boolean wantDiscordGeneralLogs = getConfig().WANT_DISCORD_GENERAL_LOGGING;
+		discordService = wantDiscordBot || wantDiscordAuctionUpdates || wantDiscordMonitoringUpdates || wantDiscordReportAbuseUpdates || wantDiscordStaffCommands || wantDiscordNaughtyWordsUpdates || wantDiscordDowntimeReports || wantDiscordGeneralLogs ? new DiscordService(this) : null;
 		loginExecutor = new LoginExecutor(this);
 		world = new World(this);
 		gameEventHandler = new GameEventHandler(this);
@@ -779,8 +780,8 @@ public class Server implements Runnable {
 					getDiscordService().reportDowntimeToDiscord(timeOffline, System.currentTimeMillis(), unloadedPlayers, playersOnline);
 				}
 			}
-		} catch(IOException e) {
-			LOGGER.catching(e);
+		} catch(IOException ex) {
+			ex.printStackTrace();
 		}
 	}
 
@@ -804,7 +805,7 @@ public class Server implements Runnable {
 					getWorld().getServer().shutdown(300);*/
 			}
 		} catch (Exception e) {
-			LOGGER.catching(e);
+			e.printStackTrace();
 		}
 	}
 
@@ -1149,11 +1150,11 @@ public class Server implements Runnable {
 		outgoingCountPerPacketOpcode.put(packetOpcode, outgoingCountPerPacketOpcode.get(packetOpcode) + 1);
 	}
 
-	public synchronized int getMaxItemID() {
+	public synchronized long getMaxItemID() {
 		return maxItemId;
 	}
 
-	public synchronized int incrementMaxItemID() {
+	public synchronized long incrementMaxItemID() {
 		return ++maxItemId;
 	}
 

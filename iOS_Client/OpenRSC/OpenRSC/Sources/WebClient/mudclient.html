@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+        <title>Runescape by Andrew Gower</title>
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="theme-color" content="#000000">
+        <meta name="mobile-web-app-capable" content="yes">
+        <style>
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+            }
+
+            body {
+                background-color: #000;
+                overflow: hidden;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            }
+
+            /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
+            canvas.emscripten {
+                width: 100%;
+                height: 100%;
+                border: 0px none;
+                touch-action: none;
+                background-color: black;
+                display: block;
+            }
+
+            canvas.emscripten:focus {
+                outline: none;
+            }
+
+            .mudclient-font-bold-12 {
+                font-size: 12px;
+                font-weight: bold;
+                /*height: 13px;*/
+                margin-top: -6px;
+                height: 25px;
+            }
+
+            .mudclient-font-bold-14 {
+                font-size: 15px;
+                font-weight: bold;
+                height: 16px;
+            }
+
+            .mudclient-font-bold-16 {
+                font-size: 16px;
+                font-weight: bold;
+            }
+
+            .mudclient-keyboard {
+                background: none;
+                font-family: Arial, sans-serif;
+                border: 0;
+                color: transparent;
+                display: block;
+                left: -9999px;
+                top: -9999px;
+                padding: 0;
+                position: absolute;
+                resize: none;
+                text-align: center;
+                transform-origin: 0 0;
+            }
+
+            .mudclient-keyboard:focus {
+                outline: none;
+            }
+
+            #mudclient-password {
+                font-family: monospace;
+            }
+
+            #ios-keyboard-btn {
+                display: none;
+                position: fixed;
+                bottom: 40px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 999999;
+                background: rgba(30, 30, 30, 0.95);
+                color: #ffd700;
+                border: 3px solid #ffd700;
+                border-radius: 16px;
+                padding: 18px 40px;
+                font-size: 22px;
+                font-weight: bold;
+                font-family: -apple-system, Arial, sans-serif;
+                cursor: pointer;
+                -webkit-tap-highlight-color: rgba(255,215,0,0.3);
+                touch-action: manipulation;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas
+            class="emscripten"
+            id="canvas"
+            oncontextmenu="event.preventDefault()"
+            tabindex="-1"
+            autofocus="autofocus"
+        ></canvas>
+
+        <input id="mudclient-keyboard" class="mudclient-keyboard" type="text" />
+
+        <input
+            id="mudclient-password"
+            class="mudclient-keyboard"
+            type="password"
+        />
+
+        <button id="ios-keyboard-btn">Tap to type</button>
+
+        <script>
+            function LSFS() {
+                if (LSFS.mount) {
+                    return LSFS;
+                }
+
+                var wrapCreateNode = wrapNode(MEMFS.createNode);
+
+                var wrap_node_ops = {
+                    setattr: wrapSave(MEMFS.node_ops.setattr),
+                    mknod: wrapNode(MEMFS.node_ops.mknod),
+                    rename: wrapSave(MEMFS.node_ops.rename),
+                    unlink: wrapSave(MEMFS.node_ops.unlink),
+                    rmdir: wrapSave(MEMFS.node_ops.rmdir),
+                    symlink: wrapNode(MEMFS.node_ops.symlink)
+                };
+
+                var wrap_stream_ops = {
+                    write: wrapSave(MEMFS.stream_ops.write),
+                    msync: wrapSave(MEMFS.stream_ops.msync)
+                };
+
+                var props = [
+                    'name',
+                    'mode',
+                    'rdev',
+                    'link',
+                    'usedBytes',
+                    'timestamp'
+                ];
+
+                LSFS.mount = mount;
+
+                return LSFS;
+
+                function wrapNode(fn) {
+                    return function () {
+                        var node = fn.apply(null, arguments);
+                        setupNode(node);
+                        return node;
+                    };
+                }
+
+                function wrapSave(fn) {
+                    return function (node) {
+                        var res = fn.apply(null, arguments);
+                        save(node);
+                        return res;
+                    };
+                }
+
+                function setupNode(node) {
+                    var node_ops = {};
+                    for (var op in node.node_ops) {
+                        node_ops[op] = wrap_node_ops[op] || node.node_ops[op];
+                    }
+                    node.node_ops = node_ops;
+
+                    var stream_ops = {};
+                    for (var op in node.stream_ops) {
+                        stream_ops[op] =
+                            wrap_stream_ops[op] || node.stream_ops[op];
+                    }
+                    node.stream_ops = stream_ops;
+                }
+
+                function filter(node) {
+                    var result = {};
+                    for (var key in node) {
+                        if (props.indexOf(key) !== -1) {
+                            result[key] = node[key];
+                        }
+                    }
+
+                    if (node.contents) {
+                        if (node.contents.length) {
+                            result.contents = Array.apply([], node.contents);
+                        } else {
+                            result.contents = {};
+                            for (var name in node.contents) {
+                                result.contents[name] = filter(
+                                    node.contents[name]
+                                );
+                            }
+                        }
+                    }
+
+                    return result;
+                }
+
+                function save(node) {
+                    if (node.node) {
+                        node = node.node;
+                    }
+
+                    var mount = node.mount;
+                    if (!mount || !mount.opts || !mount.opts.key) {
+                        return;
+                    }
+
+                    try {
+                        localStorage.setItem(
+                            mount.opts.key,
+                            JSON.stringify(filter(mount.root))
+                        );
+                    } catch (err) {}
+                }
+
+                function mount(mount) {
+                    if (!mount.opts || !mount.opts.key) {
+                        return;
+                    }
+
+                    var data;
+
+                    try {
+                        data = localStorage.getItem(mount.opts.key);
+                    } catch (err) {}
+
+                    if (data) {
+                        try {
+                            data = JSON.parse(data);
+                        } catch (err) {}
+                    }
+
+                    var node = MEMFS.mount(mount);
+                    setupNode(node);
+                    load(node, mount, data);
+
+                    return node;
+                }
+
+                function load(node, mount, data) {
+                    node.mount = mount;
+
+                    if (!data) {
+                        return;
+                    }
+
+                    for (var key in data) {
+                        if (props.indexOf(key) !== -1) {
+                            node[key] = data[key];
+                        }
+                    }
+
+                    if (data.contents) {
+                        if (data.contents.length) {
+                            node.contents = data.contents;
+                        } else {
+                            node.contents = {};
+
+                            for (var name in data.contents) {
+                                var childData = data.contents[name];
+                                var childNode = wrapCreateNode(
+                                    node,
+                                    name,
+                                    childData.mode,
+                                    childData.rdev
+                                );
+                                load(childNode, mount, childData);
+                            }
+                        }
+                    }
+                }
+            }
+
+            var Module = {
+                // Auto-detect ws:// vs wss:// based on page protocol.
+                // HTTPS pages block ws:// as mixed content, causing
+                // connection failures that crash the WASM on mobile.
+                websocket: {
+                    url: window.location.protocol === 'https:' ? 'wss://' : 'ws://'
+                },
+                preInit: [
+                    function () {
+                        FS.mkdir('/options');
+                        FS.mount(LSFS(), { key: 'rsc' }, '/options');
+                    }
+                ],
+                preRun: [
+                    function () {
+                        ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = '#canvas';
+
+                        const args = window.location.hash.slice(1).split(',');
+                        arguments_.push(...args);
+                    }
+                ],
+                postRun: [],
+                print: (function () {
+                    return function (text) {
+                        if (arguments.length > 1) {
+                            text = Array.prototype.slice
+                                .call(arguments)
+                                .join(' ');
+                        }
+
+                        console.log(text);
+                    };
+                })(),
+                canvas: (function () {
+                    var canvas = document.getElementById('canvas');
+
+                    canvas.addEventListener(
+                        'webglcontextlost',
+                        function (e) {
+                            alert(
+                                'WebGL context lost. You will need to reload the page.'
+                            );
+                            e.preventDefault();
+                        },
+                        false
+                    );
+
+                    // for rotating the camera off-window
+                    window.addEventListener(
+                        'mousemove',
+                        (event) => {
+                            if (
+                                event.clientX < 0 ||
+                                event.clientX > window.innerWidth
+                            ) {
+                                Module.ccall(
+                                    'browser_mouse_moved',
+                                    null,
+                                    ['number'],
+                                    [event.clientX, event.clientY]
+                                );
+                            }
+                        },
+                        false
+                    );
+
+                    canvas.addEventListener('mousedown', focusCanvas);
+
+                    // On mobile, just focus the canvas on touch — don't block
+                    // events or force fullscreen, as that prevents the game
+                    // from receiving any input on non-iOS devices.
+                    canvas.addEventListener('touchstart', (event) => {
+                        focusCanvas();
+                    });
+
+                    return canvas;
+                })(),
+                setStatus: function (text) {},
+                totalDependencies: 0,
+                monitorRunDependencies: function (left) {
+                    this.totalDependencies = Math.max(
+                        this.totalDependencies,
+                        left
+                    );
+
+                    Module.setStatus(
+                        left
+                            ? 'Preparing... (' +
+                                  (this.totalDependencies - left) +
+                                  '/' +
+                                  this.totalDependencies +
+                                  ')'
+                            : 'All downloads complete.'
+                    );
+                }
+            };
+
+            Module.setStatus('Downloading...');
+
+            window.onerror = function (msg, url, line, col, error) {
+                console.error('[mudclient] Error:', msg, url, line, col, error);
+                Module.setStatus('Exception thrown, see JavaScript console');
+
+                Module.setStatus = function (text) {
+                    if (text) {
+                        console.error('[post-exception status] ' + text);
+                    }
+                };
+
+                // Prevent unhandled errors from crashing the tab on mobile
+                // (which causes the browser to auto-reload the page)
+                return true;
+            };
+
+            // Catch unhandled promise rejections (e.g. failed WebSocket connect)
+            window.addEventListener('unhandledrejection', function(event) {
+                console.error('[mudclient] Unhandled rejection:', event.reason);
+                event.preventDefault();
+            });
+
+            const ENTER_KEY_CODE = 13;
+            const BACKSPACE_KEY_CODE = 8;
+
+            const keyboardInput = document.getElementById('mudclient-keyboard');
+            const passwordInput = document.getElementById('mudclient-password');
+
+            /* ============================================================
+               iOS Keyboard Fix
+               iOS Safari requires input.focus() in the SAME synchronous
+               callstack as a user touch event. The C code calls focus()
+               via Emscripten ASYNCIFY which breaks the gesture chain.
+
+               Fix: When the C code wants to show a keyboard input, we
+               show a visible "Tap to type" button. Tapping that button
+               focuses the real input in a synchronous gesture handler,
+               which iOS accepts.
+               ============================================================ */
+
+            var iosKeyboardBtn = document.getElementById('ios-keyboard-btn');
+            var _activeKeyboardInput = null;
+
+            function focusCanvas() {
+                keyboardInput.style.left = '-9999px';
+                keyboardInput.style.top = '-9999px';
+                passwordInput.style.left = '-9999px';
+                passwordInput.style.top = '-9999px';
+                _activeKeyboardInput = null;
+                if (iosKeyboardBtn) iosKeyboardBtn.style.display = 'none';
+                canvas.focus();
+            }
+
+            // Hook into the keyboard inputs: poll for when C code positions them.
+            // MutationObserver doesn't reliably fire for EM_JS inline style changes.
+            // Instead, poll every 100ms to detect when an input moves on-screen.
+            setInterval(function() {
+                var inputs = [keyboardInput, passwordInput];
+                for (var i = 0; i < inputs.length; i++) {
+                    var el = inputs[i];
+                    var left = parseFloat(el.style.left);
+                    if (!isNaN(left) && left >= 0 && parseFloat(el.style.width) > 0) {
+                        if (_activeKeyboardInput !== el) {
+                            _activeKeyboardInput = el;
+                            if (navigator.maxTouchPoints > 0) {
+                                iosKeyboardBtn.style.display = 'block';
+                                console.log('[keyboard] Input positioned at left=' + left + ', showing tap-to-type');
+                            }
+                        }
+                        return;
+                    }
+                }
+                // No input is on-screen
+                if (_activeKeyboardInput && parseFloat(_activeKeyboardInput.style.left) < 0) {
+                    _activeKeyboardInput = null;
+                    iosKeyboardBtn.style.display = 'none';
+                }
+            }, 100);
+
+            // THE KEY FIX: tapping this button is a direct user gesture,
+            // so input.focus() works and iOS opens the keyboard
+            iosKeyboardBtn.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (_activeKeyboardInput) {
+                    _activeKeyboardInput.focus();
+                    iosKeyboardBtn.style.display = 'none';
+                }
+            });
+            iosKeyboardBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (_activeKeyboardInput) {
+                    _activeKeyboardInput.focus();
+                    iosKeyboardBtn.style.display = 'none';
+                }
+            });
+
+            function emscriptenKeyPress(code, charCode) {
+                Module.ccall(
+                    'browser_key_pressed',
+                    null,
+                    ['number'],
+                    [code, charCode]
+                );
+            }
+
+            function keyboardInputEvent(event) {
+                for (let i = 0; i < 255; i++) {
+                    emscriptenKeyPress(BACKSPACE_KEY_CODE, BACKSPACE_KEY_CODE);
+                }
+
+                for (const character of event.target.value.split('')) {
+                    emscriptenKeyPress(-1, character.charCodeAt(0));
+                }
+            }
+
+            keyboardInput.addEventListener('input', keyboardInputEvent);
+            passwordInput.addEventListener('input', keyboardInputEvent);
+
+            function keyboardDownEvent(event) {
+                if (event.key === 'Enter') {
+                    emscriptenKeyPress(ENTER_KEY_CODE, ENTER_KEY_CODE);
+
+                    keyboardInput.style.left = '-9999px';
+                    keyboardInput.style.top = '-9999px';
+                    passwordInput.style.left = '-9999px';
+                    passwordInput.style.top = '-9999px';
+                    iosKeyboardBtn.style.display = 'none';
+                    _activeKeyboardInput = null;
+                }
+            }
+
+            keyboardInput.addEventListener('keydown', keyboardDownEvent);
+            passwordInput.addEventListener('keydown', keyboardDownEvent);
+
+            function keyboardBlurEvent() {
+                window._mudclientCanResize = false;
+
+                setTimeout(() => {
+                    window._mudclientCanResize = true;
+                }, 1000);
+            }
+
+            // sometimes the viewport takes more time to return to normal after
+            // the input is blur'd
+            keyboardInput.addEventListener('blur', keyboardBlurEvent);
+            passwordInput.addEventListener('blur', keyboardBlurEvent);
+
+            function keyboardFocusEvent(event) {
+                event.target.selectionStart = event.target.selectionEnd =
+                    event.target.value.length;
+            }
+
+            keyboardInput.addEventListener('focus', keyboardFocusEvent);
+            passwordInput.addEventListener('focus', keyboardFocusEvent);
+
+            window._mudclientCanResize = true;
+
+            window._mudclientKeyboard = keyboardInput;
+            window._mudclientPassword = passwordInput;
+
+            // Try to lock to landscape on mobile
+            try { screen.orientation.lock("landscape").catch(function(){}); } catch(e) {}
+
+            window._mudclientIsTouch =
+                navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+
+            /* ============================================================
+               iOS Audio Fix
+               Emscripten's SDL2 skips autoResumeAudioContext when
+               navigator.userActivation exists (true on modern iOS Safari).
+               The fallback uses setInterval which iOS ignores because it's
+               not a user gesture. Fix: add our own gesture-based resume.
+               ============================================================ */
+            (function() {
+                function resumeAudio() {
+                    var ctx = null;
+                    if (typeof Module !== 'undefined' && Module.SDL2 && Module.SDL2.audioContext) {
+                        ctx = Module.SDL2.audioContext;
+                    } else if (typeof SDL2 !== 'undefined' && SDL2.audioContext) {
+                        ctx = SDL2.audioContext;
+                    }
+                    if (ctx && ctx.state === 'suspended') {
+                        ctx.resume();
+                    }
+                }
+                ['touchstart', 'touchend', 'mousedown', 'keydown'].forEach(function(evt) {
+                    document.addEventListener(evt, resumeAudio, { once: false });
+                });
+            })();
+        </script>
+        <script id="mainScript">
+          // Fix: Emscripten's WASM fallback (mudclient.js) appends ?_rwasm=0 via
+          // location.href += '?_rwasm=0', but when a # fragment is present the
+          // param lands AFTER the hash (e.g. mudclient.html#args?_rwasm=0).
+          // location.search stays empty so the check never sees it → infinite
+          // redirect loop.  Detect this and fix the URL before anything loads.
+          (function() {
+            if (location.hash.indexOf('_rwasm=0') >= 0) {
+              var cleanHash = location.hash.replace(/[\?&]_rwasm=0/g, '');
+              history.replaceState(null, '', location.pathname + '?_rwasm=0' + cleanHash);
+            }
+          })();
+
+          function loadMainJs() {
+
+            var script = document.createElement('script');
+            script.src = "mudclient.js";
+            document.body.appendChild(script);
+
+          }
+          if (!window.WebAssembly || location.search.indexOf('_rwasm=0') > 0) {
+            // Current browser does not support WebAssembly, load the .wasm.js JavaScript fallback
+            // before the main JS runtime.
+            var wasm2js = document.createElement('script');
+            wasm2js.src = "mudclient.wasm.js";
+            wasm2js.onload = loadMainJs;
+            document.body.appendChild(wasm2js);
+          } else {
+            // Current browser supports Wasm, proceed with loading the main JS runtime.
+            loadMainJs();
+          }
+
+</script>
+    </body>
+</html>

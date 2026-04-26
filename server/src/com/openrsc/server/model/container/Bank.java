@@ -79,7 +79,7 @@ public class Bank {
 
 				// TODO: Durability
 				itemToAdd = new Item(itemToAdd.getCatalogId(), itemToAdd.getAmount());
-				int itemID = player.getWorld().getServer().getDatabase().incrementMaxItemId(player);
+				long itemID = player.getWorld().getServer().getDatabase().incrementMaxItemId(player);
 
 				itemToAdd = new Item(itemToAdd.getCatalogId(), itemToAdd.getAmount(), false, itemID);
 
@@ -116,7 +116,7 @@ public class Bank {
 
 					// Adjust quantity of second stack to reflect that which was added to the first stack.
 					itemToAdd = new Item(itemToAdd.getCatalogId(), itemToAdd.getAmount() - remainingSize);
-					int itemID = player.getWorld().getServer().getDatabase().incrementMaxItemId(player);
+					long itemID = player.getWorld().getServer().getDatabase().incrementMaxItemId(player);
 
 					itemToAdd = new Item(itemToAdd.getCatalogId(), itemToAdd.getAmount(), false, itemID);
 

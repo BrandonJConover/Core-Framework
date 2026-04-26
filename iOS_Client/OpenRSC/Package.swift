@@ -1,4 +1,4 @@
-// swift-tools-version:5.9
+// swift-tools-version: 5.9
 import PackageDescription
 
 let package = Package(
@@ -18,12 +18,20 @@ let package = Package(
         .target(
             name: "OpenRSC",
             dependencies: [],
-            path: "OpenRSC/Sources"
+            path: "OpenRSC/Sources",
+            resources: [
+                .process("Rendering/Shaders.metal"),
+                .copy("WebClient"),
+                .copy("../Resources")
+            ]
         ),
         .testTarget(
             name: "OpenRSCTests",
             dependencies: ["OpenRSC"],
-            path: "Tests"
+            path: "Tests/RenderTest",
+            resources: [
+                .copy("Fixtures")
+            ]
         ),
     ]
 )

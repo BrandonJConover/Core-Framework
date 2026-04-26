@@ -1158,10 +1158,11 @@ public final class RegularPlayer implements CommandTrigger {
 			ActionSender.sendBox(player, kills.substring(0, kills.length()-2).toString(), true);
 		} else {
 			String npcName = StringUtils.replaceChars(String.join(" ", args), '_', ' ');
+			String npcNameLowerCase = npcName.toLowerCase();
 			boolean found = false;
 			for (Map.Entry<Integer, Integer> entry : player.getKillCache().entrySet()) {
 				NPCDef npc = player.getWorld().getServer().getEntityHandler().getNpcDef(entry.getKey());
-				if (npc.getName().toLowerCase().equals(npcName)) {
+				if (npc.getName().toLowerCase().equals(npcNameLowerCase)) {
 					StringBuilder kill = new StringBuilder();
 					kill.append("NPC Kills for ")
 						.append(npc.getName())
@@ -1175,7 +1176,6 @@ public final class RegularPlayer implements CommandTrigger {
 			}
 			if (!found) {
 				StringBuilder kill = new StringBuilder();
-				String npcNameLowerCase = npcName.toLowerCase();
 				if (player.getWorld().getServer().getEntityHandler().getNpcNameLowerCase(npcNameLowerCase).equals(npcNameLowerCase)) {
 					 found = true;
 				}

@@ -41,14 +41,14 @@ public abstract class GameDatabase {
 	private static final Logger LOGGER = LogManager.getLogger();
 
 	public final Server server;
-	private final AtomicBoolean open = new AtomicBoolean(false);
+	private volatile AtomicBoolean open = new AtomicBoolean(false);
 
 	public GameDatabase(final Server server) {
 		this.server = server;
 		open.set(false);
 	}
 
-	public abstract Set<Integer> getItemIDList();
+	public abstract Set<Long> getItemIDList();
 
 	protected abstract void openInternal();
 
@@ -82,7 +82,7 @@ public abstract class GameDatabase {
 
 	protected abstract FloorItem[] queryGroundItems() throws GameDatabaseException;
 
-	public abstract Integer[] queryInUseItemIds() throws GameDatabaseException;
+	public abstract Long[] queryInUseItemIds() throws GameDatabaseException;
 
 	public abstract void queryAddDropLog(ItemDrop drop) throws GameDatabaseException;
 
@@ -244,7 +244,7 @@ public abstract class GameDatabase {
 	public abstract void querySaveLastRecoveryTryId(final int playerId, final int lastRecoveryTryId) throws GameDatabaseException;
 
 	//Item and Container operations
-	public abstract int queryItemCreate(Item item) throws GameDatabaseException;
+	public abstract long queryItemCreate(Item item) throws GameDatabaseException;
 
 	public abstract void purgeItem(Item item) throws GameDatabaseException;
 
@@ -283,9 +283,9 @@ public abstract class GameDatabase {
 
 	public abstract int queryPlayerIdFromDiscordId(final long discordId) throws GameDatabaseException;
 
-	public abstract int queryMaxItemID() throws GameDatabaseException;
+	public abstract long queryMaxItemID() throws GameDatabaseException;
 
-	public abstract int addItemToPlayer(Item item);
+	public abstract long addItemToPlayer(Item item);
 
 	public abstract long queryCheckPlayerMute(final int playerId, final int muteType) throws GameDatabaseException;
 
@@ -494,11 +494,11 @@ public abstract class GameDatabase {
 		return queryGroundItems();
 	}
 
-	public Integer[] getInUseItemIds() throws GameDatabaseException {
+	public Long[] getInUseItemIds() throws GameDatabaseException {
 		return queryInUseItemIds();
 	}
 
-	public int itemCreate(final Item item) throws GameDatabaseException {
+	public long itemCreate(final Item item) throws GameDatabaseException {
 		return queryItemCreate(item);
 	}
 
@@ -510,7 +510,7 @@ public abstract class GameDatabase {
 		queryItemUpdate(item);
 	}
 
-	public int incrementMaxItemId(final Player player) {
+	public long incrementMaxItemId(final Player player) {
 		return player.getWorld().getServer().incrementMaxItemID();
 	}
 
@@ -976,13 +976,15 @@ public abstract class GameDatabase {
 			caches[i].value = o != null ? o.toString() : null;
 			caches[i].key = key;
 
-			caches[i].type = switch (o) {
-				case Integer ignored -> 0;
-				case String ignored -> 1;
-				case Boolean ignored -> 2;
-				case Long ignored -> 3;
-				case null, default -> -1;
-			};
+			if (o instanceof Integer) {
+				caches[i].type = 0;
+			} else if (o instanceof String) {
+				caches[i].type = 1;
+			} else if (o instanceof Boolean) {
+				caches[i].type = 2;
+			} else if (o instanceof Long) {
+				caches[i].type = 3;
+			}
 			i++;
 		}
 
@@ -1044,7 +1046,7 @@ public abstract class GameDatabase {
 		querySavePlayerMaxSkills(player.getDatabaseID(), skills);
 	}
 
-	public int getMaxItemID() {
+	public long getMaxItemID() {
 		try {
 			return queryMaxItemID();
 		}

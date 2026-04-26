@@ -11,7 +11,7 @@ public class Chatlog extends Snapshot {
 	/**
 	 * Set of players that received the message;
 	 */
-	private ArrayList<String> recievers = new ArrayList<>();
+	private ArrayList<String> recievers = new ArrayList<String>();
 
 	/**
 	 * Constructor

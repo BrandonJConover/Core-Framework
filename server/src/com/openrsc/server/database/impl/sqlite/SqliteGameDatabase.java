@@ -79,11 +79,11 @@ public class SqliteGameDatabase extends MySqlGameDatabase {
                 int slot = 0;
                 for (final PlayerBank item : bank) {
                     statement.setInt(1, playerId);
-                    statement.setInt(2, item.itemId);
+                    statement.setLong(2, item.itemId);
                     statement.setInt(3, slot++);
                     statement.addBatch();
 
-                    statement2.setInt(1, item.itemId);
+                    statement2.setLong(1, item.itemId);
                     statement2.setInt(2, item.itemStatus.getCatalogId());
                     statement2.setInt(3, item.itemStatus.getAmount());
                     statement2.setInt(4, item.itemStatus.getNoted() ? 1 : 0);
@@ -109,11 +109,11 @@ public class SqliteGameDatabase extends MySqlGameDatabase {
 
             for (final PlayerInventory item : inventory) {
                 statement.setInt(1, playerId);
-                statement.setInt(2, item.itemId);
+                statement.setLong(2, item.itemId);
                 statement.setInt(3, item.slot);
                 statement.addBatch();
 
-                statement2.setInt(1, item.itemId);
+                statement2.setLong(1, item.itemId);
                 statement2.setInt(2, item.catalogID);
                 statement2.setInt(3, item.amount);
                 statement2.setInt(4, item.noted ? 1 : 0);

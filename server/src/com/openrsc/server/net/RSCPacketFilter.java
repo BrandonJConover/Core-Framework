@@ -79,6 +79,10 @@ public class RSCPacketFilter {
 	}
 
 	public void load() {
+		loadIpBans();
+	}
+
+	public void loadIpBans() {
 		synchronized (ipBans) {
 			int counter = 0;
 			File ipBansFile = new File(BAN_FILE_PATH);
@@ -89,12 +93,11 @@ public class RSCPacketFilter {
 					LOGGER.info("Created new IP bans file at " + ipBansFile.getAbsolutePath());
 					return;
 				}
-				try (BufferedReader reader = new BufferedReader(new FileReader(BAN_FILE_PATH))) {
-					String line;
-					while ((line = reader.readLine()) != null) {
-						counter++;
-						ipBans.put(line.trim(), -1L);
-					}
+				BufferedReader reader = new BufferedReader(new FileReader(BAN_FILE_PATH));
+				String line;
+				while ((line = reader.readLine()) != null) {
+					counter++;
+					ipBans.put(line.trim(), -1L);
 				}
 				LOGGER.info("Loaded " + counter + " banned IPs.");
 			} catch (IOException ex) {
@@ -103,9 +106,11 @@ public class RSCPacketFilter {
 		}
 	}
 
-	public void reload() {
-		ipBans.clear();
-		load();
+	public void reloadIpBans() {
+		synchronized (ipBans) {
+			ipBans.clear();
+		}
+		loadIpBans();
 	}
 
 	public void unload() {

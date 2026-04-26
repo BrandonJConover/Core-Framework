@@ -13,12 +13,15 @@ public class SkillCapes {
 		if (!player.getCarriedItems().getEquipment().hasEquipped(cape.id()))
 			return false;
 
-		return switch (cape) {
-			case ATTACK_CAPE -> attackCape(parameter);
-			case THIEVING_CAPE -> thievingCape(parameter);
-			case STRENGTH_CAPE -> strengthCape(parameter);
-			default -> false;
-		};
+		switch (cape) {
+			case ATTACK_CAPE:
+				return attackCape(parameter);
+			case THIEVING_CAPE:
+				return thievingCape(parameter);
+			case STRENGTH_CAPE:
+				return strengthCape(parameter);
+		}
+		return false;
 	}
 
 	public static boolean shouldActivate(Player player, ItemId cape) {
@@ -28,20 +31,32 @@ public class SkillCapes {
 		if (!player.getCarriedItems().getEquipment().hasEquipped(cape.id()))
 			return false;
 
-		return switch (cape) {
-			case MINING_CAPE -> miningCape();
-			case FLETCHING_CAPE -> fletchingCape();
-			case MAGIC_CAPE -> magicCape();
-			case SMITHING_CAPE -> smithingCape();
-			case DEFENSE_CAPE -> defenseCape();
-			case HERBLAW_CAPE -> herblawCape();
-			case PRAYER_CAPE -> prayerCape();
-			case WOODCUTTING_CAPE -> woodcuttingCape();
-			case RANGED_CAPE -> rangedCape();
-			case HARVESTING_CAPE -> harvestingCape();
-			case FIREMAKING_CAPE -> true;
-			default -> false;
-		};
+		switch (cape) {
+			case MINING_CAPE:
+				return miningCape();
+			case FLETCHING_CAPE:
+				return fletchingCape();
+			case MAGIC_CAPE:
+				return magicCape();
+			case SMITHING_CAPE:
+				return smithingCape();
+			case DEFENSE_CAPE:
+				return defenseCape();
+			case HERBLAW_CAPE:
+				return herblawCape();
+			case PRAYER_CAPE:
+				return prayerCape();
+			case WOODCUTTING_CAPE:
+				return woodcuttingCape();
+			case RANGED_CAPE:
+				return rangedCape();
+			case HARVESTING_CAPE:
+				return harvestingCape();
+			case FIREMAKING_CAPE:
+				return true;
+		}
+
+		return false;
 	}
 
 	public static int shouldActivateInt(Player player, ItemId cape) {
@@ -51,10 +66,12 @@ public class SkillCapes {
 		if (!player.getCarriedItems().getEquipment().hasEquipped(cape.id()))
 			return -1;
 
-		return switch (cape) {
-			case HITS_CAPE -> hitsCape();
-			default -> -1;
-		};
+		switch (cape) {
+			case HITS_CAPE:
+				return hitsCape();
+		}
+
+		return -1;
 	}
 
 	private static boolean attackCape(boolean isHit) {

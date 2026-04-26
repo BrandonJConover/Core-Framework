@@ -17,9 +17,6 @@ import com.openrsc.server.net.rsc.struct.outgoing.*;
 import com.openrsc.server.util.rsc.DataConversions;
 import com.openrsc.server.util.rsc.MathUtil;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,7 +25,6 @@ import java.util.Map;
  * RSC Protocol-140 Generator for Outgoing Packets from respective Protocol Independent Structs
  * **/
 public class Payload140Generator implements PayloadGenerator<OpcodeOut> {
-	private static final Logger LOGGER = LogManager.getLogger();
 	private static final Map<OpcodeOut, Integer> opcodeMap = new HashMap<OpcodeOut, Integer>() {{
 		put(OpcodeOut.SEND_PLAYER_COORDS, 255);
 		put(OpcodeOut.SEND_GROUND_ITEM_HANDLER, 254);
@@ -546,7 +542,7 @@ public class Payload140Generator implements PayloadGenerator<OpcodeOut> {
 						// IPv6
 						// Authentic server sends IP address as an 32 bit integer, IPv6 addresses can not be fully represented.
 						// Going to concat IPv6 address from 128 bits to just 24 bits, and use the first 8 bits of ipv4 to denote ipv6.
-						LOGGER.debug("ipv6 user address: {}", ipString);
+						System.out.println("ipv6 user address: " + ipString);
 
 						// Mark this as an ipv6 address by writing "6" as the first octet of the ipv4 address.
 						// Technically this is naughty, since the 6.0.0.0/8 ipv4 block could be one day be networked on the internet.

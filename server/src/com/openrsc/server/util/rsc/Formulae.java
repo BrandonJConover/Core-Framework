@@ -188,7 +188,8 @@ public final class Formulae {
 	}
 
 	private static double addPrayers(Mob source, int prayer1, int prayer2, int prayer3) {
-		if (source instanceof Player sourcePlayer) {
+		if (source.isPlayer()) {
+			Player sourcePlayer = (Player) source;
 			if (sourcePlayer.getPrayers().isPrayerActivated(prayer3)) {
 				return 1.15D;
 			}
@@ -529,20 +530,20 @@ public final class Formulae {
 		int y = -1;
 		if (objs.length == 1) {
 			Object obj = objs[0];
-			if (obj instanceof GameObjectLoc gameObjLoc) {
-				x = gameObjLoc.getX();
-				y = gameObjLoc.getY();
-			} else if (obj instanceof ItemLoc itemLoc) {
-				x = itemLoc.x;
-				y = itemLoc.y;
-			} else if (obj instanceof NPCLoc npcLoc) {
-				x = npcLoc.startX;
-				y = npcLoc.startY;
+			if (obj instanceof GameObjectLoc) {
+				x = ((GameObjectLoc) obj).getX();
+				y = ((GameObjectLoc) obj).getY();
+			} else if ((obj instanceof ItemLoc)) {
+				x = ((ItemLoc) obj).x;
+				y = ((ItemLoc) obj).y;
+			} else if (obj instanceof NPCLoc) {
+				x = ((NPCLoc) obj).startX;
+				y = ((NPCLoc) obj).startY;
 			}
 		} else {
-			if (objs[0] instanceof Integer xVal && objs[1] instanceof Integer yVal) {
-				x = xVal;
-				y = yVal;
+			if (objs[0] instanceof Integer && objs[1] instanceof Integer) {
+				x = (Integer) objs[0];
+				y = (Integer) objs[1];
 			}
 		}
 

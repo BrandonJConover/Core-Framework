@@ -2,8 +2,6 @@ package com.openrsc.server.util.languages;
 
 import com.openrsc.server.Server;
 import com.openrsc.server.model.entity.player.Player;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.net.MalformedURLException;
@@ -14,7 +12,6 @@ import java.util.ResourceBundle;
 import java.util.Locale;
 
 public class I18NService {
-	private static final Logger LOGGER = LogManager.getLogger();
 	Server server;
 
 	// males never get misgendered in authentic rsc, so a fixed locale for them isn't necessary
@@ -61,8 +58,8 @@ public class I18NService {
 			customFemaleBundle = ResourceBundle.getBundle("CustomMessages", enUKFemale, loader);
 			customGenderNeutralBundle = ResourceBundle.getBundle("CustomMessages", enUKGenderNeutral, loader);
 
-		} catch (MalformedURLException e) {
-			LOGGER.catching(e);
+		} catch (MalformedURLException ex) {
+			ex.printStackTrace();
 		}
 	}
 

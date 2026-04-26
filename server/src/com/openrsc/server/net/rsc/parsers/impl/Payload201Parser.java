@@ -11,8 +11,6 @@ import com.openrsc.server.net.rsc.struct.*;
 import com.openrsc.server.net.rsc.struct.incoming.*;
 import com.openrsc.server.util.rsc.DataConversions;
 import com.openrsc.server.util.rsc.StringUtil;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -30,7 +28,6 @@ import java.util.Map;
  * mudclient201.jar was released on 2004-12-13 and was in active use for 9 months.
  * **/
 public class Payload201Parser implements PayloadParser<OpcodeIn> {
-	private static final Logger LOGGER = LogManager.getLogger();
 
 	private static final Map<Integer, OpcodeIn> opcodes201 = new HashMap<Integer, OpcodeIn>();
 	private final Map<Integer, OpcodeIn> opcodes;
@@ -78,7 +75,7 @@ public class Payload201Parser implements PayloadParser<OpcodeIn> {
 		int payloadLength = length - 1; // subtract off opcode length.
 		OpcodeIn op = opcodes.get(opcode);
 		if (op == null) {
-			LOGGER.warn("Received unknown opcode {} from authentic claiming client", opcode);
+			System.out.println(String.format("Received unknown opcode %d from authentic claiming client", opcode));
 			return false;
 		}
 		switch (op) {

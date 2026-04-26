@@ -66,7 +66,8 @@ public class RSCConnectionHandler extends ChannelInboundHandlerAdapter implement
 		final Channel channel = ctx.channel();
 		channel.attr(attachment).get().canSendSessionId.set(false);
 
-		if (message instanceof Packet packet) {
+		if (message instanceof Packet) {
+			final Packet packet = (Packet) message;
 			Player player = null;
 			ConnectionAttachment att = channel.attr(attachment).get();
 			if (att != null) {

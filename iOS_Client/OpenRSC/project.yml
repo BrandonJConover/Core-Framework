@@ -1,8 +1,17 @@
 name: OpenRSC
 
 options:
+  bundleIdPrefix: com.openrsc
   deploymentTarget:
     iOS: "16.0"
+  xcodeVersion: "15"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    ENABLE_BITCODE: NO
+    DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
 
 targets:
   OpenRSC:
@@ -11,35 +20,43 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - path: OpenRSC/Sources
-      - path: OpenRSC/Resources
-        buildPhase: resources
-    settings:
-      base:
-        PRODUCT_NAME: OpenRSC
-        PRODUCT_BUNDLE_IDENTIFIER: com.openrsc.ios
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIStatusBarHidden: YES
-        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations:
+        excludes:
+          - "**/.DS_Store"
+          - "Rendering/Shaders.metal"
+          - "WebClient/**"
+    info:
+      path: OpenRSC/Info.plist
+      properties:
+        CFBundleDisplayName: OpenRSC
+        CFBundleIdentifier: com.openrsc.client
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "0.1.0"
+        UILaunchStoryboardName: ""
+        UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad:
+        UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsArbitraryLoadsInWebContent: true
+          NSAllowsLocalNetworking: true
+        UIRequiresFullScreen: false
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openrsc.client
+        PRODUCT_NAME: OpenRSC
+        INFOPLIST_FILE: OpenRSC/Info.plist
         SWIFT_VERSION: "5.9"
-        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        ENABLE_PREVIEWS: YES
+        MTL_ENABLE_DEBUG_INFO: INCLUDE_SOURCE
         DEVELOPMENT_TEAM: MJAYYU2WWD
-        CODE_SIGN_IDENTITY: iPhone Developer
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
-
-schemes:
-  OpenRSC:
-    build:
-      targets:
-        OpenRSC: all
+        CODE_SIGN_IDENTITY: "iPhone Developer"
+        CODE_SIGN_STYLE: Automatic

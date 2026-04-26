@@ -25,8 +25,6 @@ import com.openrsc.server.model.entity.player.Player;
 import com.openrsc.server.util.checked.CheckedRunnable;
 import com.openrsc.server.util.checked.CheckedSupplier;
 import com.openrsc.server.util.rsc.DataConversions;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,12 +33,11 @@ import java.sql.*;
 import java.util.*;
 
 public class MySqlGameDatabase extends JDBCDatabase {
-	private static final Logger LOGGER = LogManager.getLogger();
 
 	private final QueriesManager queriesManager;
 	private final Queries queries;
 	private final MySqlQueries mySqlQueries;
-	private final Set<Integer> itemIDList;
+	private final Set<Long> itemIDList;
 	private final JDBCDatabaseConnection connection;
 
 	public MySqlGameDatabase(final Server server) {
@@ -321,18 +318,18 @@ public class MySqlGameDatabase extends JDBCDatabase {
 	}
 
 	@Override
-	public Integer[] queryInUseItemIds() throws GameDatabaseException {
-		final ArrayList<Integer> inUseItemIds = new ArrayList<>();
+	public Long[] queryInUseItemIds() throws GameDatabaseException {
+		final ArrayList<Long> inUseItemIds = new ArrayList<>();
 		try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().inUseItemIds);
 			 final ResultSet result = statement.executeQuery()) {
 
 			while (result.next()) {
-				inUseItemIds.add(result.getInt("itemID"));
+				inUseItemIds.add(result.getLong("itemID"));
 			}
 		} catch (final SQLException ex) {
 			throw new GameDatabaseException(MySqlGameDatabase.class, ex.getMessage());
 		}
-		return inUseItemIds.toArray(new Integer[0]);
+		return inUseItemIds.toArray(new Long[0]);
 	}
 
 	@Override
@@ -644,7 +641,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 
 			while (result.next()) {
 				final PlayerInventory invItem = new PlayerInventory();
-				invItem.itemId = result.getInt("itemId");
+				invItem.itemId = result.getLong("itemId");
 				invItem.slot = result.getInt("slot");
 				invItem.item = new Item(result.getInt("catalogId"));
 				invItem.item.setItemId(invItem.itemId);
@@ -670,7 +667,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 			if (getServer().getConfig().WANT_EQUIPMENT_TAB) {
 				while (result.next()) {
 					final PlayerEquipped equipped = new PlayerEquipped();
-					equipped.itemId = result.getInt("itemId");
+					equipped.itemId = result.getLong("itemId");
 					ItemStatus itemStatus = new ItemStatus();
 					itemStatus.setCatalogId(result.getInt("catalogId"));
 					itemStatus.setAmount(result.getInt("amount"));
@@ -697,7 +694,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 
 			while (result.next()) {
 				final PlayerBank bankItem = new PlayerBank();
-				bankItem.itemId = result.getInt("itemId");
+				bankItem.itemId = result.getLong("itemId");
 				ItemStatus itemStatus = new ItemStatus();
 				itemStatus.setCatalogId(result.getInt("catalogId"));
 				itemStatus.setAmount(result.getInt("amount"));
@@ -1610,11 +1607,11 @@ public class MySqlGameDatabase extends JDBCDatabase {
 			updateLongs(getMySqlQueries().save_DeleteInv, playerId);
 			for (final PlayerInventory item : inventory) {
 				statement.setInt(1, playerId);
-				statement.setInt(2, item.itemId);
+				statement.setLong(2, item.itemId);
 				statement.setInt(3, item.slot);
 				statement.addBatch();
 
-				statement2.setInt(1, item.itemId);
+				statement2.setLong(1, item.itemId);
 				statement2.setInt(2, item.catalogID);
 				statement2.setInt(3, item.amount);
 				statement2.setInt(4, item.noted ? 1 : 0);
@@ -1639,10 +1636,10 @@ public class MySqlGameDatabase extends JDBCDatabase {
 			updateLongs(getMySqlQueries().save_DeleteEquip, playerId);
 			for (final PlayerEquipped item : equipment) {
 				statement.setInt(1, playerId);
-				statement.setInt(2, item.itemId);
+				statement.setLong(2, item.itemId);
 				statement.addBatch();
 
-				statement2.setInt(1, item.itemId);
+				statement2.setLong(1, item.itemId);
 				statement2.setInt(2, item.itemStatus.getCatalogId());
 				statement2.setInt(3, item.itemStatus.getAmount());
 				statement2.setInt(4, item.itemStatus.getNoted() ? 1 : 0);
@@ -1669,11 +1666,11 @@ public class MySqlGameDatabase extends JDBCDatabase {
 				int slot = 0;
 				for (final PlayerBank item : bank) {
 					statement.setInt(1, playerId);
-					statement.setInt(2, item.itemId);
+					statement.setLong(2, item.itemId);
 					statement.setInt(3, slot++);
 					statement.addBatch();
 
-					statement2.setInt(1, item.itemId);
+					statement2.setLong(1, item.itemId);
 					statement2.setInt(2, item.itemStatus.getCatalogId());
 					statement2.setInt(3, item.itemStatus.getAmount());
 					statement2.setInt(4, item.itemStatus.getNoted() ? 1 : 0);
@@ -1917,13 +1914,13 @@ public class MySqlGameDatabase extends JDBCDatabase {
 	}
 
 	@Override
-	public int queryMaxItemID() throws GameDatabaseException {
-		int maxId = 0;
+	public long queryMaxItemID() throws GameDatabaseException {
+		long maxId = 0;
 		try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().max_itemStatus);
 			 final ResultSet result = statement.executeQuery()) {
 
 			if (result.next()) {
-				maxId = result.getInt("itemID");
+				maxId = result.getLong("itemID");
 			}
 		} catch (final SQLException ex) {
 			// Convert SQLException to a general usage exception
@@ -1933,8 +1930,8 @@ public class MySqlGameDatabase extends JDBCDatabase {
 	}
 
 	@Override
-	public int queryItemCreate(final Item item) throws GameDatabaseException {
-		int itemId = -1;
+	public long queryItemCreate(final Item item) throws GameDatabaseException {
+		long itemId = -1;
 		try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().save_ItemCreate, 1)) {
 			statement.setInt(1, item.getCatalogId());
 			statement.setInt(2, item.getItemStatus().getAmount());
@@ -1945,7 +1942,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 
 			try (final ResultSet rs = statement.getGeneratedKeys()) {
 				if (rs.next()) {
-					itemId = rs.getInt(1);
+					itemId = rs.getLong(1);
 				}
 			}
 		} catch (final SQLException ex) {
@@ -1960,7 +1957,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 		try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().save_ItemPurge)) {
 			purgeItemID(item.getItemId());
 
-			statement.setInt(1, item.getItemId());
+			statement.setLong(1, item.getItemId());
 			statement.executeUpdate();
 		} catch (final SQLException ex) {
 			// Convert SQLException to a general usage exception
@@ -1978,7 +1975,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 				statement.setInt(2, item.getNoted() ? 1 : 0);
 				statement.setInt(3, item.isWielded() ? 1 : 0);
 				statement.setInt(4, item.getItemStatus().getDurability());
-				statement.setInt(5, item.getItemId());
+				statement.setLong(5, item.getItemId());
 
 				statement.executeUpdate();
 			}
@@ -1992,13 +1989,13 @@ public class MySqlGameDatabase extends JDBCDatabase {
 	public void queryInventoryAdd(final int playerId, final Item item, final int slot) throws GameDatabaseException {
 		synchronized (itemIDList) {
 			try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().save_InventoryAdd)) {
-				int itemId = item.getItemId();
+				long itemId = item.getItemId();
 				if (itemId == Item.ITEM_ID_UNASSIGNED) {
 					itemId = assignItemID(item);
 				}
 
 				statement.setInt(1, playerId);
-				statement.setInt(2, itemId);
+				statement.setLong(2, itemId);
 				statement.setInt(3, slot);
 				statement.executeUpdate();
 			} catch (final SQLException ex) {
@@ -2013,7 +2010,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 		synchronized (itemIDList) {
 			try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().save_InventoryRemove)) {
 				statement.setInt(1, playerId);
-				statement.setInt(2, item.getItemId());
+				statement.setLong(2, item.getItemId());
 				statement.executeUpdate();
 			} catch (final SQLException ex) {
 				// Convert SQLException to a general usage exception
@@ -2026,13 +2023,13 @@ public class MySqlGameDatabase extends JDBCDatabase {
 	public void queryEquipmentAdd(final int playerId, final Item item) throws GameDatabaseException {
 		synchronized (itemIDList) {
 			try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().save_EquipmentAdd)) {
-				int itemId = item.getItemId();
+				long itemId = item.getItemId();
 				if (itemId == Item.ITEM_ID_UNASSIGNED) {
 					itemId = assignItemID(item);
 				}
 
 				statement.setInt(1, playerId);
-				statement.setInt(2, itemId);
+				statement.setLong(2, itemId);
 				statement.executeUpdate();
 			} catch (final SQLException ex) {
 				// Convert SQLException to a general usage exception
@@ -2046,7 +2043,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 		synchronized (itemIDList) {
 			try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().save_EquipmentRemove)) {
 				statement.setInt(1, playerId);
-				statement.setInt(2, item.getItemId());
+				statement.setLong(2, item.getItemId());
 				statement.executeUpdate();
 			} catch (final SQLException ex) {
 				// Convert SQLException to a general usage exception
@@ -2059,13 +2056,13 @@ public class MySqlGameDatabase extends JDBCDatabase {
 	public void queryBankAdd(final int playerId, final Item item, final int slot) throws GameDatabaseException {
 		synchronized (itemIDList) {
 			try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().save_BankAdd)) {
-				int itemId = item.getItemId();
+				long itemId = item.getItemId();
 				if (itemId == Item.ITEM_ID_UNASSIGNED) {
 					itemId = assignItemID(item);
 				}
 
 				statement.setInt(1, playerId);
-				statement.setInt(2, itemId);
+				statement.setLong(2, itemId);
 				statement.setInt(3, slot);
 				statement.executeUpdate();
 			} catch (final SQLException ex) {
@@ -2080,7 +2077,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 		synchronized (itemIDList) {
 			try (final PreparedStatement statement = getConnection().prepareStatement(getMySqlQueries().save_BankRemove)) {
 				statement.setInt(1, playerId);
-				statement.setInt(2, item.getItemId());
+				statement.setLong(2, item.getItemId());
 				statement.executeUpdate();
 			} catch (final SQLException ex) {
 				// Convert SQLException to a general usage exception
@@ -2098,7 +2095,7 @@ public class MySqlGameDatabase extends JDBCDatabase {
 				}
 				statement.setInt(1, item.getAmount() - amountToRemove);
 				statement.setInt(2, playerId);
-				statement.setInt(3, item.getItemId());
+				statement.setLong(3, item.getItemId());
 				statement.executeUpdate();
 			} catch (final SQLException ex) {
 				// Convert SQLException to a general usage exception
@@ -2535,20 +2532,20 @@ public class MySqlGameDatabase extends JDBCDatabase {
 		return mySqlQueries;
 	}
 
-	public Set<Integer> getItemIDList() {
+	public Set<Long> getItemIDList() {
 		return this.itemIDList;
 	}
 
-	public int addItemToPlayer(final Item item) {
+	public long addItemToPlayer(final Item item) {
 		try {
-			int itemId = item.getItemId();
+			long itemId = item.getItemId();
 			if (itemId == Item.ITEM_ID_UNASSIGNED) {
 				return assignItemID(item);
 			}
 			return itemId;
 		}
 		catch (GameDatabaseException e) {
-			LOGGER.catching(e);
+			System.out.println(e);
 		}
 		return Item.ITEM_ID_UNASSIGNED;
 	}
@@ -2645,20 +2642,20 @@ public class MySqlGameDatabase extends JDBCDatabase {
 		}
 	}
 
-	public int assignItemID(final Item item) throws GameDatabaseException {
+	public long assignItemID(final Item item) throws GameDatabaseException {
 		synchronized (itemIDList) {
-			int itemId = itemCreate(item);
+			long itemId = itemCreate(item);
 			item.setItemId(itemId);
 			itemIDList.add(itemId);
 			return itemId;
 		}
 	}
 
-	protected void purgeItemID(final int itemID) {
+	protected void purgeItemID(final long itemID) {
 		synchronized (itemIDList) {
-			Iterator<Integer> iterator = itemIDList.iterator();
+			Iterator<Long> iterator = itemIDList.iterator();
 			while (iterator.hasNext()) {
-				Integer listID = iterator.next();
+				Long listID = iterator.next();
 				if (listID == itemID) {
 					iterator.remove();
 					return;

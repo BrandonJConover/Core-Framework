@@ -1,1130 +1,1012 @@
+// Port of Client_Base/src/orsc/graphics/three/Shader.java
+//
+// Shader contains six static scanline-fill overloads.  In the Java source every
+// overload is named `shadeScanline`; Swift does not support overloading by
+// parameter count alone when the types are the same, so each variant is given a
+// descriptive name that encodes its purpose.  The call-sites in Scene.swift must
+// use the matching name.
+//
+// Naming convention used here:
+//   shadeScanlineTransparentNormal    – overload A: transparent (skip 0) 64×64 texture
+//   shadeScanlineOpaqueNormal         – overload B: opaque 64×64 texture (guard byte==50)
+//   shadeScanlineBlendNormal          – overload C: 50 % background blend + 64×64 texture
+//   shadeScanlineBlendLarge           – overload D: 50 % background blend + 256×256 texture
+//   shadeScanlineOpaqueLarge          – overload E: opaque 256×256 texture
+//   shadeScanlineTransparentLarge     – overload F: transparent (skip 0) 256×256 texture (guard byte==25)
+//
+// All integer arithmetic uses Int32 with Swift overflow operators (&+, &-, &*, &>>)
+// exactly as Java `int` silently wraps.  The >>> logical-right-shift from Java is
+// emulated with `Int32(bitPattern: UInt32(bitPattern: x) >> n)`.
+//
+// Hot-path pixel writes use UnsafeMutablePointer so the compiler does not emit
+// bounds checks on every store.
+
 import Foundation
 
+// MARK: - Logical right-shift helper (Java >>>)
+
+@inline(__always)
+private func logicalRightShift(_ value: Int32, _ shift: Int32) -> Int32 {
+    Int32(bitPattern: UInt32(bitPattern: value) >> UInt32(shift & 31))
+}
+
+// MARK: - bitwiseAnd helper (matches FastMath.bitwiseAnd semantics)
+
+@inline(__always)
+private func bitwiseAnd(_ a: Int32, _ b: Int32) -> Int32 { a & b }
+
 // MARK: - Shader
-//
-// Port of orsc.graphics.three.Shader from the Java desktop client.
-//
-// Contains six overloaded `shadeScanline` variants that fill one horizontal
-// scanline of a textured (or texture-blended) polygon into the pixel buffer.
-// This is THE hottest code path in the entire software renderer — called
-// thousands of times per frame — so every method is `@inlinable` and inner
-// loops use unsafe buffer pointers to eliminate bounds checks.
-//
-// Two texture coordinate modes are supported:
-//   - Normal 128x128: mask 0x3F80, shift >> 7, lighting shift >> 23,
-//     lighting-U merge mask 6291456 (0x600000), U low mask 16383 (0x3FFF)
-//   - Large  256x256: mask 0x0FC0, shift >> 6, lighting shift >> 20,
-//     lighting-U merge mask 786432  (0x0C0000), U low mask 4095  (0x0FFF)
-//
-// Java `>>>` (unsigned right shift) is emulated by reinterpreting the Int32
-// value as UInt32 before shifting, then converting back.
 
-enum Shader {
+/// Scanline rasterizer — direct port of `orsc.graphics.three.Shader`.
+///
+/// The caller (Scene) must set `pixelData` and `pixelDataCount` before invoking
+/// any `shadeScanline` variant.
+final class Shader {
 
-    // MARK: - Helpers
+    // MARK: Framebuffer reference
 
-    /// Java `>>>` equivalent: unsigned right shift on a 32-bit value stored as Int32.
-    @inline(__always)
-    private static func unsignedRightShift(_ value: Int32, _ shift: Int32) -> Int32 {
-        return Int32(bitPattern: UInt32(bitPattern: value) >> UInt32(shift))
-    }
+    /// Pointer into the caller's pixel buffer.  Must be set before use.
+    var pixelData: UnsafeMutablePointer<Int32>?
+    var pixelDataCount: Int = 0
 
-    // =========================================================================
-    // MARK: - Overload 1  (128x128, textured with transparency)
-    // =========================================================================
+    // MARK: Texture storage
+
+    /// Up to 50 textures; each is a flat Int32 array.
+    var textures: [[Int32]] = []
+
+    // MARK: - Overload A: Transparent normal (64×64) texture scanline
+    //
     // Java signature:
     //   static void shadeScanline(int var0, int var1, int var2, int var3,
-    //       int[] var4, int var5, int var6, int var7, int var8, int var9,
-    //       int var10, int var11, int var12, int var13, int[] var14, int var15)
+    //                             int[] var4, int var5, int var6,
+    //                             int var7, int var8, int var9,
+    //                             int var10, int var11, int var12,
+    //                             int var13, int[] var14, int var15)
     //
-    // Called from Scene.java ~line 1956:
-    //   Shader.shadeScanline(var23, 10, 0, 0, this.pixelData,
-    //       var25 + var8*var30, var38, var8*var28 + var19,
-    //       var22 + var8*var29, var8 + var33, var26, var39,
-    //       0, var20, this.resourceDatabase[var5], var37)
-    //
-    // Parameters (meaningful names):
-    //   var0  = texU delta per span (dTexU_dZ)
-    //   var1  = sentinel/unused (always 10)
-    //   var2  = initial texU (unused; overwritten)
-    //   var3  = initial texV (unused; overwritten)
-    //   var4  = pixelData (destination buffer)
-    //   var5  = Z (perspective divisor, initial)
-    //   var6  = lighting value (initial, fixed-point)
-    //   var7  = texU numerator
-    //   var8  = texV numerator
-    //   var9  = dest pixel offset
-    //   var10 = Z step per span
-    //   var11 = lighting step
-    //   var12 = unused (always 0)
-    //   var13 = texV delta per span (dTexV_dZ)
-    //   var14 = texture data (source)
-    //   var15 = pixel count (scanline width)
+    // Functional role:
+    //   Transparent texture fill using a 64×64 texture (mask 0x3F80, shift >>7).
+    //   Pixels with value 0 are skipped (not written).
+    //   Uses 16-pixel Bresenham perspective-correction spans.
+    //   var4  = destination pixel buffer (pixelData)
+    //   var14 = source texture
+    //   var15 = pixel count (width of scanline)
+    //   var9  = starting write index into var4
 
-    @inlinable
-    static func shadeScanline(
-        _ var0: Int32,  _ var1: Int32,  _ var2_in: Int32, _ var3_in: Int32,
-        _ var4: inout [Int32],
-        _ var5_in: Int32, _ var6_in: Int32, _ var7_in: Int32,
-        _ var8_in: Int32, _ var9_in: Int32, _ var10: Int32, _ var11_in: Int32,
-        _ var12_in: Int32, _ var13: Int32,
-        _ var14: [Int32],
-        _ var15: Int32
+    func shadeScanlineTransparentNormal(
+        var0:  Int32, var1:  Int32, var2:  Int32, var3:  Int32,
+        dest:  UnsafeMutablePointer<Int32>,
+        var5:  Int32, var6:  Int32,
+        var7:  Int32, var8:  Int32, var9:  Int32,
+        var10: Int32, var11: Int32, var12: Int32,
+        var13: Int32, texture: UnsafePointer<Int32>, var15: Int32
     ) {
         guard var15 > 0 else { return }
 
-        var var2 = var2_in
-        var var3 = var3_in
-        var var5 = var5_in
-        var var6 = var6_in
-        var var7 = var7_in
-        var var8 = var8_in
-        var var9 = var9_in
-        var var11 = var11_in
-        var var12 = var12_in
+        // Sentinel recursive call in Java is dead code — omitted.
 
-        var var16: Int32 = 0
-        var var17: Int32 = 0
-        var11 <<= 2
+        var lVar2  = var2
+        var lVar3  = var3
+        var lVar5  = var5
+        var lVar6  = var6
+        var lVar7  = var7
+        var lVar8  = var8
+        var lVar9  = var9
+        var lVar11 = var11 &<< 2
+        var lVar12 = var12
+        var lVar16: Int32 = 0
+        var lVar17: Int32 = 0
 
-        if var5 != 0 {
-            var17 = (var8 / var5) << 7
-            var16 = (var7 / var5) << 7
+        if lVar5 != 0 {
+            lVar17 = (lVar8 / lVar5) &<< 7
+            lVar16 = (lVar7 / lVar5) &<< 7
         }
 
-        if var16 < 0 {
-            var16 = 0
-        } else if var16 > 0x3F80 {
-            var16 = 0x3F80
-        }
+        if lVar16 < 0 { lVar16 = 0 } else if lVar16 > 0x3F80 { lVar16 = 0x3F80 }
 
-        var4.withUnsafeMutableBufferPointer { destBuf in
-            var14.withUnsafeBufferPointer { srcBuf in
-                var var20 = var15
-                while var20 > 0 {
-                    var7 = var7 &+ var13
-                    var3 = var17
-                    var5 = var5 &+ var10
-                    var2 = var16
-                    var8 = var8 &+ var0
-
-                    if var5 != 0 {
-                        var16 = (var7 / var5) << 7
-                        var17 = (var8 / var5) << 7
-                    }
-
-                    if var16 >= 0 {
-                        if var16 > 0x3F80 { var16 = 0x3F80 }
-                    } else {
-                        var16 = 0
-                    }
-
-                    let var18 = (var16 &- var2) >> 4
-                    let var19 = (var17 &- var3) >> 4
-                    var var21 = var6 >> 23
-                    var2 = var2 &+ (6291456 & var6)
-                    var6 = var6 &+ var11
-
-                    if var20 < 16 {
-                        for var22 in 0..<var20 {
-                            var12 = unsignedRightShift(
-                                srcBuf[Int((var3 & 0x3F80) &+ (var2 >> 7))],
-                                var21
-                            )
-                            if var12 != 0 {
-                                destBuf[Int(var9)] = var12
-                            }
-                            var9 &+= 1
-                            var2 = var2 &+ var18
-                            var3 = var3 &+ var19
-                            if (var22 & 3) == 3 {
-                                var2 = (var6 & 6291456) &+ (16383 & var2)
-                                var21 = var6 >> 23
-                                var6 = var6 &+ var11
-                            }
-                        }
-                    } else {
-                        // Unrolled 16-pixel block
-                        var12 = unsignedRightShift(srcBuf[Int((var3 & 0x3F80) &+ (var2 >> 7))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var2 = var2 &+ var18; var9 &+= 1; var3 = var3 &+ var19
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (0x3F80 & var3))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var9 &+= 1; var3 = var3 &+ var19; var2 = var2 &+ var18
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (0x3F80 & var3))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var9 &+= 1; var3 = var3 &+ var19; var2 = var2 &+ var18
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (var3 & 0x3F80))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var2 = var2 &+ var18; var3 = var3 &+ var19; var9 &+= 1
-
-                        // Pixel 4: lighting update
-                        var21 = var6 >> 23
-                        var2 = (var6 & 6291456) &+ (16383 & var2)
-                        var6 = var6 &+ var11
-
-                        var12 = unsignedRightShift(srcBuf[Int((var3 & 0x3F80) &+ (var2 >> 7))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var2 = var2 &+ var18; var9 &+= 1; var3 = var3 &+ var19
-
-                        var12 = unsignedRightShift(srcBuf[Int((0x3F80 & var3) &+ (var2 >> 7))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var9 &+= 1; var2 = var2 &+ var18; var3 = var3 &+ var19
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (0x3F80 & var3))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var2 = var2 &+ var18; var3 = var3 &+ var19; var9 &+= 1
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (var3 & 0x3F80))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var3 = var3 &+ var19; var9 &+= 1; var2 = var2 &+ var18
-
-                        // Pixel 8: lighting update
-                        var21 = var6 >> 23
-                        var2 = (var2 & 16383) &+ (6291456 & var6)
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (var3 & 0x3F80))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var6 = var6 &+ var11; var9 &+= 1; var2 = var2 &+ var18; var3 = var3 &+ var19
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (var3 & 0x3F80))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var3 = var3 &+ var19; var9 &+= 1; var2 = var2 &+ var18
-
-                        var12 = unsignedRightShift(srcBuf[Int((0x3F80 & var3) &+ (var2 >> 7))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var3 = var3 &+ var19; var2 = var2 &+ var18; var9 &+= 1
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (var3 & 0x3F80))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var2 = var2 &+ var18; var3 = var3 &+ var19; var9 &+= 1
-
-                        // Pixel 12: lighting update
-                        var2 = (var2 & 16383) &+ (var6 & 6291456)
-                        var21 = var6 >> 23
-
-                        var12 = unsignedRightShift(srcBuf[Int((var3 & 0x3F80) &+ (var2 >> 7))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var6 = var6 &+ var11; var3 = var3 &+ var19; var9 &+= 1; var2 = var2 &+ var18
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (var3 & 0x3F80))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var9 &+= 1; var2 = var2 &+ var18; var3 = var3 &+ var19
-
-                        var12 = unsignedRightShift(srcBuf[Int((var2 >> 7) &+ (var3 & 0x3F80))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var3 = var3 &+ var19; var2 = var2 &+ var18; var9 &+= 1
-
-                        var12 = unsignedRightShift(srcBuf[Int((0x3F80 & var3) &+ (var2 >> 7))], var21)
-                        if var12 != 0 { destBuf[Int(var9)] = var12 }
-                        var9 &+= 1
-                    }
-
-                    var20 &-= 16
-                }
+        var count = var15
+        while count > 0 {
+            lVar7 = lVar7 &+ var13
+            lVar3 = lVar17
+            lVar5 = lVar5 &+ var10
+            lVar2 = lVar16
+            lVar8 = lVar8 &+ var0
+            if lVar5 != 0 {
+                lVar16 = (lVar7 / lVar5) &<< 7
+                lVar17 = (lVar8 / lVar5) &<< 7
             }
+
+            if lVar16 < 0 { lVar16 = 0 } else if lVar16 > 0x3F80 { lVar16 = 0x3F80 }
+
+            let var18: Int32 = (lVar16 &- lVar2) >> 4
+            let var19: Int32 = (lVar17 &- lVar3) >> 4
+            var var21:  Int32 = lVar6 >> 23
+            lVar2 = lVar2 &+ (6291456 & lVar6)
+            lVar6 = lVar6 &+ lVar11
+
+            if count < 16 {
+                // Tail loop
+                var k: Int32 = 0
+                while k < count {
+                    let texIdx = (lVar3 & 0x3F80) &+ (lVar2 >> 7)
+                    lVar12 = logicalRightShift(texture[Int(texIdx)], var21)
+                    if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                    lVar9 = lVar9 &+ 1
+                    lVar2 = lVar2 &+ var18
+                    lVar3 = lVar3 &+ var19
+                    if (k & 3) == 3 {
+                        lVar2 = (lVar6 & 6291456) &+ (16383 & lVar2)
+                        var21 = lVar6 >> 23
+                        lVar6 = lVar6 &+ lVar11
+                    }
+                    k += 1
+                }
+            } else {
+                // Full 16-pixel unrolled block
+                lVar12 = logicalRightShift(texture[Int((lVar3 & 0x3F80) &+ (lVar2 >> 7))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar2 &+= var18; lVar9 &+= 1; lVar3 &+= var19
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (0x3F80 & lVar3))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar9 &+= 1; lVar3 &+= var19; lVar2 &+= var18
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (0x3F80 & lVar3))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar9 &+= 1; lVar3 &+= var19; lVar2 &+= var18
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (lVar3 & 0x3F80))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar2 &+= var18; lVar3 &+= var19; lVar9 &+= 1
+
+                // Mid-span correction (pixel 4)
+                var21 = lVar6 >> 23
+                lVar2 = (lVar6 & 6291456) &+ (16383 & lVar2)
+                lVar6 &+= lVar11
+
+                lVar12 = logicalRightShift(texture[Int((lVar3 & 0x3F80) &+ (lVar2 >> 7))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar2 &+= var18; lVar9 &+= 1; lVar3 &+= var19
+
+                lVar12 = logicalRightShift(texture[Int((0x3F80 & lVar3) &+ (lVar2 >> 7))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar9 &+= 1; lVar2 &+= var18; lVar3 &+= var19
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (0x3F80 & lVar3))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar2 &+= var18; lVar3 &+= var19; lVar9 &+= 1
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (lVar3 & 0x3F80))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar3 &+= var19; lVar9 &+= 1; lVar2 &+= var18
+
+                // Mid-span correction (pixel 8)
+                var21 = lVar6 >> 23
+                lVar2 = (lVar2 & 16383) &+ (6291456 & lVar6)
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (lVar3 & 0x3F80))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar6 &+= lVar11; lVar9 &+= 1; lVar2 &+= var18; lVar3 &+= var19
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (lVar3 & 0x3F80))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar3 &+= var19; lVar9 &+= 1; lVar2 &+= var18
+
+                lVar12 = logicalRightShift(texture[Int((0x3F80 & lVar3) &+ (lVar2 >> 7))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar3 &+= var19; lVar2 &+= var18; lVar9 &+= 1
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (lVar3 & 0x3F80))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar2 &+= var18; lVar3 &+= var19; lVar9 &+= 1
+
+                // Mid-span correction (pixel 12)
+                lVar2 = (lVar2 & 16383) &+ (lVar6 & 6291456)
+                var21 = lVar6 >> 23
+
+                lVar12 = logicalRightShift(texture[Int((lVar3 & 0x3F80) &+ (lVar2 >> 7))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar6 &+= lVar11; lVar3 &+= var19; lVar9 &+= 1; lVar2 &+= var18
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (lVar3 & 0x3F80))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar9 &+= 1; lVar2 &+= var18; lVar3 &+= var19
+
+                lVar12 = logicalRightShift(texture[Int((lVar2 >> 7) &+ (lVar3 & 0x3F80))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar3 &+= var19; lVar2 &+= var18; lVar9 &+= 1
+
+                lVar12 = logicalRightShift(texture[Int((0x3F80 & lVar3) &+ (lVar2 >> 7))], var21)
+                if lVar12 != 0 { dest[Int(lVar9)] = lVar12 }
+                lVar9 &+= 1
+            }
+            count -= 16
         }
     }
 
-    // =========================================================================
-    // MARK: - Overload 2  (128x128, opaque textured — no transparency check)
-    // =========================================================================
+    // MARK: - Overload B: Opaque normal (64×64) texture scanline  (guard: var2 == 50)
+    //
     // Java signature:
     //   static void shadeScanline(int var0, int var1, byte var2, int var3,
-    //       int val, int valStep, int[] src, int dH, int var8, int var9,
-    //       int high, int low, int[] dest, int var13, int var14)
+    //                             int val, int valStep, int[] src,
+    //                             int dH, int var8, int var9, int high, int low,
+    //                             int[] dest, int var13, int var14)
     //
-    // Called from Scene.java ~line 1990 (walls):
-    //   Shader.shadeScanline(var22 + var29*var8, var20, (byte)50,
-    //       var25 + var8*var30, var38, var39<<2, this.resourceDatabase[var5],
-    //       var8 + var33, var8*var28 + var19, var26, 0, 0,
-    //       this.pixelData, var23, var37)
-    //
-    // The byte var2 is always 50 at the valid call site (guard check).
+    // The Java body only executes when var2 == 50.
+    // texture lookup: src[(low >> 7) + (high & 0x3F80)]
+    // Writes directly (no skip-0 test).
 
-    @inlinable
-    static func shadeScanline(
-        _ var0_in: Int32, _ var1: Int32, _ var2: Int8, _ var3_in: Int32,
-        _ val_in: Int32, _ valStep: Int32,
-        _ src: [Int32],
-        _ dH_in: Int32, _ var8_in: Int32, _ var9: Int32,
-        _ high_in: Int32, _ low_in: Int32,
-        _ dest: inout [Int32],
-        _ var13: Int32, _ var14: Int32
+    func shadeScanlineOpaqueNormal(
+        var0: Int32, var1: Int32, var2: Int8, var3: Int32,
+        val:  Int32, valStep: Int32, src: UnsafePointer<Int32>,
+        dH:   Int32, var8: Int32, var9: Int32,
+        high: Int32, low:  Int32,
+        dest: UnsafeMutablePointer<Int32>,
+        var13: Int32, var14: Int32
     ) {
-        guard var14 > 0 else { return }
-        guard var2 == 50 else { return }
+        guard var14 > 0 && var2 == 50 else { return }
 
-        var var0 = var0_in
-        var var3 = var3_in
-        var val = val_in
-        var dH = dH_in
-        var var8 = var8_in
-        var high = high_in
-        var low = low_in
+        var lVar0  = var0
+        var lVar1  = var1
+        var lVar3  = var3
+        var lVal   = val
+        var lValStep = valStep
+        var lDH    = dH
+        var lVar8  = var8
+        var lVar9  = var9
+        var lHigh  = high
+        var lLow   = low
+        var lVar13 = var13
+        var lVar14 = var14
 
-        var var15: Int32 = 0
-        var var16: Int32 = 0
+        var lVar15: Int32 = 0
+        var lVar16: Int32 = 0
 
-        if var3 != 0 {
-            low = (var8 / var3) << 7
-            high = (var0 / var3) << 7
+        if lVar3 != 0 {
+            lLow  = (lVar8 / lVar3) &<< 7
+            lHigh = (lVar0 / lVar3) &<< 7
         }
 
         var shift: Int32 = 0
-        if low < 0 {
-            low = 0
-        } else if low > 0x3F80 {
-            low = 0x3F80
+        if lLow < 0 { lLow = 0 } else if lLow > 0x3F80 { lLow = 0x3F80 }
+
+        lVar3  = lVar3 &+ lVar9
+        lVar0  = lVar0 &+ lVar13
+        lVar8  = lVar8 &+ lVar1
+        if lVar3 != 0 {
+            lVar16 = (lVar0 / lVar3) &<< 7
+            lVar15 = (lVar8 / lVar3) &<< 7
         }
+        if lVar15 < 0 { lVar15 = 0 } else if lVar15 > 0x3F80 { lVar15 = 0x3F80 }
 
-        // Advance perspective one span ahead
-        var3 = var3 &+ var9
-        var0 = var0 &+ var13
-        var8 = var8 &+ var1
+        var lowStep:  Int32 = (lVar15 &- lLow)  >> 4
+        var highStep: Int32 = (lVar16 &- lHigh) >> 4
 
-        if var3 != 0 {
-            var16 = (var0 / var3) << 7
-            var15 = (var8 / var3) << 7
-        }
+        // Full 16-pixel blocks
+        var remaining = lVar14 >> 4
+        while remaining > 0 {
+            lLow = lLow &+ (lVal & 6291456)
+            shift = lVal >> 23
+            dest[Int(lDH)] = logicalRightShift(src[Int((0x3F80 & lHigh) &+ (lLow >> 7))], shift)
+            lDH &+= 1; lVal &+= lValStep; lLow &+= lowStep; lHigh &+= highStep
 
-        if var15 >= 0 {
-            if var15 > 0x3F80 { var15 = 0x3F80 }
-        } else {
-            var15 = 0
-        }
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (0x3F80 & lHigh))], shift)
+            lHigh &+= highStep; lLow &+= lowStep; lDH &+= 1
 
-        var lowStep  = (var15 &- low) >> 4
-        var highStep = (var16 &- high) >> 4
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (0x3F80 & lHigh))], shift)
+            lHigh &+= highStep; lLow &+= lowStep; lDH &+= 1
 
-        dest.withUnsafeMutableBufferPointer { destBuf in
-            src.withUnsafeBufferPointer { srcBuf in
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (0x3F80 & lHigh))], shift)
+            lHigh &+= highStep; lLow &+= lowStep; lDH &+= 1
 
-                // Full 16-pixel spans
-                var var20 = var14 >> 4
-                while var20 > 0 {
-                    low = low &+ (val & 6291456)
-                    shift = val >> 23
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((0x3F80 & high) &+ (low >> 7))], shift)
-                    dH &+= 1; val = val &+ valStep; low = low &+ lowStep; high = high &+ highStep
+            lLow = (6291456 & lVal) &+ (16383 & lLow)
+            shift = lVal >> 23
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (lHigh & 0x3F80))], shift)
+            lDH &+= 1; lVal &+= lValStep; lLow &+= lowStep; lHigh &+= highStep
 
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (0x3F80 & high))], shift)
-                    dH &+= 1; high = high &+ highStep; low = low &+ lowStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((0x3F80 & lHigh) &+ (lLow >> 7))], shift)
+            lLow &+= lowStep; lHigh &+= highStep; lDH &+= 1
 
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (0x3F80 & high))], shift)
-                    dH &+= 1; high = high &+ highStep; low = low &+ lowStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (0x3F80 & lHigh))], shift)
+            lHigh &+= highStep; lLow &+= lowStep; lDH &+= 1
 
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (0x3F80 & high))], shift)
-                    dH &+= 1; high = high &+ highStep; low = low &+ lowStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((0x3F80 & lHigh) &+ (lLow >> 7))], shift)
+            lHigh &+= highStep; lLow &+= lowStep; lDH &+= 1
 
-                    // Lighting update
-                    low = (6291456 & val) &+ (16383 & low)
-                    shift = val >> 23
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (high & 0x3F80))], shift)
-                    dH &+= 1; val = val &+ valStep; low = low &+ lowStep; high = high &+ highStep
+            lLow = (lVal & 6291456) &+ (16383 & lLow)
+            shift = lVal >> 23
+            lVal &+= lValStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((lHigh & 0x3F80) &+ (lLow >> 7))], shift)
+            lLow &+= lowStep; lHigh &+= highStep; lDH &+= 1
 
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((0x3F80 & high) &+ (low >> 7))], shift)
-                    dH &+= 1; low = low &+ lowStep; high = high &+ highStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((0x3F80 & lHigh) &+ (lLow >> 7))], shift)
+            lLow &+= lowStep; lHigh &+= highStep; lDH &+= 1
 
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (0x3F80 & high))], shift)
-                    dH &+= 1; high = high &+ highStep; low = low &+ lowStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (0x3F80 & lHigh))], shift)
+            lHigh &+= highStep; lLow &+= lowStep; lDH &+= 1
 
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((0x3F80 & high) &+ (low >> 7))], shift)
-                    dH &+= 1; high = high &+ highStep; low = low &+ lowStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (lHigh & 0x3F80))], shift)
+            lLow &+= lowStep; lHigh &+= highStep; lDH &+= 1
 
-                    // Lighting update
-                    low = (val & 6291456) &+ (16383 & low)
-                    shift = val >> 23
-                    val = val &+ valStep
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((high & 0x3F80) &+ (low >> 7))], shift)
-                    dH &+= 1; low = low &+ lowStep; high = high &+ highStep
+            lLow = (16383 & lLow) &+ (6291456 & lVal)
+            shift = lVal >> 23
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (0x3F80 & lHigh))], shift)
+            lDH &+= 1; lVal &+= lValStep; lLow &+= lowStep; lHigh &+= highStep
 
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((0x3F80 & high) &+ (low >> 7))], shift)
-                    dH &+= 1; low = low &+ lowStep; high = high &+ highStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (lHigh & 0x3F80))], shift)
+            lLow &+= lowStep; lHigh &+= highStep; lDH &+= 1
 
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (0x3F80 & high))], shift)
-                    dH &+= 1; high = high &+ highStep; low = low &+ lowStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (0x3F80 & lHigh))], shift)
+            lHigh &+= highStep; lLow &+= lowStep; lDH &+= 1
 
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (high & 0x3F80))], shift)
-                    dH &+= 1; low = low &+ lowStep; high = high &+ highStep
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (0x3F80 & lHigh))], shift)
+            lDH &+= 1
 
-                    // Lighting update
-                    low = (16383 & low) &+ (6291456 & val)
-                    shift = val >> 23
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (0x3F80 & high))], shift)
-                    dH &+= 1; val = val &+ valStep; low = low &+ lowStep; high = high &+ highStep
-
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (high & 0x3F80))], shift)
-                    dH &+= 1; low = low &+ lowStep; high = high &+ highStep
-
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (0x3F80 & high))], shift)
-                    dH &+= 1; high = high &+ highStep; low = low &+ lowStep
-
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (0x3F80 & high))], shift)
-
-                    // Advance to next 16-pixel span
-                    low = var15
-                    high = var16
-                    var0 = var0 &+ var13
-                    var3 = var3 &+ var9
-                    var8 = var8 &+ var1
-
-                    if var3 != 0 {
-                        var16 = (var0 / var3) << 7
-                        var15 = (var8 / var3) << 7
-                    }
-
-                    if var15 >= 0 {
-                        if var15 > 0x3F80 { var15 = 0x3F80 }
-                    } else {
-                        var15 = 0
-                    }
-
-                    highStep = (var16 &- high) >> 4
-                    lowStep  = (var15 &- low) >> 4
-
-                    var20 &-= 1
-                }
-
-                // Remainder pixels
-                for var20 in 0..<(15 & var14) {
-                    if (var20 & 3) == 0 {
-                        shift = val >> 23
-                        low = (val & 6291456) &+ (16383 & low)
-                        val = val &+ valStep
-                    }
-                    destBuf[Int(dH)] = unsignedRightShift(srcBuf[Int((low >> 7) &+ (high & 0x3F80))], shift)
-                    dH &+= 1
-                    high = high &+ highStep
-                    low  = low  &+ lowStep
-                }
+            // Recalculate perspective-correct UV for next span
+            lLow  = lVar15
+            lHigh = lVar16
+            lVar0  = lVar0 &+ lVar13
+            lVar3  = lVar3 &+ lVar9
+            lVar8  = lVar8 &+ lVar1
+            if lVar3 != 0 {
+                lVar16 = (lVar0 / lVar3) &<< 7
+                lVar15 = (lVar8 / lVar3) &<< 7
             }
+            if lVar15 < 0 { lVar15 = 0 } else if lVar15 > 0x3F80 { lVar15 = 0x3F80 }
+            highStep = (lVar16 &- lLow)  >> 4   // note: Java uses lLow/lHigh after reset
+            lowStep  = (lVar15 &- lHigh) >> 4
+
+            remaining -= 1
+        }
+
+        // Tail (< 16 pixels)
+        var k: Int32 = 0
+        let tailCount = 15 & lVar14
+        while k < tailCount {
+            if (k & 3) == 0 {
+                shift = lVal >> 23
+                lLow  = (lVal & 6291456) &+ (16383 & lLow)
+                lVal  = lVal &+ lValStep
+            }
+            dest[Int(lDH)] = logicalRightShift(src[Int((lLow >> 7) &+ (lHigh & 0x3F80))], shift)
+            lDH &+= 1; lHigh &+= highStep; lLow &+= lowStep
+            k += 1
         }
     }
 
-    // =========================================================================
-    // MARK: - Overload 3  (128x128, textured + 50% blend with existing pixel)
-    // =========================================================================
+    // MARK: - Overload C: Blend-with-background + normal (64×64) texture  (guard: byte var14 <= 97 triggers recursion — dead code omitted)
+    //
     // Java signature:
     //   static void shadeScanline(int var0, int var1, int var2, int var3,
-    //       int var4, int var5, int var6, int var7, int var8, int var9,
-    //       int[] var10, int var11, int var12, int[] var13, byte var14)
+    //                             int var4, int var5, int var6,
+    //                             int var7, int var8, int var9, int[] var10,
+    //                             int var11, int var12, int[] var13, byte var14)
     //
-    // Called from Scene.java ~line 2021:
-    //   Shader.shadeScanline(var33 + var8, var22 + var8*var29, var19 + var8*var28,
-    //       0, var38, var23, 0, var25 + var8*var30, var20, var39<<2,
-    //       this.resourceDatabase[var5], var37, var26, this.pixelData, (byte)119)
-    //
-    // This variant reads the destination pixel, halves it, and adds
-    // the texture sample on top — producing a 50% transparency blend.
+    // The sentinel `if (var14 <= 97)` triggers a recursive call with out-of-range
+    // values that is effectively dead code in practice.  We omit it.
+    // Each pixel = (texture_pixel >>> shift) + ((dest[i] & 0xFEFEFE or similar) >> 1)
+    // i.e. 50 % blend of existing pixel with texture.
 
-    @inlinable
-    static func shadeScanline(
-        _ var0_in: Int32, _ var1_in: Int32, _ var2_in: Int32, _ var3_in: Int32,
-        _ var4_in: Int32, _ var5_in: Int32, _ var6_in: Int32,
-        _ var7_in: Int32, _ var8_in: Int32, _ var9_in: Int32,
-        _ var10: [Int32],
-        _ var11: Int32, _ var12_in: Int32,
-        _ var13: inout [Int32],
-        _ var14: Int8
+    func shadeScanlineBlendNormal(
+        var0: Int32, var1: Int32, var2: Int32, var3: Int32,
+        var4: Int32, var5: Int32, var6: Int32,
+        var7: Int32, var8: Int32, var9: Int32,
+        texture: UnsafePointer<Int32>,
+        var11: Int32, var12: Int32,
+        dest:  UnsafeMutablePointer<Int32>,
+        var14: Int8
     ) {
         guard var11 > 0 else { return }
 
-        var var0 = var0_in
-        var var1 = var1_in
-        var var2 = var2_in
-        var var3 = var3_in
-        var var4 = var4_in
-        var var5 = var5_in
-        var var6 = var6_in
-        var var7 = var7_in
-        var var8 = var8_in
-        var var9 = var9_in
-        var var12 = var12_in
+        var lVar0  = var0
+        var lVar1  = var1
+        var lVar2  = var2
+        var lVar3  = var3
+        var lVar4  = var4
+        var lVar5  = var5
+        var lVar6  = var6
+        var lVar7  = var7
+        var lVar8  = var8
+        var lVar9  = var9
+        var lVar11 = var11
+        var lVar12 = var12
 
-        var var15: Int32 = 0
-        var var16: Int32 = 0
-        var var19: Int32 = 0
+        var lVar15: Int32 = 0
+        var lVar16: Int32 = 0
+        var lVar19: Int32 = 0
 
-        if var7 != 0 {
-            var3 = (var1 / var7) << 7
-            var6 = (var2 / var7) << 7
+        if lVar7 != 0 {
+            lVar3 = (lVar1 / lVar7) &<< 7
+            lVar6 = (lVar2 / lVar7) &<< 7
         }
 
-        var7 = var7 &+ var12
+        lVar7 = lVar7 &+ lVar12
+        if lVar6 < 0 { lVar6 = 0 } else if lVar6 > 0x3F80 { lVar6 = 0x3F80 }
 
-        if var6 >= 0 {
-            if var6 > 0x3F80 { var6 = 0x3F80 }
-        } else {
-            var6 = 0
+        lVar1 = lVar1 &+ lVar5
+        lVar2 = lVar2 &+ lVar8
+        if lVar7 != 0 {
+            lVar15 = (lVar2 / lVar7) &<< 7
+            lVar16 = (lVar1 / lVar7) &<< 7
         }
+        if lVar15 < 0 { lVar15 = 0 } else if lVar15 > 0x3F80 { lVar15 = 0x3F80 }
 
-        var1 = var1 &+ var5
-        var2 = var2 &+ var8
+        var var17: Int32 = (lVar15 &- lVar6)  >> 4   // lowStep
+        var var18: Int32 = (lVar16 &- lVar3)  >> 4   // highStep
 
-        if var7 != 0 {
-            var15 = (var2 / var7) << 7
-            var16 = (var1 / var7) << 7
-        }
+        // Full 16-pixel blocks
+        var blockCount = lVar11 >> 4
+        while blockCount > 0 {
+            lVar19 = lVar4 >> 23
+            lVar6  = lVar6 &+ (lVar4 & 6291456)
+            lVar4  = lVar4 &+ lVar9
 
-        if var15 >= 0 {
-            if var15 > 0x3F80 { var15 = 0x3F80 }
-        } else {
-            var15 = 0
-        }
+            // 16 pixels unrolled
+            dest[Int(lVar0)] = (bitwiseAnd(dest[Int(lVar0)] >> 1, 8355711)) &+
+                logicalRightShift(texture[Int((lVar6 >> 7) &+ (lVar3 & 0x3F80))], lVar19)
+            lVar0 &+= 1; lVar3 &+= var18; lVar6 &+= var17
 
-        var var17 = (var15 &- var6) >> 4
-        var var18 = (var16 &- var3) >> 4
+            dest[Int(lVar0)] = (bitwiseAnd(dest[Int(lVar0)] >> 1, 8355711)) &+
+                logicalRightShift(texture[Int((lVar6 >> 7) &+ (0x3F80 & lVar3))], lVar19)
+            lVar0 &+= 1; lVar6 &+= var17; lVar3 &+= var18
 
-        var13.withUnsafeMutableBufferPointer { destBuf in
-            var10.withUnsafeBufferPointer { srcBuf in
+            dest[Int(lVar0)] = logicalRightShift(texture[Int((0x3F80 & lVar3) &+ (lVar6 >> 7))], lVar19) &+
+                (bitwiseAnd(16711422, dest[Int(lVar0)]) >> 1)
+            lVar0 &+= 1; lVar3 &+= var18; lVar6 &+= var17
 
-                var var20 = var11 >> 4
-                while var20 > 0 {
-                    var19 = var4 >> 23
-                    var6 = var6 &+ (var4 & 6291456)
-                    var4 = var4 &+ var9
+            dest[Int(lVar0)] = (bitwiseAnd(16711422, dest[Int(lVar0)]) >> 1) &+
+                logicalRightShift(texture[Int((lVar3 & 0x3F80) &+ (lVar6 >> 7))], lVar19)
+            lVar0 &+= 1; lVar3 &+= var18; lVar6 &+= var17
 
-                    // 16 unrolled pixels with 50% blend: dest = (dest >> 1 & 0x7F7F7F) + (tex >>> shift)
-                    destBuf[Int(var0)] = ((destBuf[Int(var0)] >> 1) & 8355711)
-                        &+ unsignedRightShift(srcBuf[Int((var6 >> 7) &+ (var3 & 0x3F80))], var19)
-                    var0 &+= 1; var3 = var3 &+ var18; var6 = var6 &+ var17
+            lVar19 = lVar4 >> 23
+            lVar6  = (lVar6 & 16383) &+ (lVar4 & 6291456)
+            lVar4  = lVar4 &+ lVar9
 
-                    destBuf[Int(var0)] = ((destBuf[Int(var0)] >> 1) & 8355711)
-                        &+ unsignedRightShift(srcBuf[Int((var6 >> 7) &+ (0x3F80 & var3))], var19)
-                    var0 &+= 1; var6 = var6 &+ var17; var3 = var3 &+ var18
+            dest[Int(lVar0)] = (bitwiseAnd(dest[Int(lVar0)] >> 1, 8355711)) &+
+                logicalRightShift(texture[Int((0x3F80 & lVar3) &+ (lVar6 >> 7))], lVar19)
+            lVar0 &+= 1; lVar3 &+= var18; lVar6 &+= var17
 
-                    destBuf[Int(var0)] = unsignedRightShift(srcBuf[Int((0x3F80 & var3) &+ (var6 >> 7))], var19)
-                        &+ (((destBuf[Int(var0)]) & 16711422) >> 1)
-                    var0 &+= 1; var3 = var3 &+ var18; var6 = var6 &+ var17
+            dest[Int(lVar0)] = logicalRightShift(texture[Int((lVar6 >> 7) &+ (lVar3 & 0x3F80))], lVar19) &+
+                bitwiseAnd(dest[Int(lVar0)] >> 1, 8355711)
+            lVar0 &+= 1; lVar3 &+= var18; lVar6 &+= var17
 
-                    destBuf[Int(var0)] = (((destBuf[Int(var0)]) & 16711422) >> 1)
-                        &+ unsignedRightShift(srcBuf[Int((var3 & 0x3F80) &+ (var6 >> 7))], var19)
-                    var0 &+= 1; var3 = var3 &+ var18; var6 = var6 &+ var17
+            dest[Int(lVar0)] = (bitwiseAnd(dest[Int(lVar0)], 16711423) >> 1) &+
+                logicalRightShift(texture[Int((lVar3 & 0x3F80) &+ (lVar6 >> 7))], lVar19)
+            lVar0 &+= 1; lVar6 &+= var17; lVar3 &+= var18
 
-                    // Lighting update
-                    var19 = var4 >> 23
-                    var6 = (var6 & 16383) &+ (var4 & 6291456)
-                    var4 = var4 &+ var9
+            dest[Int(lVar0)] = logicalRightShift(texture[Int((lVar6 >> 7) &+ (0x3F80 & lVar3))], lVar19) &+
+                (bitwiseAnd(dest[Int(lVar0)], 16711423) >> 1)
+            lVar0 &+= 1; lVar6 &+= var17; lVar3 &+= var18
 
-                    destBuf[Int(var0)] = ((destBuf[Int(var0)] >> 1) & 8355711)
-                        &+ unsignedRightShift(srcBuf[Int((0x3F80 & var3) &+ (var6 >> 7))], var19)
-                    var0 &+= 1; var3 = var3 &+ var18; var6 = var6 &+ var17
+            lVar6  = (16383 & lVar6) &+ (lVar4 & 6291456)
+            lVar19 = lVar4 >> 23
 
-                    destBuf[Int(var0)] = unsignedRightShift(srcBuf[Int((var6 >> 7) &+ (var3 & 0x3F80))], var19)
-                        &+ ((destBuf[Int(var0)] >> 1) & 8355711)
-                    var0 &+= 1; var3 = var3 &+ var18; var6 = var6 &+ var17
+            dest[Int(lVar0)] = (bitwiseAnd(16711423, dest[Int(lVar0)]) >> 1) &+
+                logicalRightShift(texture[Int((lVar6 >> 7) &+ (lVar3 & 0x3F80))], lVar19)
+            lVar4 &+= lVar9; lVar0 &+= 1; lVar3 &+= var18; lVar6 &+= var17
 
-                    destBuf[Int(var0)] = (((destBuf[Int(var0)]) & 16711423) >> 1)
-                        &+ unsignedRightShift(srcBuf[Int((var3 & 0x3F80) &+ (var6 >> 7))], var19)
-                    var0 &+= 1; var6 = var6 &+ var17; var3 = var3 &+ var18
+            dest[Int(lVar0)] = bitwiseAnd(dest[Int(lVar0)] >> 1, 8355711) &+
+                logicalRightShift(texture[Int((lVar6 >> 7) &+ (0x3F80 & lVar3))], lVar19)
+            lVar0 &+= 1; lVar6 &+= var17; lVar3 &+= var18
 
-                    destBuf[Int(var0)] = unsignedRightShift(srcBuf[Int((var6 >> 7) &+ (0x3F80 & var3))], var19)
-                        &+ (((destBuf[Int(var0)]) & 16711423) >> 1)
-                    var0 &+= 1; var6 = var6 &+ var17; var3 = var3 &+ var18
+            dest[Int(lVar0)] = logicalRightShift(texture[Int((lVar3 & 0x3F80) &+ (lVar6 >> 7))], lVar19) &+
+                bitwiseAnd(8355711, dest[Int(lVar0)] >> 1)
+            lVar0 &+= 1; lVar6 &+= var17; lVar3 &+= var18
 
-                    // Lighting update
-                    var6 = (16383 & var6) &+ (var4 & 6291456)
-                    var19 = var4 >> 23
+            dest[Int(lVar0)] = (bitwiseAnd(16711423, dest[Int(lVar0)]) >> 1) &+
+                logicalRightShift(texture[Int((0x3F80 & lVar3) &+ (lVar6 >> 7))], lVar19)
+            lVar0 &+= 1; lVar3 &+= var18; lVar6 &+= var17
 
-                    destBuf[Int(var0)] = ((16711423 & (destBuf[Int(var0)])) >> 1)
-                        &+ unsignedRightShift(srcBuf[Int((var6 >> 7) &+ (var3 & 0x3F80))], var19)
-                    var0 &+= 1; var4 = var4 &+ var9; var3 = var3 &+ var18; var6 = var6 &+ var17
+            lVar6  = (lVar6 & 16383) &+ (lVar4 & 6291456)
+            lVar19 = lVar4 >> 23
 
-                    destBuf[Int(var0)] = ((destBuf[Int(var0)] >> 1) & 8355711)
-                        &+ unsignedRightShift(srcBuf[Int((var6 >> 7) &+ (0x3F80 & var3))], var19)
-                    var0 &+= 1; var6 = var6 &+ var17; var3 = var3 &+ var18
+            dest[Int(lVar0)] = bitwiseAnd(8355711, dest[Int(lVar0)] >> 1) &+
+                logicalRightShift(texture[Int((lVar6 >> 7) &+ (lVar3 & 0x3F80))], lVar19)
+            lVar4 &+= lVar9; lVar0 &+= 1; lVar6 &+= var17; lVar3 &+= var18
 
-                    destBuf[Int(var0)] = unsignedRightShift(srcBuf[Int((var3 & 0x3F80) &+ (var6 >> 7))], var19)
-                        &+ ((8355711 & (destBuf[Int(var0)] >> 1)))
-                    var0 &+= 1; var6 = var6 &+ var17; var3 = var3 &+ var18
+            dest[Int(lVar0)] = bitwiseAnd(dest[Int(lVar0)] >> 1, 8355711) &+
+                logicalRightShift(texture[Int((lVar6 >> 7) &+ (0x3F80 & lVar3))], lVar19)
+            lVar0 &+= 1; lVar6 &+= var17; lVar3 &+= var18
 
-                    destBuf[Int(var0)] = ((16711423 & (destBuf[Int(var0)])) >> 1)
-                        &+ unsignedRightShift(srcBuf[Int((0x3F80 & var3) &+ (var6 >> 7))], var19)
-                    var0 &+= 1; var3 = var3 &+ var18; var6 = var6 &+ var17
+            dest[Int(lVar0)] = logicalRightShift(texture[Int((lVar3 & 0x3F80) &+ (lVar6 >> 7))], lVar19) &+
+                bitwiseAnd(dest[Int(lVar0)] >> 1, 8355711)
+            lVar0 &+= 1; lVar6 &+= var17; lVar3 &+= var18
 
-                    // Lighting update
-                    var6 = (var6 & 16383) &+ (var4 & 6291456)
-                    var19 = var4 >> 23
+            dest[Int(lVar0)] = bitwiseAnd(dest[Int(lVar0)] >> 1, 8355711) &+
+                logicalRightShift(texture[Int((lVar6 >> 7) &+ (0x3F80 & lVar3))], lVar19)
+            lVar0 &+= 1
 
-                    destBuf[Int(var0)] = ((8355711 & (destBuf[Int(var0)] >> 1)))
-                        &+ unsignedRightShift(srcBuf[Int((var6 >> 7) &+ (var3 & 0x3F80))], var19)
-                    var0 &+= 1; var4 = var4 &+ var9; var6 = var6 &+ var17; var3 = var3 &+ var18
-
-                    destBuf[Int(var0)] = ((destBuf[Int(var0)] >> 1) & 8355711)
-                        &+ unsignedRightShift(srcBuf[Int((var6 >> 7) &+ (0x3F80 & var3))], var19)
-                    var0 &+= 1; var6 = var6 &+ var17; var3 = var3 &+ var18
-
-                    destBuf[Int(var0)] = unsignedRightShift(srcBuf[Int((var3 & 0x3F80) &+ (var6 >> 7))], var19)
-                        &+ ((destBuf[Int(var0)] >> 1) & 8355711)
-                    var0 &+= 1; var6 = var6 &+ var17; var3 = var3 &+ var18
-
-                    destBuf[Int(var0)] = ((destBuf[Int(var0)] >> 1) & 8355711)
-                        &+ unsignedRightShift(srcBuf[Int((var6 >> 7) &+ (0x3F80 & var3))], var19)
-
-                    // Advance to next span
-                    var7 = var7 &+ var12
-                    var1 = var1 &+ var5
-                    var2 = var2 &+ var8
-                    var3 = var16
-                    var6 = var15
-
-                    if var7 != 0 {
-                        var16 = (var1 / var7) << 7
-                        var15 = (var2 / var7) << 7
-                    }
-
-                    if var15 >= 0 {
-                        if var15 > 0x3F80 { var15 = 0x3F80 }
-                    } else {
-                        var15 = 0
-                    }
-
-                    var18 = (var16 &- var3) >> 4
-                    var17 = (var15 &- var6) >> 4
-
-                    var20 &-= 1
-                }
-
-                // Remainder pixels
-                for var20 in 0..<(var11 & 15) {
-                    if (var20 & 3) == 0 {
-                        var6 = (var4 & 6291456) &+ (var6 & 16383)
-                        var19 = var4 >> 23
-                        var4 = var4 &+ var9
-                    }
-                    destBuf[Int(var0)] = unsignedRightShift(srcBuf[Int((var3 & 0x3F80) &+ (var6 >> 7))], var19)
-                        &+ (((destBuf[Int(var0)]) & 16711422) >> 1)
-                    var0 &+= 1
-                    var6 = var6 &+ var17
-                    var3 = var3 &+ var18
-                }
+            // Recalculate UV for next 16-pixel span
+            lVar7  = lVar7 &+ lVar12
+            lVar1  = lVar1 &+ lVar5
+            lVar2  = lVar2 &+ lVar8
+            lVar3  = lVar16
+            lVar6  = lVar15
+            if lVar7 != 0 {
+                lVar16 = (lVar1 / lVar7) &<< 7
+                lVar15 = (lVar2 / lVar7) &<< 7
             }
+            if lVar15 < 0 { lVar15 = 0 } else if lVar15 > 0x3F80 { lVar15 = 0x3F80 }
+            var18 = (lVar16 &- lVar3) >> 4
+            var17 = (lVar15 &- lVar6) >> 4
+
+            blockCount -= 1
+        }
+
+        // Tail pixels
+        var k: Int32 = 0
+        let tailCount = lVar11 & 15
+        while k < tailCount {
+            if (k & 3) == 0 {
+                lVar6  = (lVar4 & 6291456) &+ (lVar6 & 16383)
+                lVar19 = lVar4 >> 23
+                lVar4  = lVar4 &+ lVar9
+            }
+            dest[Int(lVar0)] = logicalRightShift(texture[Int((lVar3 & 0x3F80) &+ (lVar6 >> 7))], lVar19) &+
+                (bitwiseAnd(dest[Int(lVar0)], 16711422) >> 1)
+            lVar0 &+= 1; lVar6 &+= var17; lVar3 &+= var18
+            k += 1
         }
     }
 
-    // =========================================================================
-    // MARK: - Overload 4  (256x256, textured + 50% blend with existing pixel)
-    // =========================================================================
+    // MARK: - Overload D: Blend-with-background + large (256×256) texture
+    //
     // Java signature:
     //   static void shadeScanline(int[] var0, int var1, int var2, int var3,
-    //       int var4, int var5, int var6, int var7, int var8, int var9,
-    //       int[] var10, boolean var11, int var12, int var13, int var14)
+    //                             int var4, int var5, int var6,
+    //                             int var7, int var8, int var9, int[] var10,
+    //                             boolean var11, int var12, int var13, int var14)
     //
-    // Called from Scene.java ~line 2097:
-    //   Shader.shadeScanline(this.pixelData, var23, var26, var8*var30 + var25,
-    //       var39, var38, var8 + var33, var37, var28*var8 + var19,
-    //       0, this.resourceDatabase[var5], false, var20,
-    //       var8*var29 + var22, 0)
+    // Large texture: mask 0xFC0 for V, shift >>6 for U.  V row = 64 entries wide (6-bit).
+    // var4 <<= 2 at start (the Bresenham accumulator step).
+    // blend: (dest >> 1 & 0x7F7F7F) + (texel >>> shift)
+    //        or (dest & 0xFEFEFF >> 1) + texel  — various mask constants used in Java.
+    // dest and texture are passed as arrays in Java; here as unsafe pointers.
 
-    @inlinable
-    static func shadeScanline(
-        _ var0: inout [Int32], _ var1: Int32, _ var2_in: Int32, _ var3_in: Int32,
-        _ var4_in: Int32, _ var5_in: Int32, _ var6_in: Int32,
-        _ var7: Int32, _ var8_in: Int32, _ var9_in: Int32,
-        _ var10: [Int32],
-        _ var11: Bool, _ var12: Int32, _ var13_in: Int32, _ var14_in: Int32
+    func shadeScanlineBlendLarge(
+        dest:    UnsafeMutablePointer<Int32>,
+        var1:    Int32, var2: Int32, var3: Int32,
+        var4:    Int32, var5: Int32, var6: Int32,
+        var7:    Int32, var8: Int32, var9: Int32,
+        texture: UnsafePointer<Int32>,
+        var11:   Bool,
+        var12:   Int32, var13: Int32, var14: Int32
     ) {
         guard var7 > 0 else { return }
 
-        var var2 = var2_in
-        var var3 = var3_in
-        var var4 = var4_in
-        var var5 = var5_in
-        var var6 = var6_in
-        var var8 = var8_in
-        var var9 = var9_in
-        var var13 = var13_in
-        var var14 = var14_in
+        var lVar1  = var1
+        var lVar2  = var2
+        var lVar3  = var3
+        var lVar4  = var4 &<< 2     // Java: var4 <<= 2
+        var lVar5  = var5
+        var lVar6  = var6
+        var lVar7  = var7
+        var lVar8  = var8
+        var lVar9  = var9
+        var lVar12 = var12
+        var lVar13 = var13
+        var lVar14 = var14
 
-        var var15: Int32 = 0
-        var var16: Int32 = 0
+        var lVar15: Int32 = 0
+        var lVar16: Int32 = 0
 
-        if var3 != 0 {
-            var16 = (var13 / var3) << 6
-            var15 = (var8 / var3) << 6
+        if lVar3 != 0 {
+            lVar16 = (lVar13 / lVar3) &<< 6
+            lVar15 = (lVar8  / lVar3) &<< 6
         }
+        if lVar15 < 0 { lVar15 = 0 } else if lVar15 > 0xFC0 { lVar15 = 0xFC0 }
 
-        var4 <<= 2
+        var count = lVar7
+        while count > 0 {
+            lVar3  = lVar3 &+ lVar2
+            lVar14 = lVar15           // save lVar15 into lVar14 (Java: var14 = var15)
+            lVar8  = lVar8 &+ lVar12
+            var lVar9_local = lVar16  // Java: var9 = var16
+            lVar13 = lVar13 &+ lVar1
+            if lVar3 != 0 {
+                lVar15 = (lVar8  / lVar3) &<< 6
+                lVar16 = (lVar13 / lVar3) &<< 6
+            }
+            if lVar15 < 0 { lVar15 = 0 } else if lVar15 > 0xFC0 { lVar15 = 0xFC0 }
 
-        if var15 < 0 {
-            var15 = 0
-        } else if var15 > 0xFC0 {
-            var15 = 0xFC0
-        }
+            let var18: Int32 = (lVar16 &- lVar9_local) >> 4   // highStep
+            let var17: Int32 = (lVar15 &- lVar14)      >> 4   // lowStep
+            var var20:  Int32 = lVar5 >> 20
+            lVar14 = lVar14 &+ (lVar5 & 786432)
+            lVar5  = lVar5  &+ lVar4
 
-        var0.withUnsafeMutableBufferPointer { destBuf in
-            var10.withUnsafeBufferPointer { srcBuf in
-                var var19 = var7
-                while var19 > 0 {
-                    var3 = var3 &+ var2
-                    var14 = var15
-                    var8 = var8 &+ var12
-                    var9 = var16
-                    var13 = var13 &+ var1
+            if count >= 16 {
+                // Full 16-pixel unrolled block
+                dest[Int(lVar6)] = bitwiseAnd(dest[Int(lVar6)] >> 1, 0x7F7F7F) &+
+                    logicalRightShift(texture[Int((0xFC0 & lVar9_local) &+ (lVar14 >> 6))], var20)
+                lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
 
-                    if var3 != 0 {
-                        var15 = (var8 / var3) << 6
-                        var16 = (var13 / var3) << 6
+                dest[Int(lVar6)] = (bitwiseAnd(dest[Int(lVar6)], 0xFEFEFF) >> 1) &+
+                    logicalRightShift(texture[Int((0xFC0 & lVar9_local) &+ (lVar14 >> 6))], var20)
+                lVar6 &+= 1; lVar9_local &+= var18; lVar14 &+= var17
+
+                dest[Int(lVar6)] = (bitwiseAnd(0xFEFEFF, dest[Int(lVar6)]) >> 1) &+
+                    logicalRightShift(texture[Int((lVar9_local & 0xFC0) &+ (lVar14 >> 6))], var20)
+                lVar6 &+= 1; lVar9_local &+= var18; lVar14 &+= var17
+
+                dest[Int(lVar6)] = (bitwiseAnd(dest[Int(lVar6)], 0xFEFEFF) >> 1) &+
+                    logicalRightShift(texture[Int((lVar14 >> 6) &+ (0xFC0 & lVar9_local))], var20)
+                lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
+
+                var20  = lVar5 >> 20
+                lVar14 = (lVar5 & 786432) &+ (4095 & lVar14)
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((lVar9_local & 0xFC0) &+ (lVar14 >> 6))], var20) &+
+                    (bitwiseAnd(dest[Int(lVar6)], 0xFEFEFE) >> 1)
+                lVar5 &+= lVar4; lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((lVar14 >> 6) &+ (0xFC0 & lVar9_local))], var20) &+
+                    (bitwiseAnd(dest[Int(lVar6)], 0xFEFEFF) >> 1)
+                lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((0xFC0 & lVar9_local) &+ (lVar14 >> 6))], var20) &+
+                    (bitwiseAnd(dest[Int(lVar6)], 0xFEFEFF) >> 1)
+                lVar6 &+= 1; lVar9_local &+= var18; lVar14 &+= var17
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((0xFC0 & lVar9_local) &+ (lVar14 >> 6))], var20) &+
+                    (bitwiseAnd(0xFEFEFF, dest[Int(lVar6)]) >> 1)
+                lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
+
+                lVar14 = (786432 & lVar5) &+ (4095 & lVar14)
+                var20  = lVar5 >> 20
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((0xFC0 & lVar9_local) &+ (lVar14 >> 6))], var20) &+
+                    (bitwiseAnd(dest[Int(lVar6)], 0xFEFEFE) >> 1)
+                lVar5 &+= lVar4; lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((lVar9_local & 0xFC0) &+ (lVar14 >> 6))], var20) &+
+                    bitwiseAnd(dest[Int(lVar6)] >> 1, 0x7F7F7F)
+                lVar6 &+= 1; lVar9_local &+= var18; lVar14 &+= var17
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((0xFC0 & lVar9_local) &+ (lVar14 >> 6))], var20) &+
+                    (bitwiseAnd(dest[Int(lVar6)], 0xFEFEFF) >> 1)
+                lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
+
+                dest[Int(lVar6)] = (bitwiseAnd(0xFEFEFE, dest[Int(lVar6)]) >> 1) &+
+                    logicalRightShift(texture[Int((lVar14 >> 6) &+ (lVar9_local & 0xFC0))], var20)
+                lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
+
+                lVar14 = (lVar5 & 786432) &+ (lVar14 & 4095)
+                var20  = lVar5 >> 20
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((lVar9_local & 0xFC0) &+ (lVar14 >> 6))], var20) &+
+                    (bitwiseAnd(0xFEFEFE, dest[Int(lVar6)]) >> 1)
+                lVar5 &+= lVar4; lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
+
+                dest[Int(lVar6)] = (bitwiseAnd(dest[Int(lVar6)], 0xFEFEFF) >> 1) &+
+                    logicalRightShift(texture[Int((lVar9_local & 0xFC0) &+ (lVar14 >> 6))], var20)
+                lVar6 &+= 1; lVar14 &+= var17; lVar9_local &+= var18
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((0xFC0 & lVar9_local) &+ (lVar14 >> 6))], var20) &+
+                    bitwiseAnd(dest[Int(lVar6)] >> 1, 0x7F7F7F)
+                lVar6 &+= 1; lVar9_local &+= var18; lVar14 &+= var17
+
+                dest[Int(lVar6)] = logicalRightShift(texture[Int((lVar14 >> 6) &+ (0xFC0 & lVar9_local))], var20) &+
+                    (bitwiseAnd(dest[Int(lVar6)], 0xFEFEFF) >> 1)
+                lVar6 &+= 1
+            } else {
+                // Tail loop
+                var k: Int32 = 0
+                while k < count {
+                    dest[Int(lVar6)] = logicalRightShift(texture[Int((lVar14 >> 6) &+ (lVar9_local & 0xFC0))], var20) &+
+                        (bitwiseAnd(0xFEFEFE, dest[Int(lVar6)]) >> 1)
+                    lVar6 &+= 1; lVar9_local &+= var18; lVar14 &+= var17
+                    if (k & 3) == 3 {
+                        var20  = lVar5 >> 20
+                        lVar14 = (lVar14 & 4095) &+ (786432 & lVar5)
+                        lVar5  = lVar5 &+ lVar4
                     }
-
-                    if var15 >= 0 {
-                        if var15 > 0xFC0 { var15 = 0xFC0 }
-                    } else {
-                        var15 = 0
-                    }
-
-                    let var18 = (var16 &- var9) >> 4
-                    let var17 = (var15 &- var14) >> 4
-                    var var20 = var5 >> 20
-                    var14 = var14 &+ (var5 & 786432)
-                    var5 = var5 &+ var4
-
-                    if var19 >= 16 {
-                        destBuf[Int(var6)] = ((destBuf[Int(var6)] >> 1) & 0x7f7f7f)
-                            &+ unsignedRightShift(srcBuf[Int((0xFC0 & var9) &+ (var14 >> 6))], var20)
-                        var6 &+= 1; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        destBuf[Int(var6)] = (((destBuf[Int(var6)]) & 0xfefeff) >> 1)
-                            &+ unsignedRightShift(srcBuf[Int((0xFC0 & var9) &+ (var14 >> 6))], var20)
-                        var6 &+= 1; var9 = var9 &+ var18; var14 = var14 &+ var17
-
-                        destBuf[Int(var6)] = (((0xfefeff & destBuf[Int(var6)])) >> 1)
-                            &+ unsignedRightShift(srcBuf[Int((var9 & 0xFC0) &+ (var14 >> 6))], var20)
-                        var6 &+= 1; var9 = var9 &+ var18; var14 = var14 &+ var17
-
-                        destBuf[Int(var6)] = (((destBuf[Int(var6)]) & 0xfefeff) >> 1)
-                            &+ unsignedRightShift(srcBuf[Int((var14 >> 6) &+ (0xFC0 & var9))], var20)
-                        var6 &+= 1; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        // Lighting update
-                        var14 = (var5 & 786432) &+ (4095 & var14)
-                        var20 = var5 >> 20
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((var9 & 0xFC0) &+ (var14 >> 6))], var20)
-                            &+ (((destBuf[Int(var6)]) & 0xFEFEFE) >> 1)
-                        var6 &+= 1; var5 = var5 &+ var4; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((var14 >> 6) &+ (0xFC0 & var9))], var20)
-                            &+ (((destBuf[Int(var6)]) & 0xfefeff) >> 1)
-                        var6 &+= 1; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((0xFC0 & var9) &+ (var14 >> 6))], var20)
-                            &+ (((destBuf[Int(var6)]) & 0xfefeff) >> 1)
-                        var6 &+= 1; var9 = var9 &+ var18; var14 = var14 &+ var17
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((0xFC0 & var9) &+ (var14 >> 6))], var20)
-                            &+ (((0xfefeff & destBuf[Int(var6)])) >> 1)
-                        var6 &+= 1; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        // Lighting update
-                        var14 = (786432 & var5) &+ (4095 & var14)
-                        var20 = var5 >> 20
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((0xFC0 & var9) &+ (var14 >> 6))], var20)
-                            &+ (((destBuf[Int(var6)]) & 0xFEFEFE) >> 1)
-                        var6 &+= 1; var5 = var5 &+ var4; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((var9 & 0xFC0) &+ (var14 >> 6))], var20)
-                            &+ ((destBuf[Int(var6)] >> 1) & 0x7f7f7f)
-                        var6 &+= 1; var9 = var9 &+ var18; var14 = var14 &+ var17
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((0xFC0 & var9) &+ (var14 >> 6))], var20)
-                            &+ (((destBuf[Int(var6)]) & 0xfefeff) >> 1)
-                        var6 &+= 1; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        destBuf[Int(var6)] = (((0xFEFEFE & destBuf[Int(var6)])) >> 1)
-                            &+ unsignedRightShift(srcBuf[Int((var14 >> 6) &+ (var9 & 0xFC0))], var20)
-                        var6 &+= 1; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        // Lighting update
-                        var14 = (var5 & 786432) &+ (var14 & 4095)
-                        var20 = var5 >> 20
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((var9 & 0xFC0) &+ (var14 >> 6))], var20)
-                            &+ (((0xFEFEFE & destBuf[Int(var6)])) >> 1)
-                        var6 &+= 1; var5 = var5 &+ var4; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        destBuf[Int(var6)] = (((destBuf[Int(var6)]) & 0xfefeff) >> 1)
-                            &+ unsignedRightShift(srcBuf[Int((var9 & 0xFC0) &+ (var14 >> 6))], var20)
-                        var6 &+= 1; var14 = var14 &+ var17; var9 = var9 &+ var18
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((0xFC0 & var9) &+ (var14 >> 6))], var20)
-                            &+ ((destBuf[Int(var6)] >> 1) & 0x7f7f7f)
-                        var6 &+= 1; var9 = var9 &+ var18; var14 = var14 &+ var17
-
-                        destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((var14 >> 6) &+ (0xFC0 & var9))], var20)
-                            &+ (((destBuf[Int(var6)]) & 0xfefeff) >> 1)
-                        var6 &+= 1
-                    } else {
-                        for var21 in 0..<var19 {
-                            destBuf[Int(var6)] = unsignedRightShift(srcBuf[Int((var14 >> 6) &+ (var9 & 0xFC0))], var20)
-                                &+ (((0xFEFEFE & destBuf[Int(var6)])) >> 1)
-                            var6 &+= 1
-                            var9  = var9  &+ var18
-                            var14 = var14 &+ var17
-                            if (var21 & 3) == 3 {
-                                var20 = var5 >> 20
-                                var14 = (var14 & 4095) &+ (786432 & var5)
-                                var5 = var5 &+ var4
-                            }
-                        }
-                    }
-
-                    var19 &-= 16
+                    k += 1
                 }
             }
+            count -= 16
         }
     }
 
-    // =========================================================================
-    // MARK: - Overload 5  (256x256, opaque textured — no transparency check)
-    // =========================================================================
+    // MARK: - Overload E: Opaque large (256×256) texture scanline
+    //
     // Java signature:
     //   static void shadeScanline(int var0, int var1, int var2, int var3,
-    //       int var4, int[] src, int var6, int var7, int var8, int var9,
-    //       int[] dest, int var11, int var12, int var13, int var14)
+    //                             int var4, int[] src, int var6,
+    //                             int var7, int var8, int var9, int[] dest,
+    //                             int var11, int var12, int var13, int var14)
     //
-    // Called from Scene.java ~line 2126 (floors):
-    //   Shader.shadeScanline(var39, 1121159302, var23, var8*var29 + var22,
-    //       var20, this.resourceDatabase[var5], var38, 0,
-    //       var19 + var28*var8, 0, this.pixelData,
-    //       var33 + var8, var25 + var8*var30, var26, var37)
-    //
-    // Note: var1 == 1121159302 is a sentinel/unused value.
+    // Large texture: mask 4032 (= 0xFC0) for V, shift >>6 for U.
+    // var0 <<= 2 at start.  Writes directly (no skip-0 test, no blend).
 
-    @inlinable
-    static func shadeScanline(
-        _ var0_in: Int32, _ var1_sentinel: Int32, _ var2_in: Int32, _ var3_in: Int32,
-        _ var4: Int32,
-        _ src: [Int32],
-        _ var6_in: Int32, _ var7_in: Int32, _ var8_in: Int32, _ var9_in: Int32,
-        _ dest: inout [Int32],
-        _ var11_in: Int32, _ var12_in: Int32, _ var13: Int32, _ var14: Int32
+    func shadeScanlineOpaqueLarge(
+        var0: Int32, var1: Int32, var2: Int32, var3: Int32,
+        var4: Int32, src:  UnsafePointer<Int32>,
+        var6: Int32, var7: Int32, var8: Int32, var9: Int32,
+        dest: UnsafeMutablePointer<Int32>,
+        var11: Int32, var12: Int32, var13: Int32, var14: Int32
     ) {
         guard var14 > 0 else { return }
 
-        var var0 = var0_in
-        var var2 = var2_in
-        var var3 = var3_in
-        var var6 = var6_in
-        var var7 = var7_in
-        var var8 = var8_in
-        var var9 = var9_in
-        var var11 = var11_in
-        var var12 = var12_in
+        var lVar0  = var0 &<< 2
+        var lVar1  = var1
+        var lVar2  = var2
+        var lVar3  = var3
+        var lVar4  = var4
+        var lVar6  = var6
+        var lVar7  = var7
+        var lVar8  = var8
+        var lVar11 = var11
+        var lVar12 = var12
+        var lVar13 = var13
 
-        var var15: Int32 = 0
-        var var16: Int32 = 0
+        var lVar15: Int32 = 0
+        var lVar16: Int32 = 0
 
-        if var12 != 0 {
-            var16 = (var3 / var12) << 6
-            var15 = (var8 / var12) << 6
+        if lVar12 != 0 {
+            lVar16 = (lVar3 / lVar12) &<< 6
+            lVar15 = (lVar8 / lVar12) &<< 6
         }
+        if lVar15 < 0 { lVar15 = 0 } else if lVar15 > 4032 { lVar15 = 4032 }
 
-        var0 <<= 2
+        // Sentinel guard omitted (Java: if var1 != 1121159302 => recursive call)
 
-        if var15 >= 0 {
-            if var15 > 4032 { var15 = 4032 }
-        } else {
-            var15 = 0
-        }
+        var count = var14
+        while count > 0 {
+            lVar12 = lVar12 &+ lVar13
+            lVar8  = lVar8  &+ lVar4
+            lVar3  = lVar3  &+ lVar2
+            var lVar9_local = lVar15
+            var lVar7_local = lVar16
+            if lVar12 != 0 {
+                lVar15 = (lVar8 / lVar12) &<< 6
+                lVar16 = (lVar3 / lVar12) &<< 6
+            }
+            if lVar15 < 0 { lVar15 = 0 } else if lVar15 > 4032 { lVar15 = 4032 }
 
-        dest.withUnsafeMutableBufferPointer { destBuf in
-            src.withUnsafeBufferPointer { srcBuf in
-                var var19 = var14
-                while var19 > 0 {
-                    var12 = var12 &+ var13
-                    var8  = var8  &+ var4
-                    var3  = var3  &+ var2
-                    var9  = var15
-                    var7  = var16
+            let var18: Int32 = (lVar16 &- lVar7_local) >> 4
+            let var17: Int32 = (lVar15 &- lVar9_local) >> 4
+            var var20:  Int32 = lVar6 >> 20
+            lVar9_local = lVar9_local &+ (786432 & lVar6)
+            lVar6 = lVar6 &+ lVar0
 
-                    if var12 != 0 {
-                        var15 = (var8 / var12) << 6
-                        var16 = (var3 / var12) << 6
+            if count >= 16 {
+                // Full 16-pixel unrolled block
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar7_local & 4032) &+ (lVar9_local >> 6))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar9_local >> 6) &+ (lVar7_local & 4032))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar9_local >> 6) &+ (4032 & lVar7_local))], var20)
+                lVar11 &+= 1; lVar9_local &+= var17; lVar7_local &+= var18
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar9_local >> 6) &+ (4032 & lVar7_local))], var20)
+                lVar11 &+= 1; lVar9_local &+= var17; lVar7_local &+= var18
+
+                var20 = lVar6 >> 20
+                lVar9_local = (lVar6 & 786432) &+ (4095 & lVar9_local)
+                lVar6 &+= lVar0
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((4032 & lVar7_local) &+ (lVar9_local >> 6))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar7_local & 4032) &+ (lVar9_local >> 6))], var20)
+                lVar11 &+= 1; lVar9_local &+= var17; lVar7_local &+= var18
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar7_local & 4032) &+ (lVar9_local >> 6))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar9_local >> 6) &+ (4032 & lVar7_local))], var20)
+                lVar11 &+= 1; lVar9_local &+= var17; lVar7_local &+= var18
+
+                var20 = lVar6 >> 20
+                lVar9_local = (786432 & lVar6) &+ (4095 & lVar9_local)
+                lVar6 &+= lVar0
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar7_local & 4032) &+ (lVar9_local >> 6))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar9_local >> 6) &+ (lVar7_local & 4032))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar7_local & 4032) &+ (lVar9_local >> 6))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((4032 & lVar7_local) &+ (lVar9_local >> 6))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                var20 = lVar6 >> 20
+                lVar9_local = (4095 & lVar9_local) &+ (lVar6 & 786432)
+                lVar6 &+= lVar0
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar7_local & 4032) &+ (lVar9_local >> 6))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar9_local >> 6) &+ (lVar7_local & 4032))], var20)
+                lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((lVar9_local >> 6) &+ (lVar7_local & 4032))], var20)
+                lVar11 &+= 1; lVar9_local &+= var17; lVar7_local &+= var18
+
+                dest[Int(lVar11)] = logicalRightShift(src[Int((4032 & lVar7_local) &+ (lVar9_local >> 6))], var20)
+                lVar11 &+= 1
+            } else {
+                // Tail loop
+                var k: Int32 = 0
+                while k < count {
+                    dest[Int(lVar11)] = logicalRightShift(src[Int((lVar9_local >> 6) &+ (4032 & lVar7_local))], var20)
+                    lVar11 &+= 1; lVar7_local &+= var18; lVar9_local &+= var17
+                    if (3 & k) == 3 {
+                        var20 = lVar6 >> 20
+                        lVar9_local = (lVar6 & 786432) &+ (4095 & lVar9_local)
+                        lVar6 &+= lVar0
                     }
-
-                    if var15 < 0 {
-                        var15 = 0
-                    } else if var15 > 4032 {
-                        var15 = 4032
-                    }
-
-                    let var18 = (var16 &- var7) >> 4
-                    let var17 = (var15 &- var9) >> 4
-                    var var20 = var6 >> 20
-                    var9 = var9 &+ (786432 & var6)
-                    var6 = var6 &+ var0
-
-                    if var19 >= 16 {
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var7 & 4032) &+ (var9 >> 6))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var9 >> 6) &+ (var7 & 4032))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var9 >> 6) &+ (4032 & var7))], var20)
-                        var11 &+= 1; var9 = var9 &+ var17; var7 = var7 &+ var18
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var9 >> 6) &+ (4032 & var7))], var20)
-                        var11 &+= 1; var9 = var9 &+ var17; var7 = var7 &+ var18
-
-                        // Lighting update
-                        var20 = var6 >> 20
-                        var9 = (var6 & 786432) &+ (4095 & var9)
-                        var6 = var6 &+ var0
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((4032 & var7) &+ (var9 >> 6))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var7 & 4032) &+ (var9 >> 6))], var20)
-                        var11 &+= 1; var9 = var9 &+ var17; var7 = var7 &+ var18
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var7 & 4032) &+ (var9 >> 6))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var9 >> 6) &+ (4032 & var7))], var20)
-                        var11 &+= 1; var9 = var9 &+ var17; var7 = var7 &+ var18
-
-                        // Lighting update
-                        var20 = var6 >> 20
-                        var9 = (786432 & var6) &+ (4095 & var9)
-                        var6 = var6 &+ var0
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var7 & 4032) &+ (var9 >> 6))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var9 >> 6) &+ (var7 & 4032))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var7 & 4032) &+ (var9 >> 6))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((4032 & var7) &+ (var9 >> 6))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        // Lighting update
-                        var20 = var6 >> 20
-                        var9 = (4095 & var9) &+ (var6 & 786432)
-                        var6 = var6 &+ var0
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var7 & 4032) &+ (var9 >> 6))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var9 >> 6) &+ (var7 & 4032))], var20)
-                        var11 &+= 1; var7 = var7 &+ var18; var9 = var9 &+ var17
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var9 >> 6) &+ (var7 & 4032))], var20)
-                        var11 &+= 1; var9 = var9 &+ var17; var7 = var7 &+ var18
-
-                        destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((4032 & var7) &+ (var9 >> 6))], var20)
-                        var11 &+= 1
-                    } else {
-                        for var21 in 0..<var19 {
-                            destBuf[Int(var11)] = unsignedRightShift(srcBuf[Int((var9 >> 6) &+ (4032 & var7))], var20)
-                            var11 &+= 1
-                            var7  = var7  &+ var18
-                            var9  = var9  &+ var17
-                            if (3 & var21) == 3 {
-                                var20 = var6 >> 20
-                                var9 = (var6 & 786432) &+ (4095 & var9)
-                                var6 = var6 &+ var0
-                            }
-                        }
-                    }
-
-                    var19 &-= 16
+                    k += 1
                 }
             }
+            count -= 16
         }
     }
 
-    // =========================================================================
-    // MARK: - Overload 6  (256x256, textured with transparency)
-    // =========================================================================
+    // MARK: - Overload F: Transparent large (256×256) texture scanline  (guard: byte var3 == 25)
+    //
     // Java signature:
     //   static void shadeScanline(int var0, int var1, int var2, byte var3,
-    //       int var4, int var5, int var6, int var7, int[] var8, int[] var9,
-    //       int var10, int var11, int var12, int var13, int var14, int var15)
+    //                             int var4, int var5, int var6,
+    //                             int var7, int[] var8, int[] var9,
+    //                             int var10, int var11, int var12,
+    //                             int var13, int var14, int var15)
     //
-    // Called from Scene.java ~line 2165 (fountain spray, wooden fences):
-    //   Shader.shadeScanline(var37, var30*var8 + var25, 0, (byte)25,
-    //       0, var20, var26, var39, this.resourceDatabase[var5],
-    //       this.pixelData, var8 + var33, var8*var28 + var19,
-    //       0, var23, var38, var29*var8 + var22)
-    //
-    // The byte var3 is always 25 at the valid call site (guard check).
+    // Large texture: mask 4032 (= 0xFC0) for V (var4), shift >>6 for U (var12).
+    // Transparent: skip pixel write if texel == 0.
+    // Only executes when var3 == 25.
 
-    @inlinable
-    static func shadeScanline(
-        _ var0_in: Int32, _ var1_in: Int32, _ var2_in: Int32, _ var3: Int8,
-        _ var4_in: Int32, _ var5: Int32, _ var6_in: Int32,
-        _ var7_in: Int32,
-        _ var8: [Int32],
-        _ var9: inout [Int32],
-        _ var10_in: Int32, _ var11_in: Int32, _ var12_in: Int32,
-        _ var13_in: Int32, _ var14_in: Int32, _ var15_in: Int32
+    func shadeScanlineTransparentLarge(
+        var0: Int32, var1: Int32, var2: Int32, var3: Int8,
+        var4: Int32, var5: Int32, var6: Int32,
+        var7: Int32,
+        texture: UnsafePointer<Int32>,
+        dest:    UnsafeMutablePointer<Int32>,
+        var10: Int32, var11: Int32, var12: Int32,
+        var13: Int32, var14: Int32, var15: Int32
     ) {
-        var var0 = var0_in
-        guard var0 > 0 else { return }
-        guard var3 == 25 else { return }
+        guard var0 > 0 && var3 == 25 else { return }
 
-        var var1 = var1_in
-        var var2 = var2_in
-        var var4 = var4_in
-        var var6 = var6_in
-        var var7 = var7_in
-        var var10 = var10_in
-        var var11 = var11_in
-        var var12 = var12_in
-        var var13 = var13_in
-        var var14 = var14_in
-        var var15 = var15_in
+        var lVar0  = var0
+        var lVar1  = var1
+        var lVar4  = var4
+        var lVar5  = var5
+        var lVar6  = var6
+        var lVar7  = var7 &<< 2
+        var lVar10 = var10
+        var lVar11 = var11
+        var lVar12 = var12
+        var lVar13 = var13
+        var lVar14 = var14
+        var lVar15 = var15
 
-        var var16: Int32 = 0
-        var var17: Int32 = 0
+        var lVar16: Int32 = 0
+        var lVar17: Int32 = 0
+        var lVar2:  Int32 = 0   // used as temp pixel value in Java (was var2)
 
-        if var1 != 0 {
-            var16 = (var11 / var1) << 6
-            var17 = (var15 / var1) << 6
+        if lVar1 != 0 {
+            lVar16 = (lVar11 / lVar1) &<< 6
+            lVar17 = (lVar15 / lVar1) &<< 6
         }
+        if lVar16 < 0 { lVar16 = 0 } else if lVar16 > 4032 { lVar16 = 4032 }
 
-        var7 <<= 2
+        var count = lVar0
+        while count > 0 {
+            var lVar4_span = lVar17
+            var lVar12_span = lVar16
 
-        if var16 >= 0 {
-            if var16 > 4032 { var16 = 4032 }
-        } else {
-            var16 = 0
-        }
+            lVar11 = lVar11 &+ lVar5
+            lVar1  = lVar1  &+ lVar6
+            lVar15 = lVar15 &+ lVar13
+            if lVar1 != 0 {
+                lVar17 = (lVar15 / lVar1) &<< 6
+                lVar16 = (lVar11 / lVar1) &<< 6
+            }
+            if lVar16 < 0 { lVar16 = 0 } else if lVar16 > 4032 { lVar16 = 4032 }
 
-        var9.withUnsafeMutableBufferPointer { destBuf in
-            var8.withUnsafeBufferPointer { srcBuf in
-                var var20 = var0
-                while var20 > 0 {
-                    var4  = var17
-                    var12 = var16
-                    var11 = var11 &+ var5
-                    var1  = var1  &+ var6
-                    var15 = var15 &+ var13
+            let var19: Int32 = (lVar17 &- lVar4_span)   >> 4
+            let var18: Int32 = (lVar16 &- lVar12_span)  >> 4
+            lVar12_span = lVar12_span &+ (786432 & lVar14)
+            var var21:  Int32 = lVar14 >> 20
+            lVar14 = lVar14 &+ lVar7
 
-                    if var1 != 0 {
-                        var17 = (var15 / var1) << 6
-                        var16 = (var11 / var1) << 6
+            if count >= 16 {
+                // Full 16-pixel unrolled block
+                lVar2 = logicalRightShift(texture[Int((lVar12_span >> 6) &+ (4032 & lVar4_span))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar10 &+= 1; lVar4_span &+= var19; lVar12_span &+= var18
+
+                lVar2 = logicalRightShift(texture[Int((lVar12_span >> 6) &+ (lVar4_span & 4032))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar4_span &+= var19; lVar10 &+= 1; lVar12_span &+= var18
+
+                lVar2 = logicalRightShift(texture[Int((lVar12_span >> 6) &+ (4032 & lVar4_span))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar4_span &+= var19; lVar10 &+= 1; lVar12_span &+= var18
+
+                lVar2 = logicalRightShift(texture[Int((4032 & lVar4_span) &+ (lVar12_span >> 6))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar10 &+= 1; lVar12_span &+= var18; lVar4_span &+= var19
+
+                var21 = lVar14 >> 20
+                lVar12_span = (786432 & lVar14) &+ (4095 & lVar12_span)
+                lVar14 &+= lVar7
+
+                lVar2 = logicalRightShift(texture[Int((lVar12_span >> 6) &+ (4032 & lVar4_span))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar10 &+= 1; lVar12_span &+= var18; lVar4_span &+= var19
+
+                lVar2 = logicalRightShift(texture[Int((lVar4_span & 4032) &+ (lVar12_span >> 6))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar10 &+= 1; lVar12_span &+= var18; lVar4_span &+= var19
+
+                lVar2 = logicalRightShift(texture[Int((lVar4_span & 4032) &+ (lVar12_span >> 6))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar10 &+= 1; lVar12_span &+= var18; lVar4_span &+= var19
+
+                lVar2 = logicalRightShift(texture[Int((lVar4_span & 4032) &+ (lVar12_span >> 6))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar4_span &+= var19; lVar10 &+= 1; lVar12_span &+= var18
+
+                lVar12_span = (lVar12_span & 4095) &+ (lVar14 & 786432)
+                var21 = lVar14 >> 20
+
+                lVar2 = logicalRightShift(texture[Int((lVar12_span >> 6) &+ (lVar4_span & 4032))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar14 &+= lVar7; lVar10 &+= 1; lVar12_span &+= var18; lVar4_span &+= var19
+
+                lVar2 = logicalRightShift(texture[Int((lVar12_span >> 6) &+ (4032 & lVar4_span))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar4_span &+= var19; lVar12_span &+= var18; lVar10 &+= 1
+
+                lVar2 = logicalRightShift(texture[Int((lVar12_span >> 6) &+ (4032 & lVar4_span))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar12_span &+= var18; lVar4_span &+= var19; lVar10 &+= 1
+
+                lVar2 = logicalRightShift(texture[Int((lVar4_span & 4032) &+ (lVar12_span >> 6))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar10 &+= 1; lVar12_span &+= var18; lVar4_span &+= var19
+
+                var21 = lVar14 >> 20
+                lVar12_span = (lVar14 & 786432) &+ (lVar12_span & 4095)
+                lVar14 &+= lVar7
+
+                lVar2 = logicalRightShift(texture[Int((lVar4_span & 4032) &+ (lVar12_span >> 6))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar4_span &+= var19; lVar12_span &+= var18; lVar10 &+= 1
+
+                lVar2 = logicalRightShift(texture[Int((lVar4_span & 4032) &+ (lVar12_span >> 6))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar10 &+= 1; lVar12_span &+= var18; lVar4_span &+= var19
+
+                lVar2 = logicalRightShift(texture[Int((lVar4_span & 4032) &+ (lVar12_span >> 6))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar4_span &+= var19; lVar10 &+= 1; lVar12_span &+= var18
+
+                lVar2 = logicalRightShift(texture[Int((4032 & lVar4_span) &+ (lVar12_span >> 6))], var21)
+                if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                lVar10 &+= 1
+            } else {
+                // Tail loop
+                var k: Int32 = 0
+                while k < count {
+                    lVar2 = logicalRightShift(texture[Int((lVar12_span >> 6) &+ (4032 & lVar4_span))], var21)
+                    if lVar2 != 0 { dest[Int(lVar10)] = lVar2 }
+                    lVar10 &+= 1; lVar12_span &+= var18; lVar4_span &+= var19
+                    if (3 & k) == 3 {
+                        var21 = lVar14 >> 20
+                        lVar12_span = (4095 & lVar12_span) &+ (lVar14 & 786432)
+                        lVar14 &+= lVar7
                     }
-
-                    if var16 < 0 {
-                        var16 = 0
-                    } else if var16 > 4032 {
-                        var16 = 4032
-                    }
-
-                    let var19 = (var17 &- var4) >> 4
-                    let var18 = (var16 &- var12) >> 4
-                    var12 = var12 &+ (786432 & var14)
-                    var var21 = var14 >> 20
-                    var14 = var14 &+ var7
-
-                    if var20 >= 16 {
-                        // Unrolled 16 pixels with transparency check
-                        var2 = unsignedRightShift(srcBuf[Int((var12 >> 6) &+ (4032 & var4))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var10 &+= 1; var4 = var4 &+ var19; var12 = var12 &+ var18
-
-                        var2 = unsignedRightShift(srcBuf[Int((var12 >> 6) &+ (var4 & 4032))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var4 = var4 &+ var19; var10 &+= 1; var12 = var12 &+ var18
-
-                        var2 = unsignedRightShift(srcBuf[Int((var12 >> 6) &+ (4032 & var4))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var4 = var4 &+ var19; var10 &+= 1; var12 = var12 &+ var18
-
-                        var2 = unsignedRightShift(srcBuf[Int((4032 & var4) &+ (var12 >> 6))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var10 &+= 1; var12 = var12 &+ var18; var4 = var4 &+ var19
-
-                        // Lighting update
-                        var21 = var14 >> 20
-                        var12 = (786432 & var14) &+ (4095 & var12)
-                        var14 = var14 &+ var7
-
-                        var2 = unsignedRightShift(srcBuf[Int((var12 >> 6) &+ (4032 & var4))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var10 &+= 1; var12 = var12 &+ var18; var4 = var4 &+ var19
-
-                        var2 = unsignedRightShift(srcBuf[Int((var4 & 4032) &+ (var12 >> 6))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var10 &+= 1; var12 = var12 &+ var18; var4 = var4 &+ var19
-
-                        var2 = unsignedRightShift(srcBuf[Int((var4 & 4032) &+ (var12 >> 6))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var10 &+= 1; var12 = var12 &+ var18; var4 = var4 &+ var19
-
-                        var2 = unsignedRightShift(srcBuf[Int((var4 & 4032) &+ (var12 >> 6))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var4 = var4 &+ var19; var10 &+= 1; var12 = var12 &+ var18
-
-                        // Lighting update
-                        var12 = (var12 & 4095) &+ (var14 & 786432)
-                        var21 = var14 >> 20
-
-                        var2 = unsignedRightShift(srcBuf[Int((var12 >> 6) &+ (var4 & 4032))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var14 = var14 &+ var7; var10 &+= 1; var12 = var12 &+ var18; var4 = var4 &+ var19
-
-                        var2 = unsignedRightShift(srcBuf[Int((var12 >> 6) &+ (4032 & var4))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var4 = var4 &+ var19; var12 = var12 &+ var18; var10 &+= 1
-
-                        var2 = unsignedRightShift(srcBuf[Int((var12 >> 6) &+ (4032 & var4))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var12 = var12 &+ var18; var4 = var4 &+ var19; var10 &+= 1
-
-                        var2 = unsignedRightShift(srcBuf[Int((var4 & 4032) &+ (var12 >> 6))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var10 &+= 1; var12 = var12 &+ var18; var4 = var4 &+ var19
-
-                        // Lighting update
-                        var21 = var14 >> 20
-                        var12 = (var14 & 786432) &+ (var12 & 4095)
-                        var14 = var14 &+ var7
-
-                        var2 = unsignedRightShift(srcBuf[Int((var4 & 4032) &+ (var12 >> 6))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var4 = var4 &+ var19; var12 = var12 &+ var18; var10 &+= 1
-
-                        var2 = unsignedRightShift(srcBuf[Int((var4 & 4032) &+ (var12 >> 6))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var10 &+= 1; var12 = var12 &+ var18; var4 = var4 &+ var19
-
-                        var2 = unsignedRightShift(srcBuf[Int((var4 & 4032) &+ (var12 >> 6))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var4 = var4 &+ var19; var10 &+= 1; var12 = var12 &+ var18
-
-                        var2 = unsignedRightShift(srcBuf[Int((4032 & var4) &+ (var12 >> 6))], var21)
-                        if var2 != 0 { destBuf[Int(var10)] = var2 }
-                        var10 &+= 1
-                    } else {
-                        for var22 in 0..<var20 {
-                            var2 = unsignedRightShift(srcBuf[Int((var12 >> 6) &+ (4032 & var4))], var21)
-                            if var2 != 0 { destBuf[Int(var10)] = var2 }
-                            var10 &+= 1
-                            var12 = var12 &+ var18
-                            var4  = var4  &+ var19
-                            if (3 & var22) == 3 {
-                                var21 = var14 >> 20
-                                var12 = (4095 & var12) &+ (var14 & 786432)
-                                var14 = var14 &+ var7
-                            }
-                        }
-                    }
-
-                    var20 &-= 16
+                    k += 1
                 }
             }
+            count -= 16
         }
     }
 }

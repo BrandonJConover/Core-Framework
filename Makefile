@@ -79,7 +79,8 @@ get-updates:
 	`pwd`/Deployment_Scripts/get-updates.sh
 
 compile:
-	cd server && gradle classes
+	ant -f server/build.xml compile_core
+	ant -f server/build.xml compile_plugins
 	ant -f Client_Base/build.xml compile
 	ant -f PC_Launcher/build.xml compile
 

@@ -10,8 +10,6 @@ import com.openrsc.server.net.rsc.parsers.PayloadParser;
 import com.openrsc.server.net.rsc.struct.*;
 import com.openrsc.server.net.rsc.struct.incoming.*;
 import com.openrsc.server.util.rsc.DataConversions;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -20,7 +18,6 @@ import java.util.Arrays;
  * RSC Protocol-235 Parser of Incoming Packets to respective Protocol Independent Structs
  * **/
 public class Payload235Parser implements PayloadParser<OpcodeIn> {
-	private static final Logger LOGGER = LogManager.getLogger();
 	@Override
 	public OpcodeIn toOpcodeEnum(Packet packet, Player player) {
 		OpcodeIn opcode = null;
@@ -614,9 +611,9 @@ public class Payload235Parser implements PayloadParser<OpcodeIn> {
 						oldPassword = new String(Arrays.copyOfRange(concatPassData, 0, 20), "UTF8").trim();
 						newPassword = new String(Arrays.copyOfRange(concatPassData, 20, 42), "UTF8").trim();
 					} catch (Exception ex1) {
-						LOGGER.info("error parsing passwords in change password block");
+						//LOGGER.info("error parsing passwords in change password block");
 						errored = true;
-						LOGGER.catching(ex1);
+						ex1.printStackTrace();
 					}
 
 					if (!errored) {
@@ -662,9 +659,9 @@ public class Payload235Parser implements PayloadParser<OpcodeIn> {
 						try {
 							answers[i] = new String(answerData, "UTF8").trim();
 						} catch (Exception ex) {
-							LOGGER.info("error parsing answer {} in change recovery block", i);
+							//LOGGER.info("error parsing answer " + i + " in change recovery block");
 							errored = true;
-							LOGGER.catching(ex);
+							ex.printStackTrace();
 						}
 					}
 
@@ -764,7 +761,7 @@ public class Payload235Parser implements PayloadParser<OpcodeIn> {
 
 				// Unknown OPCODE
 				default:
-					LOGGER.warn("Received inauthentic opcode {} from authentic claiming client", opcode);
+					System.out.println(String.format("Received inauthentic opcode %d from authentic claiming client", opcode));
 					return false;
 			}
 		}
@@ -992,7 +989,7 @@ public class Payload235Parser implements PayloadParser<OpcodeIn> {
 
 				// Unknown OPCODE
 				default:
-					LOGGER.warn("Received inauthentic opcode {} from authentic claiming client", opcode);
+					System.out.println(String.format("Received inauthentic opcode %d from authentic claiming client", opcode));
 					return false;
 			}
 		}

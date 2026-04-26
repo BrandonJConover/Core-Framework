@@ -92,16 +92,17 @@ public class StringUtil {
 	}
 
 	public static String formatItemCount(int count) {
-		var str = String.valueOf(count);
+
+		String str = "" + count;
 
 		for (int i = str.length() - 3; i > 0; i -= 3) {
 			str = str.substring(0, i) + "," + str.substring(i);
 		}
 
 		if (str.length() > 8) {
-			str = "@gre@%s million @whi@(%s)".formatted(str.substring(0, str.length() - 8), str);
+			str = "@gre@" + str.substring(0, str.length() - 8) + " million @whi@(" + str + ")";
 		} else if (str.length() > 4) {
-			str = "@cya@%sK @whi@(%s)".formatted(str.substring(0, str.length() - 4), str);
+			str = "@cya@" + str.substring(0, str.length() - 4) + "K @whi@(" + str + ")";
 		}
 
 		return str;
@@ -117,18 +118,38 @@ public class StringUtil {
 		if ((sender == null || sender.length() == 0) && type != MessageType.TRADE)
 			return colour + msg;
 
-		return switch (type) {
-			case GAME, QUEST, CHAT, INVENTORY -> "%s%s: %s%s".formatted(colour, sender, colour, msg);
-			case PRIVATE_RECIEVE -> sender.toLowerCase().contains("global$")
-				? "%s%s%s tells [everyone]: %s".formatted(colour, sender.substring(7), colour, msg)
-				: "%s%s%s tells you: %s".formatted(colour, sender, colour, msg);
-			case PRIVATE_SEND -> sender.toLowerCase().equals("global$")
-				? "%sYou tell [everyone]%s: %s".formatted(colour, colour, msg)
-				: "%sYou tell %s%s: %s".formatted(colour, sender, colour, msg);
-			case FRIEND_STATUS, GLOBAL_CHAT, CLAN_CHAT -> colour + msg;
-			case TRADE -> "%s%s%s wishes to trade with you.".formatted(colour, sender, colour);
-			default -> colour;
-		};
+		switch (type) {
+			case GAME:
+				return colour + sender + ": " + colour + msg;
+			case PRIVATE_RECIEVE:
+				if (sender.toLowerCase().contains("global$")) {
+					return colour + sender.substring(7) + colour + " tells [everyone]: " + msg;
+				} else {
+					return colour + sender + colour + " tells you: " + msg;
+				}
+			case PRIVATE_SEND:
+				if (sender.toLowerCase().equals("global$")) {
+					return colour + "You tell [everyone]" + colour + ": " + msg;
+				} else {
+					return colour + "You tell " + sender + colour + ": " + msg;
+				}
+			case QUEST:
+				return colour + sender + ": " + colour + msg;
+			case CHAT:
+				return colour + sender + ": " + colour + msg;
+			case FRIEND_STATUS:
+				return colour + msg;
+			case TRADE:
+				return colour + sender + colour + " wishes to trade with you.";
+			case INVENTORY:
+				return colour + sender + ": " + colour + msg;
+			case GLOBAL_CHAT:
+				return colour + msg;
+			case CLAN_CHAT:
+				return colour + msg;
+			default:
+				return colour;
+		}
 	}
 
 	private static boolean isAlphaNumeric(char c) {
@@ -199,9 +220,9 @@ public class StringUtil {
 	}
 
 	public static String byteArrayToHex(byte[] a) {
-		var sb = new StringBuilder(a.length * 2);
+		StringBuilder sb = new StringBuilder(a.length * 2);
 		for (byte b : a)
-			sb.append("%02x".formatted(b));
+			sb.append(String.format("%02x", b));
 		return sb.toString();
 	}
 	private static final Pattern IPV4_PATTERN = Pattern.compile("^(([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}([01]?\\d\\d?|2[0-4]\\d|25[0-5])$");

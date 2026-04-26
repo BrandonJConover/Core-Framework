@@ -1,11 +1,8 @@
 package com.openrsc.server.net;
 
 import io.netty.buffer.ByteBuf;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 public class Packet {
-	private static final Logger LOGGER = LogManager.getLogger();
 	/**
 	 * Next Packet Number
 	 */
@@ -127,7 +124,7 @@ public class Packet {
 		try {
 			return (short) ((short) ((payload.readByte() & 0xff) << 8) | (short) (payload.readByte() & 0xff));
 		} catch (Exception e) {
-			LOGGER.warn("Error reading packet (short)");
+			System.out.println("Error reading packet (short)");
 			return 0;
 		}
 	}
@@ -233,28 +230,24 @@ public class Packet {
 	}
 
 	public static void printPacket(Packet packet, String direction) {
-		if (!LOGGER.isDebugEnabled()) return;
 		int length = packet.getReadableBytes();
 		int opcode = packet.getID();
 		ByteBuf buffer = packet.getBuffer();
-		var sb = new StringBuilder();
-		sb.append("%s Packet Opcode %d:".formatted(direction, opcode));
+		System.out.print(String.format("%s Packet Opcode %d:", direction, opcode));
 		for (int i=0; i < length; i++) {
-			sb.append(" %d".formatted(Byte.toUnsignedInt(buffer.readByte())));
+			System.out.print(String.format(" %d", Byte.toUnsignedInt(buffer.readByte())));
 		}
-		LOGGER.debug(sb.toString());
+		System.out.println();
 		buffer.resetReaderIndex();
 	}
 	public static void printBuffer(ByteBuf buffer, String direction) {
-		if (!LOGGER.isDebugEnabled()) return;
 		ByteBuf bufferDup = buffer.duplicate();
 		bufferDup.resetReaderIndex();
 		int length = bufferDup.readableBytes();
-		var sb = new StringBuilder();
-		sb.append("%s Packet:".formatted(direction));
+		System.out.print(String.format("%s Packet:", direction));
 		for (int i=0; i < length; i++) {
-			sb.append(" %d".formatted(Byte.toUnsignedInt(bufferDup.readByte())));
+			System.out.print(String.format(" %d", Byte.toUnsignedInt(bufferDup.readByte())));
 		}
-		LOGGER.debug(sb.toString());
+		System.out.println();
 	}
 }

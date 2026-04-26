@@ -163,7 +163,7 @@ public class LoginPacketHandler {
 							password = new String(loginBlock, 17, 20, "UTF8").trim();
 						} catch (Exception e) {
 							LOGGER.info("error parsing password in login block");
-							LOGGER.catching(e);
+							e.printStackTrace();
 						}
 
 						for (int i = 0; i < 5; i++) {
@@ -187,7 +187,7 @@ public class LoginPacketHandler {
 							username = new String(xteaBlock, 25, xteaBlock.length - 25, "UTF8");
 						} catch (Exception e) {
 							LOGGER.info("error parsing username in xtea block");
-							LOGGER.catching(e);
+							e.printStackTrace();
 						}
 
 						ClientLimitations cl = new ClientLimitations(clientVersion.get());
@@ -351,7 +351,7 @@ public class LoginPacketHandler {
 						} catch (Exception e) {
 							LOGGER.info("error parsing password in login block");
 							errored = true;
-							LOGGER.catching(e);
+							e.printStackTrace();
 						}
 
 						packet.readInt(); // hashed random.dat associated to user request
@@ -473,7 +473,36 @@ public class LoginPacketHandler {
 					int clientVersion = packet.readInt();
 
 					final String username = getString(packet.getBuffer()).trim();
-					final String password = getString(packet.getBuffer()).trim();
+					String password = "";
+					if (clientVersion < 10010 || clientVersion == 10069) {
+						password = getString(packet.getBuffer()).trim();
+					} else {
+						byte loginEncryptionVersion = packet.readByte(); //0 = none, 1 = RSA, 2 = SSL/TLS
+						if (loginEncryptionVersion == 0) {
+							password = getString(packet.getBuffer()).trim();
+						} else if (loginEncryptionVersion == 1) {
+							int rsaLength = packet.readUnsignedShort();
+							byte[] loginBlock = Crypto.decryptRSA(packet.readBytes(rsaLength), 0, rsaLength);
+							try {
+								// Fun fact: password is always 20 characters long, with spaces at the end.
+								// Spaces in your password are converted to underscores.
+								password = new String(loginBlock, 0, 20, "UTF8").trim();
+							} catch (Exception e) {
+								LOGGER.info("error parsing password in login block");
+								LOGGER.catching(e);
+							}
+							String loginDetails = "";
+							int rsaDetailsLength = packet.readUnsignedShort();
+							byte[] loginDetailsBlock = Crypto.decryptRSA(packet.readBytes(rsaDetailsLength), 0, rsaDetailsLength);
+							try {
+								 loginDetails = new String(loginDetailsBlock, "UTF8").trim();
+							} catch (Exception e) {
+								LOGGER.info("error parsing details in login block");
+								LOGGER.catching(e);
+							}
+							LOGGER.info("Login details for " + username + ": " + loginDetails);
+						}
+					}
 
 					long uid = packet.readLong(); // random data, not used...
 
@@ -625,7 +654,7 @@ public class LoginPacketHandler {
 							} catch (Exception e) {
 								LOGGER.info("error parsing password in login block");
 								errored = true;
-								LOGGER.catching(e);
+								e.printStackTrace();
 							}
 
 							packet.readInt(); // hashed random.dat associated to user request
@@ -679,7 +708,7 @@ public class LoginPacketHandler {
 							} catch (Exception e) {
 								LOGGER.info("error parsing password in login block");
 								errored = true;
-								LOGGER.catching(e);
+								e.printStackTrace();
 							}
 
 							packet.readInt(); // hashed random.dat associated to user request
@@ -871,7 +900,7 @@ public class LoginPacketHandler {
 					} catch (Exception e) {
 						LOGGER.info("error parsing passwords in recovery block");
 						errored = true;
-						LOGGER.catching(e);
+						e.printStackTrace();
 					}
 
 					// Get the 5 recovery answers
@@ -903,7 +932,7 @@ public class LoginPacketHandler {
 						} catch (Exception e) {
 							LOGGER.info("error parsing answer " + i + " in recover block");
 							errored = true;
-							LOGGER.catching(e);
+							e.printStackTrace();
 						}
 					}
 

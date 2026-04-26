@@ -4,8 +4,8 @@ import java.util.ArrayList;
 
 public class Achievement {
 
-	private ArrayList<AchievementTask> tasks = new ArrayList<>();
-	private ArrayList<AchievementReward> rewards = new ArrayList<>();
+	private ArrayList<AchievementTask> tasks = new ArrayList<AchievementTask>();
+	private ArrayList<AchievementReward> rewards = new ArrayList<AchievementReward>();
 	private int id;
 	private String name;
 	private String title;

@@ -19,13 +19,9 @@ import com.openrsc.server.util.rsc.DataConversions;
 import com.openrsc.server.util.rsc.Formulae;
 import com.openrsc.server.util.rsc.MessageType;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.util.Optional;
 
 public class PlayerDuelHandler implements PayloadProcessor<PlayerDuelStruct, OpcodeIn> {
-	private static final Logger LOGGER = LogManager.getLogger();
 
 	private boolean busy(Player player) {
 		return player.inCombat() || player.isBusy() || player.isRanging() || player.accessingBank() || player.getTrade().isTradeActive();
@@ -455,7 +451,7 @@ public class PlayerDuelHandler implements PayloadProcessor<PlayerDuelStruct, Opc
 				ActionSender.sendDuelSettingUpdate(affectedPlayer);
 				break;
 			default:
-				LOGGER.warn("Somehow PlayerDuelHandler is mismanaged.");
+				System.out.println("Somehow PlayerDuelHandler is mismanaged.");
 				break;
 		}
 	}

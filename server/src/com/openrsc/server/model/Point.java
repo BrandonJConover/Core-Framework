@@ -7,19 +7,20 @@ import com.openrsc.server.model.world.World;
 import com.openrsc.server.util.rsc.DataConversions;
 import com.openrsc.server.util.rsc.Formulae;
 
-import java.util.List;
+import java.util.ArrayList;
 
 public class Point {
 
-	// Modernized to use immutable List.of() (Java 9+)
-	private static final List<WildernessLocation> wildernessLocations = List.of(
+	private static ArrayList<WildernessLocation> wildernessLocations = new ArrayList<WildernessLocation>();
+
+	static {
 		/* Edgeville dungeon wilderness, always members wild */
-		new WildernessLocation(WildState.MEMBERS_WILD, 195, 3206, 234, 3258),
+		wildernessLocations.add(new WildernessLocation(WildState.MEMBERS_WILD, 195, 3206, 234, 3258));
 		/* Red Dragons, always P2P */
-		new WildernessLocation(WildState.MEMBERS_WILD, 129, 180, 163, 219),
+		wildernessLocations.add(new WildernessLocation(WildState.MEMBERS_WILD, 129, 180, 163, 219));
 		/* Underground Lava maze, always P2P */
-		new WildernessLocation(WildState.MEMBERS_WILD, 243, 2988, 283, 3020)
-	);
+		wildernessLocations.add(new WildernessLocation(WildState.MEMBERS_WILD, 243, 2988, 283, 3020));
+	}
 
 	protected short x, y;
 
@@ -385,18 +386,17 @@ public class Point {
 			return true;
 		}
 
-		// Modernized to use instanceof pattern matching (Java 16+)
-		if (!(o instanceof Point point)) {
+		if (!(o instanceof Point) || o == null) {
 			return false;
 		}
 
+		Point point = (Point) o;
 		return x == point.x && y == point.y;
 	}
 
 	@Override
 	public String toString() {
-		// Modernized to use String formatting
-		return "(%d, %d)".formatted(x, y);
+		return "(" + x + ", " + y + ")";
 	}
 
 	public boolean isWithin1Tile(Point o2) {
@@ -629,9 +629,9 @@ public class Point {
 		if (offsetX == 24 && offsetY == 24) {
 			// According to Rab, the spot that a new player spawns at is where /rtele 05050 went to
 			// It is the center of the chunk.
-			return "%d%02d%02d".formatted(height, sectorX, sectorY);
+			return String.format("%d%02d%02d", height, sectorX, sectorY);
 		}
-		return "%d%02d%02d %02d%02d".formatted(height, sectorX, sectorY, offsetX, offsetY);
+		return String.format("%d%02d%02d %02d%02d", height, sectorX, sectorY, offsetX, offsetY);
 	}
 
 	public static final int UNABLE_TO_CONVERT = -10000;

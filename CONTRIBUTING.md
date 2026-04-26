@@ -13,13 +13,14 @@ today! Here are the guidelines we'd like you to follow:
 ## <a name="submit-pr"></a> Merge Request Submission Guidelines
 Before you submit your merge request consider the following guidelines:
 
-* Search [GitLab](https://orsc.dev/open-rsc/Game/merge_requests) for an open or closed Merge Request
+* Search [GitLab](https://gitlab.com/openrsc/openrsc/merge_requests) for an open or closed Merge Request
   that relates to your submission. You don't want to duplicate effort.
+* Create a [fork](https://gitlab.com/openrsc/openrsc/-/forks/new) of this repository.
 * Create the [development environment](#install)
 * Make your changes in a new git branch:
 
     ```shell
-    git checkout -b my-fix-branch master
+    git checkout -b my-fix-branch develop
     ```
 
 * Create your patch commit.
@@ -48,7 +49,7 @@ Before you submit your merge request consider the following guidelines:
     You can also amend the initial commits and force push them to the branch.
 
     ```shell
-    git rebase master -i
+    git rebase develop -i
     git push origin my-fix-branch -f
     ```
 
@@ -66,10 +67,10 @@ from the main (upstream) repository:
     git push origin --delete my-fix-branch
     ```
 
-* Check out the master branch:
+* Check out the develop branch:
 
     ```shell
-    git checkout master -f
+    git checkout develop -f
     ```
 
 * Delete the local branch:
@@ -78,10 +79,10 @@ from the main (upstream) repository:
     git branch -D my-fix-branch
     ```
 
-* Update your master with the latest upstream version:
+* Update your develop with the latest upstream version:
 
     ```shell
-    git pull --ff upstream master
+    git pull --ff upstream develop
     ```
 
 ## <a name="software"></a> Suggested Developer Software

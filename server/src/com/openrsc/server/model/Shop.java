@@ -17,8 +17,8 @@ public final class Shop {
 	private final boolean general;
 	private final int respawnRate, buyModifier, sellModifier, priceModifier;
 	private final Item[] items;
-	private final ArrayList<Item> shopItems = new ArrayList<>();
-	private final ArrayList<Player> players = new ArrayList<>();
+	private final ArrayList<Item> shopItems = new ArrayList<Item>();
+	private final ArrayList<Player> players = new ArrayList<Player>();
 	public String area = "-null-";
 	public int[] ownerIDs = null;
 
@@ -183,20 +183,25 @@ public final class Shop {
 		desiredPrice = effectivePrice = 0;
 
 		// obtain desired and effective prices;
-		switch (combinedFlag) {
-			case 3 -> // world and player use retro price
+		switch(combinedFlag) {
+			case 3:
+				// world and player use retro price
 				effectivePrice = desiredPrice = calcItemBuyPrice(itemID, defaultPrice, totalBought, true);
-			case 0 -> // world and player use modern price
+				break;
+			case 0:
+				// world and player use modern price
 				effectivePrice = desiredPrice = calcItemBuyPrice(itemID, defaultPrice, totalBought, false);
-			case 2 -> { // world uses retro price, player does not
+				break;
+			case 2:
+				// world uses retro price, player does not
 				effectivePrice = calcItemBuyPrice(itemID, defaultPrice, totalBought, true);
 				desiredPrice = calcItemBuyPrice(itemID, defaultPrice, totalBought, false);
-			}
-			case 1 -> { // world uses modern price, player does not
+				break;
+			case 1:
+				// world uses modern price, player does not
 				effectivePrice = calcItemBuyPrice(itemID, defaultPrice, totalBought, false);
 				desiredPrice = calcItemBuyPrice(itemID, defaultPrice, totalBought, true);
-			}
-			default -> { }
+				break;
 		}
 		if (effectivePrice != desiredPrice) {
 			throw new PriceMismatchException(desiredPrice, effectivePrice, "A difference in shop prices encountered");
@@ -227,20 +232,25 @@ public final class Shop {
 		desiredPrice = effectivePrice = 0;
 
 		// obtain desired and effective prices;
-		switch (combinedFlag) {
-			case 3 -> // world and player use retro price
+		switch(combinedFlag) {
+			case 3:
+				// world and player use retro price
 				effectivePrice = desiredPrice = calcItemSellPrice(itemID, defaultPrice, totalRemoved, true);
-			case 0 -> // world and player use modern price
+				break;
+			case 0:
+				// world and player use modern price
 				effectivePrice = desiredPrice = calcItemSellPrice(itemID, defaultPrice, totalRemoved, false);
-			case 2 -> { // world uses retro price, player does not
+				break;
+			case 2:
+				// world uses retro price, player does not
 				effectivePrice = calcItemSellPrice(itemID, defaultPrice, totalRemoved, true);
 				desiredPrice = calcItemSellPrice(itemID, defaultPrice, totalRemoved, false);
-			}
-			case 1 -> { // world uses modern price, player does not
+				break;
+			case 1:
+				// world uses modern price, player does not
 				effectivePrice = calcItemSellPrice(itemID, defaultPrice, totalRemoved, false);
 				desiredPrice = calcItemSellPrice(itemID, defaultPrice, totalRemoved, true);
-			}
-			default -> { }
+				break;
 		}
 		if (effectivePrice != desiredPrice) {
 			throw new PriceMismatchException(desiredPrice, effectivePrice, "A difference in shop prices encountered");

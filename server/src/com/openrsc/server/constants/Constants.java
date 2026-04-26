@@ -142,7 +142,7 @@ public final class Constants {
 		{11, 2, 9, 7, 1, 6, 10, 0, 5, 8, 4, 3}
 	};
 
-	public static final Map<Integer, String> reportReasons = new HashMap<>() {{
+	public static final Map<Integer, String> reportReasons = new HashMap<Integer, String>() {{
 		// mudclient 205+ reasons
 		put(1, "Buying or selling an account");
 		put(2, "Encouraging rule-breaking");
@@ -185,7 +185,7 @@ public final class Constants {
 		put (8 + 64, "Other");
 	}};
 
-	public static final Map<Integer, String> reportDiscordColours = new HashMap<>() {{
+	public static final Map<Integer, String> reportDiscordColours = new HashMap<Integer, String>() {{
 		// mudclient 205+ reasons
 		put(1, "5069823"); // blue "Buying or selling an account"
 		put(2, "16753433"); // yellow "Encouraging rule-breaking"
@@ -228,7 +228,7 @@ public final class Constants {
 		put (8 + 64, "0"); // black "Other"
 	}};
 
-	public static final Map<Spells, Integer> spellMap = new HashMap<>() {{
+	public static final Map<Spells, Integer> spellMap = new HashMap<Spells, Integer>() {{
 		put(Spells.WIND_STRIKE, 0);
 		put(Spells.CONFUSE, 1);
 		put(Spells.WATER_STRIKE, 2);

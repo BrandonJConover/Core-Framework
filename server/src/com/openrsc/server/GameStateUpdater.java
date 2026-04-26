@@ -209,15 +209,11 @@ public final class GameStateUpdater {
 			for (final Iterator<Npc> it$ = playerToUpdate.getLocalNpcs().iterator(); it$.hasNext(); ) {
 				Npc localNpc = it$.next();
 
-				if (playerToUpdate.getConfig().WANT_INSTANCED_NPCS && !playerToUpdate.isAdmin()) {
-					if (playerToUpdate.getConfig().WANT_COMBAT_ODYSSEY
-						&& localNpc.getID() == NpcId.BIGGUM_FLODROT.id()
-						&& !playerToUpdate.canSeeBiggum()) {
-						it$.remove(); // removes Biggum from player's localNpcs list (can happen if player restarts The Odyssey)
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(UPDATE_REQUIRED, 1));
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(NOT_MOVING, 1));
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(REMOVE_NPC, 2));
-					}
+				if (localNpc.isInvisibleTo(playerToUpdate)) {
+					it$.remove();
+					mobsUpdate.add(new AbstractMap.SimpleEntry<>(UPDATE_REQUIRED, 1));
+					mobsUpdate.add(new AbstractMap.SimpleEntry<>(NOT_MOVING, 1));
+					mobsUpdate.add(new AbstractMap.SimpleEntry<>(REMOVE_NPC, 2));
 				}
 
 				if (!localNpc.withinAuthenticRangeAdditionally(playerToUpdate) || !playerToUpdate.withinRange(localNpc) || // remove because they are out of range
@@ -246,13 +242,10 @@ public final class GameStateUpdater {
 			}
 
 			for (final Npc newNPC : playerToUpdate.getViewArea().getNpcsInView()) {
-				if (playerToUpdate.getConfig().WANT_INSTANCED_NPCS && !playerToUpdate.isAdmin()) {
-					if (playerToUpdate.getConfig().WANT_COMBAT_ODYSSEY
-						&& newNPC.getID() == NpcId.BIGGUM_FLODROT.id()
-						&& !playerToUpdate.canSeeBiggum()) {
-						continue;
-					}
+				if (newNPC.isInvisibleTo(playerToUpdate)) {
+					continue;
 				}
+
 				if (newNPC.getID() == NpcId.NED_BOAT.id() && !playerToUpdate.getCache().hasKey("ned_hired")) {
 					// TODO: probably this is incorrect & should be removed.
 					// There are authentically 4 versions of the Lady Lumbridge interior, to accommodate Ned being present or not & ship being crashed or not.
@@ -1303,42 +1296,9 @@ public final class GameStateUpdater {
 			if (player.getWalkToAction() != null) {
 				if (player.getWalkToAction().shouldExecute()) {
 					player.getWalkToAction().execute();
-				} else if (player.getWalkToAction().isRetryEnabled()) {
-					// Action not ready to execute - handle retry logic
-					handleActionRetry(player);
 				}
 			}
 		});
-	}
-
-	/**
-	 * Handles the retry logic for walk-to actions that fail to execute.
-	 * If the action has exceeded its retry limit, it will be cleared and the player notified.
-	 *
-	 * @param player The player whose action is being retried
-	 */
-	private void handleActionRetry(final Player player) {
-		final var action = player.getWalkToAction();
-		if (action == null || action.isExecuted()) {
-			return;
-		}
-
-		final long currentTick = getServer().getCurrentTick();
-		final boolean shouldContinue = action.onAttemptFailed(currentTick);
-
-		if (!shouldContinue) {
-			// Max retries exceeded - notify player and clear the action
-			final String failureMessage = action.getFailureMessage();
-			if (failureMessage != null && !failureMessage.isEmpty()) {
-				player.message(failureMessage);
-			}
-			player.setWalkToAction(null);
-
-			if (getServer().getConfig().DEBUG) {
-				LOGGER.info("Action retry limit exceeded for player {} after {} attempts",
-					player.getUsername(), action.getRetryAttempts());
-			}
-		}
 	}
 
 	public final long processNpcs() {

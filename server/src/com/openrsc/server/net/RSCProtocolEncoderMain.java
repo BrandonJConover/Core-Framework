@@ -5,11 +5,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.AttributeKey;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 public final class RSCProtocolEncoderMain {
-	private static final Logger LOGGER = LogManager.getLogger();
 	public static final AttributeKey<ConnectionAttachment> attachment = AttributeKey.valueOf("conn-attachment");
 
 	private boolean isInauthenticPacket(int opcode) {
@@ -81,8 +78,8 @@ public final class RSCProtocolEncoderMain {
 							buffer.writeByte(message.getBuffer().slice(bufferLen - 1, 1).readByte());
 						} catch (IndexOutOfBoundsException e) {
 							// This should probably never happen, but "Just In Case" it is good to handle it b/c otherwise it fails silently
-							LOGGER.warn("Index out of bounds on sending last byte of opcode {}", message.getID());
-							LOGGER.debug(e.toString());
+							System.out.println(String.format("Warning: index out of bounds on sending last byte of opcode %d", message.getID()));
+							System.out.println(e.toString());
 							if (message.getBuffer().hasArray()) {
 								byte[] bArr = message.getBuffer().array();
 								buffer.writeByte(bArr[bArr.length - 1]);
@@ -124,8 +121,8 @@ public final class RSCProtocolEncoderMain {
 							buffer.writeByte(message.getBuffer().slice(bufferLen - 1, 1).readByte());
 						} catch (IndexOutOfBoundsException e) {
 							// This should probably never happen, but "Just In Case" it is good to handle it b/c otherwise it fails silently
-							LOGGER.warn("Index out of bounds on sending last byte of opcode {}", message.getID());
-							LOGGER.debug(e.toString());
+							System.out.println(String.format("Warning: index out of bounds on sending last byte of opcode %d", message.getID()));
+							System.out.println(e.toString());
 							if (message.getBuffer().hasArray()) {
 								byte[] bArr = message.getBuffer().array();
 								buffer.writeByte(bArr[bArr.length - 1]);

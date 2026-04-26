@@ -54,35 +54,35 @@ public class ActionSender {
 	 * Get respective generator
 	 * */
 	public static PayloadGenerator<OpcodeOut> getGenerator(Player player) {
-		// Using pattern matching with if-else chain since client version checks
-		// are method-based predicates rather than discrete values
+		PayloadGenerator<OpcodeOut> generator;
 		if (player.isUsing38CompatibleClient() || player.isUsing39CompatibleClient()) {
-			return new Payload38Generator();
+			generator = new Payload38Generator();
 		} else if (player.isUsing69CompatibleClient()) {
-			return new Payload69Generator();
+			generator = new Payload69Generator();
 		} else if (player.isUsing233CompatibleClient()) {
-			return new Payload235Generator();
+			generator = new Payload235Generator();
 		} else if (player.isUsing203CompatibleClient()) {
-			return new Payload203Generator();
+			generator = new Payload203Generator();
 		} else if (player.isUsing202CompatibleClient()) {
-			return new Payload202Generator();
+			generator = new Payload202Generator();
 		} else if (player.isUsing201CompatibleClient()) {
-			return new Payload201Generator();
+			generator = new Payload201Generator();
 		} else if (player.isUsing199CompatibleClient()) {
-			return new Payload199Generator();
+			generator = new Payload199Generator();
 		} else if (player.isUsing198CompatibleClient()) {
-			return new Payload198Generator();
+			generator = new Payload198Generator();
 		} else if (player.isUsing196CompatibleClient()) {
-			return new Payload196Generator();
+			generator = new Payload196Generator();
 		} else if (player.isUsing177CompatibleClient()) {
-			return new Payload177Generator();
+			generator = new Payload177Generator();
 		} else if (player.isUsing140CompatibleClient()) {
-			return new Payload140Generator();
+			generator = new Payload140Generator();
 		} else if (player.isUsing115CompatibleClient()) {
-			return new Payload115Generator();
+			generator = new Payload115Generator();
 		} else {
-			return new PayloadCustomGenerator();
+			generator = new PayloadCustomGenerator();
 		}
+		return generator;
 	}
 
 	/**
@@ -98,9 +98,15 @@ public class ActionSender {
 				player.write(p);
 		} catch (GameNetworkException gne) {
 			// do nothing, the player just doesn't get the packet (possibly logged out) & script this is called from can continue
-			var username = player != null ? player.getUsername() : "<null>";
-			var clientVersion = player != null ? "%d".formatted(player.getClientVersion()) : "<unknown>";
-			LOGGER.warn("GameNetworkException for player %s with client version %s on opcode %s".formatted(username, clientVersion, opcode.name()));
+			String username, clientVersion;
+			if (player != null) {
+				username = player.getUsername();
+				clientVersion = String.format("%d", player.getClientVersion());
+			} else {
+				username = "<null>";
+				clientVersion = "<unknown>";
+			}
+			LOGGER.warn("GameNetworkException for player " + username + " with client version " + clientVersion + " on opcode " + opcode.name());
 		}
 	}
 
@@ -271,7 +277,7 @@ public class ActionSender {
 				if (item.getNoted() && !player.isUsingCustomClient()) {
 					String itemName = item.getDef(player.getWorld()).getName();
 					player.playerServerMessage(MessageType.QUEST,
-						"@ran@Please Confirm: @whi@Other player is staking @gre@%d @yel@%s".formatted(item.getAmount(), itemName));
+						String.format("@ran@Please Confirm: @whi@Other player is staking @gre@%d @yel@%s", item.getAmount(), itemName));
 				}
 				if (struct.opponentNoted != null) {
 					struct.opponentNoted[i] = item.getNoted() ? 1 : 0;
@@ -357,7 +363,7 @@ public class ActionSender {
 				if (item.getNoted() && !player.isUsingCustomClient()) {
 					String itemName = item.getDef(player.getWorld()).getName();
 					player.playerServerMessage(MessageType.QUEST,
-						"@whi@Other player is staking @gre@%d @yel@%s".formatted(item.getAmount(), itemName));
+						String.format("@whi@Other player is staking @gre@%d @yel@%s", item.getAmount(), itemName));
 				}
 				if (struct.noted != null) {
 					struct.noted[i] = item.getNoted() ? 1 : 0;
@@ -764,6 +770,8 @@ public class ActionSender {
 			LOGGER.info(server.getConfig().DISABLE_MINIMAP_ROTATION + " 84");
 			LOGGER.info(server.getConfig().ALLOW_BEARDED_LADIES + " 85");
 			LOGGER.info(server.getConfig().PRIDE_MONTH + " 86");
+			LOGGER.info(Crypto.getPublicExponent() + " 87");
+			LOGGER.info(Crypto.getPublicModulus() + " 88");
 		}
 		Packet p = prepareServerConfigs(server);
 		// ConnectionAttachment attachment = new ConnectionAttachment();
@@ -876,6 +884,11 @@ public class ActionSender {
 		configs.add((byte) (server.getConfig().DISABLE_MINIMAP_ROTATION ? 1 : 0)); // 84
 		configs.add((byte) (server.getConfig().ALLOW_BEARDED_LADIES ? 1 : 0)); // 85
 		configs.add((byte) (server.getConfig().PRIDE_MONTH ? 1 : 0)); // 86
+		// Convert RSA keys to hex format with even number of digits (as expected by mudclient)
+		String expHex = Crypto.getPublicExponent().toString(16);
+		configs.add(expHex.length() % 2 == 1 ? "0" + expHex : expHex); // 87
+		String modHex = Crypto.getPublicModulus().toString(16);
+		configs.add(modHex.length() % 2 == 1 ? "0" + modHex : modHex); // 88
 
 		struct.configs = configs;
 		struct.setOpcode(OpcodeOut.SEND_SERVER_CONFIGS);

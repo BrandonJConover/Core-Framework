@@ -1,0 +1,46 @@
+# nginx.conf.template — OpenRSC web client site config.
+# Replace ${DOMAIN} and ${RSC_C_DIR} before use, or use envsubst:
+#   envsubst '${DOMAIN} ${RSC_C_DIR}' < nginx.conf.template > /etc/nginx/sites-available/openrsc-web
+
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    # Required for WebAssembly SharedArrayBuffer (multi-threading).
+    # Without these, the WASM client fails with "SharedArrayBuffer is not defined".
+    add_header Cross-Origin-Opener-Policy   "same-origin" always;
+    add_header Cross-Origin-Embedder-Policy "require-corp" always;
+
+    root  ${RSC_C_DIR};
+    index mudclient.html;
+
+    # .wasm files must be served with the correct MIME type or Chrome will refuse them.
+    location ~* \.wasm$ {
+        default_type application/wasm;
+        add_header Cross-Origin-Opener-Policy   "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+    }
+
+    # Cache the large preloaded data file aggressively — it only changes on rebuild.
+    location ~* \.data$ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+        add_header Cross-Origin-Opener-Policy   "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

@@ -114,7 +114,7 @@ public class Crypto {
                 privateKeyFile.close();
             }
         } catch (Exception e) {
-            LOGGER.catching(e);
+            e.printStackTrace();
         }
     }
 
@@ -123,29 +123,32 @@ public class Crypto {
             publicKey = (RSAPublicKey)KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pemParser("client.pem")));
             privateKey = (RSAPrivateKey)KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(pemParser("server.pem")));
         } catch (Exception e) {
-            LOGGER.catching(e);
+            e.printStackTrace();
         }
     }
 
     private static byte[] pemParser(String filename) {
-        StringBuilder fileString = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+        String fileString = "";
+        try {
+
+            BufferedReader br = new BufferedReader(new FileReader(filename));
             String line;
             while ((line = br.readLine()) != null) {
-                fileString.append(line).append("\n");
+                fileString += line + "\n";
             }
+            br.close();
         } catch (Exception e) {
-            LOGGER.error("Unable to read {} while parsing PEM files.", filename);
+            LOGGER.error("Unable to read " + filename + " while parsing PEM files.");
             LOGGER.error("Server will be unable to run.");
         }
 
-        String result = fileString.toString().replace(
+        fileString = fileString.replace(
             "-----BEGIN PRIVATE KEY-----\n", "").replace(
                 "-----END PRIVATE KEY-----", "").replace(
                     "-----BEGIN PUBLIC KEY-----\n", "").replace(
             "-----END PUBLIC KEY-----", "");
 
-        return Base64.decodeBase64(result);
+        return Base64.decodeBase64(fileString);
 
     }
 
@@ -156,7 +159,7 @@ public class Crypto {
             sw.write(Base64.encodeBase64String(certBytes).replaceAll("(.{64})", "$1\n"));
             sw.write(String.format("\n-----END %s KEY-----\n", type));
         } catch (Exception e) {
-            LOGGER.catching(e);
+            e.printStackTrace();
         }
         return sw.toString();
     }

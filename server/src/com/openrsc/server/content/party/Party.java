@@ -92,7 +92,7 @@ public class Party {
 		}
 
 		PartyRank setRank = PartyRank.getRankFor(newRank);
-		if (member.getRank().getRankIndex() == newRank) {
+		if (member.getRank().rankIndex == newRank) {
 			return;
 		}
 

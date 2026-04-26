@@ -40,7 +40,8 @@ public class RangeEvent extends GameTickEvent {
 	}
 
 	public boolean equals(Object o) {
-		if (o instanceof RangeEvent e) {
+		if (o instanceof RangeEvent) {
+			RangeEvent e = (RangeEvent) o;
 			return e.belongsTo(getOwner());
 		}
 		return false;

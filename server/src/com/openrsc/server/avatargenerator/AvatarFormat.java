@@ -1,8 +1,5 @@
 package com.openrsc.server.avatargenerator;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
@@ -11,7 +8,6 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 public class AvatarFormat {
-	private static final Logger LOGGER = LogManager.getLogger();
 	/// An internal helper class
 	public final static class Sprite {
 		private int[] pixels;
@@ -189,7 +185,7 @@ public class AvatarFormat {
 						out.write(buffer, 0, noRead);
 					}
 				} finally {
-					try { out.close(); } catch (Exception e) { LOGGER.catching(e); }
+					try { out.close(); } catch (Exception e) {}
 				}
 				ByteBuffer input = ByteBuffer.wrap(out.toByteArray());
 
@@ -208,8 +204,8 @@ public class AvatarFormat {
 				//fIS.close();
 
 				return newWorkspace;
-			} catch (Exception e) {
-				LOGGER.catching(e);
+			} catch (Exception a) {
+				a.printStackTrace();
 				return null;
 			}
 		}
@@ -231,7 +227,7 @@ public class AvatarFormat {
 
 					in.close();
 				} finally {
-					try { out.close(); fis.close();} catch (Exception e) { LOGGER.catching(e); }
+					try { out.close(); fis.close();} catch (Exception e) {}
 				}
 
 				ByteBuffer input = ByteBuffer.wrap(out.toByteArray());
@@ -249,8 +245,8 @@ public class AvatarFormat {
 
 				return newEntry;
 
-			} catch (IOException e) {
-				LOGGER.catching(e);
+			} catch (IOException a) {
+				a.printStackTrace();
 				return null;
 			}
 		}
@@ -273,7 +269,7 @@ public class AvatarFormat {
 					subspace.getEntryList().add(newEntry);
 				}
 
-			} catch (Exception e) { LOGGER.catching(e); }
+			} catch (Exception a) { a.printStackTrace(); }
 		}
 
 		private void readEntry(ByteBuffer stream, Entry entry) {
@@ -304,7 +300,7 @@ public class AvatarFormat {
 
 					entry.getFrames()[i] = frame;
 				}
-			} catch (Exception e) { LOGGER.catching(e); }
+			} catch (Exception a) { a.printStackTrace(); }
 		}
 
 		private String readString(ByteBuffer stream) {
@@ -313,8 +309,8 @@ public class AvatarFormat {
 				int character;
 				while ((character = stream.get()) != 0)
 					stringBuilder.append((char)(character & 0xFF));
-			} catch (Exception e) {
-				LOGGER.catching(e);
+			} catch (Exception a) {
+				a.printStackTrace();
 			}
 
 			return stringBuilder.toString();

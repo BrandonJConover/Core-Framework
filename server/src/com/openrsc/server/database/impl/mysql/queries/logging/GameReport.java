@@ -39,7 +39,8 @@ public final class GameReport extends Query {
 		Iterator<Snapshot> i = reporter.getWorld().getSnapshots().descendingIterator();
 		while (i.hasNext()) {
 			Snapshot s = i.next();
-			if (s instanceof Chatlog cl) {
+			if (s instanceof Chatlog) {
+				Chatlog cl = (Chatlog) s;
 				if ((cl.getOwner().contains(reported) || cl.getOwner().equalsIgnoreCase(reported))) {
 					if (System.currentTimeMillis() - s.getTimestamp() < 60000) {
 						chatlog.append("[").append(DataConversions.timeFormat(cl.getTimestamp())).append("] ").append(cl.getOwner()).append(": ").append(cl.getMessage()).append("\n");

@@ -17,14 +17,14 @@ public class Social {
 	/**
 	 * Map of players on players friend list
 	 */
-	private TreeMap<Long, Integer> friendList = new TreeMap<>();
-	private TreeMap<Long, String> friendListNames = new TreeMap<>();
-	private TreeMap<Long, String> friendListFormerNames = new TreeMap<>();
+	private TreeMap<Long, Integer> friendList = new TreeMap<Long, Integer>();
+	private TreeMap<Long, String> friendListNames = new TreeMap<Long, String>();
+	private TreeMap<Long, String> friendListFormerNames = new TreeMap<Long, String>();
 	/**
 	 * List of usernameHash's of players on players ignore list
 	 */
-	private ArrayList<Long> ignoreList = new ArrayList<>();
-	private TreeMap<Long, Long> ignoreListFormerNames = new TreeMap<>();
+	private ArrayList<Long> ignoreList = new ArrayList<Long>();
+	private TreeMap<Long, Long> ignoreListFormerNames = new TreeMap<Long, Long>();
 
 	public Social(Player player) {
 		this.player = player;

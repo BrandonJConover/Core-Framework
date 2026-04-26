@@ -1,592 +1,596 @@
+// Port of Client_Base/src/orsc/graphics/two/GraphicsController.java
+// Rasterization subset only — no font/menu/panel drawing.
+
 import Foundation
 
-// MARK: - RSSprite
+// MARK: - Sprite
 
-/// Represents a sprite's pixel data and layout metadata, mirroring the Java `Sprite` class.
-struct RSSprite {
-    var pixels: [Int32]     // ARGB pixel data
-    var width: Int
-    var height: Int
-    var xShift: Int = 0
-    var yShift: Int = 0
-    var boundWidth: Int = 0
-    var boundHeight: Int = 0
-    var requiresShift: Bool = false
-    // Color manipulation fields (named to match Java Sprite.getSomething1/2)
-    var something1: Int = 0
-    var something2: Int = 0
+struct Sprite {
+    var pixels: [Int32]
+    var width: Int32
+    var height: Int32
+    var cropX: Int32   // analogous to Java xShift / getSomething1
+    var cropY: Int32   // analogous to Java yShift / getSomething2
+
+    init(pixels: [Int32] = [], width: Int32 = 0, height: Int32 = 0,
+         cropX: Int32 = 0, cropY: Int32 = 0) {
+        self.pixels = pixels
+        self.width  = width
+        self.height = height
+        self.cropX  = cropX
+        self.cropY  = cropY
+    }
 }
 
 // MARK: - GraphicsController
 
-/// Software rasterizer ported from the Java desktop client's `GraphicsController`.
-/// Provides rendering primitives (lines, boxes, sprites) that write into a CPU-side
-/// ARGB framebuffer. The framebuffer is later uploaded to a Metal texture for display.
 final class GraphicsController {
 
-    // MARK: Framebuffer
+    // MARK: Constants
 
-    /// Raw pixel data in ARGB format (0xAARRGGBB). Index = y * width2 + x.
-    var pixelData: [UInt32]
-    let width2: Int
-    let height2: Int
+    static let gameWidth:  Int32 = 512
+    static let gameHeight: Int32 = 334
 
-    // MARK: Clip rectangle
+    // MARK: State fields
 
-    var clipTop: Int = 0
-    var clipLeft: Int = 0
-    var clipRight: Int
-    var clipBottom: Int
+    /// The framebuffer — packed 0x00RRGGBB (black = 0)
+    var pixelData: [Int32]
 
-    // MARK: Sprite storage
+    /// Canvas dimensions
+    var width2:  Int32
+    var height2: Int32
 
-    var sprites: [RSSprite?]
-    var spriteCount: Int
+    /// Scissor / clip rectangle
+    var clipLeft:   Int32
+    var clipTop:    Int32
+    var clipRight:  Int32
+    var clipBottom: Int32
 
-    // MARK: Interlace flag (kept for parity; always false on iOS)
+    /// Sprite atlas (entries may be nil / unloaded)
+    var sprites: [Sprite?]
 
+    /// Interlaced-render flag (mirrors Java `interlace`)
     var interlace: Bool = false
 
-    // MARK: - Init
+    // MARK: - Initialiser
 
-    init(width: Int, height: Int, spriteCount: Int) {
-        self.width2 = width
-        self.height2 = height
-        self.clipRight = width
-        self.clipBottom = height
-        self.pixelData = [UInt32](repeating: 0, count: width * height)
-        self.spriteCount = spriteCount
-        self.sprites = [RSSprite?](repeating: nil, count: spriteCount)
+    /// Mirrors `GraphicsController(int width, int height, int spriteCount)`
+    init(width: Int32, height: Int32, spriteCount: Int = 0) {
+        self.width2      = width
+        self.height2     = height
+        self.clipLeft    = 0
+        self.clipTop     = 0
+        self.clipRight   = width
+        self.clipBottom  = height
+        self.pixelData   = [Int32](repeating: 0, count: Int(width * height))
+        self.sprites     = [Sprite?](repeating: nil, count: spriteCount)
     }
 
     // MARK: - Clip helpers
 
-    /// Resets the clip rectangle to the full framebuffer. Matches Java `clearClip`.
+    /// Resets clip rect to the full canvas.
     func clearClip() {
-        clipTop = 0
-        clipLeft = 0
-        clipRight = width2
+        // For a class, properties are reference-mutable without 'mutating'
+        // but the compiler sees them as let captures inside a non-mutating func;
+        // use an explicit cast via the stored properties directly.
+        clipLeft   = 0
+        clipTop    = 0
+        clipRight  = width2
         clipBottom = height2
     }
 
-    /// Sets a custom clip rectangle.
-    func setClip(top: Int, left: Int, right: Int, bottom: Int) {
-        clipTop = top
-        clipLeft = left
-        clipRight = right
-        clipBottom = bottom
+    /// Sets clip rect, clamped to canvas bounds.
+    func setClip(clipLeft: Int32, clipRight: Int32, clipBottom: Int32, clipTop: Int32) {
+        var cl = clipLeft;   if cl < 0          { cl = 0 }
+        var cr = clipRight;  if cr > width2      { cr = width2 }
+        var ct = clipTop;    if ct < 0           { ct = 0 }
+        var cb = clipBottom; if cb > height2     { cb = height2 }
+        self.clipLeft   = cl
+        self.clipRight  = cr
+        self.clipTop    = ct
+        self.clipBottom = cb
     }
 
-    // MARK: - 1. blackScreen
+    // MARK: - blackScreen
 
-    /// Fills the entire framebuffer with opaque black (0xFF000000).
-    @inlinable
+    /// Fills the entire framebuffer with 0 (black).
+    /// Mirrors `blackScreen(boolean)` — always does the full fill (non-interlaced path).
     func blackScreen() {
-        let count = width2 * height2
+        let total = Int(height2 * width2)
         pixelData.withUnsafeMutableBufferPointer { buf in
-            for i in 0..<count {
-                buf[i] = 0xFF00_0000
+            for i in 0 ..< total {
+                buf[i] = 0
             }
         }
     }
 
-    // MARK: - 2. drawLineHoriz
+    // MARK: - drawLineHoriz
 
-    /// Draws a horizontal line at `y` from `x` spanning `width` pixels.
-    @inlinable
-    func drawLineHoriz(x: Int, y: Int, width: Int, color: UInt32) {
-        guard y >= clipTop, y < clipBottom else { return }
+    /// Draws a horizontal line.
+    /// Mirrors `drawLineHoriz(int x, int y, int width, int color)`.
+    func drawLineHoriz(x: Int32, y: Int32, width: Int32, rgb: Int32) {
+        guard clipTop <= y && y < clipBottom else { return }
 
-        var x = x
-        var width = width
+        var lx = x
+        var lw = width
 
-        if x < clipLeft {
-            width -= (clipLeft - x)
-            x = clipLeft
+        if clipLeft > lx {
+            lw -= clipLeft - lx
+            lx  = clipLeft
         }
-        if x + width > clipRight {
-            width = clipRight - x
+        if lx + lw > clipRight {
+            lw = clipRight - lx
         }
-        guard width > 0 else { return }
+        guard lw > 0 else { return }
 
-        let offset = x + width2 * y
+        let offset = Int(lx + width2 * y)
         pixelData.withUnsafeMutableBufferPointer { buf in
-            for i in 0..<width {
-                buf[offset + i] = color
+            for xi in 0 ..< Int(lw) {
+                buf[offset + xi] = rgb
             }
         }
     }
 
-    // MARK: - 3. drawLineVert
+    // MARK: - drawLineVert
 
-    /// Draws a vertical line at `x` from `y` spanning `height` pixels.
-    @inlinable
-    func drawLineVert(x: Int, y: Int, height: Int, color: UInt32) {
-        guard x >= clipLeft, x < clipRight else { return }
+    /// Draws a vertical line.
+    /// Mirrors `drawLineVert(int x, int y, int color, int height)`.
+    func drawLineVert(x: Int32, y: Int32, height: Int32, rgb: Int32) {
+        guard clipLeft <= x && x < clipRight else { return }
 
-        var y = y
-        var height = height
+        var ly = y
+        var lh = height
 
-        if y < clipTop {
-            height -= (clipTop - y)
-            y = clipTop
+        if ly < clipTop {
+            lh -= clipTop - ly
+            ly  = clipTop
         }
-        if y + height > clipBottom {
-            height = clipBottom - y
+        if ly + lh > clipBottom {
+            lh = clipBottom - ly
         }
-        guard height > 0 else { return }
+        guard lh > 0 else { return }
 
-        let offset = x + width2 * y
+        let pxOffset = Int(x + width2 * ly)
+        let stride   = Int(width2)
         pixelData.withUnsafeMutableBufferPointer { buf in
-            for i in 0..<height {
-                buf[offset + width2 * i] = color
+            for i in 0 ..< Int(lh) {
+                buf[pxOffset + stride * i] = rgb
             }
         }
     }
 
-    // MARK: - 4. drawBox (filled rectangle)
+    // MARK: - drawBox
 
-    /// Fills a rectangle with `color`. Matches Java `drawBox`.
-    @inlinable
-    func drawBox(x: Int, y: Int, width: Int, height: Int, color: UInt32) {
-        var x = x, y = y, w = width, h = height
+    /// Draws a filled (opaque) axis-aligned rectangle.
+    /// Mirrors `drawBox(int xr, int yr, int widthh, int height, int color)`.
+    func drawBox(x: Int32, y: Int32, width: Int32, height: Int32, rgb: Int32) {
+        var xr = x;   var yr = y
+        var w  = width; var h  = height
 
-        if x < clipLeft { w -= (clipLeft - x); x = clipLeft }
-        if y < clipTop  { h -= (clipTop  - y); y = clipTop  }
-        if y + h > clipBottom { h = clipBottom - y }
-        if x + w > clipRight  { w = clipRight  - x }
-        guard w > 0, h > 0 else { return }
+        if xr < clipLeft   { w  -= clipLeft - xr; xr = clipLeft }
+        if yr < clipTop    { h  -= clipTop  - yr; yr = clipTop  }
+        if yr + h > clipBottom { h = clipBottom - yr }
+        if xr + w > clipRight  { w = clipRight  - xr }
 
-        let lineSkip = width2 - w
-        var head = x + width2 * y
+        guard w > 0 && h > 0 else { return }
+
+        var lineSkip: Int32 = width2 - w
+        var yStep:    Int32 = 1
+
+        if interlace {
+            lineSkip += width2
+            if (yr & 1) != 0 { h -= 1; yr += 1 }
+            yStep = 2
+        }
+
+        var pxHead = Int(xr + width2 * yr)
+        let skip   = Int(lineSkip)
+        let cols   = Int(w)
 
         pixelData.withUnsafeMutableBufferPointer { buf in
-            for _ in 0..<h {
-                for _ in 0..<w {
-                    buf[head] = color
-                    head += 1
+            var yi: Int32 = -h
+            while yi < 0 {
+                for _ in 0 ..< cols {
+                    buf[pxHead] = rgb
+                    pxHead += 1
                 }
-                head += lineSkip
+                pxHead += skip
+                yi += yStep
             }
         }
     }
 
-    // MARK: - 5. drawBoxAlpha (alpha-blended filled rectangle)
+    // MARK: - drawBoxAlpha
 
-    /// Alpha-blended filled rectangle.  `alpha` is 0..256 (not 0..255).
-    /// Blend: `result_channel = existing_channel + ((color_channel - existing_channel) * alpha) / 256`
-    /// Ported from Java `drawBoxAlpha`.
-    @inlinable
-    func drawBoxAlpha(x: Int, y: Int, width: Int, height: Int, color: UInt32, alpha: Int) {
-        var x = x, y = y, w = width, h = height
+    /// Draws an alpha-blended filled rectangle.
+    /// Mirrors `drawBoxAlpha(int x, int y, int width, int height, int color, int alpha)`.
+    /// `alpha` is in [0, 256] where 256 = fully opaque.
+    func drawBoxAlpha(x: Int32, y: Int32, width: Int32, height: Int32, rgb: Int32, alpha: Int32) {
+        var lx = x;  var ly = y
+        var lw = width; var lh = height
 
-        if y < clipTop  { h -= (clipTop  - y); y = clipTop  }
-        if x < clipLeft { w -= (clipLeft - x); x = clipLeft }
-        if x + w > clipRight  { w = clipRight  - x }
-        if y + h > clipBottom { h = clipBottom - y }
-        guard w > 0, h > 0 else { return }
+        if ly < clipTop    { lh -= clipTop  - ly; ly = clipTop  }
+        if clipLeft > lx   { lw -= clipLeft - lx; lx = clipLeft }
+        if clipRight  < lx + lw { lw = clipRight  - lx }
+        if clipBottom < lh + ly { lh = clipBottom - ly }
 
-        let mixOld = 256 - alpha
-        let srcR = alpha * Int((color >> 16) & 0xFF)
-        let srcG = alpha * Int((color >>  8) & 0xFF)
-        let srcB = alpha * Int( color        & 0xFF)
+        guard lw > 0 && lh > 0 else { return }
 
-        let lineStride = width2 - w
-        var pxi = x + width2 * y
+        let mixOld: Int32 = 256 - alpha
+        // Pre-multiplied source components (mirrors Java)
+        let n3 = alpha * ((rgb >> 16) & 0xFF)       // red
+        let n2 = ((rgb & 0x0000FF00) >> 8) * alpha  // green
+        let n1 = alpha * (rgb & 0xFF)               // blue
+
+        var lineStride: Int32 = width2 - lw
+        var yStep: Int32 = 1
+
+        if interlace {
+            if (ly & 1) != 0 { lh -= 1; ly += 1 }
+            lineStride += width2
+            yStep = 2
+        }
+
+        var pxi = Int(lx + width2 * ly)
+        let stride = Int(lineStride)
+        let cols   = Int(lw)
 
         pixelData.withUnsafeMutableBufferPointer { buf in
-            for _ in 0..<h {
-                for _ in 0..<w {
-                    let existing = buf[pxi]
-                    let oR = mixOld * Int((existing >> 16) & 0xFF)
-                    let oG = mixOld * Int((existing >>  8) & 0xFF)
-                    let oB = mixOld * Int( existing        & 0xFF)
-                    let blended = UInt32((oR + srcR) >> 8) << 16
-                                | UInt32((oG + srcG) >> 8) <<  8
-                                | UInt32((oB + srcB) >> 8)
-                    buf[pxi] = blended
+            var yi: Int32 = 0
+            while yi < lh {
+                for _ in 0 ..< cols {
+                    let old = buf[pxi]
+                    let o1 = mixOld * (old & 0xFF)
+                    let o3 = mixOld * ((0x00FF0000 & old) >> 16)
+                    let o2 = mixOld * ((0x0000FF00 & old) >> 8)
+                    let result = ((o1 + n1) >> 8) | (((o2 + n2) >> 8) << 8) | (((n3 + o3) >> 8) << 16)
+                    buf[pxi] = result
                     pxi += 1
                 }
-                pxi += lineStride
+                pxi += stride
+                yi  += yStep
             }
         }
     }
 
-    // MARK: - 6. drawBoxBorder (rectangle outline)
+    // MARK: - plot_tran_scale (inner rasterizer)
 
-    /// Draws a 1-pixel rectangle outline.
-    @inlinable
-    func drawBoxBorder(x: Int, y: Int, width: Int, height: Int, color: UInt32) {
-        drawLineHoriz(x: x, y: y, width: width, color: color)
-        drawLineHoriz(x: x, y: y + height - 1, width: width, color: color)
-        drawLineVert(x: x, y: y, height: height, color: color)
-        drawLineVert(x: x + width - 1, y: y, height: height, color: color)
-    }
+    /// Scaled sprite blit with per-pixel alpha blending; black (0) is transparent.
+    /// Mirrors `plot_tran_scale(int heightStep, int srcStartY, int destWidth,
+    ///   byte dummy1, int scaleY, int spriteWidth, int scaleX, int height,
+    ///   int destHead, int[] src, int dummy2, int srcStartX,
+    ///   int destRowStride, int alpha, int[] dest)`.
+    ///
+    /// - Parameters:
+    ///   - heightStep:    destination-height divisor (1 or 2 for interlace)
+    ///   - srcStartY:     first source row << 16
+    ///   - destWidth:     destination column count
+    ///   - scaleY:        source rows per destination row << 16
+    ///   - spriteWidth:   source pixel data row stride
+    ///   - scaleX:        source columns per destination column << 16
+    ///   - height:        destination height * heightStep
+    ///   - destHead:      starting index into pixelData
+    ///   - src:           source pixel array
+    ///   - srcStartX:     first source column << 16
+    ///   - destRowStride: pixels to skip between output rows
+    ///   - alpha:         opacity [0-256]
+    func plot_tran_scale(heightStep: Int32, srcStartY: Int32, destWidth: Int32,
+                         scaleY: Int32, spriteWidth: Int32, scaleX: Int32,
+                         height: Int32, destHead: Int32,
+                         src: [Int32], srcStartX: Int32,
+                         destRowStride: Int32, alpha: Int32) {
+        let alphaInverse: Int32 = 256 - alpha
 
-    // MARK: - 7. drawEntity
+        var srcY      = srcStartY
+        var dstHead   = Int(destHead)
+        let rowStride = Int(destRowStride)
+        let srcW      = Int(spriteWidth)
 
-    /// Renders a billboard sprite from the sprite array, scaled to the given dimensions.
-    /// `perspective` and `var8` are kept for call-site parity but the current Java
-    /// implementation simply forwards to the scaled `drawSprite`.
-    func drawEntity(index: Int, x: Int, y: Int, width: Int, height: Int, perspective: Int = 0, var8: Int = 0) {
-        guard index >= 0, index < sprites.count, let sprite = sprites[index] else { return }
-        drawSpriteScaled(sprite: sprite, x: x, y: y, destWidth: width, destHeight: height)
-    }
+        pixelData.withUnsafeMutableBufferPointer { dstBuf in
+            src.withUnsafeBufferPointer { srcBuf in
+                var i: Int32 = -height
+                while i < 0 {
+                    let rowOffset = Int(srcY >> 16) * srcW
+                    srcY += scaleY
 
-    // MARK: - 8. spriteClipping (scaled sprite blit with transparency)
+                    var srcX = srcStartX
+                    var j: Int32 = -destWidth
+                    while j < 0 {
+                        let newColor = srcBuf[rowOffset + Int(srcX >> 16)]
+                        srcX += scaleX
+                        if newColor == 0 {
+                            dstHead += 1
+                        } else {
+                            let oldColor = dstBuf[dstHead]
+                            // Mirrors Java:
+                            // bitwiseAnd(bitwiseAnd(0xFF00,old)*alphaInv + bitwiseAnd(0xFF00,new)*alpha, 0xFF0000)
+                            // + bitwiseAnd(bitwiseAnd(new,0xFF00FF)*alpha + alphaInv*bitwiseAnd(0xFF00FF,old), -16711936) >> 8
+                            let greenBlend = (((oldColor & 0x0000FF00) &* alphaInverse) &+
+                                              ((newColor & 0x0000FF00) &* alpha)) & 0x00FF0000
+                            let rbBlend    = (((newColor & 0x00FF00FF) &* alpha) &+
+                                              (alphaInverse &* (oldColor & 0x00FF00FF))) & Int32(bitPattern: 0xFF00FF00)
+                            dstBuf[dstHead] = (greenBlend | rbBlend) >> 8
+                            dstHead += 1
+                        }
+                        j += 1
+                    }
 
-    /// Scaled sprite blit with clipping and color-key transparency (pixel == 0 is transparent).
-    /// Uses 16-bit fixed-point DDA for scaling, matching the Java `spriteClipping` method.
-    /// `alpha` controls optional alpha blending (0 = fully opaque blit, >0 = blended).
-    func spriteClipping(sprite: RSSprite, x: Int, y: Int, width destWidth: Int, height destHeight: Int,
-                        alpha: Int = 0) {
-        let spriteWidth  = sprite.width
-        let spriteHeight = sprite.height
-
-        var srcStartX: Int = 0
-        var srcStartY: Int = 0
-        var scaleX = (spriteWidth  << 16) / destWidth
-        var scaleY = (spriteHeight << 16) / destHeight
-        var x = x, y = y
-        var width  = destWidth
-        var height = destHeight
-
-        // Handle shifted sprites (sprites with sub-region offsets)
-        if sprite.requiresShift {
-            let s1 = sprite.something1
-            let s2 = sprite.something2
-            guard s1 != 0, s2 != 0 else { return }
-
-            scaleY = (s2 << 16) / destHeight
-            y += (s2 + destHeight * sprite.yShift - 1) / s2
-            x += (s1 + sprite.xShift * destWidth - 1) / s1
-            scaleX = (s1 << 16) / destWidth
-
-            if sprite.xShift * destWidth % s1 != 0 {
-                srcStartX = (s1 - sprite.xShift * destWidth % s1 << 16) / destWidth
+                    dstHead += rowStride
+                    i += heightStep
+                }
             }
-            if sprite.yShift * destHeight % s2 != 0 {
-                srcStartY = (s2 - sprite.yShift * destHeight % s2 << 16) / destHeight
-            }
-
-            width  = destWidth  * (sprite.width  - (srcStartX >> 16)) / s1
-            height = destHeight * (sprite.height - (srcStartY >> 16)) / s2
-        }
-
-        var destHead = y * width2 + x
-
-        // Top clipping
-        if y < clipTop {
-            let lost = clipTop - y
-            height -= lost
-            destHead += width2 * lost
-            srcStartY += scaleY * lost
-        }
-
-        var destRowStride = width2 - width
-
-        // Left clipping
-        if x < clipLeft {
-            let lost = clipLeft - x
-            srcStartX += lost * scaleX
-            destHead += lost
-            width -= lost
-            destRowStride += lost
-        }
-
-        // Bottom clipping
-        if y + height >= clipBottom {
-            height -= (y + height - clipBottom + 1)
-        }
-
-        // Right clipping
-        if x + width >= clipRight {
-            let lost = x + width - clipRight + 1
-            destRowStride += lost
-            width -= lost
-        }
-
-        guard width > 0, height > 0 else { return }
-
-        if alpha > 0 {
-            plotTranScale(
-                srcPixels: sprite.pixels, srcWidth: spriteWidth,
-                srcStartX: srcStartX, srcStartY: srcStartY,
-                scaleX: scaleX, scaleY: scaleY,
-                destWidth: width, destHeight: height,
-                destHead: destHead, destRowStride: destRowStride,
-                alpha: alpha
-            )
-        } else {
-            plotScaleBlackMask(
-                srcPixels: sprite.pixels, srcWidth: spriteWidth,
-                srcStartX: srcStartX, srcStartY: srcStartY,
-                scaleX: scaleX, scaleY: scaleY,
-                destWidth: width, destHeight: height,
-                destHead: destHead, destRowStride: destRowStride
-            )
         }
     }
 
-    // MARK: - Scaled drawSprite (used by drawEntity)
+    // MARK: - spriteClipping
 
-    /// Scaled sprite blit (no alpha blending). Equivalent to the Java
-    /// `drawSprite(Sprite, x, y, destWidth, destHeight, var5)`.
-    func drawSpriteScaled(sprite: RSSprite, x: Int, y: Int, destWidth: Int, destHeight: Int) {
-        let spriteWidth  = sprite.width
-        let spriteHeight = sprite.height
+    /// Scaled sprite blit (alpha-blended) matching the Java `spriteClipping` that
+    /// draws `Sprite sprite` at destination rectangle `(dstX, dstY, destWidth, destHeight)`.
+    /// The original Java signature (non-shift path):
+    ///   `spriteClipping(Sprite sprite, byte var2, int height, int var4,
+    ///                   int width, int var6, int alpha)`
+    /// where var4=dstX, var6=dstY.
+    func spriteClipping(sprite: Sprite, dstX: Int32, dstY: Int32,
+                        destWidth: Int32, destHeight: Int32,
+                        alpha: Int32) {
+        let sprW = sprite.width
+        let sprH = sprite.height
+        guard sprW > 0 && sprH > 0 && destWidth > 0 && destHeight > 0 else { return }
 
-        var srcStartX: Int = 0
-        var srcStartY: Int = 0
-        var scaleX = (spriteWidth  << 16) / destWidth
-        var scaleY = (spriteHeight << 16) / destHeight
-        var x = x, y = y
-        var width  = destWidth
-        var height = destHeight
+        let scaleX: Int32 = (sprW << 16) / destWidth
+        var scaleY: Int32 = (sprH << 16) / destHeight
+        var srcStartX: Int32 = 0  // var10
+        var srcStartY: Int32 = 0  // var11
+        var var4    = dstX
+        var var6    = dstY
+        var width   = destWidth
+        var height  = destHeight
 
-        if sprite.requiresShift {
-            let s1 = sprite.something1
-            let s2 = sprite.something2
-            guard s1 != 0, s2 != 0 else { return }
+        // Destination base pixel index
+        var var14: Int32 = var6 * width2 + var4
+        var var16: Int32
 
-            if sprite.yShift * destHeight % s2 != 0 {
-                srcStartY = (s2 - destHeight * sprite.yShift % s2 << 16) / destHeight
+        // Clip top
+        if clipTop > var6 {
+            var16    = clipTop - var6
+            height  -= var16
+            var6     = 0
+            var14   += width2 * var16
+            srcStartY += scaleY * var16
+        }
+
+        var rowStride: Int32 = width2 - width
+
+        // Clip left
+        if var4 < clipLeft {
+            var16      = clipLeft - var4
+            var4       = 0
+            srcStartX += var16 * scaleX
+            var14     += var16
+            width     -= var16
+            rowStride += var16
+        }
+
+        // Clip bottom
+        if var6 + height >= clipBottom {
+            height -= 1 + height + (var6 - clipBottom)
+        }
+
+        // Clip right
+        if var4 + width >= clipRight {
+            var16      = 1 + var4 + (width - clipRight)
+            rowStride += var16
+            width     -= var16
+        }
+
+        var heightStep: Int32 = 1
+        if interlace {
+            scaleY    += scaleY
+            rowStride += width2
+            if (var6 & 1) != 0 {
+                var14  += width2
+                height -= 1
             }
-            scaleX = (s1 << 16) / destWidth
-            if sprite.xShift * destWidth % s1 != 0 {
-                srcStartX = (s1 - sprite.xShift * destWidth % s1 << 16) / destWidth
-            }
-            x += (destWidth * sprite.xShift + s1 - 1) / s1
-            scaleY = (s2 << 16) / destHeight
-            y += (s2 + destHeight * sprite.yShift - 1) / s2
-            height = (sprite.height - (srcStartY >> 16)) * destHeight / s2
-            width  = destWidth * (sprite.width - (srcStartX >> 16)) / s1
+            heightStep = 2
         }
 
-        var destHead = x + width2 * y
+        guard width > 0 && height > 0 else { return }
 
-        // Top clip
-        if y < clipTop {
-            let lost = clipTop - y
-            srcStartY += scaleY * lost
-            height -= lost
-            destHead += width2 * lost
-        }
-
-        var destRowStride = width2 - width
-
-        // Bottom clip
-        if y + height >= clipBottom {
-            height -= (y + height - clipBottom + 1)
-        }
-
-        // Left clip
-        if x < clipLeft {
-            let lost = clipLeft - x
-            width -= lost
-            destRowStride += lost
-            destHead += lost
-            srcStartX += scaleX * lost
-        }
-
-        // Right clip
-        if x + width >= clipRight {
-            let lost = x + width - clipRight + 1
-            destRowStride += lost
-            width -= lost
-        }
-
-        guard width > 0, height > 0 else { return }
-
-        plotScaleBlackMask(
-            srcPixels: sprite.pixels, srcWidth: spriteWidth,
-            srcStartX: srcStartX, srcStartY: srcStartY,
-            scaleX: scaleX, scaleY: scaleY,
-            destWidth: width, destHeight: height,
-            destHead: destHead, destRowStride: destRowStride
+        plot_tran_scale(
+            heightStep:   heightStep,
+            srcStartY:    srcStartY,
+            destWidth:    width,
+            scaleY:       scaleY,
+            spriteWidth:  sprW,
+            scaleX:       scaleX,
+            height:       height,
+            destHead:     var14,
+            src:          sprite.pixels,
+            srcStartX:    srcStartX,
+            destRowStride: rowStride,
+            alpha:        alpha
         )
     }
 
-    // MARK: - 9. drawSprite (unscaled 1:1 blit)
+    // MARK: - drawEntity
 
-    /// Simple unscaled sprite blit with transparency (pixel == 0 is transparent).
-    /// Matches Java `drawSprite(Sprite, x, y)`.
-    func drawSprite(sprite: RSSprite, x: Int, y: Int) {
-        var x = x, y = y
+    /// Draws a billboard sprite at screen position (x, y) scaled to (width × height).
+    /// Mirrors `drawEntity(int index, int x, int y, int width, int height, int var1, int var8)`.
+    /// Uses `sprites[index]`; no-ops if the sprite is nil.
+    func drawEntity(index: Int, x: Int32, y: Int32, width: Int32, height: Int32, perspective: Int32) {
+        guard index >= 0 && index < sprites.count, let sprite = sprites[index] else { return }
+        // Java delegates to drawSprite(sprite, x, y, width, height, 5924) which uses
+        // the plot_scale_black_mask path (transparent on black = 0).
+        drawSpriteScaled(sprite: sprite, x: x, y: y, destWidth: width, destHeight: height)
+    }
 
-        if sprite.requiresShift {
-            x += sprite.xShift
-            y += sprite.yShift
-        }
+    /// Tinted character-layer blit. Ports the gray/white-axis mask logic from
+    /// Java GraphicsController.plot_trans_scale_with_2_masks (line 1007+):
+    ///   - Source pixels with R==G==B (gray) get tinted by mask1 (multiplicative).
+    ///   - Source pixels with R==255 && G==B (white axis) get tinted by mask2.
+    ///   - Other colors pass through unchanged.
+    /// Transparent pixels (alpha=0 or full-zero) are skipped. No scaling — the
+    /// sprite is blit at its native size; horizontal mirror is handled.
+    func drawEntityTinted(index: Int, x: Int32, y: Int32, width: Int32, height: Int32,
+                          mask1: Int32, mask2: Int32, mirrorX: Bool) {
+        guard index >= 0 && index < sprites.count, let sprite = sprites[index] else { return }
+        let m1 = mask1 == 0 ? Int32(0xFFFFFF) : mask1
+        let m2 = mask2 == 0 ? Int32(0xFFFFFF) : mask2
+        let m1R = (Int(m1) >> 16) & 0xFF, m1G = (Int(m1) >> 8) & 0xFF, m1B = Int(m1) & 0xFF
+        let m2R = (Int(m2) >> 16) & 0xFF, m2G = (Int(m2) >> 8) & 0xFF, m2B = Int(m2) & 0xFF
 
-        var destHead = y * width2 + x
-        var srcHead  = 0
-        var sprHeight = sprite.height
-        var sprWidth  = sprite.width
-        var destRowSkip = width2 - sprWidth
-        var srcRowSkip  = 0
+        let sw = Int(sprite.width); let sh = Int(sprite.height)
+        let dw = Int(width2); let dh = Int(height2)
 
-        // Top clip
-        if y < clipTop {
-            let lost = clipTop - y
-            sprHeight -= lost
-            y = clipTop
-            srcHead += lost * sprite.width
-            destHead += lost * width2
-        }
+        for sy in 0..<sh {
+            let dy = Int(y) + sy
+            if dy < 0 || dy >= dh { continue }
+            let rowBase = dy * dw
+            for sx in 0..<sw {
+                let srcX = mirrorX ? (sw - 1 - sx) : sx
+                let pixel = sprite.pixels[sy * sw + srcX]
+                // RSC sprites are stored as 24-bit RGB with no alpha byte:
+                // pixel == 0 (full black) signals transparency. Don't reject on
+                // alpha == 0 — every non-transparent pixel has alpha = 0 on disk.
+                if pixel == 0 { continue }
 
-        // Bottom clip
-        if y + sprHeight >= clipBottom {
-            sprHeight -= (y + sprHeight - clipBottom + 1)
-        }
+                let dx = Int(x) + sx
+                if dx < 0 || dx >= dw { continue }
 
-        // Left clip
-        if x < clipLeft {
-            let lost = clipLeft - x
-            sprWidth -= lost
-            srcHead += lost
-            destHead += lost
-            srcRowSkip += lost
-            destRowSkip += lost
-        }
+                var r = (Int(pixel) >> 16) & 0xFF
+                var g = (Int(pixel) >> 8) & 0xFF
+                var b = Int(pixel) & 0xFF
 
-        // Right clip
-        if x + sprWidth >= clipRight {
-            let lost = x + sprWidth - clipRight + 1
-            sprWidth -= lost
-            srcRowSkip += lost
-            destRowSkip += lost
-        }
-
-        guard sprWidth > 0, sprHeight > 0 else { return }
-
-        pixelData.withUnsafeMutableBufferPointer { dest in
-            sprite.pixels.withUnsafeBufferPointer { src in
-                var di = destHead
-                var si = srcHead
-                for _ in 0..<sprHeight {
-                    for _ in 0..<sprWidth {
-                        let px = src[si]
-                        si += 1
-                        if px != 0 {
-                            dest[di] = UInt32(bitPattern: px)
-                        }
-                        di += 1
-                    }
-                    si += srcRowSkip
-                    di += destRowSkip
+                if r == g && g == b {
+                    // Gray pixel — tint with mask1 (e.g. hair/top/bottom layer color)
+                    r = (r * m1R) >> 8
+                    g = (g * m1G) >> 8
+                    b = (b * m1B) >> 8
+                } else if r == 255 && g == b {
+                    // White-axis pixel — tint with mask2 (skin color)
+                    r = (r * m2R) >> 8
+                    g = (g * m2G) >> 8
+                    b = (b * m2B) >> 8
                 }
+                // else: pass through unchanged
+
+                let outARGB = Int32(bitPattern: UInt32(0xFF000000) | (UInt32(r) << 16) | (UInt32(g) << 8) | UInt32(b))
+                pixelData[rowBase + dx] = outARGB
             }
         }
     }
 
-    // MARK: - 10. fade2black
+    // MARK: - drawSpriteScaled  (plot_scale_black_mask path)
 
-    /// Darkens every pixel towards black. Applies an approximate 87.5% brightness reduction:
-    ///   result = (px >>> 1) + (px >>> 3) + (px >>> 4) — matching the Java `fade2black`.
-    @inlinable
-    func fade2black() {
-        let count = width2 * height2
-        pixelData.withUnsafeMutableBufferPointer { buf in
-            for i in 0..<count {
-                let px = buf[i] & 0x00FF_FFFF
-                let a = (px >> 1) & 0x7F7F7F
-                let b = (px >> 2) & 0x3F3F3F
-                let c = (px >> 3) & 0x1F1F1F
-                let d = (px >> 4) & 0x0F0F0F
-                buf[i] = a + b + c + d
-            }
+    /// Scaled sprite blit where pixel colour 0 is transparent (black mask).
+    /// Matches the Java `drawSprite(Sprite, int x, int y, int destWidth, int destHeight, int)` ->
+    /// `plot_scale_black_mask(...)` path used by `drawEntity`.
+    func drawSpriteScaled(sprite: Sprite, x: Int32, y: Int32,
+                          destWidth: Int32, destHeight: Int32) {
+        let spriteWidth  = sprite.width
+        let spriteHeight = sprite.height
+        guard spriteWidth > 0 && spriteHeight > 0 && destWidth > 0 && destHeight > 0 else { return }
+
+        let scaleX:    Int32 = (spriteWidth  << 16) / destWidth
+        var scaleY:    Int32 = (spriteHeight << 16) / destHeight
+        var srcStartX: Int32 = 0
+        var srcStartY: Int32 = 0
+        var lx = x; var ly = y
+        var lw = destWidth; var lh = destHeight
+
+        var destHead: Int32 = lx + width2 * ly
+
+        // Clip top
+        if ly < clipTop {
+            let lost = clipTop - ly
+            srcStartY += scaleY * lost
+            lh        -= lost
+            destHead  += width2 * lost
+            ly         = 0
         }
-    }
 
-    // MARK: - 11. drawString (stub)
+        var destRowStride: Int32 = width2 - lw
 
-    /// Simplified text rendering stub. The iOS client uses SwiftUI overlays for text,
-    /// so this is a no-op placeholder that maintains API compatibility with the Java client.
-    func drawString(_ text: String, x: Int, y: Int, color: UInt32, font: Int) {
-        // No-op: text rendering is handled by SwiftUI on iOS.
-        // A bitmap font renderer can be plugged in here if needed for in-framebuffer text.
-    }
+        // Clip bottom
+        if ly + lh >= clipBottom {
+            lh -= ly - clipBottom + lh + 1
+        }
 
-    // MARK: - Internal rasterizer kernels
+        // Clip left
+        if lx < clipLeft {
+            let lost = clipLeft - lx
+            lw            -= lost
+            destRowStride += lost
+            destHead      += lost
+            lx             = 0
+            srcStartX     += scaleX * lost
+        }
 
-    /// Scaled blit with color-key transparency (skip pixels == 0). No alpha blending.
-    /// Mirrors Java `plot_scale_black_mask`.
-    @inlinable
-    internal func plotScaleBlackMask(
-        srcPixels: [Int32], srcWidth: Int,
-        srcStartX: Int, srcStartY: Int,
-        scaleX: Int, scaleY: Int,
-        destWidth: Int, destHeight: Int,
-        destHead: Int, destRowStride: Int
-    ) {
-        let firstColumn = srcStartX
-        var srcY = srcStartY
-        var dh = destHead
+        // Clip right
+        if lx + lw >= clipRight {
+            let lost = 1 + lx + (lw - clipRight)
+            destRowStride += lost
+            lw            -= lost
+        }
 
-        pixelData.withUnsafeMutableBufferPointer { dest in
-            srcPixels.withUnsafeBufferPointer { src in
-                for _ in 0..<destHeight {
-                    let srcRowOffset = (srcY >> 16) * srcWidth
+        var heightStep: Int32 = 1
+        if interlace {
+            if (ly & 1) != 0 {
+                lh       -= 1
+                destHead += width2
+            }
+            destRowStride += width2
+            heightStep     = 2
+            scaleY        += scaleY
+        }
+
+        guard lw > 0 && lh > 0 else { return }
+
+        let srcW      = Int(spriteWidth)
+        var dstHead   = Int(destHead)
+        let rowStride = Int(destRowStride)
+
+        pixelData.withUnsafeMutableBufferPointer { dstBuf in
+            sprite.pixels.withUnsafeBufferPointer { srcBuf in
+                var srcY = srcStartY
+                var i: Int32 = -lh
+                while i < 0 {
+                    let rowOffset = Int(srcY >> 16) * srcW
                     srcY += scaleY
-                    var srcX = firstColumn
-
-                    for _ in 0..<destWidth {
-                        let color = src[(srcX >> 16) + srcRowOffset]
+                    var srcX = srcStartX
+                    var j: Int32 = -lw
+                    while j < 0 {
+                        let color = srcBuf[rowOffset + Int(srcX >> 16)]
                         srcX += scaleX
                         if color != 0 {
-                            dest[dh] = UInt32(bitPattern: color)
+                            dstBuf[dstHead] = color
                         }
-                        dh += 1
+                        dstHead += 1
+                        j += 1
                     }
-                    dh += destRowStride
+                    dstHead += rowStride
+                    i += heightStep
                 }
             }
         }
     }
 
-    /// Scaled blit with color-key transparency and alpha blending.
-    /// Mirrors Java `plot_tran_scale`.
-    @inlinable
-    internal func plotTranScale(
-        srcPixels: [Int32], srcWidth: Int,
-        srcStartX: Int, srcStartY: Int,
-        scaleX: Int, scaleY: Int,
-        destWidth: Int, destHeight: Int,
-        destHead: Int, destRowStride: Int,
-        alpha: Int
-    ) {
-        let alphaInv = 256 - alpha
-        let firstColumn = srcStartX
-        var srcY = srcStartY
-        var dh = destHead
+    // MARK: - setPixel
 
-        pixelData.withUnsafeMutableBufferPointer { dest in
-            srcPixels.withUnsafeBufferPointer { src in
-                for _ in 0..<destHeight {
-                    let srcRowOffset = (srcY >> 16) * srcWidth
-                    srcY += scaleY
-                    var srcX = firstColumn
+    /// Sets a single pixel, clipped to the scissor rect.
+    func setPixel(x: Int32, y: Int32, val: Int32) {
+        guard clipLeft <= x && clipTop <= y && clipRight > x && clipBottom > y else { return }
+        pixelData[Int(x + width2 * y)] = val
+    }
 
-                    for _ in 0..<destWidth {
-                        let newColor = src[(srcX >> 16) + srcRowOffset]
-                        srcX += scaleX
-                        if newColor == 0 {
-                            dh += 1
-                        } else {
-                            let nc = UInt32(bitPattern: newColor)
-                            let oc = dest[dh]
-                            // Blend each channel: result = (old * alphaInv + new * alpha) >> 8
-                            let rr = (Int((oc >> 16) & 0xFF) * alphaInv + Int((nc >> 16) & 0xFF) * alpha) >> 8
-                            let gg = (Int((oc >>  8) & 0xFF) * alphaInv + Int((nc >>  8) & 0xFF) * alpha) >> 8
-                            let bb = (Int( oc        & 0xFF) * alphaInv + Int( nc        & 0xFF) * alpha) >> 8
-                            dest[dh] = UInt32(rr) << 16 | UInt32(gg) << 8 | UInt32(bb)
-                            dh += 1
-                        }
-                    }
-                    dh += destRowStride
-                }
-            }
-        }
+    // MARK: - resize
+
+    /// Resize the canvas (mirrors Java `resize(int, int)`).
+    func resize(width: Int32, height: Int32) {
+        self.width2      = width
+        self.height2     = height
+        self.clipRight   = width
+        self.clipBottom  = height
+        self.pixelData   = [Int32](repeating: 0, count: Int(width * height))
     }
 }

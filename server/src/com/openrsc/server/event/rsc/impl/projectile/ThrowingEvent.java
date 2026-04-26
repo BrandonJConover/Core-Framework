@@ -33,7 +33,8 @@ public class ThrowingEvent extends GameTickEvent {
 	}
 
 	public boolean equals(Object o) {
-		if (o instanceof ThrowingEvent e) {
+		if (o instanceof ThrowingEvent) {
+			ThrowingEvent e = (ThrowingEvent) o;
 			return e.belongsTo(getOwner());
 		}
 		return false;

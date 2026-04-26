@@ -165,7 +165,7 @@ public class Inventory {
 				}
 
 				// Update the Database - Add to the last slot and create a new itemID
-				int itemID = player.getWorld().getServer().getDatabase().incrementMaxItemId(player);
+				long itemID = player.getWorld().getServer().getDatabase().incrementMaxItemId(player);
 				itemToAdd = new Item(itemToAdd.getCatalogId(), itemToAdd.getAmount(), itemToAdd.getNoted(), itemID);
 
 				// Update the server inventory
@@ -212,7 +212,7 @@ public class Inventory {
 
 					// Update the existing stack amount to max value
 					existingStack.setAmount(MAXSTACK);
-					int itemID = player.getWorld().getServer().getDatabase().incrementMaxItemId(player);
+					long itemID = player.getWorld().getServer().getDatabase().incrementMaxItemId(player);
 					itemToAdd = new Item(itemToAdd.getCatalogId(), itemToAdd.getAmount(), itemToAdd.getNoted(), itemID);
 
 					// Update the server inventory
@@ -227,11 +227,11 @@ public class Inventory {
 		}
 	}
 
-	public int remove(Item item, boolean sendInventory) {
+	public long remove(Item item, boolean sendInventory) {
 		return remove(item, sendInventory, false);
 	}
 
-	public int remove(Item item, boolean sendInventory, boolean bypassItemId) {
+	public long remove(Item item, boolean sendInventory, boolean bypassItemId) {
 		synchronized (list) {
 			// Confirm items exist in the inventory
 			if (list.isEmpty())
@@ -239,7 +239,7 @@ public class Inventory {
 
 			int catalogId = item.getCatalogId();
 			int amount = item.getAmount();
-			int itemID = item.getItemId();
+			long itemID = item.getItemId();
 
 			if (itemID == -1) {
 				return -1;
@@ -334,7 +334,7 @@ public class Inventory {
 				// could not satisfy removal
 				return -1;
 			}
-			LOGGER.warn("Item not found: {} for player {}", item.getItemId(), player.getUsername());
+			System.out.println("Item not found: " + item.getItemId() + " for player " + player.getUsername());
 		}
 		return -1;
 	}
@@ -514,6 +514,9 @@ public class Inventory {
 				final GroundItem groundItem = new GroundItem(player.getWorld(), item.getCatalogId(), player.getX(),
 					player.getY(), item.getAmount(), null, item.getNoted());
 				player.getWorld().registerItem(groundItem, player.getConfig().GAME_TICK * 1000);
+
+				groundItem.setAttribute("killedByMob", player.getUsernameHash());
+
 				continue;
 			}
 

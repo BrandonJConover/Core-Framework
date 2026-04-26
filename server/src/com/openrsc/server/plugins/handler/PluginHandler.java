@@ -104,7 +104,9 @@ public final class PluginHandler implements IPluginHandler {
             // Triggers found, create an instance
             Object pluginInstance = getPluginInstance(pluginType);
 
-            if (pluginInstance instanceof AbstractShop shopPlugin) {
+            if (pluginInstance instanceof AbstractShop) {
+                final AbstractShop shopPlugin = (AbstractShop) pluginInstance;
+
                 for (final Shop shop : shopPlugin.getShops(server.getWorld())) {
                     server.getWorld().getShops().add(shop);
                     server.getGameEventHandler().add(new ShopRestockEvent(server.getWorld(), shop));
@@ -216,7 +218,7 @@ public final class PluginHandler implements IPluginHandler {
             }
 
             try {
-                if (!shouldBlockDefault && defaultHandler != null) {
+                if (!shouldBlockDefault) {
                     invokePluginAction(triggerType, owner, defaultHandler, data, walkToAction);
                 }
             } catch (final Exception e) {
@@ -235,10 +237,6 @@ public final class PluginHandler implements IPluginHandler {
             WalkToAction walkToAction
     ) {
         if (reloading) {
-            return;
-        }
-
-        if (triggerInstance == null) {
             return;
         }
 
@@ -301,7 +299,7 @@ public final class PluginHandler implements IPluginHandler {
                 // there is no action listener defined in Default plugin
             }
         } catch (final Exception e) {
-            LOGGER.error("Exception at plugin handling:");
+            System.err.println("Exception at plugin handling: ");
             LOGGER.catching(e);
         }
     }

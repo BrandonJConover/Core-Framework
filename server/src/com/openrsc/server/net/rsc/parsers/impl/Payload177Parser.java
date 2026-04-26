@@ -11,8 +11,6 @@ import com.openrsc.server.net.rsc.struct.AbstractStruct;
 import com.openrsc.server.net.rsc.struct.incoming.*;
 import com.openrsc.server.util.rsc.DataConversions;
 import com.openrsc.server.util.rsc.StringUtil;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -21,8 +19,6 @@ import java.util.Arrays;
  * RSC Protocol-177 Parser of Incoming Packets to respective Protocol Independent Structs
  * **/
 public class Payload177Parser implements PayloadParser<OpcodeIn> {
-	private static final Logger LOGGER = LogManager.getLogger();
-
 	@Override
 	public OpcodeIn toOpcodeEnum(Packet packet, Player player) {
 		OpcodeIn opcode = null;
@@ -583,9 +579,9 @@ public class Payload177Parser implements PayloadParser<OpcodeIn> {
 						oldPassword = new String(Arrays.copyOfRange(concatPassData, 0, 20), "UTF8").trim();
 						newPassword = new String(Arrays.copyOfRange(concatPassData, 20, 42), "UTF8").trim();
 					} catch (Exception ex1) {
-						LOGGER.info("error parsing passwords in change password block");
+						//LOGGER.info("error parsing passwords in change password block");
 						errored = true;
-						LOGGER.catching(ex1);
+						ex1.printStackTrace();
 					}
 
 					if (!errored) {
@@ -631,9 +627,9 @@ public class Payload177Parser implements PayloadParser<OpcodeIn> {
 						try {
 							answers[i] = new String(answerData, "UTF8").trim();
 						} catch (Exception ex) {
-							LOGGER.info("error parsing answer {} in change recovery block", i);
+							//LOGGER.info("error parsing answer " + i + " in change recovery block");
 							errored = true;
-							LOGGER.catching(ex);
+							ex.printStackTrace();
 						}
 					}
 

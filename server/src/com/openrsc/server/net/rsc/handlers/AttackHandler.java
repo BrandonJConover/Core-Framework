@@ -168,8 +168,8 @@ public class AttackHandler implements PayloadProcessor<TargetMobStruct, OpcodeIn
 						RangeEvent rangeEvent = null;
 
 						for (final GameTickEvent gameTickEvent : gameEventHandler.getPlayerEvents(getPlayer())) {
-							if (gameTickEvent instanceof RangeEvent re) {
-								rangeEvent = re;
+							if (gameTickEvent instanceof RangeEvent) {
+								rangeEvent = (RangeEvent) gameTickEvent;
 								break;
 							}
 						}
@@ -196,8 +196,8 @@ public class AttackHandler implements PayloadProcessor<TargetMobStruct, OpcodeIn
 						ThrowingEvent throwingEvent = null;
 
 						for (final GameTickEvent gameTickEvent : gameEventHandler.getPlayerEvents(getPlayer())) {
-							if (gameTickEvent instanceof ThrowingEvent te) {
-								throwingEvent = te;
+							if (gameTickEvent instanceof ThrowingEvent) {
+								throwingEvent = (ThrowingEvent) gameTickEvent;
 								break;
 							}
 						}

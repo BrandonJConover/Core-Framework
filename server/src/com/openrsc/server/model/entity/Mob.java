@@ -360,8 +360,8 @@ public abstract class Mob extends Entity {
 			return true;
 		}
 		return (val & 64) != 0
-			&& (e instanceof Npc || e instanceof Player || (e instanceof GroundItem groundItem && !groundItem.isOn(x, y))
-			|| (e instanceof GameObject gameObject && !gameObject.isOn(x, y)));
+			&& (e instanceof Npc || e instanceof Player || (e instanceof GroundItem && !((GroundItem) e).isOn(x, y))
+			|| (e instanceof GameObject && !((GameObject) e).isOn(x, y)));
 	}
 
 	public boolean withinRange(final Entity e) {
@@ -478,10 +478,10 @@ public abstract class Mob extends Entity {
 
 	public void setPossessing(final Mob mob) {
 		possessing = mob;
-		if (mob instanceof Player player) {
-			possessingUsername = player.getUsername();
-		} else if (possessing instanceof Npc npc) {
-			possessingUsername = npc.getDef().getName();
+		if (mob instanceof Player) {
+			possessingUsername = ((Player)mob).getUsername();
+		} else {
+			possessingUsername = ((Npc) possessing).getDef().getName();
 		}
 		possessionEvent = new GameTickEvent(getWorld(), this, 0, "Moderator possessing Mob", DuplicationStrategy.ALLOW_MULTIPLE) {
 			public void run() {
@@ -495,7 +495,7 @@ public abstract class Mob extends Entity {
 							moderator.message("The body you possessed has left this world, but your spirit still searches for them...");
 							moderator.knowsPossesseeLoggedOut = true;
 						}
-						var targetPlayer = moderator.getWorld().getPlayer(DataConversions.usernameToHash(moderator.possessingUsername));
+						Player targetPlayer = moderator.getWorld().getPlayer(DataConversions.usernameToHash(moderator.possessingUsername));
 						if (targetPlayer == null)
 							return;
 						moderator.message("Your spirit has found @mag@" + possessingUsername + "@whi@ once again.");
@@ -527,9 +527,10 @@ public abstract class Mob extends Entity {
 	}
 
 	public void becomeLain(boolean serial, int interval) {
-		if (!(this instanceof Player lain)) {
+		if (!(this instanceof Player)) {
 			return;
 		}
+		Player lain = (Player) this;
 		lain.setCacheInvisible(true);
 		lain.message("@yel@Lain: Hello, Navi.");
 		lain.message("@whi@Navi: Hello, Lain.");
@@ -642,12 +643,12 @@ public abstract class Mob extends Entity {
 
 		if (possessionEvent != null) {
 			if (tellLeft) {
-				if (this instanceof Player thisPlayer) {
+				if (this instanceof Player) {
 					if (possessing instanceof Player) {
-						thisPlayer.message("Your spirit has left @mag@" + possessingUsername + "@whi@ and returned to your body.");
-					} else if (possessing instanceof Npc possessedNpc) {
-						thisPlayer.message("Your spirit has left @mag@" + possessedNpc.getDef().getName() + "@whi@ and returned to your body.");
-						thisPlayer.setCacheInvisible(false);
+						((Player) this).message("Your spirit has left @mag@" + possessingUsername + "@whi@ and returned to your body.");
+					} else {
+						((Player) this).message("Your spirit has left @mag@" + ((Npc) possessing).getDef().getName() + "@whi@ and returned to your body.");
+						((Player) this).setCacheInvisible(false);
 					}
 				}
 			}
@@ -1226,7 +1227,8 @@ public abstract class Mob extends Entity {
 
 	public void runDropEvent(boolean fromInventory) {
 		// TODO: Allow npcs to use this code for drop parties?
-		if (!(this instanceof Player player)) return; // We can only run Plugins on Players.
+		if (!this.isPlayer()) return; // We can only run Plugins on Players.
+		final Player player = (Player) this;
 		final Item item = player.getDropItemEvent();
 		final int index = dropItemIndex;
 		this.setDropItemEvent(-1, null);
@@ -1262,8 +1264,8 @@ public abstract class Mob extends Entity {
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof Mob mob) {
-			return mob.getUUID().equals(uuid);
+		if(obj instanceof Mob) {
+			return ((Mob)obj).getUUID().equals(uuid);
 		}
 		return false;
 	}

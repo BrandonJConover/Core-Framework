@@ -81,7 +81,7 @@ public final class Player extends Mob {
 	// so everything is multiplied by 2 to avoid decimals
 	private final int KITTEN_ACTIVITY_THRESHOLD = 50;
 	public int sessionId;
-	private Queue<PrivateMessage> privateMessageQueue = new LinkedList<>();
+	private Queue<PrivateMessage> privateMessageQueue = new LinkedList<PrivateMessage>();
 	private int actionsMouseStill = 0;
 	private long lastMouseMoved = 0;
 	private Map<Integer, Integer> achievements = new ConcurrentHashMap<>();
@@ -119,14 +119,14 @@ public final class Player extends Mob {
 	private long consumeTimer = 0;
 	private long lastSaveTime = System.currentTimeMillis();
 	private int appearanceID;
-	private HashMap<Long, Integer> knownPlayersAppearanceIDs = new HashMap<>();
+	private HashMap<Long, Integer> knownPlayersAppearanceIDs = new HashMap<Long, Integer>();
 	private long lastCommand;
-	private LinkedHashSet<Player> localPlayers = new LinkedHashSet<>();
-	private LinkedHashSet<Npc> localNpcs = new LinkedHashSet<>();
-	private LinkedHashSet<GameObject> localObjects = new LinkedHashSet<>();
-	private LinkedHashSet<GameObject> localWallObjects = new LinkedHashSet<>();
-	private LinkedHashSet<GroundItem> localGroundItems = new LinkedHashSet<>();
-	private ArrayDeque<Point> locationsToClear = new ArrayDeque<>();
+	private LinkedHashSet<Player> localPlayers = new LinkedHashSet<Player>();
+	private LinkedHashSet<Npc> localNpcs = new LinkedHashSet<Npc>();
+	private LinkedHashSet<GameObject> localObjects = new LinkedHashSet<GameObject>();
+	private LinkedHashSet<GameObject> localWallObjects = new LinkedHashSet<GameObject>();
+	private LinkedHashSet<GroundItem> localGroundItems = new LinkedHashSet<GroundItem>();
+	private ArrayDeque<Point> locationsToClear = new ArrayDeque<Point>();
 	private String currentIP = "0.0.0.0";
 	private int incorrectSleepTries = 0;
 	private volatile int questionOption;
@@ -810,7 +810,14 @@ public final class Player extends Mob {
 		if (denyAllLogoutRequests && System.currentTimeMillis() - getLastClientActivity() < 30000) {
 			return false;
 		}
-		return !isBusy() && (System.currentTimeMillis() - getLastClientActivity() > 30000 || System.currentTimeMillis() - getCombatTimer() > 10000)
+		if (inCombat() || getDuel().isDuelActive()) {
+			return false;
+		}
+		return !isBusy() && hasSatisfiedCooldown();
+	}
+
+	private boolean hasSatisfiedCooldown() {
+		return (System.currentTimeMillis() - getLastClientActivity() > 30000 || System.currentTimeMillis() - getCombatTimer() > 10000)
 			&& System.currentTimeMillis() - getAttribute("last_shot", (long) 0) > 10000
 			&& System.currentTimeMillis() - getLastExchangeTime() > 3000;
 	}
@@ -2200,27 +2207,39 @@ public final class Player extends Mob {
 		getSettings().getAttackedBy().clear();
 		getCache().store("last_death", System.currentTimeMillis());
 
-		final Player player = mob instanceof Player p ? p : null;
+		final Player player = mob instanceof Player ? (Player) mob : null;
 
 		if (player != null) {
-			player.message("You have defeated %s!".formatted(getUsername()));
+			player.message(String.format("You have defeated %s!", getUsername()));
 			ActionSender.sendSound(player, "victory");
 
 			if (player.getLocation().inWilderness()) {
-				final int killTypeId = switch (player.getKillType()) {
-					case COMBAT -> {
+				final int killTypeId;
+
+				switch (player.getKillType()) {
+					case COMBAT:
 						final int weaponId = player.getEquippedWeaponID();
-						yield (weaponId == ItemId.NOTHING.id() || weaponId == ItemId.PHOENIX_CROSSBOW.id() ||
-							weaponId == ItemId.CROSSBOW.id()) ? 16 : weaponId;
-					}
-					case RANGED -> -2;
-					case MAGIC -> -1;
-				};
+
+						if (weaponId == ItemId.NOTHING.id() || weaponId == ItemId.PHOENIX_CROSSBOW.id() ||
+							weaponId == ItemId.CROSSBOW.id()) {
+							killTypeId = 16;
+						} else {
+							killTypeId = weaponId;
+						}
+						break;
+					case RANGED:
+						killTypeId = -2;
+						break;
+					case MAGIC:
+					default:
+						killTypeId = -1;
+						break;
+				}
 
 				getWorld().sendKilledUpdate(getUsernameHash(), player.getUsernameHash(), killTypeId);
 				player.incKills();
 				incDeaths();
-				getWorld().getServer().getGameLogger().addQuery(new LiveFeedLog(player, "has PKed %s".formatted(getUsername())));
+				getWorld().getServer().getGameLogger().addQuery(new LiveFeedLog(player, String.format("has PKed %s", getUsername())));
 			}
 
 			// Defense skillcape message
@@ -2441,7 +2460,7 @@ public final class Player extends Mob {
 
 	public long processIncomingPackets() {
 		return getWorld().getServer().bench(() -> {
-			if (!channel.isOpen() && !channel.isWritable()) {
+			if (channel == null || (!channel.isOpen() && !channel.isWritable())) {
 				return;
 			}
 			synchronized (incomingPackets) {
@@ -3062,7 +3081,7 @@ public final class Player extends Mob {
 
 	public int getRecentNpcKills() {
 		if (getLastNpcKilledId() == -1) return 0;
-		return getKillCache().get(getLastNpcKilledId());
+		return getKillCache().getOrDefault(getLastNpcKilledId(), 0);
 	}
 
 	public int getExpShared() {
@@ -4416,13 +4435,6 @@ public final class Player extends Mob {
 
 	public boolean canBeReattacked() {
 		return this.getRanAwayTimer() + getConfig().PVP_REATTACK_TIMER <= getWorld().getServer().getCurrentTick();
-	}
-
-	public boolean canSeeBiggum() {
-		int prestige = getCache().hasKey("co_prestige") ? getCache().getInt("co_prestige") : 0;
-		boolean playerHasBiggum = getCarriedItems().hasCatalogID(ItemId.BIGGUM_FLODROT.id()) || getBank().hasItemId(ItemId.BIGGUM_FLODROT.id());
-
-		return prestige >= 1 && !playerHasBiggum;
 	}
 
 	public void setInteractingNpc(Npc npc) {

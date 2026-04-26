@@ -11,8 +11,6 @@ import com.openrsc.server.net.rsc.struct.*;
 import com.openrsc.server.net.rsc.struct.incoming.*;
 import com.openrsc.server.util.rsc.DataConversions;
 import com.openrsc.server.util.rsc.StringUtil;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -29,7 +27,6 @@ import java.util.Map;
  * mudclient204.jar (same protocol version) was released on 2006-05-25.
  * **/
 public class Payload203Parser implements PayloadParser<OpcodeIn> {
-	private static final Logger LOGGER = LogManager.getLogger();
 
 	private static final Map<Integer, OpcodeIn> opcodes203 = new HashMap<Integer, OpcodeIn>();
 
@@ -355,9 +352,9 @@ public class Payload203Parser implements PayloadParser<OpcodeIn> {
 						oldPassword = new String(Arrays.copyOfRange(concatPassData, 0, 20), "UTF8").trim();
 						newPassword = new String(Arrays.copyOfRange(concatPassData, 20, 42), "UTF8").trim();
 					} catch (Exception ex1) {
-						LOGGER.info("error parsing passwords in change password block");
+						//LOGGER.info("error parsing passwords in change password block");
 						errored = true;
-						LOGGER.catching(ex1);
+						ex1.printStackTrace();
 					}
 
 					if (!errored) {
@@ -403,9 +400,9 @@ public class Payload203Parser implements PayloadParser<OpcodeIn> {
 						try {
 							answers[i] = new String(answerData, "UTF8").trim();
 						} catch (Exception ex) {
-							LOGGER.info("error parsing answer {} in change recovery block", i);
+							//LOGGER.info("error parsing answer " + i + " in change recovery block");
 							errored = true;
-							LOGGER.catching(ex);
+							ex.printStackTrace();
 						}
 					}
 
@@ -496,7 +493,7 @@ public class Payload203Parser implements PayloadParser<OpcodeIn> {
 		int payloadLength = length - 1; // subtract off opcode length.
 		OpcodeIn op = opcodes.get(opcode);
 		if (op == null) {
-			LOGGER.warn("Received unknown opcode {} from authentic claiming client", opcode);
+			System.out.println(String.format("Received unknown opcode %d from authentic claiming client", opcode));
 			return false;
 		}
 		switch (op) {
@@ -653,7 +650,7 @@ public class Payload203Parser implements PayloadParser<OpcodeIn> {
 			case KNOWN_PLAYERS:
 				return payloadLength >= 2;
 		}
-		LOGGER.warn("Received UNHANDLED opcode {} from authentic claiming client", opcode);
+		System.out.println(String.format("Received UNHANDLED opcode %d from authentic claiming client", opcode));
 		return false;
 	}
 

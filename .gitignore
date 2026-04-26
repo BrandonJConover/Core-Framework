@@ -167,9 +167,6 @@ DerivedData/
 *.xcscmblueprint
 *.xccheckout
 
-# Planning docs
-docs/
-
 # Secrets / sensitive files
 .env
 VPN_SETUP.md

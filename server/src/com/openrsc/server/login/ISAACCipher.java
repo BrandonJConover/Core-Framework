@@ -19,9 +19,6 @@
 
 package com.openrsc.server.login;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 /**
  * <p>An implementation of an ISAAC cipher. See
  * <a href="http://en.wikipedia.org/wiki/ISAAC_(cipher)">
@@ -33,7 +30,6 @@ import org.apache.logging.log4j.Logger;
  * @author Graham Edgecombe
  */
 public class ISAACCipher {
-    private static final Logger LOGGER = LogManager.getLogger();
 
     /**
      * The golden ratio.
@@ -90,16 +86,12 @@ public class ISAACCipher {
      * @param seed The seed.
      */
     public void setKeys(int[] seed) {
-        if (LOGGER.isDebugEnabled()) {
-            StringBuilder keys = new StringBuilder("Setting keys: ");
-            for (int i = 0; i < seed.length; i++) {
-                keys.append(seed[i]).append(" ");
-            }
-            LOGGER.debug(keys.toString());
-        }
-        for (int i = 0; i < seed.length; i++) {
+        System.out.print("Setting keys: ");
+        for(int i = 0; i < seed.length; i++) {
+            System.out.print(String.format("%d ", seed[i]));
             results[i] = seed[i];
         }
+        System.out.println();
         init(true);
     }
 
