@@ -242,6 +242,9 @@ struct GameView: View {
         if engine.worldState.showAppearanceChange {
             AppearancePanel(worldState: engine.worldState, engine: engine)
         }
+        if engine.worldState.welcomeShown {
+            WelcomePanel(worldState: engine.worldState)
+        }
         // XP drop notifications (top-right, floating up)
         if !engine.worldState.xpDrops.isEmpty {
             VStack(alignment: .trailing, spacing: 2) {

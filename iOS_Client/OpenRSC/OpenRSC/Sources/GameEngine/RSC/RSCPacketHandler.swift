@@ -242,6 +242,16 @@ final class RSCPacketHandler {
             ws.addChat(sender: "[System]", text: "You can't logout right now.")
 
         case 182: // SHOW_WELCOME — welcome dialog after login
+            // Java showLoginDialog (PacketHandler.java:2396): STRING lastIP,
+            // SHORT daysAgo, SHORT recoveryDays. Plus a tip-of-day index 0..5
+            // we pick locally. Show once per session.
+            if !ws.welcomeShown {
+                ws.welcomeLastIP = buf.getString()
+                ws.welcomeDaysAgo = buf.getShort()
+                ws.welcomeRecoveryDays = buf.getShort()
+                ws.welcomeTipOfDay = Int.random(in: 0..<6)
+                ws.welcomeShown = true
+            }
             ws.addChat(sender: "[System]", text: "Welcome to \(ws.serverName)")
 
         case 234: // UPDATE_PLAYERS — player appearance/chat/combat updates

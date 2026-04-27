@@ -35,6 +35,7 @@
 		6648F15278343C12D182D549 /* NPCNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5576569325B6C2223C6DEE7E /* NPCNames.swift */; };
 		6B141925187BB265598AE4E2 /* ISAACCipher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63B049FFEB87A145A0D3F9BC /* ISAACCipher.swift */; };
 		7234C13A3B9833C90E81C8CF /* Scene.swift in Sources */ = {isa = PBXBuildFile; fileRef = F01562B77A1FF9666EF960FB /* Scene.swift */; };
+		7255140007F553B7E76E835B /* WelcomePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4158CF99B998E5ACBE1150CE /* WelcomePanel.swift */; };
 		79FBC4B39E4291EA3889A584 /* FastMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79470D5C002A690DB639638F /* FastMath.swift */; };
 		7DEDBC075AAE1EA8F6D35A82 /* GameSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5F4767C4E2C9162C1DF5F3 /* GameSelectorView.swift */; };
 		7E6C152D0E1B360DA926B507 /* NpcDefs.json in Resources */ = {isa = PBXBuildFile; fileRef = FFEE1170686C181AC0F64F7F /* NpcDefs.json */; };
@@ -82,6 +83,7 @@
 		38223850597085ADCA3EE8A3 /* TouchTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchTranslator.swift; sourceTree = "<group>"; };
 		3E5FBB918C12B58C6F35F9CA /* AppearancePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePanel.swift; sourceTree = "<group>"; };
 		3ED06FB5405C413FFB721D92 /* ObjectNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectNames.swift; sourceTree = "<group>"; };
+		4158CF99B998E5ACBE1150CE /* WelcomePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomePanel.swift; sourceTree = "<group>"; };
 		43C023BDFCCE3322E38787E6 /* GraphicsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphicsController.swift; sourceTree = "<group>"; };
 		47C3A69581252F63EC5EAA1E /* GameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameView.swift; sourceTree = "<group>"; };
 		4AA431B51F6327E8909C7691 /* BankPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BankPanel.swift; sourceTree = "<group>"; };
@@ -161,6 +163,7 @@
 				D1FC277CCD5343D460C70637 /* ShopPanel.swift */,
 				77082BCCC301983216C93E70 /* TradePanel.swift */,
 				9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */,
+				4158CF99B998E5ACBE1150CE /* WelcomePanel.swift */,
 			);
 			path = Game;
 			sourceTree = "<group>";
@@ -458,6 +461,7 @@
 				378B96EA683C267A82C4C8AA /* TouchTranslator.swift in Sources */,
 				0499D33505237234EC1FEEB2 /* TradePanel.swift in Sources */,
 				9BF9A498F47DACC733867A2D /* WebGameView.swift in Sources */,
+				7255140007F553B7E76E835B /* WelcomePanel.swift in Sources */,
 				E6742B1D452C43AB4926C8A9 /* World.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
