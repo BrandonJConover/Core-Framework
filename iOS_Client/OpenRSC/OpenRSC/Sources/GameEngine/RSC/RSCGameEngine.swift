@@ -877,13 +877,16 @@ final class RSCGameEngine: ObservableObject {
             Task {
                 let buf = ByteBuffer()
                 buf.newPacket(opcode: 187)  // WALK_TO_POINT
-                // First point = start position
+                // First point = start position. Per mudclient.java:17432-17452
+                // server expects [SHORT startX][SHORT startZ][BYTE dx,BYTE dz]*N
+                // where each waypoint pair is a signed delta from start (-128..127).
                 buf.putShort(worldState.localPlayerX)
                 buf.putShort(worldState.localPlayerY)
-                // Waypoints as deltas from start
                 for wp in path {
-                    buf.putByte(wp.x - worldState.localPlayerX)
-                    buf.putByte(wp.z - worldState.localPlayerY)
+                    let dx = max(-128, min(127, wp.x - worldState.localPlayerX))
+                    let dz = max(-128, min(127, wp.z - worldState.localPlayerY))
+                    buf.putByte(dx)
+                    buf.putByte(dz)
                 }
                 try? await connection.send(buf.finishPacket())
             }
