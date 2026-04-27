@@ -47,6 +47,7 @@
 		89A587E1B70A0CBC5632E006 /* RSCGameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24A98D60D91F8BC96E8BD27 /* RSCGameEngine.swift */; };
 		8D061CA1AC54B0CBBD451140 /* RSCOpcodes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A1905E095D026FE16EA83 /* RSCOpcodes.swift */; };
 		8FFAC6D6B26D024D29E86D7E /* Pathfinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D25BDF5D342303EE194991D5 /* Pathfinder.swift */; };
+		92372A0FC76D6BAA377EFE79 /* FriendToastStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569A8D0135576A42A7C18004 /* FriendToastStack.swift */; };
 		9A87124B06D31862E37C17BD /* InteractivePanelStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2F5EF8F7ACAB00446AD4B5 /* InteractivePanelStyles.swift */; };
 		9BF9A498F47DACC733867A2D /* WebGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */; };
 		A19DE57B3E32A6C6541C11D6 /* HUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00878BEFAD27286B1E048F3B /* HUDView.swift */; };
@@ -93,6 +94,7 @@
 		4EAAA291551DD814CD0DA0F3 /* RSModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSModel.swift; sourceTree = "<group>"; };
 		5242B6A5DCB117B084B12B9C /* SystemUpdateBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemUpdateBanner.swift; sourceTree = "<group>"; };
 		5576569325B6C2223C6DEE7E /* NPCNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPCNames.swift; sourceTree = "<group>"; };
+		569A8D0135576A42A7C18004 /* FriendToastStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendToastStack.swift; sourceTree = "<group>"; };
 		5969C636EE8BFAC20BDCE024 /* OpenRSCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRSCApp.swift; sourceTree = "<group>"; };
 		5A2F5EF8F7ACAB00446AD4B5 /* InteractivePanelStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractivePanelStyles.swift; sourceTree = "<group>"; };
 		5CBD0EBDD0DAD78E31727091 /* RSCWorldState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCWorldState.swift; sourceTree = "<group>"; };
@@ -158,6 +160,7 @@
 				3E5FBB918C12B58C6F35F9CA /* AppearancePanel.swift */,
 				4AA431B51F6327E8909C7691 /* BankPanel.swift */,
 				0C5DA77DFB8A641346DA3FD3 /* DuelPanel.swift */,
+				569A8D0135576A42A7C18004 /* FriendToastStack.swift */,
 				47C3A69581252F63EC5EAA1E /* GameView.swift */,
 				00878BEFAD27286B1E048F3B /* HUDView.swift */,
 				5A2F5EF8F7ACAB00446AD4B5 /* InteractivePanelStyles.swift */,
@@ -426,6 +429,7 @@
 				843CD2F78B555661353B2FBA /* DuelPanel.swift in Sources */,
 				AFB05CAF0757B4C1C741DCBF /* EntityDefinitions.swift in Sources */,
 				79FBC4B39E4291EA3889A584 /* FastMath.swift in Sources */,
+				92372A0FC76D6BAA377EFE79 /* FriendToastStack.swift in Sources */,
 				4B6D93F4FBEAD30A6A116F46 /* GameObjectDefinitions.swift in Sources */,
 				EB5AA1EDEB883B4B339EC1B2 /* GameProtocol.swift in Sources */,
 				7DEDBC075AAE1EA8F6D35A82 /* GameSelectorView.swift in Sources */,

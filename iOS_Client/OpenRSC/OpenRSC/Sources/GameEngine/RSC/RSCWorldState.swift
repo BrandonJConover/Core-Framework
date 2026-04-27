@@ -133,6 +133,22 @@ final class RSCWorldState: ObservableObject {
     /// 0 = no pending update.
     @Published var systemUpdateTicks: Int = 0
 
+    /// Transient friend-status toast notifications. Each toast self-expires
+    /// after ~3 seconds. Pushed by opcode 149 (friend login/logout).
+    struct FriendToast: Identifiable, Equatable {
+        let id = UUID()
+        let name: String
+        let online: Bool
+        let createdAt: Date
+    }
+    @Published var friendToasts: [FriendToast] = []
+
+    func pushFriendToast(name: String, online: Bool) {
+        friendToasts.append(FriendToast(name: name, online: online, createdAt: Date()))
+        let cutoff = Date().addingTimeInterval(-3.0)
+        friendToasts.removeAll { $0.createdAt < cutoff }
+    }
+
     // Welcome dialog state — populated by opcode 182 (PacketHandler.showLoginDialog).
     // Shown once per session right after the first character/skills sync.
     @Published var welcomeShown: Bool = false

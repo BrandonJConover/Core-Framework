@@ -136,6 +136,18 @@ struct GameView: View {
                     Spacer()
                 }
 
+                // Friend online/offline toasts (top-right corner).
+                VStack {
+                    HStack {
+                        Spacer()
+                        FriendToastStack(worldState: engine.worldState)
+                            .padding(.trailing, 12)
+                            .padding(.top, 48)
+                    }
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+
                 // Modal overlays
                 modalOverlays
             }

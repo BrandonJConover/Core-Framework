@@ -197,6 +197,8 @@ final class RSCPacketHandler {
             }
             let statusText = isOnline ? "logged in" : "logged out"
             ws.addChat(sender: "[Friend]", text: "\(friendName) has \(statusText)")
+            ws.pushFriendToast(name: friendName, online: isOnline)
+            _ = world149
 
         case 240: // GAME_SETTINGS — updateOptionsMenuSettings
             // Just skip the settings bytes for now
