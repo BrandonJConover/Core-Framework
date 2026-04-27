@@ -183,23 +183,47 @@ export class PacketHandler530 {
     // ── World/scene packets ──
 
     static handleRebuildNormal(buf: Buffer, size: number, game: any): boolean {
-        // Opcode 162: REBUILD_NORMAL (var-short)
+        // Opcode 162: REBUILD_NORMAL (var-short).
+        // Body order matches rt4-client Protocol.java line ~419:
         //   g2add() -> zoneZ
-        //   {regionCount x 4 mg4() XTEA keys}
+        //   {regionCount x 4 x mg4()}  XTEA keys (16 bytes per region)
         //   g1sub() -> buildArea
-        //   g2()    -> regionX
+        //   g2()    -> regionX (raw)
         //   g2add() -> regionZ
         //   g2add() -> zoneX
         const zoneZ = this.g2add(buf);
         const remainingForXtea = size - 2 - 7; // zoneZ(2) consumed; trailing buildArea(1)+regionX(2)+regionZ(2)+zoneX(2)=7
         const regionCount = (remainingForXtea / 16) | 0;
+        // Capture XTEA keys per-region. game.regionXteaKeys[i] is a length-4
+        // Int32Array suitable for direct use by an XTEA block decoder when we
+        // wire the idx5 region group fetch in Tier 2e.
+        const keys: Int32Array[] = new Array(regionCount);
         for (let i = 0; i < regionCount; i++) {
-            for (let j = 0; j < 4; j++) this.mg4(buf);
+            const k = new Int32Array(4);
+            for (let j = 0; j < 4; j++) k[j] = this.mg4(buf) | 0;
+            keys[i] = k;
         }
         const buildArea = this.g1sub(buf);
         const regionX = this.g2(buf);
         const regionZ = this.g2add(buf);
         const zoneX = this.g2add(buf);
+
+        // Compute the region IDs that occupy the 13x13 zone-window centered
+        // on (regionX, regionZ) so the renderer / idx5 fetcher can pair each
+        // region's map-file groupId with its XTEA key. Mirrors rt4-client
+        // Protocol.java loop at line ~448.
+        const regionBitPacked: number[] = new Array(regionCount);
+        let slot = 0;
+        for (let rx = ((regionX - 6) / 8) | 0; rx <= ((regionX + 6) / 8) | 0; rx++) {
+            for (let rz = ((regionZ - 6) / 8) | 0; rz <= ((regionZ + 6) / 8) | 0; rz++) {
+                if (slot < regionCount) regionBitPacked[slot++] = (rx << 8) + rz;
+            }
+        }
+
+        game.regionXteaKeys = keys;
+        game.regionBitPacked = regionBitPacked;
+        game.regionX = regionX;
+        game.regionZ = regionZ;
 
         game.chunkX = zoneX;
         game.chunkY = zoneZ;
@@ -208,6 +232,7 @@ export class PacketHandler530 {
         game.aBoolean1163 = false;
         if (game.plane === undefined || game.plane === null) game.plane = 0;
         game.loadingStage = 2;
+        console.log("REBUILD_NORMAL: regions=" + regionCount + " centre=(" + regionX + "," + regionZ + ") zone=(" + zoneX + "," + zoneZ + ")");
         return true;
     }
 
