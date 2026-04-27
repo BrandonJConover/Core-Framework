@@ -3,15 +3,32 @@
 ## Overview
 `server-java-modern/` is a Java 21+ modernized variant of the OpenRSC server running parallel to the legacy Java 8 `server/` directory. This document tracks progress toward feature parity with the upstream develop branch.
 
-## Current Status (April 24, 2026)
+## Current Status (April 27, 2026)
 
-### Pending uncommitted changes (5 files, ~21 line edits)
-Java 11+ idiom modernization applied but NOT YET committed/verified:
-- `Stream.collect(Collectors.toList())` → `Stream.toList()` (Java 16+) — 5 sites in PatchApplier, NamedParameterQuery, RSCPacketFilter, Functions, Server
-- `.trim().isEmpty()` → `.isBlank()` (Java 11) — 7 sites in SpellHandler, Server, RecoveryChangeRequest, Admins
-- `new String(Files.readAllBytes(path))` → `Files.readString(path)` (Java 11) — 9 sites in JDBCPatchApplier, WorldPopulator, CombatOdysseyData, EntityHandler
+### Round 2 modernization — Java 11→21 idiom upgrades (now on develop)
 
-**Build:** passes. **Runtime:** can't currently verify — host disk is at 100% capacity, causing JVM init to hang reading a ResourceBundle Properties file. Investigation paused until disk space is freed.
+After the initial server-java-modern fork was merged into develop via
+the feat/2009scape branch, this round applied modern-Java idioms across
+the codebase. All commits pushed to origin/develop.
+
+| Commit | What |
+|---|---|
+| 1a30e8c79 | Stream.toList(), .isBlank(), Files.readString() — Java 11/16 idioms |
+| 8f0262654 | Switch expression conversion + AvatarFormat hashCode |
+| a95070268 | Lint cleanup: 5 serialVersionUIDs, 10 redundant casts, 7 fallthrough warnings, 7 hashCode methods (Player/GameObject/Item/3 projectile events/ObjectRemover) |
+| 1a9f75c18 | More switch expressions: StringUtil.formatMessage, Player kill-type-id, Player NPC face-on-finish, Npc.updatePosition |
+| b5fef399c | AbstractMap.SimpleEntry → Map.entry (41 sites, Java 9+) |
+| 1b5995a92 | 4 lossy-conversion fixes in Player XP party-share |
+
+### Modernizations deliberately skipped
+
+| Idiom | Why skipped |
+|---|---|
+| `var` keyword (Java 10) | 894 candidate sites is pure aesthetic churn that touches almost every file. Negative signal-to-noise. |
+| Records (Java 16) | Existing data classes use `getX()` accessor naming, while record components are `x()`. Migration would require renaming every caller. No clean candidates with low caller count found. |
+| Virtual threads (Java 21) | Server architecture is fundamentally single-threaded around the 640ms game tick. SQL pools intentionally serial. No fan-out I/O patterns where virtual threads would shine. |
+| World.java byte-traversalMask lossy warnings | Real precision concerns but `traversalMask` is `byte` while masks use 16-bit constants — a possibly latent bug. Needs semantic investigation, not mechanical suppression. |
+| 34 `this-escape` warnings | Mostly in legacy entity constructors that register self with parent during init. Refactoring touches plugin/event hierarchy widely. Out of scope. |
 
 ### Earlier status (April 19, 2026)
 
