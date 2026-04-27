@@ -39,7 +39,7 @@ Must report `BUILD SUCCEEDED`. iPhone 15 Pro device: `Brick the 15th`, id `00008
 - [x] Walk-target server command opcode 187 with multi-tile pathfinding: currently sends single destination. Server expects `[len][187][SHORT destX][SHORT destZ]` and optionally `[BYTE deltaX][BYTE deltaZ]` pairs for waypoints. Use existing Pathfinder.swift to compute waypoints; encode + send. _(verified — handleTap uses Pathfinder.findPath + appends BYTE deltas; commit 7bf0588b2 added int8 clamping for safety on very-long paths)_
 - [x] Quest dialogue: opcode 245 (already shows dialog options). Add SwiftUI overlay that buttons each option; tapping sends opcode 116 with the option index. _(verified — DialogueOverlayView in HUDView.swift + engine.answerDialogue(opcode 116) already wired)_
 - [x] Right-click context menu: long-press already triggers it, but the action list is empty. Build context-menu actions per target type (NPC: Talk to, Attack, Examine; Player: Trade, Duel, Follow, Examine; Object: Use, Examine; Item: Pickup, Examine). _(commit f61a4cb80 — also fixed the picker projection to match the tap-to-walk math)_
-- [ ] Friend status notifications: opcode 149 already adds chat — also flash a small toast UI when friends come online/offline.
+- [x] Friend status notifications: opcode 149 already adds chat — also flash a small toast UI when friends come online/offline. _(commit 3c7c9afdf — top-right capsule toasts, 3s auto-dismiss)_
 
 ## Workflow per iteration
 
