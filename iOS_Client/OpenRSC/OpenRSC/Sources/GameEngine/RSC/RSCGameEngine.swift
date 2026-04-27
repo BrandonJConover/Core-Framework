@@ -36,9 +36,31 @@ final class RSCGameEngine: ObservableObject {
     private var cameraX: Int32 = 0
     private var cameraY: Int32 = 0
     private var cameraZ: Int32 = 0
+    // Camera angles use Java's 1024-unit convention (1024 = full revolution).
+    // The Scene rotates by these in setCamera. Default pitch 64 = ~22.5°
+    // looking down (matches mudclient.java default).
     private var cameraRotation: Int32 = 0
     private var cameraPitch: Int32 = 64
     private var cameraZoom: Int32 = 750  // Java default: 750 (mudclient.java:311)
+
+    /// Camera rotation in degrees (0..360). Read by gesture handlers in GameView.
+    var cameraRotationDegrees: Double { Double(cameraRotation) * 360.0 / 256.0 }
+    var cameraPitchDegrees: Double { Double(cameraPitch) * 360.0 / 256.0 }
+
+    /// Set camera yaw from a degrees value (wraps mod 360). Used by pan gesture.
+    func setCameraRotationDegrees(_ deg: Double) {
+        var d = deg.truncatingRemainder(dividingBy: 360.0)
+        if d < 0 { d += 360 }
+        cameraRotation = Int32(d * 256.0 / 360.0) & 255
+    }
+
+    /// Set camera pitch from a degrees value, clamped to a sensible range so
+    /// the player can't tip the camera fully upside-down.
+    func setCameraPitchDegrees(_ deg: Double) {
+        // Clamp to roughly 30°..80° (look-down only) — corresponds to pitch 21..57
+        let clamped = max(30.0, min(80.0, deg))
+        cameraPitch = Int32(clamped * 256.0 / 360.0) & 255
+    }
 
     init() {
         packetHandler.worldState = worldState
@@ -680,27 +702,41 @@ final class RSCGameEngine: ObservableObject {
     // MARK: - Input handling
 
     private func handleTap(x: Int, y: Int) {
-        // Convert screen tap to world tile coordinates using isometric projection
-        let w = MetalRenderer.gameWidth
-        let h = MetalRenderer.gameHeight
-        let zoom = 24.0 * Double(zoomLevel)
-        let tilt = 0.55
-        let camRot = Double(cameraAngle) * .pi / 180.0
-        let cosR = cos(camRot); let sinR = sin(camRot)
-        let cx = Double(w) / 2.0; let cy = Double(h) * 0.40
+        // Convert screen tap → world tile by inverting the same camera transform
+        // the renderer uses. The Scene projects with rot1024 yaw/pitch; we
+        // approximate the inverse by raycasting from the camera through the tap
+        // pixel and intersecting the y=0 ground plane.
+        let w = Double(MetalRenderer.gameWidth)
+        let h = Double(MetalRenderer.gameHeight)
 
-        // Reverse isometric projection: screen → world
-        let screenDx = Double(x) - cx
-        let screenDy = Double(y) - cy
+        // Tap in normalized device coords (-1..+1)
+        let ndx = (Double(x) - w / 2.0) / (w / 2.0)
+        let ndy = (Double(y) - h / 2.0) / (h / 2.0)
 
-        // Undo isometric: sx = rx*zoom, sy = rz*zoom*tilt → rx = sx/zoom, rz = sy/(zoom*tilt)
-        let rx = screenDx / zoom
-        let rz = screenDy / (zoom * tilt)
+        // Approximate field of view for our perspective: ~60° horizontal at the
+        // current zoom. Larger zoom values pull camera back, narrowing FOV.
+        let zoomFactor = max(0.4, 1500.0 / Double(cameraZoom * 2))
+        let viewX = ndx * zoomFactor                         // ground X offset per unit ray length
+        let viewY = ndy * zoomFactor * (h / w)               // pitch component
 
-        // Undo rotation: rx = dx*cos - dz*sin, rz = dx*sin + dz*cos
-        // Solve: dx = rx*cos + rz*sin, dz = -rx*sin + rz*cos
-        let tileOffsetX = Int(rx * cosR + rz * sinR)
-        let tileOffsetY = Int(-rx * sinR + rz * cosR)
+        // Camera angles
+        let yawRad = Double(cameraRotation) * 2.0 * .pi / 1024.0
+        let pitchRad = Double(cameraPitch) * 2.0 * .pi / 1024.0
+
+        // Tap point's ground projection in camera-space, then rotated by yaw.
+        // viewY is forward-tilt; multiply by camera height (180 units) and
+        // adjust by pitch to get world-Z (forward) and use viewX for sideways.
+        let groundForward = (1.0 - viewY) * 180.0 / max(0.0001, sin(pitchRad))
+        let groundRight = viewX * groundForward
+
+        // Convert (right, forward) in camera space to world (X, Z) by rotating
+        // by camera yaw. Tile size is 128 game units.
+        let cosY = cos(yawRad), sinY = sin(yawRad)
+        let dxWorld = groundRight * cosY + groundForward * sinY
+        let dzWorld = -groundRight * sinY + groundForward * cosY
+
+        let tileOffsetX = Int(dxWorld / 128.0)
+        let tileOffsetY = Int(dzWorld / 128.0)
 
         let destX = worldState.localPlayerX + tileOffsetX
         let destZ = worldState.localPlayerY + tileOffsetY

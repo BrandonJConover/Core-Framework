@@ -60,3 +60,6 @@ targets:
         DEVELOPMENT_TEAM: MJAYYU2WWD
         CODE_SIGN_IDENTITY: "iPhone Developer"
         CODE_SIGN_STYLE: Automatic
+        # Define OPENRSC_APP so OpenRSCApp.swift's @main attribute is active.
+        # Without this, the linker can't find _main.
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) OPENRSC_APP"
