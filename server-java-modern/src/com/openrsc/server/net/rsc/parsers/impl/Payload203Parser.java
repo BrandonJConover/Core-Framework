@@ -496,77 +496,79 @@ public class Payload203Parser implements PayloadParser<OpcodeIn> {
 			System.out.println("Received unknown opcode %d from authentic claiming client".formatted(opcode));
 			return false;
 		}
-		switch (op) {
-			case HEARTBEAT -> { return payloadLength == 0; }
-			case WALK_TO_ENTITY -> { return payloadLength >= 4; }
-			case WALK_TO_POINT -> { return payloadLength >= 4; }
-			case CONFIRM_LOGOUT -> { return payloadLength == 0; }
-			case LOGOUT -> { return payloadLength == 0; }
-			case COMBAT_STYLE_CHANGED -> { return payloadLength == 1; }
-			case QUESTION_DIALOG_ANSWER -> { return payloadLength == 1; }
-			case PLAYER_APPEARANCE_CHANGE -> { return payloadLength == 8; }
-			case SOCIAL_ADD_IGNORE -> { return payloadLength >= 8; }
-			case SOCIAL_ADD_FRIEND -> { return payloadLength >= 8; }
-			case SOCIAL_SEND_PRIVATE_MESSAGE -> { return payloadLength >= 8; }
-			case SOCIAL_REMOVE_FRIEND -> { return payloadLength >= 8; }
-			case SOCIAL_REMOVE_IGNORE -> { return payloadLength >= 8; }
-			case DUEL_FIRST_SETTINGS_CHANGED -> { return payloadLength == 4; }
-			case DUEL_FIRST_ACCEPTED -> { return payloadLength == 0; }
-			case DUEL_DECLINED -> { return payloadLength == 0; }
-			case DUEL_OFFER_ITEM -> { return payloadLength >= 1; }
-			case DUEL_SECOND_ACCEPTED -> { return payloadLength == 0; }
-			case INTERACT_WITH_BOUNDARY -> { return payloadLength == 5; }
-			case INTERACT_WITH_BOUNDARY2 -> { return payloadLength == 5; }
-			case CAST_ON_BOUNDARY -> { return payloadLength == 7; }
-			case USE_WITH_BOUNDARY -> { return payloadLength == 7; }
-			case NPC_TALK_TO -> { return payloadLength == 2; }
-			case NPC_COMMAND -> { return payloadLength == 2; }
-			case NPC_ATTACK -> { return payloadLength == 2; }
-			case CAST_ON_NPC -> { return payloadLength == 4; }
-			case NPC_USE_ITEM -> { return payloadLength == 4; }
-			case PLAYER_CAST_PVP -> { return payloadLength == 4; }
-			case PLAYER_USE_ITEM -> { return payloadLength == 4; }
-			case PLAYER_ATTACK -> { return payloadLength == 2; }
-			case PLAYER_DUEL -> { return payloadLength == 2; }
-			case PLAYER_INIT_TRADE_REQUEST -> { return payloadLength == 2; }
-			case PLAYER_FOLLOW -> { return payloadLength == 2; }
-			case CAST_ON_GROUND_ITEM -> { return payloadLength == 8; }
-			case GROUND_ITEM_USE_ITEM -> { return payloadLength == 8; }
-			case GROUND_ITEM_TAKE -> { return payloadLength >= 6; }
-			case CAST_ON_INVENTORY_ITEM -> { return payloadLength == 4; }
-			case ITEM_USE_ITEM -> { return payloadLength == 4; }
-			case ITEM_UNEQUIP_FROM_INVENTORY -> { return payloadLength == 2; }
-			case ITEM_EQUIP_FROM_INVENTORY -> { return payloadLength == 2; }
-			case ITEM_COMMAND -> { return payloadLength == 2; }
-			case ITEM_DROP -> { return payloadLength == 2; }
-			case CAST_ON_SELF -> { return payloadLength == 2; }
-			case CAST_ON_LAND -> { return payloadLength == 6; }
-			case OBJECT_COMMAND -> { return payloadLength == 4; }
-			case OBJECT_COMMAND2 -> { return payloadLength == 4; }
-			case CAST_ON_SCENERY -> { return payloadLength == 6; }
-			case USE_ITEM_ON_SCENERY -> { return payloadLength == 6; }
-			case SHOP_CLOSE -> { return payloadLength == 0; }
-			case SHOP_BUY -> { return payloadLength == 6; }
-			case SHOP_SELL -> { return payloadLength == 6; }
-			case PLAYER_ACCEPTED_INIT_TRADE_REQUEST -> { return payloadLength == 0; }
-			case PLAYER_DECLINED_TRADE -> { return payloadLength == 0; }
-			case PLAYER_ADDED_ITEMS_TO_TRADE_OFFER -> { return payloadLength >= 1; }
-			case PLAYER_ACCEPTED_TRADE -> { return payloadLength == 0; }
-			case PRAYER_ACTIVATED -> { return payloadLength == 1; }
-			case PRAYER_DEACTIVATED -> { return payloadLength == 1; }
-			case GAME_SETTINGS_CHANGED -> { return payloadLength == 2; }
-			case CHAT_MESSAGE -> { return payloadLength >= 1; }
-			case COMMAND -> { return payloadLength >= 1; }
-			case PRIVACY_SETTINGS_CHANGED -> { return payloadLength == 4; }
-			case REPORT_ABUSE -> { return payloadLength == 10; }
-			case BANK_CLOSE -> { return payloadLength == 0; }
-			case BANK_WITHDRAW -> { return payloadLength >= 8; }
-			case BANK_DEPOSIT -> { return payloadLength >= 8; }
-			case SLEEPWORD_ENTERED -> { return payloadLength >= 1; }
-			case KNOWN_PLAYERS -> { return payloadLength >= 2; }
-		}
-		System.out.println("Received UNHANDLED opcode %d from authentic claiming client".formatted(opcode));
-		return false;
+		return switch (op) {
+			case HEARTBEAT -> payloadLength == 0;
+			case WALK_TO_ENTITY -> payloadLength >= 4;
+			case WALK_TO_POINT -> payloadLength >= 4;
+			case CONFIRM_LOGOUT -> payloadLength == 0;
+			case LOGOUT -> payloadLength == 0;
+			case COMBAT_STYLE_CHANGED -> payloadLength == 1;
+			case QUESTION_DIALOG_ANSWER -> payloadLength == 1;
+			case PLAYER_APPEARANCE_CHANGE -> payloadLength == 8;
+			case SOCIAL_ADD_IGNORE -> payloadLength >= 8;
+			case SOCIAL_ADD_FRIEND -> payloadLength >= 8;
+			case SOCIAL_SEND_PRIVATE_MESSAGE -> payloadLength >= 8;
+			case SOCIAL_REMOVE_FRIEND -> payloadLength >= 8;
+			case SOCIAL_REMOVE_IGNORE -> payloadLength >= 8;
+			case DUEL_FIRST_SETTINGS_CHANGED -> payloadLength == 4;
+			case DUEL_FIRST_ACCEPTED -> payloadLength == 0;
+			case DUEL_DECLINED -> payloadLength == 0;
+			case DUEL_OFFER_ITEM -> payloadLength >= 1;
+			case DUEL_SECOND_ACCEPTED -> payloadLength == 0;
+			case INTERACT_WITH_BOUNDARY -> payloadLength == 5;
+			case INTERACT_WITH_BOUNDARY2 -> payloadLength == 5;
+			case CAST_ON_BOUNDARY -> payloadLength == 7;
+			case USE_WITH_BOUNDARY -> payloadLength == 7;
+			case NPC_TALK_TO -> payloadLength == 2;
+			case NPC_COMMAND -> payloadLength == 2;
+			case NPC_ATTACK -> payloadLength == 2;
+			case CAST_ON_NPC -> payloadLength == 4;
+			case NPC_USE_ITEM -> payloadLength == 4;
+			case PLAYER_CAST_PVP -> payloadLength == 4;
+			case PLAYER_USE_ITEM -> payloadLength == 4;
+			case PLAYER_ATTACK -> payloadLength == 2;
+			case PLAYER_DUEL -> payloadLength == 2;
+			case PLAYER_INIT_TRADE_REQUEST -> payloadLength == 2;
+			case PLAYER_FOLLOW -> payloadLength == 2;
+			case CAST_ON_GROUND_ITEM -> payloadLength == 8;
+			case GROUND_ITEM_USE_ITEM -> payloadLength == 8;
+			case GROUND_ITEM_TAKE -> payloadLength >= 6;
+			case CAST_ON_INVENTORY_ITEM -> payloadLength == 4;
+			case ITEM_USE_ITEM -> payloadLength == 4;
+			case ITEM_UNEQUIP_FROM_INVENTORY -> payloadLength == 2;
+			case ITEM_EQUIP_FROM_INVENTORY -> payloadLength == 2;
+			case ITEM_COMMAND -> payloadLength == 2;
+			case ITEM_DROP -> payloadLength == 2;
+			case CAST_ON_SELF -> payloadLength == 2;
+			case CAST_ON_LAND -> payloadLength == 6;
+			case OBJECT_COMMAND -> payloadLength == 4;
+			case OBJECT_COMMAND2 -> payloadLength == 4;
+			case CAST_ON_SCENERY -> payloadLength == 6;
+			case USE_ITEM_ON_SCENERY -> payloadLength == 6;
+			case SHOP_CLOSE -> payloadLength == 0;
+			case SHOP_BUY -> payloadLength == 6;
+			case SHOP_SELL -> payloadLength == 6;
+			case PLAYER_ACCEPTED_INIT_TRADE_REQUEST -> payloadLength == 0;
+			case PLAYER_DECLINED_TRADE -> payloadLength == 0;
+			case PLAYER_ADDED_ITEMS_TO_TRADE_OFFER -> payloadLength >= 1;
+			case PLAYER_ACCEPTED_TRADE -> payloadLength == 0;
+			case PRAYER_ACTIVATED -> payloadLength == 1;
+			case PRAYER_DEACTIVATED -> payloadLength == 1;
+			case GAME_SETTINGS_CHANGED -> payloadLength == 2;
+			case CHAT_MESSAGE -> payloadLength >= 1;
+			case COMMAND -> payloadLength >= 1;
+			case PRIVACY_SETTINGS_CHANGED -> payloadLength == 4;
+			case REPORT_ABUSE -> payloadLength == 10;
+			case BANK_CLOSE -> payloadLength == 0;
+			case BANK_WITHDRAW -> payloadLength >= 8;
+			case BANK_DEPOSIT -> payloadLength >= 8;
+			case SLEEPWORD_ENTERED -> payloadLength >= 1;
+			case KNOWN_PLAYERS -> payloadLength >= 2;
+			default -> {
+				System.out.println("Received UNHANDLED opcode %d from authentic claiming client".formatted(opcode));
+				yield false;
+			}
+		};
 	}
 
 	static {

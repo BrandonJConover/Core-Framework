@@ -4,7 +4,9 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.zip.GZIPInputStream;
 
 public class AvatarFormat {
@@ -384,6 +386,11 @@ public class AvatarFormat {
 			return true;
 		}
 
+		@Override
+		public int hashCode() {
+			return Objects.hash(id, type, layer) ^ Arrays.hashCode(frames);
+		}
+
 		public Entry clone() {
 			Entry entry = new Entry(
 				this.id,
@@ -453,6 +460,12 @@ public class AvatarFormat {
 			}
 
 			return true;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(width, height, useShift, offsetX, offsetY, boundWidth, boundHeight)
+				^ Arrays.hashCode(pixels);
 		}
 
 		public int getWidth() {
