@@ -28,7 +28,7 @@ Must report `BUILD SUCCEEDED`. iPhone 15 Pro device: `Brick the 15th`, id `00008
 ## Items (highest impact first)
 
 - [x] Combat animations: port `animFrameToSprite_CombatA = [0,1,2,1,0,0,0,0]` and `animFrameToSprite_CombatB = [0,0,0,0,0,1,2,1]` from mudclient.java line 97-98 into CharacterBillboards.swift; pick CombatA vs CombatB per character based on a new `inCombat: Bool` + `combatRole: Int` field on RSCNPC/RSCPlayer; cycle through frames over time using a tick counter; render combat frames at offset = 15 + frame*1 (NOT walking offsets). _(commit efd14b2f6 — uses combatTimeout/inCombat as the role signal; per-NPC combatRole field on the struct is deferred until the server sends explicit combatant-side info.)_
-- [ ] Welcome screen: new file `Sources/Views/Game/WelcomePanel.swift`. Show on opcode 182 (already received). Display last login IP + days since last login + welcome text. Dismiss button.
+- [x] Welcome screen: new file `Sources/Views/Game/WelcomePanel.swift`. Show on opcode 182 (already received). Display last login IP + days since last login + welcome text. Dismiss button. _(commit d17b68508 — also added six tip-of-day strings from mudclient tipsArray)_
 - [ ] Sleep screen: new file `Sources/Views/Game/SleepPanel.swift`. Show on opcode 117 (showSleepScreen). Display the captcha image (raw pixel data from worldState.sleepCaptchaImage), text input field, "Submit" sends opcode 45 (SEND_SLEEPWORD) with the typed string.
 - [ ] WAKE_UP packet handler: opcode 84, sets `worldState.isSleeping = false`. (Already exists per earlier note — verify and add if missing.)
 - [ ] INCORRECT_SLEEPWORD: opcode 224, sets a flag in worldState that SleepPanel can show as "Word incorrect, try again" — adds shake animation.
