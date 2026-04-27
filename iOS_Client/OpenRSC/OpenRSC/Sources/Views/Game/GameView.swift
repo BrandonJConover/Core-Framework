@@ -10,6 +10,14 @@ struct GameView: View {
     @State private var hudVisible: Bool = true
     @State private var quickStatsVisible: Bool = true
 
+    // Gesture state — accumulators that capture the camera/zoom snapshot at
+    // gesture-start so .onChanged values are interpreted as deltas, not absolutes.
+    @State private var dragStartLocation: CGPoint = .zero
+    @State private var dragStartCameraRotation: CGFloat = 0
+    @State private var dragStartCameraPitch: CGFloat = 0
+    @State private var dragMovedFar: Bool = false
+    @State private var pinchStartZoom: CGFloat = 1.6
+
     var body: some View {
         #if canImport(UIKit)
         GeometryReader { geo in
@@ -19,12 +27,36 @@ struct GameView: View {
                 // Metal game canvas — full screen
                 MetalViewRepresentable(engine: engine)
                     .ignoresSafeArea()
+                    // Single-finger drag = pan-rotate camera. A drag that
+                    // never moves more than ~10pt is treated as a tap when
+                    // it ends. Threshold avoids tiny finger jitter being
+                    // counted as a drag.
                     .gesture(
                         DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                if !dragMovedFar {
+                                    let dist = hypot(value.translation.width, value.translation.height)
+                                    if dist < 10 { return }   // still treating this as a tap-in-progress
+                                    dragMovedFar = true
+                                    dragStartCameraRotation = CGFloat(engine.cameraRotationDegrees)
+                                    dragStartCameraPitch = CGFloat(engine.cameraPitchDegrees)
+                                }
+                                // Horizontal drag rotates the yaw, vertical drag
+                                // adjusts pitch. Sensitivity scales 1 pt → ~0.6°.
+                                let rotDelta = value.translation.width * 0.6
+                                let pitchDelta = -value.translation.height * 0.4
+                                engine.setCameraRotationDegrees(Double(dragStartCameraRotation + rotDelta))
+                                engine.setCameraPitchDegrees(Double(dragStartCameraPitch + pitchDelta))
+                            }
                             .onEnded { value in
-                                engine.touchTranslator.handleTap(at: value.location)
+                                if !dragMovedFar {
+                                    // Treated as a tap.
+                                    engine.touchTranslator.handleTap(at: value.location)
+                                }
+                                dragMovedFar = false
                             }
                     )
+                    // Long-press = right-click context menu.
                     .simultaneousGesture(
                         LongPressGesture(minimumDuration: 0.5)
                             .sequenced(before: DragGesture(minimumDistance: 0))
@@ -36,10 +68,20 @@ struct GameView: View {
                                 }
                             }
                     )
+                    // Pinch = zoom. The gesture's `scale` is multiplicative
+                    // since the gesture started, so we capture the start zoom
+                    // once and apply scale relative to it.
                     .simultaneousGesture(
                         MagnificationGesture()
                             .onChanged { scale in
-                                engine.zoomLevel = max(0.5, min(3.0, scale))
+                                if abs(scale - 1.0) < 0.01 {
+                                    pinchStartZoom = engine.zoomLevel
+                                }
+                                let newZoom = pinchStartZoom * scale
+                                engine.zoomLevel = max(0.5, min(3.0, newZoom))
+                            }
+                            .onEnded { _ in
+                                pinchStartZoom = engine.zoomLevel
                             }
                     )
 
