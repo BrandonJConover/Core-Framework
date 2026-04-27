@@ -12150,9 +12150,10 @@ export class Game extends GameShell {
                 (globalThis as any).js5Cache = js5Cache;
                 console.log("Js5Cache initialized");
                 await this.preloadSprites530(js5Cache);
-                // idx13 font metrics need a guarded/offline decode pass before startup can
-                // safely preload them. The adapter is in FontLoader530; keep startup on the
-                // verified sprite path until the idx13 sector path is hardened.
+                // Try font preload — each fetch in preloadFonts530 is wrapped in
+                // withTimeout(1000ms) so a slow/missing idx13 sector can't stall startup.
+                // Worst case `fonts530` ends up empty and TypeFace falls back to stubs.
+                await this.preloadFonts530(js5Cache);
             }
             const present = extraIdxNumbers.filter((n) => extraIdx[n] != null);
             console.log("530 extra indexes loaded: " + present.join(","));
@@ -12183,16 +12184,37 @@ export class Game extends GameShell {
     }
 
     async preloadFonts530(js5Cache: Js5Cache) {
+        console.log("preloadFonts530:start");
         const fonts: { [name: string]: any } = {};
         const sprites = (globalThis as any).sprites530 || {};
-        for (const name of ["p11_full", "p12_full", "b12_full"]) {
-            try {
-                const groupId = await this.withTimeout(js5Cache.getGroupId(8, name), 1000);
-                const metrics = groupId >= 0 ? await this.withTimeout(js5Cache.getFileBytes(13, groupId, 0), 1000) : null;
-                const font = metrics && sprites[name] ? FontLoader530.decode(metrics, sprites[name]) : null;
-                if (font) fonts[name] = font;
-            } catch (e) {
-                // Keep startup resilient while the 530 font bridge matures.
+        // First try to bring up idx13 metadata under an outer timeout — if the
+        // master-index entry for idx13 is malformed or its decompression hangs,
+        // fall through with empty fonts rather than stalling startup.
+        let idx13Ready = false;
+        try {
+            const meta13 = await this.withTimeout(js5Cache.getMeta(13), 2000);
+            idx13Ready = !!meta13;
+            console.log("preloadFonts530:idx13Ready=" + idx13Ready);
+        } catch (e) {
+            console.log("preloadFonts530:idx13 meta timeout");
+        }
+        if (idx13Ready) {
+            for (const name of ["p11_full", "p12_full", "b12_full"]) {
+                console.log("preloadFonts530:try " + name);
+                try {
+                    const groupId = await this.withTimeout(js5Cache.getGroupId(13, name), 500);
+                    console.log("preloadFonts530:" + name + " groupId=" + groupId);
+                    if (groupId < 0) continue;
+                    const metrics = await this.withTimeout(js5Cache.getGroupBytes(13, groupId), 1500);
+                    console.log("preloadFonts530:" + name + " metricsSize=" + (metrics?.byteLength || 0));
+                    const font = metrics && sprites[name] ? FontLoader530.decode(metrics, sprites[name]) : null;
+                    if (font) {
+                        fonts[name] = font;
+                        console.log("preloadFonts530:loaded " + name);
+                    }
+                } catch (e) {
+                    console.log("preloadFonts530:failed " + name + " (" + (e as Error).message + ")");
+                }
             }
         }
         (globalThis as any).fonts530 = fonts;

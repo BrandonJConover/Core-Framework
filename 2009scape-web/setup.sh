@@ -65,13 +65,20 @@ cd "$SCRIPT_DIR/client"
 
 if command -v npm &>/dev/null; then
     npm install
+    # Extra runtime deps needed by the rev-530 patches but not in the upstream
+    # 377 client's package.json. seek-bzip is the primary BZip2 decoder used by
+    # Js5Cache.uncompress (the in-tree 377-era decoder CPU-spins on some 530
+    # idx13 streams; seek-bzip is reliable and well-tested).
+    if ! [ -d node_modules/seek-bzip ]; then
+        npm install --no-save seek-bzip@2.0.0
+    fi
     npm run build
     echo ""
     echo "=== Build complete ==="
     echo "Client dist: $SCRIPT_DIR/client/dist/"
 else
     echo "[!] npm not found. Install Node.js, then run:"
-    echo "    cd $SCRIPT_DIR/client && npm install && npm run build"
+    echo "    cd $SCRIPT_DIR/client && npm install && npm install --no-save seek-bzip@2.0.0 && npm run build"
 fi
 
 echo ""
