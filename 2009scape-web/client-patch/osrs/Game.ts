@@ -5912,6 +5912,12 @@ export class Game extends GameShell {
             l3--;
             const l5: number = this.anIntArray1123[l3];
             const j6: number = this.anIntArray1124[l3];
+            // 530 body layout (rt4-client ClientProt.method3502):
+            //   opcode, length-byte, ctrl(p1add), destX(p2 BE raw),
+            //   destY(p2add BE), then per-waypoint dx(p1add) + dy(p1sub).
+            // 377 layout was destX-first then ctrl then destY using
+            // little-endian-added 16-bit. Wire opcode is mapped by
+            // Buffer.OUTGOING_REMAP (28/213/247 → 215/39/77).
             if (packetType === 0) {
                 this.outBuffer.putOpcode(28);
                 this.outBuffer.putByte(j4 + j4 + 3);
@@ -5924,15 +5930,15 @@ export class Game extends GameShell {
                 this.outBuffer.putOpcode(247);
                 this.outBuffer.putByte(j4 + j4 + 3);
             }
-            this.outBuffer.putLEShortAdded(l5 + this.nextTopLeftTileX);
-            this.outBuffer.putByte(this.keyStatus[5] !== 1 ? 0 : 1);
-            this.outBuffer.putLEShortAdded(j6 + this.nextTopRightTileY);
+            this.outBuffer.putByteAdded(this.keyStatus[5] !== 1 ? 0 : 1);
+            this.outBuffer.putShort(l5 + this.nextTopLeftTileX);
+            this.outBuffer.putShortAdded(j6 + this.nextTopRightTileY);
             this.destinationX = this.anIntArray1123[0];
             this.destinationY = this.anIntArray1124[0];
             for (let l6: number = 1; l6 < j4; l6++) {
                 {
                     l3--;
-                    this.outBuffer.putByte(this.anIntArray1123[l3] - l5);
+                    this.outBuffer.putByteAdded(this.anIntArray1123[l3] - l5);
                     this.outBuffer.putByteSubtracted(this.anIntArray1124[l3] - j6);
                 }
             }
