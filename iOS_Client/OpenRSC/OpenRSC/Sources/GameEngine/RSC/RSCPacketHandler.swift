@@ -223,8 +223,9 @@ final class RSCPacketHandler {
         case 245: // showOptionsMenu (NPC dialogue options)
             handleShowOptionsMenu(buf: buf, ws: ws)
 
-        case 204: // playSound
-            let _ = buf.getString() // soundName — no audio system yet
+        case 204: // playSound — Java PacketHandler.playSound() / soundPlayer.playSoundFile()
+            let soundName = buf.getString()
+            SoundManager.shared.play(name: soundName)
 
         case 118: // killAnnouncement
             let text = buf.getString()

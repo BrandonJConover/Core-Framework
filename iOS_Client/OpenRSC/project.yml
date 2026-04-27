@@ -66,6 +66,13 @@ targets:
         type: file
         buildPhase: resources
         optional: true
+      # Sound effects (37 .wav files + sounds.mem). Mirrors
+      # Client_Base/Cache/audio/. Loaded by SoundManager via
+      # Bundle.main.url(forResource:withExtension:"wav").
+      - path: OpenRSC/Audio
+        type: folder
+        buildPhase: resources
+        optional: true
     info:
       path: OpenRSC/Info.plist
       properties:

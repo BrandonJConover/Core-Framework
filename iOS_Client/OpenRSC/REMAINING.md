@@ -1,0 +1,54 @@
+# Remaining iOS Client Work
+
+Drive iOS OpenRSC toward feature parity with desktop Java client.
+
+## Repo
+
+- Root: `/Users/brandonjconover/Documents/GitHub/Core-Framework`
+- iOS sources: `iOS_Client/OpenRSC/OpenRSC/Sources/`
+- Java reference: `Client_Base/src/`
+
+## Build command
+
+```sh
+cd /Users/brandonjconover/Documents/GitHub/Core-Framework/iOS_Client/OpenRSC \
+  && xcodegen generate \
+  && xcodebuild -project OpenRSC.xcodeproj -scheme OpenRSC \
+       -configuration Debug \
+       -destination 'id=00008130-000805D10AF0001C' \
+       -derivedDataPath /tmp/openrsc-build-ralph build
+```
+
+Must report `BUILD SUCCEEDED`. iPhone 15 Pro device: `Brick the 15th`, id `00008130-000805D10AF0001C`.
+
+## Avoid (other agents own these)
+
+`HUDView.swift, MinimapPanel.swift, PrayerPanel.swift, SpellbookPanel.swift, CombatStylePanel.swift, SettingsPanel.swift, QuestBookPanel.swift, SocialPanel.swift, BankPanel.swift, ShopPanel.swift, TradePanel.swift, DuelPanel.swift, SoundManager.swift, AppearancePanel.swift, ModelArchiveLoader.swift`
+
+## Items (highest impact first)
+
+- [x] Combat animations: port `animFrameToSprite_CombatA = [0,1,2,1,0,0,0,0]` and `animFrameToSprite_CombatB = [0,0,0,0,0,1,2,1]` from mudclient.java line 97-98 into CharacterBillboards.swift; pick CombatA vs CombatB per character based on a new `inCombat: Bool` + `combatRole: Int` field on RSCNPC/RSCPlayer; cycle through frames over time using a tick counter; render combat frames at offset = 15 + frame*1 (NOT walking offsets). _(commit efd14b2f6 — uses combatTimeout/inCombat as the role signal; per-NPC combatRole field on the struct is deferred until the server sends explicit combatant-side info.)_
+- [ ] Welcome screen: new file `Sources/Views/Game/WelcomePanel.swift`. Show on opcode 182 (already received). Display last login IP + days since last login + welcome text. Dismiss button.
+- [ ] Sleep screen: new file `Sources/Views/Game/SleepPanel.swift`. Show on opcode 117 (showSleepScreen). Display the captcha image (raw pixel data from worldState.sleepCaptchaImage), text input field, "Submit" sends opcode 45 (SEND_SLEEPWORD) with the typed string.
+- [ ] WAKE_UP packet handler: opcode 84, sets `worldState.isSleeping = false`. (Already exists per earlier note — verify and add if missing.)
+- [ ] INCORRECT_SLEEPWORD: opcode 224, sets a flag in worldState that SleepPanel can show as "Word incorrect, try again" — adds shake animation.
+- [ ] System update timer: opcode 52 (SYSTEM_UPDATE), 2-byte tick countdown until reboot. Display as a banner above the chat window.
+- [ ] Kill announcement: opcode 118 (already partially handled — verify it shows in chat with red color).
+- [ ] Player appearance update from server: opcode 234's appearance section — currently we only parse position/direction; full appearance update is in PacketHandler.java updatePlayerAppearances. Port that so other players show their actual cosmetic (head/body/legs/colors) instead of default starter avatar.
+- [ ] Terrain textures: port `Shader.swift` scanline rasterization to actually run. Currently Scene uses bbox-fill. Wire `Shader.shadeScanlineTransparentNormal` for terrain polygons that have a texture index instead of a color. Need texture archive `textures.orsc` — check if it's in `Client_Base/Cache/video/`. If absent, document and skip.
+- [ ] Walk-target server command opcode 187 with multi-tile pathfinding: currently sends single destination. Server expects `[len][187][SHORT destX][SHORT destZ]` and optionally `[BYTE deltaX][BYTE deltaZ]` pairs for waypoints. Use existing Pathfinder.swift to compute waypoints; encode + send.
+- [ ] Quest dialogue: opcode 245 (already shows dialog options). Add SwiftUI overlay that buttons each option; tapping sends opcode 116 with the option index.
+- [ ] Right-click context menu: long-press already triggers it, but the action list is empty. Build context-menu actions per target type (NPC: Talk to, Attack, Examine; Player: Trade, Duel, Follow, Examine; Object: Use, Examine; Item: Pickup, Examine).
+- [ ] Friend status notifications: opcode 149 already adds chat — also flash a small toast UI when friends come online/offline.
+
+## Workflow per iteration
+
+1. Pick top unchecked item.
+2. Read corresponding Java in `Client_Base/src/`.
+3. Implement; touch only the files this item needs.
+4. Run build command. Fix compile errors until BUILD SUCCEEDED.
+5. `git add` the files you touched, commit with message starting `iOS: <feature>`.
+6. Mark this item `[x]` in this file. Commit the file change.
+7. Stop the iteration.
+
+Do NOT push to remote. Do NOT touch the avoid list. Keep changes small and single-feature.
