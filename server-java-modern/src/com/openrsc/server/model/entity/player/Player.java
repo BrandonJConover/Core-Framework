@@ -1850,12 +1850,12 @@ public final class Player extends Mob {
 				// Do some maths to get the XP to reward
 				switch (getConfig().PARTY_SHARE_SIZE_ALGORITHM) {
 					case "linear":
-						xpLeftToReward *= 1.0 + (getConfig().PARTY_ADDITIONAL_XP_PERCENT_PER_PLAYER
-							* Math.min(shareCount, getConfig().PARTY_MAX_SIZE_FOR_ADDITIONAL_XP));
+						xpLeftToReward = (int) (xpLeftToReward * (1.0 + (getConfig().PARTY_ADDITIONAL_XP_PERCENT_PER_PLAYER
+							* Math.min(shareCount, getConfig().PARTY_MAX_SIZE_FOR_ADDITIONAL_XP))));
 						break;
 					case "exponential":
-						xpLeftToReward *= Math.pow(1.0 + getConfig().PARTY_ADDITIONAL_XP_PERCENT_PER_PLAYER,
-							Math.min(shareCount, getConfig().PARTY_MAX_SIZE_FOR_ADDITIONAL_XP));
+						xpLeftToReward = (int) (xpLeftToReward * Math.pow(1.0 + getConfig().PARTY_ADDITIONAL_XP_PERCENT_PER_PLAYER,
+							Math.min(shareCount, getConfig().PARTY_MAX_SIZE_FOR_ADDITIONAL_XP)));
 						break;
 					default:
 						LOGGER.error("Unrecognized PARTY_SHARE_SIZE_ALGORITHM provided in config");
@@ -1893,7 +1893,7 @@ public final class Player extends Mob {
 					// Award XP to the party member
 					int playerXp = (int) (maxXpPerSharedPlayer * xpDropoffPercent);
 					xpLeftToReward -= playerXp;
-					playerXp *= partyMemberPlayer.getExperienceMultiplier(skill);
+					playerXp = (int) (playerXp * partyMemberPlayer.getExperienceMultiplier(skill));
 					if (getConfig().WANT_OPENPK_POINTS) {
 						partyMemberPlayer.addOpenPkPoints(playerXp);
 					} else {
@@ -1906,7 +1906,7 @@ public final class Player extends Mob {
 
 		// Update this player's XP.
 		thisXp = Math.min(thisXp, skillXP);
-		thisXp *= getExperienceMultiplier(skill);
+		thisXp = (int) (thisXp * getExperienceMultiplier(skill));
 		if (getConfig().WANT_OPENPK_POINTS) {
 			addOpenPkPoints(thisXp);
 		} else {
