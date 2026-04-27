@@ -895,11 +895,6 @@ final class RSCGameEngine: ObservableObject {
     func showContextMenu(at screenPoint: CGPoint) {
         let w = MetalRenderer.gameWidth
         let h = MetalRenderer.gameHeight
-        let zoom = 24.0 * Double(zoomLevel)
-        let tilt = 0.55
-        let camRot = Double(cameraAngle) * .pi / 180.0
-        let cosR = cos(camRot); let sinR = sin(camRot)
-        let cx = Double(w) / 2.0; let cy = Double(h) * 0.40
 
         // Convert screen point to game pixel coordinates
         let viewSize = touchTranslator.viewSize
@@ -908,18 +903,30 @@ final class RSCGameEngine: ObservableObject {
         let gx = Double(screenPoint.x) * Double(scaleX)
         let gy = Double(screenPoint.y) * Double(scaleY)
 
-        // Reverse isometric projection
-        let rx = (gx - cx) / zoom
-        let rz = (gy - cy) / (zoom * tilt)
-        let tileOffsetX = Int(rx * cosR + rz * sinR)
-        let tileOffsetY = Int(-rx * sinR + rz * cosR)
+        // Reverse projection — same ground-plane raycast handleTap uses, so the
+        // context-menu picker lines up with where the user actually pressed.
+        let ndx = (gx - Double(w) / 2.0) / (Double(w) / 2.0)
+        let ndy = (gy - Double(h) / 2.0) / (Double(h) / 2.0)
+        let zoomFactor = max(0.4, 1500.0 / Double(cameraZoom * 2))
+        let viewX = ndx * zoomFactor
+        let viewY = ndy * zoomFactor * (Double(h) / Double(w))
+        let yawRad = Double(cameraRotation) * 2.0 * .pi / 1024.0
+        let pitchRad = Double(cameraPitch) * 2.0 * .pi / 1024.0
+        let groundForward = (1.0 - viewY) * 180.0 / max(0.0001, sin(pitchRad))
+        let groundRight = viewX * groundForward
+        let cosY = cos(yawRad), sinY = sin(yawRad)
+        let dxWorld = groundRight * cosY + groundForward * sinY
+        let dzWorld = -groundRight * sinY + groundForward * cosY
+        let tileOffsetX = Int(dxWorld / 128.0)
+        let tileOffsetY = Int(dzWorld / 128.0)
         let worldX = worldState.localPlayerX + tileOffsetX
         let worldZ = worldState.localPlayerY + tileOffsetY
 
         var actions: [(label: String, icon: String, action: () -> Void)] = []
         var title = "(\(worldX), \(worldZ))"
 
-        // Check NPCs (within 2 tiles)
+        // Check NPCs (within 2 tiles). Always offer Examine; offer Attack only
+        // for combat-eligible NPCs (NPCDef.attackable == true).
         for npc in worldState.npcs {
             let dx: Int = npc.x - worldX; let dz: Int = npc.y - worldZ
             let distSq: Int = dx * dx + dz * dz
@@ -928,17 +935,23 @@ final class RSCGameEngine: ObservableObject {
                 actions.append(("Talk to \(npc.name)", "bubble.left", { [weak self] in
                     self?.talkToNPC(serverIndex: npc.id)
                 }))
-                actions.append(("Attack \(npc.name)", "bolt.fill", { [weak self] in
-                    self?.attackNPC(serverIndex: npc.id)
-                }))
+                if let def = NPCDefinitions.get(npc.npcId), def.attackable {
+                    actions.append(("Attack \(npc.name) (lvl \(def.combatLevel))", "bolt.fill", { [weak self] in
+                        self?.attackNPC(serverIndex: npc.id)
+                    }))
+                }
                 actions.append(("Pickpocket \(npc.name)", "hand.raised", { [weak self] in
                     self?.npcCommand(serverIndex: npc.id)
+                }))
+                actions.append(("Examine \(npc.name)", "eye", { [weak self] in
+                    let descr = NPCDefinitions.get(npc.npcId)?.description ?? npc.name
+                    self?.worldState.addChat(sender: "[Examine]", text: descr)
                 }))
                 break
             }
         }
 
-        // Check players (within 2 tiles)
+        // Check players (within 2 tiles). Add Trade + Duel + Follow + Examine.
         for player in worldState.players {
             let pdx: Int = player.x - worldX; let pdz: Int = player.y - worldZ
             if pdx * pdx + pdz * pdz <= 4 {
@@ -946,8 +959,17 @@ final class RSCGameEngine: ObservableObject {
                 actions.append(("Attack \(player.name)", "bolt.fill", { [weak self] in
                     self?.attackPlayer(serverIndex: player.id)
                 }))
+                actions.append(("Trade with \(player.name)", "arrow.left.arrow.right", { [weak self] in
+                    self?.requestTrade(serverIndex: player.id)
+                }))
+                actions.append(("Duel \(player.name)", "shield.lefthalf.filled", { [weak self] in
+                    self?.requestDuel(serverIndex: player.id)
+                }))
                 actions.append(("Follow \(player.name)", "figure.walk", { [weak self] in
                     self?.followPlayer(serverIndex: player.id)
+                }))
+                actions.append(("Examine \(player.name)", "eye", { [weak self] in
+                    self?.worldState.addChat(sender: "[Examine]", text: "\(player.name) (combat level \(player.combatLevel))")
                 }))
                 break
             }
@@ -1397,6 +1419,29 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerFollow.rawValue))
+            buf.putShort(serverIndex)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    /// Send PLAYER_INIT_TRADE_REQUEST (opcode 62 in the modern server). The
+    /// other player gets a "X wishes to trade with you" prompt and either
+    /// accepts (TradePanel opens) or declines.
+    func requestTrade(serverIndex: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: 62)
+            buf.putShort(serverIndex)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    /// Send PLAYER_DUEL request (opcode 217). Same flow as trade — server
+    /// confirms, the DuelPanel opens for both sides.
+    func requestDuel(serverIndex: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: 217)
             buf.putShort(serverIndex)
             try? await connection.send(buf.finishPacket())
         }
