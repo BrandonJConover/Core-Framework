@@ -14,6 +14,24 @@ enum CharacterBillboards {
     // mudclient.java:395
     static let animFrameToSprite_Walk: [Int] = [0, 1, 2, 1]
 
+    // mudclient.java:97-98 — 8-frame combat cycles. CombatA is the attacker
+    // standing still on the left of the duel; CombatB is the attacker on the
+    // right and renders mirrored. Both use the 3 "combat" sprites at offset
+    // 15..17 within an animation's 27-slot range.
+    static let animFrameToSprite_CombatA: [Int] = [0, 1, 2, 1, 0, 0, 0, 0]
+    static let animFrameToSprite_CombatB: [Int] = [0, 0, 0, 0, 0, 1, 2, 1]
+
+    /// Combat role for a billboard: which side of the fight the character is
+    /// rendered as (controls frame table, mirror, and small horizontal lean).
+    enum CombatRole {
+        /// Not in combat — use the walking frame cycle.
+        case none
+        /// Attacker on the LEFT — use CombatA frames, no flip, lean right.
+        case combatA
+        /// Attacker on the RIGHT — use CombatB frames, horizontal flip, lean left.
+        case combatB
+    }
+
     // mudclient.java:92 — maps (rsDir, layerSlot) -> compositing order
     // In each row the 12 values are the draw order of the 12 layers.
     static let animDirLayer_To_CharLayer: [[Int]] = [
@@ -50,7 +68,11 @@ enum CharacterBillboards {
         hairColor: Int32 = 0,
         topColor: Int32 = 0,
         bottomColor: Int32 = 0,
-        skinColor: Int32 = 0
+        skinColor: Int32 = 0,
+        combatRole: CombatRole = .none,
+        combatModel: Int = 6,
+        combatSprite: Int = 5,
+        overlayMovement: Int = 0
     ) {
         // Convert server tile coords to Scene world units (128 units/tile, + 64 center)
         let worldX: Int32 = Int32(tileX) * 128 + 64
@@ -63,22 +85,56 @@ enum CharacterBillboards {
         let anchorScreenY = projected.screenY
         let depth = projected.depth
 
-        // Direction resolution per mudclient.java:6297-6313 and 6553-6565
-        let wantedAnimDir = Int(((Int32(rsDir) &+ (cameraRotation &+ 16) / 32)) & 7)
+        // Direction resolution per mudclient.java:6297-6313 and 6553-6565.
+        // Combat ignores rsDir and forces a fixed dir so attacker always faces
+        // the duel partner. Walk uses the camera-relative direction.
+        let wantedAnimDir: Int
         var flip = false
-        var actualAnimDir = wantedAnimDir
-        switch wantedAnimDir {
-        case 5: flip = true; actualAnimDir = 3
-        case 6: flip = true; actualAnimDir = 2
-        case 7: flip = true; actualAnimDir = 1
-        default: break
+        var actualAnimDir: Int
+        var anchorXAdjust: Int32 = 0
+
+        switch combatRole {
+        case .none:
+            wantedAnimDir = Int(((Int32(rsDir) &+ (cameraRotation &+ 16) / 32)) & 7)
+            actualAnimDir = wantedAnimDir
+            switch wantedAnimDir {
+            case 5: flip = true; actualAnimDir = 3
+            case 6: flip = true; actualAnimDir = 2
+            case 7: flip = true; actualAnimDir = 1
+            default: break
+            }
+        case .combatA:
+            // Java mudclient.java:6320-6322: var11 = 2 (face east), var13 = 5,
+            // x -= overlayMovement * combatSprite / 100 (lean right toward foe).
+            wantedAnimDir = 2
+            actualAnimDir = 5
+            flip = false
+            anchorXAdjust = -Int32(overlayMovement * combatSprite / 100)
+        case .combatB:
+            // Java mudclient.java:6322-6328: var11 = 2, var13 = 5, mirror.
+            wantedAnimDir = 2
+            actualAnimDir = 5
+            flip = true
+            anchorXAdjust = Int32(overlayMovement * combatSprite / 100)
         }
 
         // Per-layer compositing order for this direction
         let orderRow = animDirLayer_To_CharLayer[min(7, wantedAnimDir)]
-        let walkFrame = animFrameToSprite_Walk[(stepFrame / max(1, walkModel)) % 4]
         let dirOffset = actualAnimDir * 3
-        let var14 = walkFrame + dirOffset
+        let var14: Int
+        switch combatRole {
+        case .none:
+            let walkFrame = animFrameToSprite_Walk[(stepFrame / max(1, walkModel)) % 4]
+            var14 = walkFrame + dirOffset
+        case .combatA:
+            // mudclient.java:6321 — frame divisor is (combatModel - 1)
+            let combatFrame = animFrameToSprite_CombatA[(stepFrame / max(1, combatModel - 1)) % 8]
+            var14 = combatFrame + dirOffset    // = 15 + frame because dirOffset = 15
+        case .combatB:
+            // mudclient.java:6327 — divisor is combatModel
+            let combatFrame = animFrameToSprite_CombatB[(stepFrame / max(1, combatModel)) % 8]
+            var14 = combatFrame + dirOffset
+        }
 
         // For each of 12 body-layer slots in z-order
         for slot in 0..<12 {
@@ -105,7 +161,7 @@ enum CharacterBillboards {
             let spriteW = Int32(gs.width)
             let spriteH = Int32(gs.height)
 
-            let boxLeft = anchorScreenX - authW / 2
+            let boxLeft = anchorScreenX - authW / 2 + anchorXAdjust
             let boxTop = anchorScreenY - authH
             let drawX = boxLeft + Int32(gs.xShift)
             let drawY = boxTop + Int32(gs.yShift)

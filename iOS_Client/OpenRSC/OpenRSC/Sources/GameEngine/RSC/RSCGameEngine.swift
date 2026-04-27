@@ -307,20 +307,30 @@ final class RSCGameEngine: ObservableObject {
 
             // Characters are registered in the same player-local coord frame as
             // the terrain mesh — so NPC tile offsets are (npc.x - px, npc.y - pz).
+            // NPCs in active combat (combatTimeout > 0) render with combat-A
+            // animation frames; the player's combat counterpart goes to B.
+            // Java mudclient.java drives combatRole off ORSCharacterDirection;
+            // we approximate via the combatTimeout flag set when fighting.
+            let combatTick = renderLogCount  // shared frame counter for combat cycle
             for npc in worldState.npcs {
                 if let def = NPCDefinitions.get(npc.npcId) {
+                    let role: CharacterBillboards.CombatRole = npc.combatTimeout > 0 ? .combatA : .none
                     CharacterBillboards.register(
                         scene: scene, spriteLoader: spriteLoader,
                         tileX: npc.x - px, tileZ: npc.y - pz,
                         rsDir: 4,  // TODO: track NPC direction from packet updates
-                        stepFrame: renderLogCount,
+                        stepFrame: role == .none ? renderLogCount : combatTick,
                         walkModel: def.walkModel,
                         cameraRotation: cameraRotation,
                         sprites: def.sprites,
                         hairColor: Int32(def.hairColour),
                         topColor: Int32(def.topColour),
                         bottomColor: Int32(def.bottomColour),
-                        skinColor: Int32(def.skinColour)
+                        skinColor: Int32(def.skinColour),
+                        combatRole: role,
+                        combatModel: def.combatModel,
+                        combatSprite: def.combatSprite,
+                        overlayMovement: 32  // small lean while attacking
                     )
                 }
             }
@@ -342,7 +352,10 @@ final class RSCGameEngine: ObservableObject {
                     bottomColor: defaultBottom, skinColor: defaultSkin
                 )
             }
-            // Local player sits at the origin in local coords
+            // Local player sits at the origin in local coords. When the engine
+            // is in combat with a tracked target, render in the combatB pose so
+            // the player faces the NPC mid-fight.
+            let localCombatRole: CharacterBillboards.CombatRole = worldState.inCombat ? .combatB : .none
             CharacterBillboards.register(
                 scene: scene, spriteLoader: spriteLoader,
                 tileX: 0, tileZ: 0,
@@ -351,7 +364,11 @@ final class RSCGameEngine: ObservableObject {
                 cameraRotation: cameraRotation,
                 sprites: defaultPlayerSprites,
                 hairColor: defaultHair, topColor: defaultTop,
-                bottomColor: defaultBottom, skinColor: defaultSkin
+                bottomColor: defaultBottom, skinColor: defaultSkin,
+                combatRole: localCombatRole,
+                combatModel: 6,
+                combatSprite: 5,
+                overlayMovement: 32
             )
 
             scene.endScene(1)
@@ -802,6 +819,33 @@ final class RSCGameEngine: ObservableObject {
             }
         }
 
+        // Spell-cast target mode — armed by SpellbookPanel / MagicPanelView.
+        // The next world tap is consumed as the spell target instead of
+        // triggering walk/talk. Resolve in priority: NPC > player > ground.
+        if let spellId = worldState.pendingSpellId {
+            worldState.pendingSpellId = nil
+            if let npc = nearestNPC {
+                print("[Input] Cast spell \(spellId) on NPC \(npc.id)")
+                castSpellOnNPC(spellId: spellId, npcServerIndex: npc.id)
+            } else {
+                var nearestPlayer: RSCPlayer? = nil
+                var nearestPlayerDist = Int.max
+                for p in worldState.players {
+                    let pdx = p.x - destX; let pdz = p.y - destZ
+                    let pd = pdx * pdx + pdz * pdz
+                    if pd < nearestPlayerDist && pd <= 4 { nearestPlayerDist = pd; nearestPlayer = p }
+                }
+                if let player = nearestPlayer {
+                    print("[Input] Cast spell \(spellId) on player \(player.id)")
+                    castSpellOnPlayer(spellId: spellId, playerServerIndex: player.id)
+                } else {
+                    print("[Input] Cast spell \(spellId) on ground (\(destX),\(destZ))")
+                    castSpellOnGround(spellId: spellId, x: destX, z: destZ)
+                }
+            }
+            return
+        }
+
         if let npc = nearestNPC {
             // Tap near NPC → talk to it
             print("[Input] Talk to NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
@@ -1244,6 +1288,51 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    /// Mirror of mudclient.java prayer toggle (clickHandler around line 8916):
+    /// sends opcode 60 + 1-byte slot to enable, opcode 254 + 1-byte slot to
+    /// disable. Optimistically updates `activePrayers` so the UI reflects the
+    /// change immediately; the server still has authority via subsequent
+    /// updateStat / drain packets.
+    func togglePrayer(prayerId: Int) {
+        guard prayerId >= 0 && prayerId < worldState.activePrayers.count else { return }
+        let isOn = worldState.activePrayers[prayerId]
+        worldState.activePrayers[prayerId] = !isOn
+        Task {
+            let buf = ByteBuffer()
+            // Java client uses 1-byte slot for prayer toggle, not short — see
+            // mudclient.java:8918 putByte(spellIndex). We mirror that exactly.
+            buf.newPacket(opcode: isOn ? Int(RSCOutOpcode.prayerOff.rawValue)
+                                       : Int(RSCOutOpcode.prayerOn.rawValue))
+            buf.putByte(prayerId)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    /// Cast a spell on a ground tile (telekinetic grab, alch on ground item).
+    /// Mirrors RSCOutOpcode.castOnLand (158) with [short spellId][short x][short z].
+    func castSpellOnGround(spellId: Int, x: Int, z: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.castOnLand.rawValue))
+            buf.putShort(spellId)
+            buf.putShort(x)
+            buf.putShort(z)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    /// Cast a spell on an inventory item (e.g. enchant, low alch, superheat).
+    /// Mirrors mudclient.java ITEM_CAST_SPELL: opcode 4, [short spellId][short slot].
+    func castSpellOnItem(spellId: Int, slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: 4)
+            buf.putShort(spellId)  // server reads spellId first per mudclient (idOrZ then indexOrX)
+            buf.putShort(slot)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
     // MARK: - Social
 
     func addFriend(name: String) {
@@ -1278,6 +1367,23 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: 241) // REMOVE_IGNORE
             buf.putString(name)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    // MARK: - Settings
+
+    /// Send privacy/chat-block flags. Mirrors mudclient.java createPacket64
+    /// (line 2316) — opcode 64 with four 1-byte values: chat, private, trade,
+    /// duel. Each is 0 (allow all) / 1 (block strangers) / 2 (block all).
+    func setChatBlockFlags(chat: Int, priv: Int, trade: Int, duel: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: 64)
+            buf.putByte(chat)
+            buf.putByte(priv)
+            buf.putByte(trade)
+            buf.putByte(duel)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -1376,9 +1482,80 @@ final class RSCGameEngine: ObservableObject {
 
     func tradeDecline() {
         worldState.tradeOpen = false
+        worldState.tradeConfirmOpen = false
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.tradeDecline.rawValue))
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    /// Sends the entire current trade offer list to the server (TRADE_OFFER, opcode 46).
+    /// Java client mudclient.java:17215 — replaces server-side offer with the full list.
+    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount, SHORT noted(0/1).
+    func tradeOffer(_ items: [(id: Int, amount: Int)]) {
+        // Optimistic local update — packet handler will overwrite from server later.
+        worldState.tradeMyOffer = items
+        worldState.tradeAccepted = false
+        worldState.tradePartnerAccepted = false
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: 46) // TRADE_OFFER
+            buf.putByte(items.count)
+            for it in items {
+                buf.putShort(it.id)
+                buf.putInt(it.amount)
+                buf.putShort(0) // noted: 0 — TODO: support noted items
+            }
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    /// Confirms the trade in the second-stage confirmation panel (opcode 104).
+    func tradeConfirmAccept() {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: 104) // TRADE_CONFIRM_ACCEPTED
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    // MARK: - Duel offer / settings
+
+    /// Sends the entire current duel stake list (DUEL_OFFER_ITEM, opcode 33).
+    /// Java client mudclient.java:11102 — same format as trade offer.
+    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount, SHORT noted(0/1).
+    func duelOffer(_ items: [(id: Int, amount: Int)]) {
+        worldState.duelMyStake = items
+        worldState.duelAccepted = false
+        worldState.duelOpponentAccepted = false
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: 33) // DUEL_OFFER_ITEM
+            buf.putByte(items.count)
+            for it in items {
+                buf.putShort(it.id)
+                buf.putInt(it.amount)
+                buf.putShort(0) // noted: 0
+            }
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    /// Sends the four duel rule toggles (DUEL_FIRST_SETTINGS_CHANGED, opcode 8).
+    /// Java client mudclient.java:3026 — order is retreat, magic, prayer, weapons.
+    /// Each byte is 1 (rule enabled / restriction on) or 0.
+    func duelSettingsChange(retreat: Bool, magic: Bool, prayer: Bool, weapons: Bool) {
+        worldState.duelSettings = [retreat, magic, prayer, weapons]
+        worldState.duelAccepted = false
+        worldState.duelOpponentAccepted = false
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: 8) // DUEL_FIRST_SETTINGS_CHANGED
+            buf.putByte(retreat ? 1 : 0)
+            buf.putByte(magic ? 1 : 0)
+            buf.putByte(prayer ? 1 : 0)
+            buf.putByte(weapons ? 1 : 0)
             try? await connection.send(buf.finishPacket())
         }
     }
