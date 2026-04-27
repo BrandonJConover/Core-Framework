@@ -878,37 +878,32 @@ public class Npc extends Mob {
 		}
 	}
 
-	@SuppressWarnings("fallthrough")
 	public void updatePosition() {
 		NpcInteraction interaction = getNpcInteraction();
 		Player player = getInteractingPlayer();
 		if (player != null && player.getInteractingNpc() == this) {
+			// Interactions that should reset the NPC's path.
 			switch (interaction) {
-				//Interactions that should reset the NPC's path.
-				case NPC_TALK_TO:
-				case NPC_USE_ITEM:
+				case NPC_TALK_TO, NPC_USE_ITEM -> {
 					resetPath();
 					resetRange();
-					// fall through
-				default:
-					break;
+				}
+				default -> { /* no-op */ }
 			}
 
+			// Other interaction specific handling.
 			switch (interaction) {
-				//Other interaction specific handling.
-				case NPC_TALK_TO:
+				case NPC_TALK_TO -> {
 					// NPCs on the same tile as you will walk somewhere else.
 					if (player.getLocation().equals(getLocation())) {
 						moveToAdjacentTile();
 					}
-					// fall through
-				case NPC_USE_ITEM:
-				case NPC_GNOMEBALL_OP:
 					if (finishedPath() && !inCombat()) face(player);
-					break;
-				case NPC_OP:
-				default:
-					break;
+				}
+				case NPC_USE_ITEM, NPC_GNOMEBALL_OP -> {
+					if (finishedPath() && !inCombat()) face(player);
+				}
+				default -> { /* no-op */ }
 			}
 		} else {
 			getNpcBehavior().tick();

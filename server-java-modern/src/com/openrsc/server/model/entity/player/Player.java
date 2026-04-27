@@ -2207,27 +2207,15 @@ public final class Player extends Mob {
 			ActionSender.sendSound(player, "victory");
 
 			if (player.getLocation().inWilderness()) {
-				final int killTypeId;
-
-				switch (player.getKillType()) {
-					case COMBAT:
+				final int killTypeId = switch (player.getKillType()) {
+					case COMBAT -> {
 						final int weaponId = player.getEquippedWeaponID();
-
-						if (weaponId == ItemId.NOTHING.id() || weaponId == ItemId.PHOENIX_CROSSBOW.id() ||
-							weaponId == ItemId.CROSSBOW.id()) {
-							killTypeId = 16;
-						} else {
-							killTypeId = weaponId;
-						}
-						break;
-					case RANGED:
-						killTypeId = -2;
-						break;
-					case MAGIC:
-					default:
-						killTypeId = -1;
-						break;
-				}
+						yield (weaponId == ItemId.NOTHING.id() || weaponId == ItemId.PHOENIX_CROSSBOW.id() ||
+							weaponId == ItemId.CROSSBOW.id()) ? 16 : weaponId;
+					}
+					case RANGED -> -2;
+					default -> -1;
+				};
 
 				getWorld().sendKilledUpdate(getUsernameHash(), player.getUsernameHash(), killTypeId);
 				player.incKills();
@@ -2410,14 +2398,10 @@ public final class Player extends Mob {
 
 		if (npc != null) {
 			switch (interaction) {
-				case NPC_TALK_TO:
-				case NPC_GNOMEBALL_OP:
-				case NPC_USE_ITEM:
+				case NPC_TALK_TO, NPC_GNOMEBALL_OP, NPC_USE_ITEM -> {
 					if (!inCombat() && finishedPath()) face(npc);
-					break;
-				case NPC_OP:
-				default:
-					break;
+				}
+				default -> { /* no-op */ }
 			}
 		}
 
