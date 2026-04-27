@@ -24,6 +24,48 @@ targets:
           - "**/.DS_Store"
           - "Rendering/Shaders.metal"
           - "WebClient/**"
+      - path: OpenRSC/Sources/WebClient
+        type: folder
+        buildPhase: resources
+      # Bundle the binary game-data archives as resources. They are loaded via
+      # Bundle.main.path(forResource:ofType:). See ModelArchiveLoader,
+      # LandscapeLoader, SpriteLoader, GameObjectDefinitions, NPCDefinitions.
+      - path: OpenRSC/models.orsc
+        type: file
+        buildPhase: resources
+        optional: true
+      - path: OpenRSC/Authentic_Landscape.orsc
+        type: file
+        buildPhase: resources
+        optional: true
+      - path: OpenRSC/Authentic_Sprites.orsc
+        type: file
+        buildPhase: resources
+        optional: true
+      - path: OpenRSC/landscape.dat
+        type: file
+        buildPhase: resources
+        optional: true
+      - path: OpenRSC/sprites.dat
+        type: file
+        buildPhase: resources
+        optional: true
+      - path: OpenRSC/sprites_v2.dat
+        type: file
+        buildPhase: resources
+        optional: true
+      - path: OpenRSC/GameObjectDef.xml
+        type: file
+        buildPhase: resources
+        optional: true
+      - path: OpenRSC/NpcDefs.json
+        type: file
+        buildPhase: resources
+        optional: true
+      - path: OpenRSC/ItemDefs.json
+        type: file
+        buildPhase: resources
+        optional: true
     info:
       path: OpenRSC/Info.plist
       properties:

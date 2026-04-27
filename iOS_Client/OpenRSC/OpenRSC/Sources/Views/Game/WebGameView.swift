@@ -35,13 +35,31 @@ struct WebGameView: UIViewRepresentable {
         // JS → Swift message bridge
         config.userContentController.add(coordinator, name: "nativeBridge")
         config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        config.defaultWebpagePreferences.allowsContentJavaScript = true
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = coordinator
+        webView.uiDelegate = coordinator
+        webView.allowsBackForwardNavigationGestures = false
+        webView.allowsLinkPreview = false
+        webView.scrollView.isScrollEnabled = false
         webView.scrollView.bounces = false
+        webView.scrollView.alwaysBounceHorizontal = false
+        webView.scrollView.alwaysBounceVertical = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.contentInset = .zero
+        webView.scrollView.scrollIndicatorInsets = .zero
+        webView.scrollView.pinchGestureRecognizer?.isEnabled = false
+        webView.scrollView.panGestureRecognizer.isEnabled = false
         webView.isOpaque = true
         webView.backgroundColor = UIColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1)
         webView.scrollView.backgroundColor = webView.backgroundColor
+        // dataDetectorTypes is not exposed on WKWebView (it's a UITextView property);
+        // disabling auto-detection is configured via WKWebpagePreferences if ever needed.
+        if #available(iOS 16.4, *) {
+            webView.isInspectable = true
+        }
 
         if coordinator.httpPort > 0,
            let url = URL(string: "http://127.0.0.1:\(coordinator.httpPort)/mudclient.html#free,\(server.host),\(server.wsPort)") {
@@ -84,7 +102,7 @@ struct WebGameView: UIViewRepresentable {
 
     // MARK: - Coordinator
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
         let httpServer = LocalHTTPServer()
         let httpPort: UInt16
         var onBack: () -> Void

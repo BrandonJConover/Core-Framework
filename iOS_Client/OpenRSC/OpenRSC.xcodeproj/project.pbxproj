@@ -16,11 +16,15 @@
 		1F13FB4369B1983A1DA68B2D /* AnimationDefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FBC620FEE34BCB304CCA49 /* AnimationDefs.swift */; };
 		295E2A677F0E7DADBE03EC41 /* ObjectNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED06FB5405C413FFB721D92 /* ObjectNames.swift */; };
 		3014C9952753A6CE34CE0042 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85989A2D185A0C6B9D712DC5 /* RegisterView.swift */; };
+		338FA91C1E0E26BAAEA38C25 /* WebClient in Resources */ = {isa = PBXBuildFile; fileRef = E51923D95FF7E811C424EE3D /* WebClient */; };
 		378B96EA683C267A82C4C8AA /* TouchTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38223850597085ADCA3EE8A3 /* TouchTranslator.swift */; };
 		3AA1A652B3144AB124C777AA /* ByteBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62F92BCAA91ED7CB2C887F6F /* ByteBuffer.swift */; };
 		3D751413D47F84684101DEC1 /* Polygon.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2188BC35B6FD7A3DFDBCA4 /* Polygon.swift */; };
+		406DA2FFE25D7DA56EC24D73 /* models.orsc in Resources */ = {isa = PBXBuildFile; fileRef = F96FB7917C1BE2A428AA3513 /* models.orsc */; };
+		42639A01C5A6A4A50E55E50F /* Authentic_Landscape.orsc in Resources */ = {isa = PBXBuildFile; fileRef = 66DF674CB40A4F01E8EBEEC1 /* Authentic_Landscape.orsc */; };
 		476AD837C7512706C19396F1 /* SpriteLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8ADEBB716923D01590135A4 /* SpriteLoader.swift */; };
 		48198E65F85056BF3CD2BCE6 /* ModelArchiveLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9F6A909F89CE0F94742AF5 /* ModelArchiveLoader.swift */; };
+		49BE2E9E20608DF7F8491734 /* landscape.dat in Resources */ = {isa = PBXBuildFile; fileRef = EB1994B23C1113BEF842C514 /* landscape.dat */; };
 		4B6D93F4FBEAD30A6A116F46 /* GameObjectDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4EDAB057950782165E6034E /* GameObjectDefinitions.swift */; };
 		4EDFD6C354CB77D0C3011728 /* RSCWorldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CBD0EBDD0DAD78E31727091 /* RSCWorldState.swift */; };
 		5D992464CE94A9E8AD9FE4FE /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA34960346994775CDF265C /* LoginView.swift */; };
@@ -30,8 +34,10 @@
 		7234C13A3B9833C90E81C8CF /* Scene.swift in Sources */ = {isa = PBXBuildFile; fileRef = F01562B77A1FF9666EF960FB /* Scene.swift */; };
 		79FBC4B39E4291EA3889A584 /* FastMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79470D5C002A690DB639638F /* FastMath.swift */; };
 		7DEDBC075AAE1EA8F6D35A82 /* GameSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5F4767C4E2C9162C1DF5F3 /* GameSelectorView.swift */; };
+		7E6C152D0E1B360DA926B507 /* NpcDefs.json in Resources */ = {isa = PBXBuildFile; fileRef = FFEE1170686C181AC0F64F7F /* NpcDefs.json */; };
 		7FFB9D1CA4251DC6E52E18DC /* NPCDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D507B265366A49DD76F0BDAD /* NPCDefinitions.swift */; };
 		87B26B2F490394943F28B68D /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A609DE488849FEB3D6CB9E47 /* MetalRenderer.swift */; };
+		8816B8332CC031CA6433B1A2 /* Authentic_Sprites.orsc in Resources */ = {isa = PBXBuildFile; fileRef = 4C427C9F5B86C2E46A8D4C79 /* Authentic_Sprites.orsc */; };
 		89A587E1B70A0CBC5632E006 /* RSCGameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24A98D60D91F8BC96E8BD27 /* RSCGameEngine.swift */; };
 		8D061CA1AC54B0CBBD451140 /* RSCOpcodes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A1905E095D026FE16EA83 /* RSCOpcodes.swift */; };
 		8FFAC6D6B26D024D29E86D7E /* Pathfinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D25BDF5D342303EE194991D5 /* Pathfinder.swift */; };
@@ -41,12 +47,16 @@
 		A90CABFEADA63166A315C892 /* LocalHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BDDB02A754C67CF7D8CEC0D /* LocalHTTPServer.swift */; };
 		AFB05CAF0757B4C1C741DCBF /* EntityDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABDC850EF4975AC38D6C8306 /* EntityDefinitions.swift */; };
 		B8725914B85D1E9DFE630D12 /* RSModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EAAA291551DD814CD0DA0F3 /* RSModel.swift */; };
+		C17AE88BA79A247836F1CFBB /* sprites.dat in Resources */ = {isa = PBXBuildFile; fileRef = A10B951D45EB676566FF7CB1 /* sprites.dat */; };
 		CBF2C9E8D5FADE352A16BF9B /* Shader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 690046C4CF8B28809E819546 /* Shader.swift */; };
 		CC7E01957E9CC492C4A17597 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA10602CA01E71FF2E52EF /* AppState.swift */; };
+		D10043D1E4A4315989E35C21 /* ItemDefs.json in Resources */ = {isa = PBXBuildFile; fileRef = CAC8D2CF9A6083B23FDBC4C8 /* ItemDefs.json */; };
 		D52601860204DA30D7B28639 /* TCPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990619EF9FCF13064CD17511 /* TCPConnection.swift */; };
 		E3F13C70A5D6B3E05C6615BE /* GameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C3A69581252F63EC5EAA1E /* GameView.swift */; };
 		E6742B1D452C43AB4926C8A9 /* World.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F001E360C5E37BAE24BD54 /* World.swift */; };
 		EB5AA1EDEB883B4B339EC1B2 /* GameProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7A50354B450F1785FDA303 /* GameProtocol.swift */; };
+		EF9B796974E87C5ABA49F84A /* GameObjectDef.xml in Resources */ = {isa = PBXBuildFile; fileRef = B31B8BD08541F5B8861754B6 /* GameObjectDef.xml */; };
+		F03679ABB7ADFCC6B61737E9 /* sprites_v2.dat in Resources */ = {isa = PBXBuildFile; fileRef = DA44202D4E360DF84525A203 /* sprites_v2.dat */; };
 		F434395EB6BF20DBAC76710C /* ServerBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C61DBD09EB20B0BF2CC077 /* ServerBrowserView.swift */; };
 		FBB7C16E4E6EAC7BE21D3EE2 /* ItemNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E03CEC760DF829859E3CFBB /* ItemNames.swift */; };
 /* End PBXBuildFile section */
@@ -60,6 +70,7 @@
 		3ED06FB5405C413FFB721D92 /* ObjectNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectNames.swift; sourceTree = "<group>"; };
 		43C023BDFCCE3322E38787E6 /* GraphicsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphicsController.swift; sourceTree = "<group>"; };
 		47C3A69581252F63EC5EAA1E /* GameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameView.swift; sourceTree = "<group>"; };
+		4C427C9F5B86C2E46A8D4C79 /* Authentic_Sprites.orsc */ = {isa = PBXFileReference; path = Authentic_Sprites.orsc; sourceTree = "<group>"; };
 		4EAAA291551DD814CD0DA0F3 /* RSModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSModel.swift; sourceTree = "<group>"; };
 		5576569325B6C2223C6DEE7E /* NPCNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPCNames.swift; sourceTree = "<group>"; };
 		5969C636EE8BFAC20BDCE024 /* OpenRSCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRSCApp.swift; sourceTree = "<group>"; };
@@ -68,6 +79,7 @@
 		5D6B9F41201F6AE4126D67AF /* LandscapeLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandscapeLoader.swift; sourceTree = "<group>"; };
 		62F92BCAA91ED7CB2C887F6F /* ByteBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ByteBuffer.swift; sourceTree = "<group>"; };
 		63B049FFEB87A145A0D3F9BC /* ISAACCipher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ISAACCipher.swift; sourceTree = "<group>"; };
+		66DF674CB40A4F01E8EBEEC1 /* Authentic_Landscape.orsc */ = {isa = PBXFileReference; path = Authentic_Landscape.orsc; sourceTree = "<group>"; };
 		690046C4CF8B28809E819546 /* Shader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shader.swift; sourceTree = "<group>"; };
 		6EA8AE1F76A6030168425450 /* CharacterBillboards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterBillboards.swift; sourceTree = "<group>"; };
 		79470D5C002A690DB639638F /* FastMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastMath.swift; sourceTree = "<group>"; };
@@ -82,19 +94,27 @@
 		990619EF9FCF13064CD17511 /* TCPConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCPConnection.swift; sourceTree = "<group>"; };
 		99F001E360C5E37BAE24BD54 /* World.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = World.swift; sourceTree = "<group>"; };
 		9F7A50354B450F1785FDA303 /* GameProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameProtocol.swift; sourceTree = "<group>"; };
+		A10B951D45EB676566FF7CB1 /* sprites.dat */ = {isa = PBXFileReference; path = sprites.dat; sourceTree = "<group>"; };
 		A4EDAB057950782165E6034E /* GameObjectDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameObjectDefinitions.swift; sourceTree = "<group>"; };
 		A609DE488849FEB3D6CB9E47 /* MetalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalRenderer.swift; sourceTree = "<group>"; };
 		ABDC850EF4975AC38D6C8306 /* EntityDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntityDefinitions.swift; sourceTree = "<group>"; };
 		AFA34960346994775CDF265C /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		B31B8BD08541F5B8861754B6 /* GameObjectDef.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = GameObjectDef.xml; sourceTree = "<group>"; };
 		BF2188BC35B6FD7A3DFDBCA4 /* Polygon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polygon.swift; sourceTree = "<group>"; };
 		C24A98D60D91F8BC96E8BD27 /* RSCGameEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCGameEngine.swift; sourceTree = "<group>"; };
 		CA9F6A909F89CE0F94742AF5 /* ModelArchiveLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelArchiveLoader.swift; sourceTree = "<group>"; };
+		CAC8D2CF9A6083B23FDBC4C8 /* ItemDefs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ItemDefs.json; sourceTree = "<group>"; };
 		D25BDF5D342303EE194991D5 /* Pathfinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pathfinder.swift; sourceTree = "<group>"; };
 		D37E5A4EBD7022529B04B92A /* Scanline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scanline.swift; sourceTree = "<group>"; };
 		D507B265366A49DD76F0BDAD /* NPCDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPCDefinitions.swift; sourceTree = "<group>"; };
 		D8ADEBB716923D01590135A4 /* SpriteLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteLoader.swift; sourceTree = "<group>"; };
+		DA44202D4E360DF84525A203 /* sprites_v2.dat */ = {isa = PBXFileReference; path = sprites_v2.dat; sourceTree = "<group>"; };
 		DB5F4767C4E2C9162C1DF5F3 /* GameSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSelectorView.swift; sourceTree = "<group>"; };
+		E51923D95FF7E811C424EE3D /* WebClient */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebClient; path = OpenRSC/Sources/WebClient; sourceTree = SOURCE_ROOT; };
+		EB1994B23C1113BEF842C514 /* landscape.dat */ = {isa = PBXFileReference; path = landscape.dat; sourceTree = "<group>"; };
 		F01562B77A1FF9666EF960FB /* Scene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scene.swift; sourceTree = "<group>"; };
+		F96FB7917C1BE2A428AA3513 /* models.orsc */ = {isa = PBXFileReference; path = models.orsc; sourceTree = "<group>"; };
+		FFEE1170686C181AC0F64F7F /* NpcDefs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = NpcDefs.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -164,6 +184,15 @@
 		6CE1BB6E2A812FA0B34E7ED0 /* OpenRSC */ = {
 			isa = PBXGroup;
 			children = (
+				66DF674CB40A4F01E8EBEEC1 /* Authentic_Landscape.orsc */,
+				4C427C9F5B86C2E46A8D4C79 /* Authentic_Sprites.orsc */,
+				B31B8BD08541F5B8861754B6 /* GameObjectDef.xml */,
+				CAC8D2CF9A6083B23FDBC4C8 /* ItemDefs.json */,
+				EB1994B23C1113BEF842C514 /* landscape.dat */,
+				F96FB7917C1BE2A428AA3513 /* models.orsc */,
+				FFEE1170686C181AC0F64F7F /* NpcDefs.json */,
+				DA44202D4E360DF84525A203 /* sprites_v2.dat */,
+				A10B951D45EB676566FF7CB1 /* sprites.dat */,
 				EEB3325A965B51B67539C863 /* Sources */,
 			);
 			path = OpenRSC;
@@ -249,6 +278,7 @@
 		EEB3325A965B51B67539C863 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				E51923D95FF7E811C424EE3D /* WebClient */,
 				DA666C262DAE6D64BC51373A /* GameEngine */,
 				6CC986A78088F1B0AC60103F /* Input */,
 				699C5C185BD323A5162E5836 /* Models */,
@@ -267,6 +297,7 @@
 			buildConfigurationList = B8B47ADBC563D9AFEB8ED8B3 /* Build configuration list for PBXNativeTarget "OpenRSC" */;
 			buildPhases = (
 				27EBD023E308F40C21193944 /* Sources */,
+				C619CAAC18FDD0E65217EADB /* Resources */,
 			);
 			buildRules = (
 			);
@@ -312,6 +343,26 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C619CAAC18FDD0E65217EADB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				42639A01C5A6A4A50E55E50F /* Authentic_Landscape.orsc in Resources */,
+				8816B8332CC031CA6433B1A2 /* Authentic_Sprites.orsc in Resources */,
+				EF9B796974E87C5ABA49F84A /* GameObjectDef.xml in Resources */,
+				D10043D1E4A4315989E35C21 /* ItemDefs.json in Resources */,
+				7E6C152D0E1B360DA926B507 /* NpcDefs.json in Resources */,
+				338FA91C1E0E26BAAEA38C25 /* WebClient in Resources */,
+				49BE2E9E20608DF7F8491734 /* landscape.dat in Resources */,
+				406DA2FFE25D7DA56EC24D73 /* models.orsc in Resources */,
+				C17AE88BA79A247836F1CFBB /* sprites.dat in Resources */,
+				F03679ABB7ADFCC6B61737E9 /* sprites_v2.dat in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		27EBD023E308F40C21193944 /* Sources */ = {

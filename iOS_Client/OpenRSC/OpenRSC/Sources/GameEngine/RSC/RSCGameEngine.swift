@@ -198,6 +198,10 @@ final class RSCGameEngine: ObservableObject {
 
     private var terrainBuilt = false
     private var terrainBuiltAtSector: (Int, Int) = (-1, -1)
+    /// Number of models in the scene that belong to the static terrain mesh.
+    /// Anything past this index is per-frame ephemera (game objects). We
+    /// truncate back to this on every tick before re-instantiating objects.
+    private var terrainModelCount: Int = 0
 
     private func tick() {
         guard isRunning else { return }
@@ -230,7 +234,51 @@ final class RSCGameEngine: ObservableObject {
                 world.loadSections(worldX: absX, worldZ: absZ, plane: 0)
                 terrainBuilt = true
                 terrainBuiltAtSector = (secX, secZ)
+                terrainModelCount = scene.modelCount
                 print("[Engine] Terrain mesh built for sector (\(secX),\(secZ)) at abs (\(absX),\(absZ)); scene has \(scene.modelCount) models")
+            }
+
+            // Game-object 3D models. Mirrors PacketHandler.gotObjectsPacket()
+            // in the Java client: clone from the model archive, rotate by
+            // direction*32 (256-space yaw), translate to (tileX, -elevation,
+            // tileZ) in the *player-local* coord frame the terrain mesh uses.
+            //
+            // We rebuild this list every tick because the Scene model array
+            // is shared with the terrain mesh (which we don't want to reparse
+            // each frame). Truncating back to `terrainModelCount` keeps
+            // memory bounded.
+            if scene.modelCount > terrainModelCount {
+                for i in terrainModelCount..<scene.modelCount { scene.models[i] = nil }
+                scene.modelCount = terrainModelCount
+            }
+            for obj in worldState.gameObjects {
+                let dx = obj.x - px       // tile-local X relative to player
+                let dz = obj.y - pz       // (worldState uses y for the world Z axis)
+                // Cull anything outside the terrain footprint (terrain is
+                // generated for ~half a sector around the player).
+                guard abs(dx) <= 24 && abs(dz) <= 24 else { continue }
+
+                let def = GameObjectDefinitions.get(obj.objectId)
+                let modelName = def?.modelID ?? ""
+                let width = def?.width ?? 1
+                let height = def?.height ?? 1
+
+                // Y-elevation in world coords: terrain-mesh Y is negative-up,
+                // and World.getElevation expects world coords. The mesh is
+                // built in player-local space so we pass dx/dz scaled by
+                // tileSize (128) for elevation lookup.
+                let xWorld = (dx * 2 + width) * 128 / 2
+                let zWorld = (dz * 2 + height) * 128 / 2
+                let elevation = world.getElevation(x: xWorld, z: zWorld)
+
+                ModelArchiveLoader.shared.instantiate(
+                    named: modelName,
+                    atTileX: dx, atTileZ: dz,
+                    direction: obj.direction,
+                    width: width, height: height,
+                    elevation: elevation,
+                    scene: scene
+                )
             }
 
             // Camera setup. The terrain mesh is built in player-local coordinates
