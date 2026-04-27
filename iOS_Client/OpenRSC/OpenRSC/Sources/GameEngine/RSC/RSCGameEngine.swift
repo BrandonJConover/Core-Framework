@@ -210,6 +210,11 @@ final class RSCGameEngine: ObservableObject {
             if worldState.npcs[i].combatTimeout > 0 { worldState.npcs[i].combatTimeout -= 1 }
             if worldState.npcs[i].messageTimeout > 0 { worldState.npcs[i].messageTimeout -= 1 }
         }
+        // Tick down the system-update countdown (50ms per tick = engine timer
+        // interval). Banner hides automatically when it reaches 0.
+        if worldState.systemUpdateTicks > 0 {
+            worldState.systemUpdateTicks = max(0, worldState.systemUpdateTicks - 50)
+        }
 
         // Real 3D Scene renderer (matches Java client mudclient.java render path):
         // - World generates a terrain mesh for the current region

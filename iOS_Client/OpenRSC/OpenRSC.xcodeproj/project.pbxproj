@@ -54,6 +54,7 @@
 		A90CABFEADA63166A315C892 /* LocalHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BDDB02A754C67CF7D8CEC0D /* LocalHTTPServer.swift */; };
 		AFB05CAF0757B4C1C741DCBF /* EntityDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABDC850EF4975AC38D6C8306 /* EntityDefinitions.swift */; };
 		B8725914B85D1E9DFE630D12 /* RSModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EAAA291551DD814CD0DA0F3 /* RSModel.swift */; };
+		BB7A1B71A3C297D0770B6E89 /* SystemUpdateBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5242B6A5DCB117B084B12B9C /* SystemUpdateBanner.swift */; };
 		C17AE88BA79A247836F1CFBB /* sprites.dat in Resources */ = {isa = PBXBuildFile; fileRef = A10B951D45EB676566FF7CB1 /* sprites.dat */; };
 		CBF2C9E8D5FADE352A16BF9B /* Shader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 690046C4CF8B28809E819546 /* Shader.swift */; };
 		CC7E01957E9CC492C4A17597 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA10602CA01E71FF2E52EF /* AppState.swift */; };
@@ -90,6 +91,7 @@
 		4AA431B51F6327E8909C7691 /* BankPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BankPanel.swift; sourceTree = "<group>"; };
 		4C427C9F5B86C2E46A8D4C79 /* Authentic_Sprites.orsc */ = {isa = PBXFileReference; path = Authentic_Sprites.orsc; sourceTree = "<group>"; };
 		4EAAA291551DD814CD0DA0F3 /* RSModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSModel.swift; sourceTree = "<group>"; };
+		5242B6A5DCB117B084B12B9C /* SystemUpdateBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemUpdateBanner.swift; sourceTree = "<group>"; };
 		5576569325B6C2223C6DEE7E /* NPCNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPCNames.swift; sourceTree = "<group>"; };
 		5969C636EE8BFAC20BDCE024 /* OpenRSCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRSCApp.swift; sourceTree = "<group>"; };
 		5A2F5EF8F7ACAB00446AD4B5 /* InteractivePanelStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractivePanelStyles.swift; sourceTree = "<group>"; };
@@ -164,6 +166,7 @@
 				E26571E96500DAB87E51F147 /* SettingsPanel.swift */,
 				D1FC277CCD5343D460C70637 /* ShopPanel.swift */,
 				9D699C23A0F9C4835F522B84 /* SleepPanel.swift */,
+				5242B6A5DCB117B084B12B9C /* SystemUpdateBanner.swift */,
 				77082BCCC301983216C93E70 /* TradePanel.swift */,
 				9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */,
 				4158CF99B998E5ACBE1150CE /* WelcomePanel.swift */,
@@ -461,6 +464,7 @@
 				0DA666740B06BC98390E1A70 /* SleepPanel.swift in Sources */,
 				E2F931D857FB7A50A40F1316 /* SoundManager.swift in Sources */,
 				476AD837C7512706C19396F1 /* SpriteLoader.swift in Sources */,
+				BB7A1B71A3C297D0770B6E89 /* SystemUpdateBanner.swift in Sources */,
 				D52601860204DA30D7B28639 /* TCPConnection.swift in Sources */,
 				378B96EA683C267A82C4C8AA /* TouchTranslator.swift in Sources */,
 				0499D33505237234EC1FEEB2 /* TradePanel.swift in Sources */,

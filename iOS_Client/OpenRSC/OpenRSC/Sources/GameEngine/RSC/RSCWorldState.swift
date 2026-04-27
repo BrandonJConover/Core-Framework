@@ -127,6 +127,12 @@ final class RSCWorldState: ObservableObject {
     @Published var fatigue: Int = 0
     @Published var isDead: Bool = false
 
+    /// Ticks remaining until the server reboots (opcode 52). Server sends
+    /// ticks-of-32ms; Java code multiplies by 32 to get milliseconds. We
+    /// keep that scaled value here so the banner shows seconds = ticks/1000.
+    /// 0 = no pending update.
+    @Published var systemUpdateTicks: Int = 0
+
     // Welcome dialog state — populated by opcode 182 (PacketHandler.showLoginDialog).
     // Shown once per session right after the first character/skills sync.
     @Published var welcomeShown: Bool = false

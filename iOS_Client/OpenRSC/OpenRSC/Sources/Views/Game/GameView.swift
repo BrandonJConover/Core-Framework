@@ -128,6 +128,14 @@ struct GameView: View {
                     }
                 }
 
+                // System update countdown — small floating banner above
+                // the modal stack so it stays visible during banks/trades.
+                VStack {
+                    Spacer().frame(height: 18)
+                    SystemUpdateBanner(worldState: engine.worldState)
+                    Spacer()
+                }
+
                 // Modal overlays
                 modalOverlays
             }

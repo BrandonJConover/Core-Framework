@@ -286,7 +286,12 @@ final class RSCPacketHandler {
             break
 
         case 52:  // UPDATE_SYSTEM_UPDATE_TIMER
-            break
+            // Java mudclient.java:413 — server sends ticks, multiplies by 32
+            // to convert to ~milliseconds (one tick ≈ 32ms client clock).
+            if buf.bytesRemaining >= 2 {
+                let rawTicks = buf.getShort()
+                ws.systemUpdateTicks = rawTicks * 32
+            }
 
         case 59:  // SHOW_APPEARANCE_CHANGE — character creation screen
             ws.showAppearanceChange = true
