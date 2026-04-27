@@ -207,7 +207,13 @@ export class Buffer extends CacheableNode {
         [40,  93],
         [187, 22],
         [202, 245],
-        [56,  44], // 377 "::command" opcode → 530 CLIENT_CHEAT
+        [56,  44],   // 377 "::command" → 530 CLIENT_CHEAT
+        // Movement: 530 body layout differs (ctrl-first, BE 16-bit vs LE-added);
+        // Game.walk() rewrites the body to match. Buffer just translates the
+        // wire opcode here.
+        [28,  215],  // 377 walk via game-scene click → 530 MOVE_GAMECLICK
+        [213, 39],   // 377 walk via minimap click   → 530 MOVE_MINIMAPCLICK
+        [247, 77],   // 377 walk-with-action (NPC follow) → 530 MOVE_GAMECLICK_RESET
     ]);
     private _suppressed: boolean = false;
 
