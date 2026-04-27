@@ -147,13 +147,17 @@ export class PacketHandler530 {
                  (buf.buffer[buf.currentPosition - 1] & 0xFF)) >>> 0;
     }
     static mg4(buf: Buffer): number {
-        // Middle-endian: CDAB byte order
+        // Middle-endian "BADC": rt4-client Buffer.mg4 reads bytes in read-order
+        // B0 B1 B2 B3 and assembles the int as (B1<<24)|(B0<<16)|(B3<<8)|B2.
+        // The XTEA key fields and other middle-endian ints use this exact order;
+        // any deviation produces unrelated key bytes and downstream decompression
+        // of l_X_Z location groups silently fails (returns null).
         buf.currentPosition += 4;
         const b0 = buf.buffer[buf.currentPosition - 4] & 0xFF;
         const b1 = buf.buffer[buf.currentPosition - 3] & 0xFF;
         const b2 = buf.buffer[buf.currentPosition - 2] & 0xFF;
         const b3 = buf.buffer[buf.currentPosition - 1] & 0xFF;
-        return ((b2 << 24) | (b3 << 16) | (b0 << 8) | b1) >>> 0;
+        return ((b1 << 24) | (b0 << 16) | (b3 << 8) | b2) >>> 0;
     }
     static img4(buf: Buffer): number {
         // Inverse-middle-endian: BADC byte order
@@ -233,6 +237,49 @@ export class PacketHandler530 {
         if (game.plane === undefined || game.plane === null) game.plane = 0;
         game.loadingStage = 2;
         console.log("REBUILD_NORMAL: regions=" + regionCount + " centre=(" + regionX + "," + regionZ + ") zone=(" + zoneX + "," + zoneZ + ")");
+
+        // One-shot probe to validate the cache + XTEA path end-to-end. Tries
+        // fetching the centre region's terrain (m_X_Z, no XTEA) and locations
+        // (l_X_Z, XTEA-encrypted with the per-region key). A future regression
+        // in mg4 byte-order, sector-chain reader, XTEA constants, or
+        // gzip/bzip2 decoder shows up here as null instead of a byte length.
+        const js5 = (globalThis as any).js5Cache;
+        if (js5 && typeof js5.getRegionBytes === "function" && (game as any).__regionProbeDone !== true) {
+            (game as any).__regionProbeDone = true;
+            const centreRegionId = (((regionX / 8) | 0) << 8) | ((regionZ / 8) | 0);
+            const probeIdx = regionBitPacked.indexOf(centreRegionId);
+            const probeKey = probeIdx >= 0 ? keys[probeIdx] : keys[0];
+            (async () => {
+                try {
+                    // Try multiple location naming conventions to figure out
+                    // what idx5 actually stores groups under.
+                    const rx = (centreRegionId >> 8) & 0xFF;
+                    const rz = centreRegionId & 0xFF;
+                    const candidates = ["l" + rx + "_" + rz, "L" + rx + "_" + rz, "l_" + rx + "_" + rz, "loc" + rx + "_" + rz, "loc_" + rx + "_" + rz];
+                    for (const name of candidates) {
+                        const gid = await js5.getGroupId(5, name);
+                        console.log("name probe: " + name + " -> groupId=" + gid);
+                    }
+                    const terrain = await js5.getRegionBytes("m", centreRegionId, null);
+                    const locsNoXtea = await js5.getRegionBytes("l", centreRegionId, null);
+                    let locs: Uint8Array | null = null;
+                    let usedKeyIdx = -1;
+                    for (let ki = 0; ki < keys.length && !locs; ki++) {
+                        const r = await js5.getRegionBytes("l", centreRegionId, keys[ki]);
+                        if (r) { locs = r; usedKeyIdx = ki; }
+                    }
+                    // Sample first 4 mg4-decoded ints of the first key for visual check
+                    const k0 = keys[probeIdx >= 0 ? probeIdx : 0];
+                    console.log("region probe: m=" + (terrain?.byteLength ?? "null") +
+                                " lNoXtea=" + (locsNoXtea?.byteLength ?? "null") +
+                                " l=" + (locs?.byteLength ?? "null") +
+                                " keyIdx=" + usedKeyIdx + " region=" + centreRegionId + " probeIdx=" + probeIdx +
+                                " key0=[" + (k0[0]>>>0).toString(16) + "," + (k0[1]>>>0).toString(16) + "," + (k0[2]>>>0).toString(16) + "," + (k0[3]>>>0).toString(16) + "]");
+                } catch (e) {
+                    console.log("region probe failed: " + (e as Error).message);
+                }
+            })();
+        }
         return true;
     }
 

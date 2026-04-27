@@ -515,4 +515,65 @@ export class Js5Cache {
         const idx = this.indexes[idxNum];
         return idx ? idx.capacity() : 0;
     }
+
+    /**
+     * XTEA in-place block decrypt over a Js5 compressed envelope. Mirrors
+     * rt4-client Buffer.tinydec(): skip the 5-byte (type+compLen) header,
+     * decrypt full 8-byte blocks of the encrypted body using a 4-int key
+     * with 32 rounds and the standard delta 0x9E3779B9. Trailing bytes that
+     * don't fill an 8-byte block are left untouched.
+     *
+     * Used for idx5 location groups (`l_X_Z`) which are XTEA-encrypted using
+     * the per-region key delivered by REBUILD_NORMAL. Map terrain (`m_X_Z`)
+     * is not encrypted.
+     */
+    static xteaDecryptInPlace(envelope: Uint8Array, key: Int32Array): void {
+        if (!key || key.length < 4) return;
+        if (key[0] === 0 && key[1] === 0 && key[2] === 0 && key[3] === 0) return;
+        const start = 5;
+        if (envelope.byteLength <= start) return;
+        const blocks = ((envelope.byteLength - start) / 8) | 0;
+        const dv = new DataView(envelope.buffer, envelope.byteOffset, envelope.byteLength);
+        const DELTA = 0x9E3779B9 | 0;
+        const SUM_INIT = 0xC6EF3720 | 0;
+        for (let i = 0; i < blocks; i++) {
+            let off = start + i * 8;
+            let v0 = dv.getInt32(off, false);     // big-endian
+            let v1 = dv.getInt32(off + 4, false);
+            let sum = SUM_INIT;
+            for (let r = 0; r < 32; r++) {
+                v1 = (v1 - ((((v0 << 4) ^ (v0 >>> 5)) + v0) ^ (sum + key[(sum >>> 11) & 3]))) | 0;
+                sum = (sum - DELTA) | 0;
+                v0 = (v0 - ((((v1 << 4) ^ (v1 >>> 5)) + v1) ^ (sum + key[sum & 3]))) | 0;
+            }
+            dv.setInt32(off, v0, false);
+            dv.setInt32(off + 4, v1, false);
+        }
+    }
+
+    /**
+     * Read a region group from idx5 where the group name is `${prefix}${rx}_${rz}`,
+     * decrypt with the supplied XTEA key, then run the standard
+     * compression-type dispatch. `prefix` is "m" for terrain, "l" for locations.
+     * Region bit-pack is `(rx << 8) | rz` per rt4-client convention.
+     */
+    async getRegionBytes(prefix: string, regionId: number, xteaKey: Int32Array | null): Promise<Uint8Array | null> {
+        // rt4-client convention (LoginManager.java:624) is `${prefix}${rx}_${rz}`
+        // — no underscore between prefix and X. e.g. "m50_52" or "l50_52".
+        const rx = (regionId >> 8) & 0xFF;
+        const rz = regionId & 0xFF;
+        const groupName = prefix + rx + "_" + rz;
+        const groupId = await this.getGroupId(5, groupName);
+        if (groupId < 0) return null;
+        const idx = this.indexes[5];
+        if (!idx) return null;
+        const raw = idx.readGroup(groupId);
+        if (!raw) return null;
+        // Clone so the in-place XTEA pass doesn't mutate the cache-side buffer
+        // returned by sector reader.
+        const envelope = new Uint8Array(raw.byteLength);
+        envelope.set(raw);
+        if (xteaKey) Js5Cache.xteaDecryptInPlace(envelope, xteaKey);
+        return Js5Compression.uncompress(envelope);
+    }
 }
