@@ -388,8 +388,14 @@ final class RSCPacketHandler {
             ws.isSleeping = true
             ws.sleepFatigue = ws.fatigue
             ws.sleepStatusText = "Enter the word to wake up"
-            // The packet contains captcha image bytes — we skip them since we can't render the captcha
-            // The player needs to type the word shown on screen (on PC client this shows a distorted image)
+            // The remaining bytes are the encoded captcha sprite. SleepPanel
+            // renders them via a custom RLE decoder mirroring
+            // mudclient.makeSleepSprite (PacketHandler.java:2422-2438).
+            var captchaBytes: [UInt8] = []
+            while buf.bytesRemaining > 0 {
+                captchaBytes.append(UInt8(truncatingIfNeeded: buf.getUnsignedByte()))
+            }
+            ws.sleepCaptchaBytes = Data(captchaBytes)
 
         case 15:  // tradeSelfDecision
             let _ = buf.getByte() // accepted flag

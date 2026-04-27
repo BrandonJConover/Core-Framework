@@ -13,6 +13,7 @@
 		0719CA5F2460CB24784BB821 /* MinimapPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A2C8E3EE280E9D4EC285120 /* MinimapPanel.swift */; };
 		0950957DF00260DAA0754C38 /* OpenRSCApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5969C636EE8BFAC20BDCE024 /* OpenRSCApp.swift */; };
 		0B5B96679272F4061595F185 /* ServerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82C6EF63288E0ECBA6862BC3 /* ServerProfile.swift */; };
+		0DA666740B06BC98390E1A70 /* SleepPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D699C23A0F9C4835F522B84 /* SleepPanel.swift */; };
 		173ADFFA4E8DB40C15342E6B /* Audio in Resources */ = {isa = PBXBuildFile; fileRef = 8B57ED468FC1209E7D5335BC /* Audio */; };
 		1C69A0A877D02C70BAB61037 /* LandscapeLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6B9F41201F6AE4126D67AF /* LandscapeLoader.swift */; };
 		1F05133FAB0524EC26661315 /* GraphicsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C023BDFCCE3322E38787E6 /* GraphicsController.swift */; };
@@ -113,6 +114,7 @@
 		9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebGameView.swift; sourceTree = "<group>"; };
 		990619EF9FCF13064CD17511 /* TCPConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCPConnection.swift; sourceTree = "<group>"; };
 		99F001E360C5E37BAE24BD54 /* World.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = World.swift; sourceTree = "<group>"; };
+		9D699C23A0F9C4835F522B84 /* SleepPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepPanel.swift; sourceTree = "<group>"; };
 		9F7A50354B450F1785FDA303 /* GameProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameProtocol.swift; sourceTree = "<group>"; };
 		A10B951D45EB676566FF7CB1 /* sprites.dat */ = {isa = PBXFileReference; path = sprites.dat; sourceTree = "<group>"; };
 		A4EDAB057950782165E6034E /* GameObjectDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameObjectDefinitions.swift; sourceTree = "<group>"; };
@@ -161,6 +163,7 @@
 				2A2C8E3EE280E9D4EC285120 /* MinimapPanel.swift */,
 				E26571E96500DAB87E51F147 /* SettingsPanel.swift */,
 				D1FC277CCD5343D460C70637 /* ShopPanel.swift */,
+				9D699C23A0F9C4835F522B84 /* SleepPanel.swift */,
 				77082BCCC301983216C93E70 /* TradePanel.swift */,
 				9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */,
 				4158CF99B998E5ACBE1150CE /* WelcomePanel.swift */,
@@ -455,6 +458,7 @@
 				F793CE144665DBB9834FA194 /* SettingsPanel.swift in Sources */,
 				CBF2C9E8D5FADE352A16BF9B /* Shader.swift in Sources */,
 				EBA8E4A55266291BCB60A316 /* ShopPanel.swift in Sources */,
+				0DA666740B06BC98390E1A70 /* SleepPanel.swift in Sources */,
 				E2F931D857FB7A50A40F1316 /* SoundManager.swift in Sources */,
 				476AD837C7512706C19396F1 /* SpriteLoader.swift in Sources */,
 				D52601860204DA30D7B28639 /* TCPConnection.swift in Sources */,

@@ -205,6 +205,14 @@ final class RSCWorldState: ObservableObject {
     @Published var isSleeping: Bool = false
     @Published var sleepFatigue: Int = 0
     @Published var sleepStatusText: String = ""
+    /// Raw bytes of the sleep-screen captcha. The Java client decodes it via
+    /// `mc.makeSleepSprite(bytes)` (mudclient.java:7800ish) — a custom RLE
+    /// blob that produces a 255×40 grayscale word image. We store the bytes
+    /// here; the SleepPanel renders them as a CGImage on-screen.
+    @Published var sleepCaptchaBytes: Data? = nil
+    /// Width/height of the decoded captcha sprite (255×40 from server).
+    var sleepCaptchaWidth: Int = 255
+    var sleepCaptchaHeight: Int = 40
 
     // Context menu state
     @Published var contextMenuOpen: Bool = false

@@ -245,6 +245,9 @@ struct GameView: View {
         if engine.worldState.welcomeShown {
             WelcomePanel(worldState: engine.worldState)
         }
+        if engine.worldState.isSleeping {
+            SleepPanel(worldState: engine.worldState, engine: engine)
+        }
         // XP drop notifications (top-right, floating up)
         if !engine.worldState.xpDrops.isEmpty {
             VStack(alignment: .trailing, spacing: 2) {
