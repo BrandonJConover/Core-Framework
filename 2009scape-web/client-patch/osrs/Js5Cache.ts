@@ -25,6 +25,12 @@
  */
 
 import { BZip2Decompressor } from "./cache/bzip/BZip2Decompressor";
+// seek-bzip is a clean pure-JS BZip2 decoder. Used as the primary path because
+// the in-tree BZip2Decompressor port has shown CPU-spin behaviour on certain
+// 530 idx13 streams; we keep that decoder as a fallback for any edge case
+// seek-bzip rejects.
+// @ts-ignore — vendored JS, no .d.ts shipped
+import Bunzip from "seek-bzip";
 
 export class Js5Sector {
     static readonly SECTOR_SIZE = 520;
@@ -158,18 +164,34 @@ export class Js5Compression {
         if (uncompressedLen < 0) return null;
 
         if (type === 1) {
-            // BZip2. The existing BZip2Decompressor expects a stream with a 'BZh' header.
-            // Js5 bzip2 blobs have the 'BZh' header stripped; we re-prepend it.
-            const out = new Array<number>(uncompressedLen).fill(0);
-            const bz2Input = new Array<number>(4 + compressedLen);
-            bz2Input[0] = "B".charCodeAt(0);
-            bz2Input[1] = "Z".charCodeAt(0);
-            bz2Input[2] = "h".charCodeAt(0);
-            bz2Input[3] = "1".charCodeAt(0);
+            // BZip2. Js5 strips the "BZh1" file header; re-prepend it before decoding.
+            if (uncompressedLen > 16 * 1024 * 1024) return null;
+            if (uncompressedLen > compressedLen * 64) return null;
+            const bz2Input = new Uint8Array(4 + compressedLen);
+            bz2Input[0] = 0x42; // 'B'
+            bz2Input[1] = 0x5A; // 'Z'
+            bz2Input[2] = 0x68; // 'h'
+            bz2Input[3] = 0x31; // '1'
             for (let i = 0; i < compressedLen; i++) bz2Input[4 + i] = input[9 + i];
+            // Primary path: seek-bzip. Reliable, well-tested, doesn't CPU-spin on
+            // edge cases. Pass uncompressedLen as the output buffer size hint.
+            try {
+                const decoded = Bunzip.decode(bz2Input, uncompressedLen);
+                if (decoded && decoded.length >= uncompressedLen) {
+                    const u8 = new Uint8Array(uncompressedLen);
+                    for (let i = 0; i < uncompressedLen; i++) u8[i] = decoded[i] & 0xFF;
+                    return u8;
+                }
+            } catch (e) {
+                // fall through to legacy decoder
+            }
+            // Fallback: in-tree decoder for any stream seek-bzip refuses.
+            const out = new Array<number>(uncompressedLen).fill(0);
+            const legacyInput = new Array<number>(4 + compressedLen);
+            for (let i = 0; i < bz2Input.length; i++) legacyInput[i] = bz2Input[i];
             try {
                 BZip2Decompressor.decompress$byte_A$int$byte_A$int$int(
-                    out, uncompressedLen, bz2Input, compressedLen + 4, 0
+                    out, uncompressedLen, legacyInput, compressedLen + 4, 0
                 );
             } catch (e) {
                 return null;
