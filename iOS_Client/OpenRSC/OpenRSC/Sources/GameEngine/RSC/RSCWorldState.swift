@@ -127,6 +127,17 @@ final class RSCWorldState: ObservableObject {
     @Published var fatigue: Int = 0
     @Published var isDead: Bool = false
 
+    // Welcome dialog state — populated by opcode 182 (PacketHandler.showLoginDialog).
+    // Shown once per session right after the first character/skills sync.
+    @Published var welcomeShown: Bool = false
+    @Published var welcomeLastIP: String = ""
+    /// Days since the previous login (0 = today). 65535 means "never logged in".
+    @Published var welcomeDaysAgo: Int = 0
+    /// Days remaining until recovery questions expire (0 if not set).
+    @Published var welcomeRecoveryDays: Int = 0
+    /// 0..5 — index into a tip-of-the-day text array picked client-side.
+    @Published var welcomeTipOfDay: Int = 0
+
     // Bank state (opcode 42 showBank, 203 closeBank)
     @Published var bankOpen: Bool = false
     @Published var bankItems: [(id: Int, amount: Int)] = []
@@ -216,6 +227,13 @@ final class RSCWorldState: ObservableObject {
     @Published var combatStyle: Int = 0  // 0=controlled, 1=aggressive, 2=accurate, 3=defensive
     @Published var lastDamageReceived: Int = 0
     @Published var lastDamageDealt: Int = 0
+
+    // Active prayers — index matches the prayer slot (0..49 capacity, 14 used in RSC)
+    @Published var activePrayers: [Bool] = Array(repeating: false, count: 50)
+
+    // Pending spell cast — when set, the next world tap is interpreted as the
+    // target rather than a walk. Cleared by RSCGameEngine.handleTap.
+    @Published var pendingSpellId: Int? = nil
 
     // Computed combat stats
     var hitpoints: Int { skills.first(where: { $0.id == 3 })?.current ?? 10 }

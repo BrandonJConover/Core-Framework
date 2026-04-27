@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum HUDPanel {
-    case chat, inventory, stats, combat, prayer, magic, friends, quests, map
+    case chat, inventory, stats, combat, prayer, magic, friends, quests, map, minimap, settings
 }
 
 // MARK: - Main HUD
@@ -36,6 +36,8 @@ struct HUDView: View {
                     HUDButton(icon: "person.2", label: "Social", panel: .friends, activePanel: $activePanel)
                     HUDButton(icon: "scroll", label: "Quest", panel: .quests, activePanel: $activePanel)
                     HUDButton(icon: "map", label: "Map", panel: .map, activePanel: $activePanel)
+                    HUDButton(icon: "location.viewfinder", label: "Mini", panel: .minimap, activePanel: $activePanel)
+                    HUDButton(icon: "gearshape", label: "Opts", panel: .settings, activePanel: $activePanel)
                 }
             }
             .padding(.horizontal, 12)
@@ -65,6 +67,10 @@ struct HUDView: View {
             QuestPanelView(worldState: worldState)
         case .map:
             MapPanelView(worldState: worldState)
+        case .minimap:
+            MinimapPanel(worldState: worldState, engine: engine)
+        case .settings:
+            SettingsPanel(worldState: worldState, engine: engine)
         }
     }
 }
@@ -522,19 +528,77 @@ private struct CombatPanelView: View {
 private struct MapPanelView: View {
     @ObservedObject var worldState: RSCWorldState
 
+    /// Hand-picked landmarks based on absolute world coords (matches the
+    /// Java client's location bookmarks). This is a stop-gap until we
+    /// render the actual world-map image — see MinimapPanel for the
+    /// per-tile minimap.
+    private let landmarks: [(name: String, x: Int, z: Int)] = [
+        ("Lumbridge", 122, 648),
+        ("Varrock", 122, 510),
+        ("Falador", 287, 540),
+        ("Draynor", 214, 632),
+        ("Edgeville", 217, 449),
+        ("Al Kharid", 70, 700),
+        ("Ardougne", 549, 587),
+        ("Camelot", 442, 459),
+    ]
+
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "map")
-                .font(.system(size: 32))
-                .foregroundColor(Color(hex: "#444444"))
-            Text("World Map")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color(hex: "#666666"))
-            Text("Coming soon")
-                .font(.system(size: 11))
-                .foregroundColor(Color(hex: "#444444"))
+        let absX = worldState.worldOffsetX + worldState.localPlayerX
+        let absZ = worldState.worldOffsetZ + worldState.localPlayerY
+
+        VStack(spacing: 6) {
+            HStack {
+                Text("World Map")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("(\(absX), \(absZ))")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(Color(hex: "#888888"))
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+
+            Text("Nearby landmarks")
+                .font(.system(size: 10))
+                .foregroundColor(Color(hex: "#888888"))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(landmarks.sorted(by: { distSq(absX, absZ, $0) < distSq(absX, absZ, $1) }), id: \.name) { lm in
+                        HStack {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.system(size: 11))
+                                .foregroundColor(.red)
+                            Text(lm.name)
+                                .font(.system(size: 12))
+                                .foregroundColor(.white)
+                            Spacer()
+                            Text(distanceText(absX, absZ, lm))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(Color(hex: "#888888"))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(hex: "#222222"))
+                        .cornerRadius(4)
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func distSq(_ x: Int, _ z: Int, _ lm: (name: String, x: Int, z: Int)) -> Int {
+        let dx = x - lm.x; let dz = z - lm.z
+        return dx * dx + dz * dz
+    }
+
+    private func distanceText(_ x: Int, _ z: Int, _ lm: (name: String, x: Int, z: Int)) -> String {
+        let d = Double(distSq(x, z, lm)).squareRoot()
+        return String(format: "%.0f tiles", d)
     }
 }
 
@@ -595,13 +659,34 @@ private struct PrayerPanelView: View {
     @ObservedObject var worldState: RSCWorldState
     let engine: RSCGameEngine
 
-    private let prayers = [
-        (0, "Thick Skin", 1), (1, "Burst of Strength", 4), (2, "Clarity of Thought", 7),
-        (3, "Rock Skin", 10), (4, "Superhuman Strength", 13), (5, "Improved Reflexes", 16),
-        (6, "Rapid Restore", 19), (7, "Rapid Heal", 22), (8, "Protect Items", 25),
-        (9, "Steel Skin", 28), (10, "Ultimate Strength", 31), (11, "Incredible Reflexes", 34),
-        (12, "Paralyze Monster", 37), (13, "Protect from Missiles", 40)
+    // (slot, name, level requirement, drain rate per minute) — drain values
+    // mirror PrayerDef.json defaults in the Java server.
+    private let prayers: [(Int, String, Int, Double)] = [
+        (0, "Thick Skin", 1, 0.5),
+        (1, "Burst of Strength", 4, 0.5),
+        (2, "Clarity of Thought", 7, 0.5),
+        (3, "Rock Skin", 10, 1.0),
+        (4, "Superhuman Strength", 13, 1.0),
+        (5, "Improved Reflexes", 16, 1.0),
+        (6, "Rapid Restore", 19, 0.4),
+        (7, "Rapid Heal", 22, 0.6),
+        (8, "Protect Items", 25, 0.6),
+        (9, "Steel Skin", 28, 2.0),
+        (10, "Ultimate Strength", 31, 2.0),
+        (11, "Incredible Reflexes", 34, 2.0),
+        (12, "Paralyze Monster", 37, 3.0),
+        (13, "Protect from Missiles", 40, 3.0),
     ]
+
+    private var prayerLevel: Int {
+        worldState.skills.first(where: { $0.id == 5 })?.base ?? 1
+    }
+
+    private var totalDrain: Double {
+        prayers.reduce(0.0) { acc, p in
+            acc + (worldState.activePrayers.indices.contains(p.0) && worldState.activePrayers[p.0] ? p.3 : 0)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -617,30 +702,54 @@ private struct PrayerPanelView: View {
             .padding(.top, 6)
 
             ScrollView {
-                LazyVStack(spacing: 2) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 3) {
                     ForEach(prayers, id: \.0) { prayer in
-                        let prayerLevel = worldState.skills.first(where: { $0.id == 5 })?.base ?? 1
                         let canUse = prayerLevel >= prayer.2
-                        Button(action: { engine.enablePrayer(prayerId: prayer.0) }) {
-                            HStack {
+                        let isActive = worldState.activePrayers.indices.contains(prayer.0)
+                            && worldState.activePrayers[prayer.0]
+                        Button(action: { engine.togglePrayer(prayerId: prayer.0) }) {
+                            VStack(alignment: .leading, spacing: 1) {
                                 Text(prayer.1)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(canUse ? .white : Color(hex: "#555555"))
-                                Spacer()
+                                    .font(.system(size: 11, weight: isActive ? .bold : .regular))
+                                    .foregroundColor(canUse
+                                        ? (isActive ? Color(hex: "#c8a951") : .white)
+                                        : Color(hex: "#444444"))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                                 Text("Lvl \(prayer.2)")
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 9))
                                     .foregroundColor(Color(hex: "#888888"))
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
-                            .background(Color(hex: "#222222"))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
+                            .background(isActive ? Color(hex: "#c8a951").opacity(0.15) : Color(hex: "#222222"))
                             .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(isActive ? Color(hex: "#c8a951") : Color.clear, lineWidth: 1)
+                            )
                         }
                         .disabled(!canUse)
                     }
                 }
                 .padding(.horizontal, 8)
             }
+
+            // Drain summary
+            HStack {
+                Image(systemName: "drop")
+                    .font(.system(size: 10))
+                    .foregroundColor(.cyan)
+                Text(totalDrain > 0
+                     ? String(format: "Draining %.1f points/min", totalDrain)
+                     : "No prayers active")
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(hex: "#888888"))
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 6)
         }
     }
 }
@@ -651,16 +760,41 @@ private struct MagicPanelView: View {
     @ObservedObject var worldState: RSCWorldState
     let engine: RSCGameEngine
 
-    private let spells = [
-        (0, "Wind Strike", 1), (1, "Confuse", 3), (2, "Water Strike", 5),
-        (3, "Enchant Lvl-1", 7), (4, "Earth Strike", 9), (5, "Weaken", 11),
-        (6, "Fire Strike", 13), (7, "Bones to Bananas", 15), (8, "Wind Bolt", 17),
-        (9, "Curse", 19), (10, "Low Alchemy", 21), (11, "Water Bolt", 23),
-        (12, "Varrock Teleport", 25), (13, "Enchant Lvl-2", 27), (14, "Earth Bolt", 29),
-        (15, "Lumbridge Teleport", 31), (16, "Telekinetic Grab", 33), (17, "Fire Bolt", 35),
-        (18, "Falador Teleport", 37), (19, "Crumble Undead", 39), (20, "Wind Blast", 41),
-        (21, "Superheat Item", 43), (22, "Camelot Teleport", 45), (23, "Water Blast", 47),
-        (24, "Enchant Lvl-3", 49), (25, "Ardougne Teleport", 51),
+    /// (id, name, level, kind) — `kind` controls how the spell is cast:
+    /// - .combat: tap NPC/player target after selecting
+    /// - .selfBuff: cast on self immediately (curse/confuse style — but those
+    ///   actually target enemies. We treat curse/confuse/weaken as combat too.)
+    /// - .teleport: cast on self
+    /// - .ground: tap ground target (telekinetic grab)
+    /// - .invItem: needs item-slot follow-up (low alch, enchant, superheat)
+    enum Kind { case combat, teleport, ground, invItem, selfBuff }
+    private let spells: [(Int, String, Int, Kind)] = [
+        (0, "Wind Strike", 1, .combat),
+        (1, "Confuse", 3, .combat),
+        (2, "Water Strike", 5, .combat),
+        (3, "Enchant Lvl-1", 7, .invItem),
+        (4, "Earth Strike", 9, .combat),
+        (5, "Weaken", 11, .combat),
+        (6, "Fire Strike", 13, .combat),
+        (7, "Bones to Bananas", 15, .selfBuff),
+        (8, "Wind Bolt", 17, .combat),
+        (9, "Curse", 19, .combat),
+        (10, "Low Alchemy", 21, .invItem),
+        (11, "Water Bolt", 23, .combat),
+        (12, "Varrock Teleport", 25, .teleport),
+        (13, "Enchant Lvl-2", 27, .invItem),
+        (14, "Earth Bolt", 29, .combat),
+        (15, "Lumbridge Teleport", 31, .teleport),
+        (16, "Telekinetic Grab", 33, .ground),
+        (17, "Fire Bolt", 35, .combat),
+        (18, "Falador Teleport", 37, .teleport),
+        (19, "Crumble Undead", 39, .combat),
+        (20, "Wind Blast", 41, .combat),
+        (21, "Superheat Item", 43, .invItem),
+        (22, "Camelot Teleport", 45, .teleport),
+        (23, "Water Blast", 47, .combat),
+        (24, "Enchant Lvl-3", 49, .invItem),
+        (25, "Ardougne Teleport", 51, .teleport),
     ]
 
     var body: some View {
@@ -669,10 +803,25 @@ private struct MagicPanelView: View {
                 Text("Magic")
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
-                let magicLvl = worldState.skills.first(where: { $0.id == 6 })?.current ?? 1
-                Text("Level: \(magicLvl)")
-                    .font(.system(size: 11))
-                    .foregroundColor(.purple)
+                if let pendingId = worldState.pendingSpellId,
+                   let pending = spells.first(where: { $0.0 == pendingId }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "scope")
+                            .font(.system(size: 10))
+                        Text("Tap a target for \(pending.1)")
+                            .font(.system(size: 10, weight: .semibold))
+                        Button(action: { worldState.pendingSpellId = nil }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                        }
+                    }
+                    .foregroundColor(Color(hex: "#c8a951"))
+                } else {
+                    let magicLvl = worldState.skills.first(where: { $0.id == 6 })?.current ?? 1
+                    Text("Level: \(magicLvl)")
+                        .font(.system(size: 11))
+                        .foregroundColor(.purple)
+                }
             }
             .padding(.horizontal, 8)
             .padding(.top, 6)
@@ -682,12 +831,17 @@ private struct MagicPanelView: View {
                     ForEach(spells, id: \.0) { spell in
                         let magicLvl = worldState.skills.first(where: { $0.id == 6 })?.base ?? 1
                         let canCast = magicLvl >= spell.2
-                        Button(action: { engine.castSpellOnSelf(spellId: spell.0) }) {
+                        let isPending = worldState.pendingSpellId == spell.0
+                        Button(action: { castSpell(spell) }) {
                             HStack {
+                                Image(systemName: spellIcon(spell.3))
+                                    .font(.system(size: 9))
+                                    .foregroundColor(spellColor(spell.3))
                                 Text(spell.1)
                                     .font(.system(size: 10))
                                     .foregroundColor(canCast ? .white : Color(hex: "#555555"))
                                     .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                                 Spacer()
                                 Text("\(spell.2)")
                                     .font(.system(size: 9, design: .monospaced))
@@ -695,14 +849,55 @@ private struct MagicPanelView: View {
                             }
                             .padding(.horizontal, 4)
                             .padding(.vertical, 4)
-                            .background(Color(hex: "#222222"))
+                            .background(isPending ? Color(hex: "#c8a951").opacity(0.2) : Color(hex: "#222222"))
                             .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(isPending ? Color(hex: "#c8a951") : Color.clear, lineWidth: 1)
+                            )
                         }
                         .disabled(!canCast)
                     }
                 }
                 .padding(.horizontal, 8)
             }
+        }
+    }
+
+    private func castSpell(_ spell: (Int, String, Int, Kind)) {
+        switch spell.3 {
+        case .teleport, .selfBuff:
+            engine.castSpellOnSelf(spellId: spell.0)
+        case .combat, .ground:
+            // Arm the engine — the next world tap routes through pendingSpellId.
+            worldState.pendingSpellId = spell.0
+            worldState.addChat(sender: "[Magic]", text: "Select a target for \(spell.1).")
+        case .invItem:
+            // TODO: present an inventory-slot picker. For now we surface a
+            // chat hint — the user can fall back to the long-press menu on
+            // an inventory item once that's wired up.
+            worldState.addChat(sender: "[Magic]", text: "\(spell.1): tap an inventory item to cast on.")
+            worldState.pendingSpellId = spell.0
+        }
+    }
+
+    private func spellIcon(_ kind: Kind) -> String {
+        switch kind {
+        case .combat:    return "bolt.fill"
+        case .teleport:  return "sparkles"
+        case .ground:    return "hand.raised.fill"
+        case .invItem:   return "bag"
+        case .selfBuff:  return "person.fill"
+        }
+    }
+
+    private func spellColor(_ kind: Kind) -> Color {
+        switch kind {
+        case .combat:    return .red
+        case .teleport:  return .purple
+        case .ground:    return .yellow
+        case .invItem:   return Color(hex: "#c8a951")
+        case .selfBuff:  return .green
         }
     }
 }
@@ -713,7 +908,10 @@ private struct FriendsPanelView: View {
     @ObservedObject var worldState: RSCWorldState
     let engine: RSCGameEngine
     @State private var newFriendName = ""
+    @State private var newIgnoreName = ""
     @State private var showIgnore = false
+    @State private var pmRecipient: String? = nil
+    @State private var pmText = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -734,81 +932,166 @@ private struct FriendsPanelView: View {
             .padding(.top, 6)
 
             if !showIgnore {
-                // Add friend
+                friendsPane
+            } else {
+                ignorePane
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var friendsPane: some View {
+        // Add friend
+        HStack(spacing: 4) {
+            TextField("Add friend...", text: $newFriendName)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(Color(hex: "#2a2a2a"))
+                .cornerRadius(6)
+                .onSubmit { addFriend() }
+            Button(action: addFriend) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundColor(Color(hex: "#c8a951"))
+            }
+        }
+        .padding(.horizontal, 8)
+
+        // Inline PM composer for the currently-selected friend.
+        if let recipient = pmRecipient {
+            VStack(spacing: 4) {
+                HStack {
+                    Text("To \(recipient)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.cyan)
+                    Spacer()
+                    Button(action: { pmRecipient = nil; pmText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "#666666"))
+                    }
+                }
                 HStack(spacing: 4) {
-                    TextField("Add friend...", text: $newFriendName)
+                    TextField("Message...", text: $pmText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 4)
                         .background(Color(hex: "#2a2a2a"))
                         .cornerRadius(6)
-                        .onSubmit {
-                            guard !newFriendName.isEmpty else { return }
-                            engine.addFriend(name: newFriendName)
-                            newFriendName = ""
-                        }
-                    Button(action: {
-                        guard !newFriendName.isEmpty else { return }
-                        engine.addFriend(name: newFriendName)
-                        newFriendName = ""
-                    }) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(Color(hex: "#c8a951"))
+                        .onSubmit { sendPM(to: recipient) }
+                    Button(action: { sendPM(to: recipient) }) {
+                        Image(systemName: "paperplane.fill")
+                            .foregroundColor(pmText.isEmpty ? Color(hex: "#444444") : Color(hex: "#c8a951"))
                     }
-                }
-                .padding(.horizontal, 8)
-
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(Array(worldState.friendsList.enumerated()), id: \.offset) { idx, friend in
-                            HStack {
-                                Circle()
-                                    .fill(friend.online ? Color.green : Color(hex: "#555555"))
-                                    .frame(width: 8, height: 8)
-                                Text(friend.name)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(friend.online ? .white : Color(hex: "#888888"))
-                                Spacer()
-                                Button(action: { engine.removeFriend(name: friend.name) }) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(Color(hex: "#555555"))
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(hex: "#222222"))
-                            .cornerRadius(4)
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                }
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(Array(worldState.ignoreList.enumerated()), id: \.offset) { idx, name in
-                            HStack {
-                                Text(name)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(Color(hex: "#888888"))
-                                Spacer()
-                                Button(action: { engine.removeIgnore(name: name) }) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(Color(hex: "#555555"))
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(hex: "#222222"))
-                            .cornerRadius(4)
-                        }
-                    }
-                    .padding(.horizontal, 8)
+                    .disabled(pmText.isEmpty)
                 }
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color(hex: "#0f0f0f"))
+            .cornerRadius(6)
+            .padding(.horizontal, 8)
         }
+
+        ScrollView {
+            LazyVStack(spacing: 2) {
+                ForEach(Array(worldState.friendsList.enumerated()), id: \.offset) { _, friend in
+                    HStack {
+                        Circle()
+                            .fill(friend.online ? Color.green : Color(hex: "#555555"))
+                            .frame(width: 8, height: 8)
+                        Button(action: {
+                            // Tap a friend → open PM composer
+                            pmRecipient = friend.name
+                        }) {
+                            Text(friend.name)
+                                .font(.system(size: 12))
+                                .foregroundColor(friend.online ? .white : Color(hex: "#888888"))
+                        }
+                        Spacer()
+                        Button(action: { pmRecipient = friend.name }) {
+                            Image(systemName: "bubble.left.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(friend.online ? .cyan : Color(hex: "#444444"))
+                        }
+                        .disabled(!friend.online)
+                        Button(action: { engine.removeFriend(name: friend.name) }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hex: "#555555"))
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(hex: "#222222"))
+                    .cornerRadius(4)
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+    }
+
+    @ViewBuilder
+    private var ignorePane: some View {
+        // Add ignore
+        HStack(spacing: 4) {
+            TextField("Add to ignore...", text: $newIgnoreName)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(Color(hex: "#2a2a2a"))
+                .cornerRadius(6)
+                .onSubmit { addIgnore() }
+            Button(action: addIgnore) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundColor(Color(hex: "#c8a951"))
+            }
+        }
+        .padding(.horizontal, 8)
+
+        ScrollView {
+            LazyVStack(spacing: 2) {
+                ForEach(Array(worldState.ignoreList.enumerated()), id: \.offset) { _, name in
+                    HStack {
+                        Text(name)
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(hex: "#888888"))
+                        Spacer()
+                        Button(action: { engine.removeIgnore(name: name) }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hex: "#555555"))
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(hex: "#222222"))
+                    .cornerRadius(4)
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+    }
+
+    private func addFriend() {
+        guard !newFriendName.isEmpty else { return }
+        engine.addFriend(name: newFriendName)
+        newFriendName = ""
+    }
+
+    private func addIgnore() {
+        guard !newIgnoreName.isEmpty else { return }
+        engine.addIgnore(name: newIgnoreName)
+        newIgnoreName = ""
+    }
+
+    private func sendPM(to recipient: String) {
+        guard !pmText.isEmpty else { return }
+        engine.sendPrivateMessage(to: recipient, text: pmText)
+        pmText = ""
     }
 }
 
@@ -1159,6 +1442,20 @@ private struct QuestPanelView: View {
             }
             .padding(.horizontal, 8)
             .padding(.top, 6)
+
+            // Quest points summary (1 QP per completed quest as a placeholder —
+            // the server doesn't yet ship per-quest QP rewards over the wire,
+            // so we approximate from completion count).
+            HStack(spacing: 4) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(hex: "#c8a951"))
+                Text("Quest Points: \(worldState.quests.filter { $0.stage == -1 }.count)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Color(hex: "#c8a951"))
+                Spacer()
+            }
+            .padding(.horizontal, 8)
 
             if worldState.quests.isEmpty {
                 VStack(spacing: 8) {
