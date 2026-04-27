@@ -40,6 +40,7 @@ public class PathfindingDebug {
 	}
 
 	class PathfindingDebugPanel extends JPanel {
+		private static final long serialVersionUID = 1L;
 		int size = 15;
 		int width = 20;
 		Color[][] board = null;

@@ -333,7 +333,7 @@ public final class Shop {
 				baseStock = item.getAmount() + 1;
 			}
 		}
-		int offset = (int) priceModifier * (baseStock - (getItemCount(itemID) + totalRemoved));
+		int offset = priceModifier * (baseStock - (getItemCount(itemID) + totalRemoved));
 		if (offset < -100)
 			offset = -100;
 		else if (offset > 100)
@@ -348,7 +348,7 @@ public final class Shop {
 				baseStock = item.getAmount();
 			}
 		}
-		int offset = (int) priceModifier * (baseStock - (getItemCount(itemID) - totalRemoved));
+		int offset = priceModifier * (baseStock - (getItemCount(itemID) - totalRemoved));
 		if (offset < -100)
 			offset = -100;
 		else if (offset > 100)

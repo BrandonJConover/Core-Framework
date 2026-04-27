@@ -71,7 +71,7 @@ public class ItemUseOnObject implements PayloadProcessor<ItemOnObjectStruct, Opc
 
 				if (getPlayer().getWorld().getServer().getPluginHandler()
 					.handlePlugin(UseLocTrigger.class, getPlayer(),
-						new Object[]{getPlayer(), (GameObject) object, item}, this))
+						new Object[]{getPlayer(), object, item}, this))
 					return;
 			}
 		});

@@ -46,6 +46,11 @@ public class RangeEvent extends GameTickEvent {
 		return false;
 	}
 
+	@Override
+	public int hashCode() {
+		return java.util.Objects.hashCode(getOwner());
+	}
+
 	public Mob getTarget() {
 		return target;
 	}

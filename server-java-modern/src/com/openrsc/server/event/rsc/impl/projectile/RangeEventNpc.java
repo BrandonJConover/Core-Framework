@@ -30,6 +30,11 @@ public class RangeEventNpc extends GameTickEvent {
         return false;
     }
 
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hashCode(getOwner());
+    }
+
     public void run() {
         final Mob owner = getOwner();
         if ((victim.isPlayer() && !((Player) victim).loggedIn())

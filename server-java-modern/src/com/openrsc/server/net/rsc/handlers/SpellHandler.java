@@ -1302,6 +1302,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 		});
 	}
 
+	@SuppressWarnings("fallthrough")
 	private void handleMobCast(final Player player, final Mob affectedMob, Spells spellEnum, int spellType) {
 		if (player.getDuel().isDuelActive() && affectedMob.isPlayer()) {
 			Player aff = (Player) affectedMob;
@@ -1624,6 +1625,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 						break;
 					case CLAWS_OF_GUTHIX:
 						isClaws = true;
+						// fall through
 					case SARADOMIN_STRIKE:
 					case FLAMES_OF_ZAMORAK:
 						if (!getPlayer().getCarriedItems().getEquipment().hasEquipped(ItemId.STAFF_OF_GUTHIX.id()) && spellEnum == Spells.CLAWS_OF_GUTHIX) {

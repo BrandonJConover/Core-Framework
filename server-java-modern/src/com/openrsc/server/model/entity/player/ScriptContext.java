@@ -357,6 +357,7 @@ public class ScriptContext {
 		lock();
 	}
 
+	@SuppressWarnings("fallthrough")
 	public void setInitialInteraction(final EntityType entityType, final Object interactingObject) {
 		switch(entityType) {
 			case PLAYER:
@@ -380,8 +381,10 @@ public class ScriptContext {
 			case COORDINATE:
 				setEntityType(EntityType.NONE);
 				setInteractingCoordinate((Point)interactingObject);
+				// fall through
 			case NONE:
 				setInteractingNothing();
+				// fall through
 			default:
 				break;
 		}

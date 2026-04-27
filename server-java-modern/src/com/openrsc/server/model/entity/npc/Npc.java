@@ -878,6 +878,7 @@ public class Npc extends Mob {
 		}
 	}
 
+	@SuppressWarnings("fallthrough")
 	public void updatePosition() {
 		NpcInteraction interaction = getNpcInteraction();
 		Player player = getInteractingPlayer();
@@ -888,6 +889,7 @@ public class Npc extends Mob {
 				case NPC_USE_ITEM:
 					resetPath();
 					resetRange();
+					// fall through
 				default:
 					break;
 			}
@@ -899,6 +901,7 @@ public class Npc extends Mob {
 					if (player.getLocation().equals(getLocation())) {
 						moveToAdjacentTile();
 					}
+					// fall through
 				case NPC_USE_ITEM:
 				case NPC_GNOMEBALL_OP:
 					if (finishedPath() && !inCombat()) face(player);

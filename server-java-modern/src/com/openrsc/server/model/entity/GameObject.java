@@ -175,6 +175,11 @@ public class GameObject extends Entity {
 	}
 
 	@Override
+	public int hashCode() {
+		return java.util.Objects.hash(getLocation(), getID(), getDirection(), getType());
+	}
+
+	@Override
 	public String toString() {
 		return getType() + ":id = " + getID()
 			+ "; dir = " + direction + "; location = "

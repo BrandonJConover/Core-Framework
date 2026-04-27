@@ -129,7 +129,7 @@ public final class PluginHandler implements IPluginHandler {
             pluginInstances.putInstance(type, instance);
             return instance;
         }
-        return (T) pluginInstances.getInstance(type);
+        return pluginInstances.getInstance(type);
     }
 
     public Collection<Class<?>> explodeClassTree(Class<?> type) {

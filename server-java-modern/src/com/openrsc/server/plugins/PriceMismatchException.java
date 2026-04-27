@@ -1,6 +1,7 @@
 package com.openrsc.server.plugins;
 
 public class PriceMismatchException extends Exception {
+	private static final long serialVersionUID = 1L;
 	private int desiredPrice;
 	private int effectivePrice;
 	public PriceMismatchException(final int desiredPrice, final int effectivePrice, String message) {

@@ -237,11 +237,11 @@ public class AchievementSystem {
 	}
 
 	public void setQuestStage(final Player player, final int questID, final int stage) {
-		player.getCache().set("simpletask[" + questID + "]_stage", (int) stage);
+		player.getCache().set("simpletask[" + questID + "]_stage", stage);
 	}
 
 	public void setQuestStage(final Player player, final Achievement quest, final int stage) {
-		player.getCache().set("simpletask[" + quest.getId() + "]_stage", (int) stage);
+		player.getCache().set("simpletask[" + quest.getId() + "]_stage", stage);
 	}
 
 	public boolean playerCompletedQuest(final Player player, final Achievement quest) {

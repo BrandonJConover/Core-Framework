@@ -2,6 +2,8 @@ package com.openrsc.server.database.patches;
 
 public class PatchApplicationException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     public PatchApplicationException(String message) {
         super(message);
     }

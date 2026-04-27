@@ -634,6 +634,7 @@ public class PathValidation {
 		return blockedPath;
 	}
 
+	@SuppressWarnings("fallthrough")
 	public static boolean isPlayerBlocking(Player localPlayer, int x, int y) {
 		// Set player's target tile so we can check this later when they finish walking.
 		localPlayer.setLastTileClicked(new Point(x, y));
@@ -650,6 +651,7 @@ public class PathValidation {
 					localPlayer.face(player);
 					return true;
 				}
+				// fall through
 			default:
 				return false;
 		}

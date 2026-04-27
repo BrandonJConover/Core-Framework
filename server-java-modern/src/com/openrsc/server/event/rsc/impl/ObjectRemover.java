@@ -22,6 +22,11 @@ public class ObjectRemover extends GameTickEvent {
 		return false;
 	}
 
+	@Override
+	public int hashCode() {
+		return java.util.Objects.hashCode(object);
+	}
+
 	public GameObject getObject() {
 		return object;
 	}

@@ -756,7 +756,7 @@ public final class GameStateUpdater {
 
 						if (updateType == 1 || updateType == 7) {
 							if (cm.getSender() != null && cm.getSender() instanceof Player)
-								updatesMain.add((int) sender.getIcon());
+								updatesMain.add(sender.getIcon());
 						}
 
 						if (updateType == 7) {
@@ -786,7 +786,7 @@ public final class GameStateUpdater {
 							updatesMain.add((short) cm.getSender().getIndex());
 							updatesMain.add((byte) (!isRetroClient ? updateType : 1));
 							if (updateType != 6 && (isCustomClient || player.isUsing233CompatibleClient())) {
-								updatesMain.add((byte) sender.getIconAuthentic());
+								updatesMain.add(sender.getIconAuthentic());
 							}
 							if (isRetroClient) {
 								String messageUse = message;
@@ -837,7 +837,7 @@ public final class GameStateUpdater {
 					if (isRetroClient) {
 						updatesAlt.add((short) playerNeedingAppearanceUpdate.getIndex()); // server index
 						updatesAlt.add((short) playerNeedingAppearanceUpdate.getIndex()); // server id
-						updatesAlt.add((long) DataConversions.usernameToHash(playerNeedingAppearanceUpdate.getUsername()));
+						updatesAlt.add(DataConversions.usernameToHash(playerNeedingAppearanceUpdate.getUsername()));
 					} else {
 						updatesMain.add((short) playerNeedingAppearanceUpdate.getIndex());
 						updatesMain.add((byte) 5);
@@ -855,7 +855,7 @@ public final class GameStateUpdater {
 							}
 						} else if (appearanceUpdateWithUsernameHash) {
 							updatesMain.add((short) player.getAppearanceID());
-							updatesMain.add((long) DataConversions.usernameToHash(playerNeedingAppearanceUpdate.getUsername()));
+							updatesMain.add(DataConversions.usernameToHash(playerNeedingAppearanceUpdate.getUsername()));
 						} else if (player.isUsingCustomClient()) {
 							updatesMain.add(playerNeedingAppearanceUpdate.getUsername());
 						}
@@ -1019,7 +1019,7 @@ public final class GameStateUpdater {
 						updatesMain.add((byte) (playerNeedingAppearanceUpdate.stateIsInvisible() ? 1 : 0));
 						updatesMain.add((byte) (playerNeedingAppearanceUpdate.stateIsInvulnerable() ? 1 : 0));
 						updatesMain.add((byte) playerNeedingAppearanceUpdate.getGroupID());
-						updatesMain.add((int) playerNeedingAppearanceUpdate.getIcon());
+						updatesMain.add(playerNeedingAppearanceUpdate.getIcon());
 					}
 				}
 

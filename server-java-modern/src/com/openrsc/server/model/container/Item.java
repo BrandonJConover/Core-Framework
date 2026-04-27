@@ -40,6 +40,11 @@ public class Item implements Comparable<Item> {
 	}
 
 	@Override
+	public int hashCode() {
+		return java.util.Objects.hash(getCatalogId(), getNoted());
+	}
+
+	@Override
 	public String toString() {
 		return "Item(" + getCatalogId() + ", " + getAmount() + ", " + getNoted() + ")";
 	}

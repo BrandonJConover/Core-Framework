@@ -68,7 +68,7 @@ public class PcapLogger {
 
 		long timestampMS = packet.timestamp;
 		int timestampSeconds = (int)((timestampMS) / 1000);
-		long timestampMicro = ((long)timestampMS * 1000) % 1000000;
+		long timestampMicro = (timestampMS * 1000) % 1000000;
 
 		pcap.writeInt(timestampSeconds); // Timestamp seconds
 		pcap.writeInt((int)timestampMicro); // Timestamp microseconds

@@ -169,7 +169,7 @@ public class Point {
 	}
 
 	public static boolean inWilderness(int x, int y) {
-		int wild = 2203 - (y + (1776 - (944 * (int) (y / 944))));
+		int wild = 2203 - (y + (1776 - (944 * (y / 944))));
 		if (x + 2304 >= 2640) {
 			wild = -50;
 		}
@@ -636,6 +636,7 @@ public class Point {
 	public static final int UNABLE_TO_CONVERT = -10000;
 	public static final int BAD_COORDINATE_LENGTH = 0;
 	public static final int NOT_A_NUMBER = 1;
+	@SuppressWarnings("fallthrough")
 	public static Point jagexPointToPoint(String jagexPoint) {
 		int x = 0;
 		int y = 0;
@@ -650,6 +651,7 @@ public class Point {
 				case 10:
 					offsetX = Integer.parseInt(jagexPoint.substring(6, 8));
 					offsetY = Integer.parseInt(jagexPoint.substring(8, 10));
+					// fall through
 				case 5:
 					height = Integer.parseInt(jagexPoint.substring(0, 1));
 					sectorX = Integer.parseInt(jagexPoint.substring(1, 3));

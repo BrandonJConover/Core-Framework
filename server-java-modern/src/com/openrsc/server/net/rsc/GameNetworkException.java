@@ -1,6 +1,7 @@
 package com.openrsc.server.net.rsc;
 
 public class GameNetworkException extends RuntimeException  {
+	private static final long serialVersionUID = 1L;
 	private final Object struct;
 	private final String reason;
 	private final String exposedDetail; // any exposed detail to send out

@@ -244,7 +244,7 @@ public class FishingTrawler extends DelayedEvent {
 
 					ticksTillNextLeak = DataConversions.random(minimumBreak, maximumBreak) * BASE_TICK / getWorld().getServer().getConfig().GAME_TICK;
 				}
-				setWaterLevel(getWaterLevel() + ((int) (getLeakCount())));
+				setWaterLevel(getWaterLevel() + getLeakCount());
 				updateInterfaces();
 				if (timeTillReturn-- <= 0) {
 					endGame();
