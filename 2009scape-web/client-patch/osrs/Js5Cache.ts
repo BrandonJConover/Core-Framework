@@ -31,6 +31,12 @@ import { BZip2Decompressor } from "./cache/bzip/BZip2Decompressor";
 // seek-bzip rejects.
 // @ts-ignore — vendored JS, no .d.ts shipped
 import Bunzip from "seek-bzip";
+// pako gives us a synchronous Inflate that handles gzip wrappers without the
+// async stream plumbing of DecompressionStream. We ran into headless-Chromium
+// throwing "Failed to fetch" when consuming a Blob.stream() through
+// DecompressionStream("gzip") on XTEA-decrypted payloads — pako sidesteps the
+// browser stream pipeline entirely.
+import pako from "pako";
 
 export class Js5Sector {
     static readonly SECTOR_SIZE = 520;
@@ -202,16 +208,26 @@ export class Js5Compression {
         }
 
         if (type === 2) {
-            // GZip — use browser DecompressionStream if available.
-            const ds = (globalThis as any).DecompressionStream;
-            if (!ds) return null;
+            // GZip via pako. The 530 cache wraps a standard 10-byte gzip
+            // header + raw deflate body + 8-byte gzip trailer; rt4-client's
+            // GzipDecompressor.method1842 strips both header and trailer and
+            // feeds the raw deflate to Inflater(true). We do the same — the
+            // gzip-wrapper path (pako.ungzip) fails its CRC32 check on
+            // XTEA-decrypted streams in headless Chromium, but raw deflate of
+            // the inner body decompresses cleanly to the expected uncLen.
             try {
-                const stream = new Response(input.slice(9, 9 + compressedLen)).body;
-                if (!stream) return null;
-                const decompressed = stream.pipeThrough(new ds("gzip"));
-                const buf = await new Response(decompressed).arrayBuffer();
-                return new Uint8Array(buf);
+                const headerLen = 10;
+                const trailerLen = 8;
+                const innerLen = compressedLen - headerLen - trailerLen;
+                if (innerLen <= 0) return null;
+                const rawDeflate = input.slice(9 + headerLen, 9 + headerLen + innerLen);
+                const inflated = pako.inflate(rawDeflate, { raw: true } as any);
+                return inflated instanceof Uint8Array ? inflated : new Uint8Array(inflated);
             } catch (e) {
+                if ((globalThis as any).__decryptDebug) {
+                    const msg = (e as any)?.message || String(e);
+                    console.log("gzip decompress failed: " + msg + " (compLen=" + compressedLen + " uncLen=" + uncompressedLen + " inputLen=" + input.byteLength + ")");
+                }
                 return null;
             }
         }
@@ -531,23 +547,33 @@ export class Js5Cache {
         if (!key || key.length < 4) return;
         if (key[0] === 0 && key[1] === 0 && key[2] === 0 && key[3] === 0) return;
         const start = 5;
-        if (envelope.byteLength <= start) return;
-        const blocks = ((envelope.byteLength - start) / 8) | 0;
-        const dv = new DataView(envelope.buffer, envelope.byteOffset, envelope.byteLength);
+        const len = envelope.length;  // Uint8Array.length, not byteLength of underlying buffer
+        if (len <= start) return;
+        const blocks = ((len - start) / 8) | 0;
         const DELTA = 0x9E3779B9 | 0;
         const SUM_INIT = 0xC6EF3720 | 0;
         for (let i = 0; i < blocks; i++) {
-            let off = start + i * 8;
-            let v0 = dv.getInt32(off, false);     // big-endian
-            let v1 = dv.getInt32(off + 4, false);
+            const off = start + i * 8;
+            // Read big-endian int32 from raw bytes — avoid DataView since it
+            // can fail silently if the underlying ArrayBuffer view's
+            // byteOffset+byteLength doesn't align as we expect (observed
+            // empirically: only block 0 was being mutated when using DataView).
+            let v0 = ((envelope[off] << 24) | (envelope[off + 1] << 16) | (envelope[off + 2] << 8) | envelope[off + 3]) | 0;
+            let v1 = ((envelope[off + 4] << 24) | (envelope[off + 5] << 16) | (envelope[off + 6] << 8) | envelope[off + 7]) | 0;
             let sum = SUM_INIT;
             for (let r = 0; r < 32; r++) {
                 v1 = (v1 - ((((v0 << 4) ^ (v0 >>> 5)) + v0) ^ (sum + key[(sum >>> 11) & 3]))) | 0;
                 sum = (sum - DELTA) | 0;
                 v0 = (v0 - ((((v1 << 4) ^ (v1 >>> 5)) + v1) ^ (sum + key[sum & 3]))) | 0;
             }
-            dv.setInt32(off, v0, false);
-            dv.setInt32(off + 4, v1, false);
+            envelope[off]     = (v0 >>> 24) & 0xFF;
+            envelope[off + 1] = (v0 >>> 16) & 0xFF;
+            envelope[off + 2] = (v0 >>> 8)  & 0xFF;
+            envelope[off + 3] =  v0         & 0xFF;
+            envelope[off + 4] = (v1 >>> 24) & 0xFF;
+            envelope[off + 5] = (v1 >>> 16) & 0xFF;
+            envelope[off + 6] = (v1 >>> 8)  & 0xFF;
+            envelope[off + 7] =  v1         & 0xFF;
         }
     }
 
