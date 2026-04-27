@@ -212,6 +212,8 @@ struct GameView: View {
         case .friends:  FriendsPanelView_Internal(worldState: engine.worldState, engine: engine)
         case .quests:   QuestPanelView_Internal(worldState: engine.worldState)
         case .map:      MapPanelView_Internal(worldState: engine.worldState)
+        case .minimap:  MinimapPanel(worldState: engine.worldState, engine: engine)
+        case .settings: SettingsPanel(worldState: engine.worldState, engine: engine)
         }
     }
 
@@ -220,25 +222,25 @@ struct GameView: View {
     @ViewBuilder
     private var modalOverlays: some View {
         if engine.worldState.bankOpen {
-            BankOverlayView(worldState: engine.worldState, engine: engine)
+            BankPanel(worldState: engine.worldState, engine: engine)
         }
         if engine.worldState.shopOpen {
-            ShopOverlayView(worldState: engine.worldState, engine: engine)
+            ShopPanel(worldState: engine.worldState, engine: engine)
         }
         if engine.worldState.dialogueOpen {
             DialogueOverlayView(worldState: engine.worldState, engine: engine)
         }
         if engine.worldState.tradeOpen || engine.worldState.tradeConfirmOpen {
-            TradeOverlayView(worldState: engine.worldState, engine: engine)
+            TradePanel(worldState: engine.worldState, engine: engine)
         }
         if engine.worldState.duelOpen || engine.worldState.duelConfirmOpen {
-            DuelOverlayView(worldState: engine.worldState, engine: engine)
+            DuelPanel(worldState: engine.worldState, engine: engine)
         }
         if engine.worldState.contextMenuOpen {
             ContextMenuOverlay(worldState: engine.worldState, engine: engine)
         }
         if engine.worldState.showAppearanceChange {
-            AppearanceOverlayView(worldState: engine.worldState, engine: engine)
+            AppearancePanel(worldState: engine.worldState, engine: engine)
         }
         // XP drop notifications (top-right, floating up)
         if !engine.worldState.xpDrops.isEmpty {
@@ -344,6 +346,8 @@ private struct LandscapeTabBar: View {
         (.friends, "person.2", "Soc"),
         (.quests, "scroll", "Quest"),
         (.map, "map", "Map"),
+        (.minimap, "location.viewfinder", "Mini"),
+        (.settings, "gearshape", "Opts"),
     ]
 
     var body: some View {
@@ -546,12 +550,18 @@ private struct PrayerPanelView_Internal: View {
         ScrollView {
             VStack(spacing: 1) {
                 ForEach(prayers, id: \.0) { p in
-                    Button(action: { engine.enablePrayer(prayerId: p.0) }) {
+                    let isActive = worldState.activePrayers.indices.contains(p.0) && worldState.activePrayers[p.0]
+                    Button(action: { engine.togglePrayer(prayerId: p.0) }) {
                         HStack {
-                            Text(p.1).font(.system(size: 9)).foregroundColor(.white)
+                            Text(p.1)
+                                .font(.system(size: 9, weight: isActive ? .bold : .regular))
+                                .foregroundColor(isActive ? Color(hex: "#c8a951") : .white)
                             Spacer()
                             Text("L\(p.2)").font(.system(size: 8)).foregroundColor(Color(hex: "#666"))
-                        }.padding(.horizontal, 4).padding(.vertical, 3).background(Color(hex: "#222")).cornerRadius(3)
+                        }
+                        .padding(.horizontal, 4).padding(.vertical, 3)
+                        .background(isActive ? Color(hex: "#c8a951").opacity(0.15) : Color(hex: "#222"))
+                        .cornerRadius(3)
                     }
                 }
             }.padding(.horizontal, 4)
