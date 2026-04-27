@@ -145,7 +145,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 				player.message("You don't have all the reagents you need for this spell");
 				throw new SpellFailureException("Player does not have all the reagents you need for this spell");
 			}
-			runesToConsume.add(new AbstractMap.SimpleEntry<>(e.getKey(), e.getValue()));
+			runesToConsume.add(Map.entry(e.getKey(), e.getValue()));
 		}
 		return runesToConsume;
 	}

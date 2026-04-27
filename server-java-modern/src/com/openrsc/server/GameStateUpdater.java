@@ -198,22 +198,22 @@ public final class GameStateUpdater {
 
 			struct.mobsUpdate = mobsUpdate;
 		} else {
-			var mobsUpdate = new ArrayList<AbstractMap.SimpleEntry<Integer, Integer>>();
+			var mobsUpdate = new ArrayList<Map.Entry<Integer, Integer>>();
 			final int MOVEMENT_UPDATE = 0;
 			final int UPDATE_NOT_REQUIRED = 0;
 			final int UPDATE_REQUIRED = 1;
 			final int NOT_MOVING = 1;
 			final int REMOVE_NPC = 3;
 
-			mobsUpdate.add(new AbstractMap.SimpleEntry<>(playerToUpdate.getLocalNpcs().size(), 8));
+			mobsUpdate.add(Map.entry(playerToUpdate.getLocalNpcs().size(), 8));
 			for (var it$ = playerToUpdate.getLocalNpcs().iterator(); it$.hasNext(); ) {
 				var localNpc = it$.next();
 
 				if (localNpc.isInvisibleTo(playerToUpdate)) {
 					it$.remove();
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>(UPDATE_REQUIRED, 1));
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>(NOT_MOVING, 1));
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>(REMOVE_NPC, 2));
+					mobsUpdate.add(Map.entry(UPDATE_REQUIRED, 1));
+					mobsUpdate.add(Map.entry(NOT_MOVING, 1));
+					mobsUpdate.add(Map.entry(REMOVE_NPC, 2));
 				}
 
 				if (!localNpc.withinAuthenticRangeAdditionally(playerToUpdate) || !playerToUpdate.withinRange(localNpc) || // remove because they are out of range
@@ -223,20 +223,20 @@ public final class GameStateUpdater {
 					localNpc.isRespawning() // removed because they have not yet respawned; may not be necessary, but there's no scenario where this is true & they shouldn't be removed.
 					) {
 					it$.remove(); // removes NPC from player's localNpcs list
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>(UPDATE_REQUIRED, 1));
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>(NOT_MOVING, 1));
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>(REMOVE_NPC, 2));
+					mobsUpdate.add(Map.entry(UPDATE_REQUIRED, 1));
+					mobsUpdate.add(Map.entry(NOT_MOVING, 1));
+					mobsUpdate.add(Map.entry(REMOVE_NPC, 2));
 				} else {
 					if (localNpc.hasMoved()) {
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(UPDATE_REQUIRED, 1));
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(MOVEMENT_UPDATE, 1)); // Tell player that the NPC has moved 1 tile in the direction that their sprite is facing
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(localNpc.getSprite(), 3)); // sprite is limited to 3 bits for 8 directions, since NPC can't be fighting while moving
+						mobsUpdate.add(Map.entry(UPDATE_REQUIRED, 1));
+						mobsUpdate.add(Map.entry(MOVEMENT_UPDATE, 1)); // Tell player that the NPC has moved 1 tile in the direction that their sprite is facing
+						mobsUpdate.add(Map.entry(localNpc.getSprite(), 3)); // sprite is limited to 3 bits for 8 directions, since NPC can't be fighting while moving
 					} else if (localNpc.spriteChanged()) {
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(UPDATE_REQUIRED, 1));
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(NOT_MOVING, 1));
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(localNpc.getSprite(), 4)); // 4 bits to accommodate sprites 8 & 9, used for fighting
+						mobsUpdate.add(Map.entry(UPDATE_REQUIRED, 1));
+						mobsUpdate.add(Map.entry(NOT_MOVING, 1));
+						mobsUpdate.add(Map.entry(localNpc.getSprite(), 4)); // 4 bits to accommodate sprites 8 & 9, used for fighting
 					} else {
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(UPDATE_NOT_REQUIRED, 1));
+						mobsUpdate.add(Map.entry(UPDATE_NOT_REQUIRED, 1));
 					}
 				}
 			}
@@ -266,13 +266,13 @@ public final class GameStateUpdater {
 				final byte[] offsets = DataConversions.getMobPositionOffsets(newNPC.getLocation(), playerToUpdate.getLocation());
 				boolean forClient115 = playerToUpdate.isUsing115CompatibleClient();
 				boolean forClient140 = playerToUpdate.isUsing140CompatibleClient();
-				mobsUpdate.add(new AbstractMap.SimpleEntry<>(safeNPCIndex(playerToUpdate, newNPC.getIndex()), forClient115 || forClient140 ? 11 : 12));
+				mobsUpdate.add(Map.entry(safeNPCIndex(playerToUpdate, newNPC.getIndex()), forClient115 || forClient140 ? 11 : 12));
 				boolean forAuthentic = !playerToUpdate.isUsingCustomClient();
-				mobsUpdate.add(new AbstractMap.SimpleEntry<>((int) offsets[0], forAuthentic ? 5 : 6));
-				mobsUpdate.add(new AbstractMap.SimpleEntry<>((int) offsets[1], forAuthentic ? 5 : 6));
-				mobsUpdate.add(new AbstractMap.SimpleEntry<>(newNPC.getSprite(), 4));
+				mobsUpdate.add(Map.entry((int) offsets[0], forAuthentic ? 5 : 6));
+				mobsUpdate.add(Map.entry((int) offsets[1], forAuthentic ? 5 : 6));
+				mobsUpdate.add(Map.entry(newNPC.getSprite(), 4));
 				int numBits = forClient115 ? 8 : (forClient140 ? 9 : 10);
-				mobsUpdate.add(new AbstractMap.SimpleEntry<>(newNPC.getID(), numBits));
+				mobsUpdate.add(Map.entry(newNPC.getID(), numBits));
 
 				if (!playerToUpdate.getConfig().BREAK_NPC_LOCATION_CACHE) {
 					playerToUpdate.getLocalNpcs().add(newNPC);
@@ -382,17 +382,17 @@ public final class GameStateUpdater {
 
 			struct.mobsUpdate = mobsUpdate;
 		} else {
-			var mobsUpdate = new ArrayList<AbstractMap.SimpleEntry<Integer, Integer>>();
+			var mobsUpdate = new ArrayList<Map.Entry<Integer, Integer>>();
 
 			if (playerToUpdate.isUsing140CompatibleClient() || playerToUpdate.isUsing115CompatibleClient() || playerToUpdate.isUsing69CompatibleClient()) {
-				mobsUpdate.add(new AbstractMap.SimpleEntry<>(playerToUpdate.getX(), 10));
-				mobsUpdate.add(new AbstractMap.SimpleEntry<>(playerToUpdate.getY(), 12));
+				mobsUpdate.add(Map.entry(playerToUpdate.getX(), 10));
+				mobsUpdate.add(Map.entry(playerToUpdate.getY(), 12));
 			} else {
-				mobsUpdate.add(new AbstractMap.SimpleEntry<>(playerToUpdate.getX(), 11));
-				mobsUpdate.add(new AbstractMap.SimpleEntry<>(playerToUpdate.getY(), 13));
+				mobsUpdate.add(Map.entry(playerToUpdate.getX(), 11));
+				mobsUpdate.add(Map.entry(playerToUpdate.getY(), 13));
 			}
-			mobsUpdate.add(new AbstractMap.SimpleEntry<>(playerToUpdate.getSprite(), 4));
-			mobsUpdate.add(new AbstractMap.SimpleEntry<>(playerToUpdate.getLocalPlayers().size(), 8));
+			mobsUpdate.add(Map.entry(playerToUpdate.getSprite(), 4));
+			mobsUpdate.add(Map.entry(playerToUpdate.getLocalPlayers().size(), 8));
 			if (playerToUpdate.loggedIn()) {
 				for (var it$ = playerToUpdate.getLocalPlayers().iterator(); it$.hasNext(); ) {
 					final Player otherPlayer = it$.next();
@@ -401,24 +401,24 @@ public final class GameStateUpdater {
 						|| otherPlayer.isTeleporting() || otherPlayer.isInvisibleTo(playerToUpdate)
 						|| otherPlayer.inCombat() || otherPlayer.hasMoved())
 					{
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(1, 1)); //Needs Update
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(1, 1)); //Update Type
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(3, 2)); //Animation type (Remove)
+						mobsUpdate.add(Map.entry(1, 1)); //Needs Update
+						mobsUpdate.add(Map.entry(1, 1)); //Update Type
+						mobsUpdate.add(Map.entry(3, 2)); //Animation type (Remove)
 						it$.remove();
 						playerToUpdate.getKnownPlayerAppearanceIDs().remove(otherPlayer.getUsernameHash());
 					} else {
 						if (!otherPlayer.hasMoved() && !otherPlayer.spriteChanged()) {
-							mobsUpdate.add(new AbstractMap.SimpleEntry<>(0, 1)); //Needs Update
+							mobsUpdate.add(Map.entry(0, 1)); //Needs Update
 						} else {
 							// The player is actually going to be updated
 							if (otherPlayer.hasMoved()) {
-								mobsUpdate.add(new AbstractMap.SimpleEntry<>(1, 1)); //Needs Update
-								mobsUpdate.add(new AbstractMap.SimpleEntry<>(0, 1)); //Update Type
-								mobsUpdate.add(new AbstractMap.SimpleEntry<>(otherPlayer.getSprite(), 3));
+								mobsUpdate.add(Map.entry(1, 1)); //Needs Update
+								mobsUpdate.add(Map.entry(0, 1)); //Update Type
+								mobsUpdate.add(Map.entry(otherPlayer.getSprite(), 3));
 							} else if (otherPlayer.spriteChanged()) {
-								mobsUpdate.add(new AbstractMap.SimpleEntry<>(1, 1)); //Needs Update
-								mobsUpdate.add(new AbstractMap.SimpleEntry<>(1, 1)); //Update Type
-								mobsUpdate.add(new AbstractMap.SimpleEntry<>(otherPlayer.getSprite(), 4));
+								mobsUpdate.add(Map.entry(1, 1)); //Needs Update
+								mobsUpdate.add(Map.entry(1, 1)); //Update Type
+								mobsUpdate.add(Map.entry(otherPlayer.getSprite(), 4));
 							}
 						}
 					}
@@ -434,13 +434,13 @@ public final class GameStateUpdater {
 
 					final byte[] offsets = DataConversions.getMobPositionOffsets(otherPlayer.getLocation(),
 						playerToUpdate.getLocation());
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>(otherPlayer.getIndex(), 11));
+					mobsUpdate.add(Map.entry(otherPlayer.getIndex(), 11));
 					boolean forAuthentic = !playerToUpdate.isUsingCustomClient();
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>((int) offsets[0], forAuthentic ? 5 : 6));
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>((int) offsets[1], forAuthentic ? 5 : 6));
-					mobsUpdate.add(new AbstractMap.SimpleEntry<>(otherPlayer.getSprite(), 4));
+					mobsUpdate.add(Map.entry((int) offsets[0], forAuthentic ? 5 : 6));
+					mobsUpdate.add(Map.entry((int) offsets[1], forAuthentic ? 5 : 6));
+					mobsUpdate.add(Map.entry(otherPlayer.getSprite(), 4));
 					if (usesKnownPlayers) {
-						mobsUpdate.add(new AbstractMap.SimpleEntry<>(playerToUpdate.isKnownPlayer(otherPlayer.getIndex()) ? 1 : 0, 1));
+						mobsUpdate.add(Map.entry(playerToUpdate.isKnownPlayer(otherPlayer.getIndex()) ? 1 : 0, 1));
 					}
 
 					playerToUpdate.getLocalPlayers().add(otherPlayer);
