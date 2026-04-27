@@ -172,7 +172,7 @@ private struct ChatPanelView: View {
                                     .foregroundColor(chatColor(msg))
                                 Text(msg.text)
                                     .font(.system(size: 12))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(msg.isKill ? .red : .white)
                             }
                             .id(msg.id)
                         }
@@ -221,6 +221,7 @@ private struct ChatPanelView: View {
     }
 
     private func chatColor(_ msg: RSCChatMessage) -> Color {
+        if msg.isKill { return .red }
         if msg.isPrivate { return .cyan }
         if msg.isLocal { return Color(hex: "#c8a951") }
         if msg.sender.hasPrefix("[") { return .yellow }

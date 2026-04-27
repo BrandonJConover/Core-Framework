@@ -53,13 +53,15 @@ struct RSCChatMessage: Identifiable {
     let text: String
     let isLocal: Bool
     let isPrivate: Bool
+    let isKill: Bool
     let timestamp: Date
 
-    init(sender: String, text: String, isLocal: Bool = false, isPrivate: Bool = false) {
+    init(sender: String, text: String, isLocal: Bool = false, isPrivate: Bool = false, isKill: Bool = false) {
         self.sender = sender
         self.text = text
         self.isLocal = isLocal
         self.isPrivate = isPrivate
+        self.isKill = isKill
         self.timestamp = Date()
     }
 }
@@ -278,8 +280,8 @@ final class RSCWorldState: ObservableObject {
         return (atk + def + str + hp) / 4
     }
 
-    func addChat(sender: String, text: String, isLocal: Bool = false, isPrivate: Bool = false) {
-        let msg = RSCChatMessage(sender: sender, text: text, isLocal: isLocal, isPrivate: isPrivate)
+    func addChat(sender: String, text: String, isLocal: Bool = false, isPrivate: Bool = false, isKill: Bool = false) {
+        let msg = RSCChatMessage(sender: sender, text: text, isLocal: isLocal, isPrivate: isPrivate, isKill: isKill)
         chatMessages.append(msg)
         if chatMessages.count > 100 { chatMessages.removeFirst() }
     }

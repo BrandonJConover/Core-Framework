@@ -229,9 +229,18 @@ final class RSCPacketHandler {
             let soundName = buf.getString()
             SoundManager.shared.play(name: soundName)
 
-        case 118: // killAnnouncement
-            let text = buf.getString()
-            ws.addChat(sender: "[Kill]", text: text)
+        case 118: // killAnnouncement — Java PacketHandler.announceKill():
+            // STRING victim, STRING attacker, INT killType (0=COMBAT, 1=MAGIC, 2=RANGED).
+            let victim = buf.getString()
+            let attacker = buf.getString()
+            let killType = buf.get32()
+            let style: String
+            switch killType {
+            case 1: style = "with magic"
+            case 2: style = "with ranged"
+            default: style = "in combat"
+            }
+            ws.addChat(sender: "[Kill]", text: "\(attacker) defeated \(victim) \(style).", isKill: true)
 
         case 222: // showServerMsg
             let text = buf.getString()
