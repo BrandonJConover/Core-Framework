@@ -269,7 +269,7 @@ final class RSCPacketHandler {
             handleUpdatePlayers(buf: buf, ws: ws)
 
         case 206: // SET_PRAYERS
-            break // Prayer data
+            handleSetPrayers(buf: buf, ws: ws)
 
         case 211: // UPDATE_ENTITIES — ground item/object/wall counts
             break // Entity counts
@@ -501,12 +501,7 @@ final class RSCPacketHandler {
             break
 
         case 206: // togglePrayer — BYTE per prayer (enabled/disabled)
-            var prayerIdx = 0
-            while buf.bytesRemaining > 0 {
-                let enabled = buf.getByte() == 1
-                _ = enabled // Prayer state could be tracked here
-                prayerIdx += 1
-            }
+            handleSetPrayers(buf: buf, ws: ws)
 
         case 88:  // createNPC — dynamic NPC definition from server
             // SHORT id, STRING name, STRING desc, BYTE cmdLen, [STRING cmd],
@@ -1211,6 +1206,22 @@ final class RSCPacketHandler {
         ws.tradeOpen = false
         ws.tradeConfirmOpen = true
         print("[Packet] Trade confirm with \(partnerName)")
+    }
+
+    // Port of PacketHandler.java togglePrayer(length) — opcode 206.
+    private func handleSetPrayers(buf: ByteBuffer, ws: RSCWorldState) {
+        var idx = 0
+        var next = ws.activePrayers
+        while buf.bytesRemaining > 0 {
+            if idx >= next.count {
+                next.append(false)
+            }
+            next[idx] = buf.getByte() == 1
+            idx += 1
+        }
+        if idx > 0 {
+            ws.activePrayers = next
+        }
     }
 
     // MARK: - NPC Appearance Updates (opcode 104)
