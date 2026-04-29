@@ -496,19 +496,28 @@ export class PacketHandler530 {
         return true;
     }
 
+    /**
+     * 8-direction step deltas. Index = walkDir / runDir from the bit stream.
+     * Layout matches rt4 PathFinder.tileDirX / tileDirY:
+     *   0=NW 1=N 2=NE 3=W 4=E 5=SW 6=S 7=SE
+     * worldX increases east, worldY increases south (towards higher Z).
+     */
+    static readonly DIR_DX: number[] = [-1, 0, 1, -1, 1, -1, 0, 1];
+    static readonly DIR_DY: number[] = [-1, -1, -1, 0, 0, 1, 1, 1];
+
     static parseLocalPlayerPosition(buf: Buffer, game: any): void {
         const updating = buf.getBits(1);
         if (!updating) return;
         const subOpcode = buf.getBits(2);
+        const localPlayer = game.players ? game.players[game.thisPlayerId] : null;
         if (subOpcode === 3) {
-            // Teleport: 7 bits sceneY, 1 bit teleport, 2 bits z, 1 bit mask flag, 7 bits sceneX
+            // Teleport: sceneY(7) + teleport(1) + z(2) + maskRequired(1) + sceneX(7)
             const sceneY = buf.getBits(7);
             const teleporting = buf.getBits(1);
             const z = buf.getBits(2);
             const maskRequired = buf.getBits(1);
             const sceneX = buf.getBits(7);
             game.plane = z & 3;
-            const localPlayer = game.players ? game.players[game.thisPlayerId] : null;
             if (localPlayer) {
                 localPlayer.worldX = sceneX * 128 + 64;
                 localPlayer.worldY = sceneY * 128 + 64;
@@ -518,17 +527,25 @@ export class PacketHandler530 {
                 }
             }
         } else if (subOpcode === 2) {
-            // Run: walkDir(3) + runDir(3) + mask(1) = 7 bits  (after 1+2 already read)
-            buf.getBits(1);
-            buf.getBits(3);
-            buf.getBits(3);
-            buf.getBits(1);
+            // Run: walkDir(3) + runDir(3) + maskRequired(1).
+            // Order seen in rt4-client / 2009scape: walkDir then runDir.
+            const walkDir = buf.getBits(3);
+            const runDir = buf.getBits(3);
+            const maskRequired = buf.getBits(1);
+            if (localPlayer) {
+                localPlayer.worldX += (PacketHandler530.DIR_DX[walkDir & 7] + PacketHandler530.DIR_DX[runDir & 7]) * 128;
+                localPlayer.worldY += (PacketHandler530.DIR_DY[walkDir & 7] + PacketHandler530.DIR_DY[runDir & 7]) * 128;
+            }
         } else if (subOpcode === 1) {
-            // Walk: walkDir(3) + mask(1)
-            buf.getBits(3);
-            buf.getBits(1);
+            // Walk: walkDir(3) + maskRequired(1)
+            const walkDir = buf.getBits(3);
+            const maskRequired = buf.getBits(1);
+            if (localPlayer) {
+                localPlayer.worldX += PacketHandler530.DIR_DX[walkDir & 7] * 128;
+                localPlayer.worldY += PacketHandler530.DIR_DY[walkDir & 7] * 128;
+            }
         } else {
-            // subOpcode 0: mask only (no further position bits; 1 bit mask flag)
+            // subOpcode 0: maskRequired only — position unchanged.
             buf.getBits(1);
         }
     }
