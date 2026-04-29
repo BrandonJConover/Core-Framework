@@ -22,6 +22,11 @@ final class RSCGameEngine: ObservableObject {
     // Pixels rendered each tick — initially all black.
     private var pixelData = [Int32](repeating: 0, count: MetalRenderer.gameWidth * MetalRenderer.gameHeight)
 
+    /// Combine subscriptions held by the engine. The worldState forward
+    /// below relies on the cancellable staying alive for the engine's
+    /// lifetime; dropping it would silently break SwiftUI updates.
+    private var cancellables = Set<AnyCancellable>()
+
     // Camera/zoom state for mobile controls
     @Published var zoomLevel: CGFloat = 1.6 // 0.5 = zoomed out, 2.0 = zoomed in
     @Published var cameraAngle: CGFloat = 0.0 // degrees rotation
@@ -64,6 +69,16 @@ final class RSCGameEngine: ObservableObject {
 
     init() {
         packetHandler.worldState = worldState
+        // Forward worldState's @Published changes into the engine's own
+        // objectWillChange. GameView is @StateObject'd to the engine and
+        // doesn't observe worldState directly, so without this its body
+        // (which gates modal panels on flags like welcomeOpen) never
+        // re-evaluates when those flags flip — it took an unrelated
+        // engine-level publish to indirectly trigger a redraw, which is
+        // why the welcome dialog appeared stuck open after dismiss.
+        worldState.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
         connection.onPacket = { [weak self] opcode, payload in
             Task { @MainActor in
                 self?.packetHandler.handlePacket(opcode: opcode, payload: payload)
