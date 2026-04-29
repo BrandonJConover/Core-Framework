@@ -18,14 +18,11 @@ enum GameObjectDefinitions {
     private(set) static var defs: [GameObjectDefinition] = []
     static var isLoaded: Bool { !defs.isEmpty }
 
-    /// Minimal XML parser for GameObjectDef.xml — XML is produced by XStream and
-    /// looks like:
-    ///     <list>
-    ///       <com.openrsc.GameObjectDef>
-    ///         <name>Tree</name> ...
-    ///       </com.openrsc.GameObjectDef>
-    ///     </list>
-    /// We only need name + dimensions for now.
+    /// Minimal XML parser for GameObjectDef.xml. Depending on which OpenRSC
+    /// export produced the file, entries may be plain `<GameObjectDef>` tags
+    /// or fully-qualified Java class tags. We only need name + dimensions for
+    /// now, but we must preserve entry order because object IDs index directly
+    /// into this table.
     static func loadArchive() {
         guard let path = Bundle.main.path(forResource: "GameObjectDef", ofType: "xml"),
               let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
@@ -33,12 +30,14 @@ enum GameObjectDefinitions {
             return
         }
         // Lightweight regex-based extraction since XMLParser would be heavy for
-        // the scope we need. We grab <name>...</name>, <width>, <height>, <type>
-        // per <com.openrsc.client.entityhandling.defs.GameObjectDef> block.
+        // the scope we need. We grab each object block, then extract the fields
+        // inside that block. `[\s\S]` keeps this portable across Foundation
+        // regex options and lets blocks span lines.
         guard let xml = String(data: data, encoding: .utf8) else { return }
         var parsed: [GameObjectDefinition] = []
-        // Split on closing tags to get per-object chunks
-        let blocks = xml.components(separatedBy: "</com.openrsc.client.entityhandling.defs.GameObjectDef>")
+
+        let blockPattern = #"<(?:[A-Za-z0-9_.]+\.)?GameObjectDef>([\s\S]*?)</(?:[A-Za-z0-9_.]+\.)?GameObjectDef>"#
+        let blocks = allGroups(pattern: blockPattern, in: xml)
         var idCounter = 0
         for block in blocks where block.contains("<name>") {
             let name = firstGroup(pattern: "<name>([^<]*)</name>", in: block) ?? ""
@@ -68,5 +67,15 @@ enum GameObjectDefinitions {
         guard let m = re.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)),
               m.numberOfRanges > 1 else { return nil }
         return ns.substring(with: m.range(at: 1))
+    }
+
+    private static func allGroups(pattern: String, in s: String) -> [String] {
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let ns = s as NSString
+        let matches = re.matches(in: s, range: NSRange(location: 0, length: ns.length))
+        return matches.compactMap { match in
+            guard match.numberOfRanges > 1 else { return nil }
+            return ns.substring(with: match.range(at: 1))
+        }
     }
 }
