@@ -113,11 +113,15 @@ public final class ApiServer {
         StatusEndpoint status = new StatusEndpoint(server);
         JwtUtil jwt = new JwtUtil(server.getName());
         AuthEndpoint auth = new AuthEndpoint(server, jwt);
+        WhoamiEndpoint whoami = new WhoamiEndpoint(jwt);
+        OnlinePlayersEndpoint online = new OnlinePlayersEndpoint(server);
 
         return new HttpRouter()
-            .route(HttpMethod.GET,  "/api/status",     req -> status.handle())
-            .route(HttpMethod.GET,  "/healthz",        req -> status.handle())
-            .route(HttpMethod.POST, "/api/auth/login", auth::handle);
+            .route(HttpMethod.GET,  "/api/status",         req -> status.handle())
+            .route(HttpMethod.GET,  "/healthz",            req -> status.handle())
+            .route(HttpMethod.POST, "/api/auth/login",     auth::handle)
+            .route(HttpMethod.GET,  "/api/auth/whoami",    whoami::handle)
+            .route(HttpMethod.GET,  "/api/players/online", req -> online.handle());
     }
 
     /** Single-shot dispatcher: aggregator gives us a complete request, we reply once. */

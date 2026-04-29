@@ -84,4 +84,24 @@ public final class JwtUtil {
             return null;
         }
     }
+
+    /**
+     * Verify a token and return its decoded claims. Returns null on any
+     * verification failure (so callers can short-circuit to 401 without
+     * caring why the token was rejected).
+     */
+    public Claims verify(String token) {
+        try {
+            DecodedJWT decoded = verifier.verify(token);
+            long exp = decoded.getExpiresAt() != null ? decoded.getExpiresAt().getTime() : 0L;
+            long iat = decoded.getIssuedAt() != null ? decoded.getIssuedAt().getTime() : 0L;
+            return new Claims(decoded.getSubject(), exp, iat);
+        } catch (JWTVerificationException e) {
+            return null;
+        }
+    }
+
+    /** Decoded claims surfaced to API endpoints. Hides the raw DecodedJWT
+     *  (an external library type) behind our own DTO. */
+    public record Claims(String username, long expiresAtMs, long issuedAtMs) {}
 }
