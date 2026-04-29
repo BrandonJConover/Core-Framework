@@ -210,11 +210,6 @@ final class RSCPacketHandler {
         case 114: // SET_FATIGUE
             ws.fatigue = buf.getShort()
 
-        case 149: // connectionMessage (login/logout notice)
-            let name = buf.getString()
-            let loggedIn = buf.getByte() != 0
-            ws.addChat(sender: "[System]", text: "\(name) has \(loggedIn ? "logged in" : "logged out").")
-
         case 42:  // showBank
             handleShowBank(buf: buf, ws: ws)
 
@@ -379,25 +374,14 @@ final class RSCPacketHandler {
             handleUpdateEquipmentSlot(buf: buf, ws: ws)
 
         case 249: // updateBank — individual bank slot update
-            if buf.bytesRemaining >= 6 {
-                let slot249 = buf.getShort()
-                let itemId249 = buf.getShort()
+            if buf.bytesRemaining >= 7 {
+                let slot249 = buf.getUnsignedByte()
+                let itemId249 = buf.getUnsignedShort()
                 let amount249 = buf.get32()
                 if slot249 < ws.bankItems.count {
                     ws.bankItems[slot249] = (id: itemId249, amount: amount249)
                 }
             }
-
-        case 97:  // updateTradeDialog — trade items update
-            // Items being offered in trade
-            let tradeItemCount = buf.getUnsignedByte()
-            var theirItems: [(id: Int, amount: Int)] = []
-            for _ in 0..<tradeItemCount {
-                let tid = buf.getShort()
-                let tamt = buf.get32()
-                theirItems.append((id: tid, amount: tamt))
-            }
-            ws.tradeTheirOffer = theirItems
 
         case 104: // updateNPCAppearances — NPC chat/damage/projectile updates
             handleNPCAppearances(buf: buf, ws: ws)
@@ -414,12 +398,6 @@ final class RSCPacketHandler {
                 captchaBytes.append(UInt8(truncatingIfNeeded: buf.getUnsignedByte()))
             }
             ws.sleepCaptchaBytes = Data(captchaBytes)
-
-        case 15:  // tradeSelfDecision
-            let _ = buf.getByte() // accepted flag
-
-        case 20:  // confirmTrade — show trade confirmation
-            break
 
         case 176: // beginDuelOptions — opens duel stake window
             let duelPartnerIdx = buf.getShort()
@@ -485,8 +463,12 @@ final class RSCPacketHandler {
             let msg89 = buf.getString()
             ws.addChat(sender: "[Server]", text: msg89)
 
-        case 88:  // createNPC — NPC spawn notification
-            break // NPC creation data
+        case 88:  // createNPC — dynamic NPC definition from server
+            // SHORT id, STRING name, STRING desc, BYTE cmdLen, [STRING cmd],
+            // 4x BYTE stats, BYTE attackable, BYTE spriteCount, spriteCount*INT sprites, 4*INT colours...
+            // Just skip all data for now — bundled NpcDefs.json carries the
+            // static definitions used by the native renderer.
+            while buf.bytesRemaining > 0 { let _ = buf.getUnsignedByte() }
 
         case 112: // updateClan
             break // Clan data
@@ -504,25 +486,6 @@ final class RSCPacketHandler {
 
         case 71:  // friend list init — same format as 149, handled by those updates
             break
-
-        case 206: // togglePrayer — BYTE per prayer (enabled/disabled)
-            handleSetPrayers(buf: buf, ws: ws)
-
-        case 88:  // createNPC — dynamic NPC definition from server
-            // SHORT id, STRING name, STRING desc, BYTE cmdLen, [STRING cmd],
-            // 4x BYTE stats, BYTE attackable, BYTE spriteCount, spriteCount*INT sprites, 4*INT colours...
-            // Just skip all data — we have NPC defs from JSON
-            while buf.bytesRemaining > 0 { let _ = buf.getUnsignedByte() }
-
-        case 249: // updateBank — individual slot update
-            if buf.bytesRemaining >= 7 {
-                let slot = buf.getUnsignedByte()
-                let itemId = buf.getShort()
-                let amount = buf.get32()
-                if slot < ws.bankItems.count {
-                    ws.bankItems[slot] = (id: itemId, amount: amount)
-                }
-            }
 
         case 147: // updateExperienceCounter — XP gained notification
             if buf.bytesRemaining >= 5 {
