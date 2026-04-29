@@ -111,10 +111,13 @@ public final class ApiServer {
     /** Wires endpoint handlers into a router. Add new endpoints here. */
     private static HttpRouter buildRouter(Server server) {
         StatusEndpoint status = new StatusEndpoint(server);
+        JwtUtil jwt = new JwtUtil(server.getName());
+        AuthEndpoint auth = new AuthEndpoint(server, jwt);
 
         return new HttpRouter()
-            .route(HttpMethod.GET,  "/api/status", req -> status.handle())
-            .route(HttpMethod.GET,  "/healthz",    req -> status.handle());
+            .route(HttpMethod.GET,  "/api/status",     req -> status.handle())
+            .route(HttpMethod.GET,  "/healthz",        req -> status.handle())
+            .route(HttpMethod.POST, "/api/auth/login", auth::handle);
     }
 
     /** Single-shot dispatcher: aggregator gives us a complete request, we reply once. */
