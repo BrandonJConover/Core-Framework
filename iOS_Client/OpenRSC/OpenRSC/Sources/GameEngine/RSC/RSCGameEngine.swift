@@ -359,6 +359,15 @@ final class RSCGameEngine: ObservableObject {
             for npc in worldState.npcs {
                 if let def = NPCDefinitions.get(npc.npcId) {
                     let role: CharacterBillboards.CombatRole = npc.combatTimeout > 0 ? .combatA : .none
+                    var sprites = def.sprites
+                    if npc.wield > 0 {
+                        if sprites.count <= 4 { sprites += Array(repeating: -1, count: 5 - sprites.count) }
+                        sprites[4] = npc.wield
+                    }
+                    if npc.wield2 > 0 {
+                        if sprites.count <= 10 { sprites += Array(repeating: -1, count: 11 - sprites.count) }
+                        sprites[10] = npc.wield2
+                    }
                     CharacterBillboards.register(
                         scene: scene, spriteLoader: spriteLoader,
                         tileX: npc.x - px, tileZ: npc.y - pz,
@@ -366,7 +375,7 @@ final class RSCGameEngine: ObservableObject {
                         stepFrame: role == .none ? renderLogCount : combatTick,
                         walkModel: def.walkModel,
                         cameraRotation: cameraRotation,
-                        sprites: def.sprites,
+                        sprites: sprites,
                         hairColor: Int32(def.hairColour),
                         topColor: Int32(def.topColour),
                         bottomColor: Int32(def.bottomColour),
@@ -1636,10 +1645,12 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func dropItem(slot: Int) {
+        let amount = max(1, worldState.inventory.first(where: { $0.id == slot })?.amount ?? 1)
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemDrop.rawValue))
             buf.putShort(slot)
+            buf.putInt(amount)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }

@@ -1357,8 +1357,12 @@ final class RSCPacketHandler {
                 }
 
             case 6: // Wield change
-                let _ = buf.getUnsignedByte() // wield
-                let _ = buf.getUnsignedByte() // wield2
+                let wield = buf.getUnsignedByte()
+                let wield2 = buf.getUnsignedByte()
+                if let idx = ws.npcs.firstIndex(where: { $0.id == serverIndex }) {
+                    ws.npcs[idx].wield = wield
+                    ws.npcs[idx].wield2 = wield2
+                }
 
             case 7: // Bubble item
                 let itemType = buf.getShort()

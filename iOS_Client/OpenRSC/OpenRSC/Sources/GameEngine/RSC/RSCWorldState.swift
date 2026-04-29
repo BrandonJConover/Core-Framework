@@ -61,6 +61,8 @@ struct RSCNPC: Identifiable {
     var projectileSourceServerIndex: Int = -1
     var projectileSourceIsNpc: Bool = false
     var skullVisible: Int = 0
+    var wield: Int = 0
+    var wield2: Int = 0
     /// 0..7 facing direction captured from showNPCs's per-NPC 4-bit field.
     /// Defaults to 4 (south) so the renderer always has a valid value.
     var direction: Int = 4
