@@ -23,7 +23,7 @@ public class Inventory {
 	/**
 	 * The asynchronous logger
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	/**
 	 * The number of inventory slots per player
 	 */

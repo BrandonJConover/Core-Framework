@@ -11,7 +11,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 
 public class JContent {
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
     private byte[] m_data;
     private boolean m_bzip2;

@@ -164,7 +164,7 @@ public class OSRSCombatFormula {
 				// Check if strength cape should activate
 				final int maxHit = calcMaxHit(attacker);
 				if (damage >= maxHit - (maxHit * 0.5) && SkillCapes.shouldActivate((Player) attacker, STRENGTH_CAPE, isHit)) {
-					damage += (maxHit*0.2);
+					damage += (int) (maxHit * 0.2);
 					((Player) attacker).message("@ora@Your Strength cape has granted you a critical hit");
 				}
 			}

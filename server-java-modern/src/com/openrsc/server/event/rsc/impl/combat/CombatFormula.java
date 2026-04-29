@@ -19,7 +19,7 @@ public class CombatFormula {
 	/**
 	 * Logger instance
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	/**
 	 * Gets a dice roll for melee damage for a single attack
@@ -179,7 +179,7 @@ public class CombatFormula {
 
 			final double maximum = (double) (getMeleeDamage(source) + 320) / 640;
 			if (damage >= (maximum * 0.5) && SkillCapes.shouldActivate(sourcePlayer, STRENGTH_CAPE, isHit)) {
-				damage += (maximum*0.2);
+				damage += (int) (maximum * 0.2);
 				sourcePlayer.message("@ora@Your Strength cape has granted you a critical hit");
 			}
 		}

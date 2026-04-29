@@ -73,7 +73,7 @@ public final class Player extends Mob {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	// activity indicator for kitten to cat growth
 	// 100 trigger up a Kitten to cat event

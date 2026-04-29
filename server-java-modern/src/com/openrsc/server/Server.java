@@ -138,7 +138,7 @@ public class Server implements Runnable {
 	static {
 		Thread.currentThread().setName("InitThread");
 		LogUtil.configure();
-		LOGGER = LogManager.getLogger();
+		LOGGER = LogManager.getLogger("OpenRSC");
 	}
 
 	private SslContext sslcontext = null;

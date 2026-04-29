@@ -14,7 +14,7 @@ import org.apache.logging.log4j.Logger;
 import java.util.Iterator;
 
 public final class ReportHandler implements PayloadProcessor<ReportStruct, OpcodeIn> {
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	public void process(ReportStruct payload, Player player) throws Exception {
 

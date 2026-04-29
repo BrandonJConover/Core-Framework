@@ -14,7 +14,7 @@ public final class PcapLoggerService implements Runnable {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private volatile AtomicBoolean running;
 	private final BlockingQueue<Runnable> jobs;

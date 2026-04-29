@@ -18,7 +18,7 @@ public class PasswordChangeRequest extends LoginExecutorProcess {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private final Server server;
 	private final Channel channel;

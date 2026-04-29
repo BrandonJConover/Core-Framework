@@ -24,7 +24,7 @@ public class RuneScript {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	// The maximum value a big var can hold (2^28 - 1)
 	final static int BIG_VAR_MAX = 268435455;

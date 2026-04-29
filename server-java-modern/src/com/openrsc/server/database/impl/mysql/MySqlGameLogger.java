@@ -21,7 +21,7 @@ public final class MySqlGameLogger extends GameLogger {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private volatile AtomicBoolean running;
 	private final BlockingQueue<Query> queries;

@@ -11,7 +11,7 @@ public class ClientDebugHandler implements PayloadProcessor<DebugInfoStruct, Opc
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	@Override
 	public void process(DebugInfoStruct payload, Player player) throws Exception {

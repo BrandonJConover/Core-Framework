@@ -18,7 +18,7 @@ import org.apache.logging.log4j.Logger;
  * **/
 public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	@Override
 	public OpcodeIn toOpcodeEnum(Packet packet, Player player) {

@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 
 public class AchievementSystem {
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private static final int ACHIEVEMENT_COMPLETED = 2;
 	private static final int ACHIEVEMENT_STARTED = 1;

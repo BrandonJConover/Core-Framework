@@ -16,7 +16,7 @@ import java.util.HashMap;
 public class PayloadProcessorManager {
 	/* Handlers for parsed payload */
 	private static HashMap<OpcodeIn, PayloadProcessor<? extends AbstractStruct<OpcodeIn>, OpcodeIn>> payloadProcessors = new HashMap<>();
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	static {
 
 		bind(OpcodeIn.HEARTBEAT, Heartbeat.class);

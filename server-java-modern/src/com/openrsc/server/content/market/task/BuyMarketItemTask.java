@@ -14,7 +14,7 @@ import org.apache.logging.log4j.Logger;
 
 public class BuyMarketItemTask extends MarketTask {
 
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private Player playerBuyer;
 	private int auctionID;

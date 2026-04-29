@@ -16,7 +16,7 @@ public class ItemActionHandler implements PayloadProcessor<ItemCommandStruct, Op
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	public void process(ItemCommandStruct payload, Player player) throws Exception {
 		int idx = payload.index;

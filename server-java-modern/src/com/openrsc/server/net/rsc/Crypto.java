@@ -39,7 +39,7 @@ import java.io.FileWriter;
 
 public class Crypto {
 
-    private final static Logger LOGGER = LogManager.getLogger();
+    private final static Logger LOGGER = LogManager.getLogger("OpenRSC");
     private static RSAPublicKey publicKey;
     private static RSAPrivateKey privateKey;
 

@@ -8,7 +8,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 
 public class JContentFile {
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
     private byte[] m_data;
     private int m_position;

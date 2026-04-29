@@ -20,7 +20,7 @@ import java.util.zip.ZipFile;
 
 public final class AvatarGenerator {
 
-	private final static Logger LOGGER = LogManager.getLogger();
+	private final static Logger LOGGER = LogManager.getLogger("OpenRSC");
 	private final World world;
 	/// A map of unpacked sprites
 	private final static HashMap<String, Map<String, Entry>> spriteTree = new HashMap<>();

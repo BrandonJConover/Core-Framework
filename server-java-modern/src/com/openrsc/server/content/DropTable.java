@@ -17,7 +17,7 @@ import java.util.Iterator;
 
 public class DropTable {
 
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	ArrayList<Drop> drops;
 	ArrayList<Accessor> accessors;

@@ -19,7 +19,7 @@ public class RSCPacketFilter {
 	/**
 	 * The asynchronous Logger
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	/**
 	 * Holds a reference to the context Server
 	 */

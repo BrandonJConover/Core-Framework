@@ -17,7 +17,7 @@ public final class PersistenceManager {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private static final XStream xstream = new XStream();
 

@@ -60,7 +60,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	static {
 		staffs.put(ItemId.FIRE_RUNE.id(), new Item[]{new Item(ItemId.STAFF_OF_FIRE.id()), new Item(ItemId.BATTLESTAFF_OF_FIRE.id()), new Item(ItemId.ENCHANTED_BATTLESTAFF_OF_FIRE.id())}); // Fire-Rune

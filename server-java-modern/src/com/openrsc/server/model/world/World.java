@@ -70,7 +70,7 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	/**
 	 * Avatar generator upon logout save to PNG.
@@ -784,19 +784,19 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 							resetProjectileAllowance(x, y, dir, o.getType(), o.getGameObjectDef().getType(), -1);
 						}
 						if (o.getGameObjectDef().getType() == 1) {
-							getTile(x, y).traversalMask &= 0xffbf;
+							getTile(x, y).traversalMask &= (byte) 0xffbf;
 						} else if (dir == 0) {
-							getTile(x, y).traversalMask &= 0xfffd;
-							getTile(x - 1, y).traversalMask &= 65535 - 8;
+							getTile(x, y).traversalMask &= (byte) 0xfffd;
+							getTile(x - 1, y).traversalMask &= (byte) (65535 - 8);
 						} else if (dir == 2) {
-							getTile(x, y).traversalMask &= 0xfffb;
-							getTile(x, y + 1).traversalMask &= 65535 - 1;
+							getTile(x, y).traversalMask &= (byte) 0xfffb;
+							getTile(x, y + 1).traversalMask &= (byte) (65535 - 1);
 						} else if (dir == 4) {
-							getTile(x, y).traversalMask &= 0xfff7;
-							getTile(x + 1, y).traversalMask &= 65535 - 2;
+							getTile(x, y).traversalMask &= (byte) 0xfff7;
+							getTile(x + 1, y).traversalMask &= (byte) (65535 - 2);
 						} else if (dir == 6) {
-							getTile(x, y).traversalMask &= 0xfffe;
-							getTile(x, y - 1).traversalMask &= 65535 - 4;
+							getTile(x, y).traversalMask &= (byte) 0xfffe;
+							getTile(x, y - 1).traversalMask &= (byte) (65535 - 4);
 						}
 					}
 				}
@@ -812,15 +812,15 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 				}
 
 				if (dir == 0) {
-					getTile(x, y).traversalMask &= 0xfffe;
-					getTile(x, y - 1).traversalMask &= 65535 - 4;
+					getTile(x, y).traversalMask &= (byte) 0xfffe;
+					getTile(x, y - 1).traversalMask &= (byte) (65535 - 4);
 				} else if (dir == 1) {
-					getTile(x, y).traversalMask &= 0xfffd;
-					getTile(x - 1, y).traversalMask &= 65535 - 8;
+					getTile(x, y).traversalMask &= (byte) 0xfffd;
+					getTile(x - 1, y).traversalMask &= (byte) (65535 - 8);
 				} else if (dir == 2) {
-					getTile(x, y).traversalMask &= 0xffef;
+					getTile(x, y).traversalMask &= (byte) 0xffef;
 				} else if (dir == 3) {
-					getTile(x, y).traversalMask &= 0xffdf;
+					getTile(x, y).traversalMask &= (byte) 0xffdf;
 				}
 				break;
 		}

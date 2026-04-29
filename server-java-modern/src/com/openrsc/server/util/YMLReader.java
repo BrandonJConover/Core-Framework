@@ -9,7 +9,7 @@ import java.nio.file.Paths;
 import java.util.*;
 
 public class YMLReader {
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private final HashMap<String, String> settings = new HashMap<>();
 

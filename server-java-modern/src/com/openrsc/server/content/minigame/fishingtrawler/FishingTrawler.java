@@ -27,7 +27,7 @@ public class FishingTrawler extends DelayedEvent {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	private static final int SHIP_WATER_LIMIT_SECOND_BOAT = 500;
 	private static final int SHIP_WATER_LIMIT_SINK = 1000;
 

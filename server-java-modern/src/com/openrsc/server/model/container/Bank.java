@@ -21,7 +21,7 @@ public class Bank {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	// TODO: Use an ItemContainer rather than a list here.
 	private List<Item> list = Collections.synchronizedList(new ArrayList<>());

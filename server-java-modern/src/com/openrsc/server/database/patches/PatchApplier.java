@@ -18,7 +18,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 public abstract class PatchApplier {
-    private static final Logger LOGGER = LogManager.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
     public boolean applyPatches() {
         List<File> patches = getPatches(getExecutedPatches());

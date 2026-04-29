@@ -28,7 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SqliteGameDatabase extends MySqlGameDatabase {
-    private final Logger LOGGER = LogManager.getLogger();
+    private final Logger LOGGER = LogManager.getLogger("OpenRSC");
     private final SqliteGameDatabaseConnection connection;
     private final QueriesManager queriesManager;
     private final Queries queries;

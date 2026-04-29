@@ -35,7 +35,7 @@ public class ClanManager {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private final ArrayList<Clan> clans = new ArrayList<>();
 

@@ -26,7 +26,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class JDBCPatchApplier extends PatchApplier {
-    private static final Logger LOGGER = LogManager.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
     private final JDBCDatabaseConnection connection;
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ISO_DATE;
     private final DatabaseType databaseType;

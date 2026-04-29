@@ -38,7 +38,7 @@ public abstract class GameDatabase {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	public final Server server;
 	private volatile AtomicBoolean open = new AtomicBoolean(false);

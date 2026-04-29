@@ -17,7 +17,7 @@ import org.apache.logging.log4j.Logger;
 import java.util.Collection;
 
 public class Region {
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	/**
 	 * The RegionManager this Region belongs to

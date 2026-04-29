@@ -18,7 +18,7 @@ import java.util.Map;
 public class QueriesManager {
     private static final Map<String, String> QUERIES = new HashMap<>();
     private static final XStream X_STREAM = new XStream();
-    private static final Logger LOGGER = LogManager.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
     private static final String PREFIX_MARKER = "_PREFIX_";
 
     private final String namespace;

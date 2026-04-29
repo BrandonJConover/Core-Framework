@@ -17,7 +17,7 @@ public class CombatScriptLoader {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private final Map<String, CombatScript> combatScripts = new HashMap<>();
 	private final Map<String, OnCombatStartScript> combatStartScripts = new HashMap<>();

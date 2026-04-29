@@ -15,7 +15,7 @@ import java.sql.Statement;
 
 public class SqliteGameDatabaseConnection extends JDBCDatabaseConnection {
     public static final String DB_FOLDER = "inc/sqlite/";
-    private final Logger LOGGER = LogManager.getLogger();
+    private final Logger LOGGER = LogManager.getLogger("OpenRSC");
     private Connection connection;
     private Statement statement;
     private boolean connected;

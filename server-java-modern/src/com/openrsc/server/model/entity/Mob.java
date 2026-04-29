@@ -36,7 +36,7 @@ public abstract class Mob extends Entity {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	protected static final int DEFAULT_PROJECTILE_RADIUS = 5;
 

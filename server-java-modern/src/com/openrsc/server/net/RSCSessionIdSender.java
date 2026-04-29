@@ -9,7 +9,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class RSCSessionIdSender implements Runnable {
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	private static final AttributeKey<ConnectionAttachment> attachment = AttributeKey.valueOf("conn-attachment");
 	private ChannelHandlerContext ctx;
 	private int timer;

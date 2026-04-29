@@ -18,7 +18,7 @@ public class GameEventHandler {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private final GameTickEventStore eventStore = new GameTickEventStore();
 	private final ConcurrentHashMap<String, Integer> eventsCounts = new ConcurrentHashMap<>();

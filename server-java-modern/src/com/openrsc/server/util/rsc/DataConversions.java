@@ -27,7 +27,7 @@ public final class DataConversions {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	private static final char[] special_characters = "~`!@#$%^&*()_-+={}[]|\'\";:?><,./".toCharArray();
 	public static StringEncryption encryption = new StringEncryption();
 	private static char characters[] = {' ', 'e', 't', 'a', 'o', 'i',

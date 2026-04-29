@@ -48,7 +48,7 @@ public class ActionSender {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	/**
 	 * Get respective generator

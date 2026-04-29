@@ -15,7 +15,7 @@ import java.util.Optional;
 
 public class Equipment {
 
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	public static final int SLOT_COUNT = 14;
 	private final Item[] list = new Item[SLOT_COUNT];
 	private final Player player;
@@ -817,13 +817,13 @@ public class Equipment {
 		if (player.getConfig().WANT_EQUIPMENT_TAB) {
 			synchronized (list) {
 				for (Item item : list)
-					total += item == null ? 0 : item.getDef(player.getWorld()).getArmourBonus();
+					total += item == null ? 0 : (int) item.getDef(player.getWorld()).getArmourBonus();
 			}
 		} else {
 			synchronized (player.getCarriedItems().getInventory().getItems()) {
 				for (Item item : player.getCarriedItems().getInventory().getItems()) {
 					if (item.isWielded()) {
-						total += item.getDef(player.getWorld()).getArmourBonus();
+						total += (int) item.getDef(player.getWorld()).getArmourBonus();
 					}
 				}
 			}

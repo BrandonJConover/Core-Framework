@@ -13,7 +13,7 @@ import org.apache.logging.log4j.Logger;
 
 public class CancelMarketItemTask extends MarketTask {
 
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private Player owner;
 	private int auctionID;

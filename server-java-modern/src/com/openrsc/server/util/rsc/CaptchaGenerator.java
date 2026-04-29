@@ -18,7 +18,7 @@ public class CaptchaGenerator {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private static List<Color> colors = new ArrayList<>();
 	private static List<String> words = new ArrayList<>();

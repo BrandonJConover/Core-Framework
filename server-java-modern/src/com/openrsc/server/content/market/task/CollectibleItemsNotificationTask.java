@@ -12,7 +12,7 @@ import java.util.ArrayList;
 
 public class CollectibleItemsNotificationTask extends MarketTask {
 
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private Player player;
 

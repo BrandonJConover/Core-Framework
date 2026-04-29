@@ -12,7 +12,7 @@ import org.apache.logging.log4j.Logger;
 import java.util.Optional;
 
 public class Duel implements ContainerListener {
-	public static Logger LOGGER = LogManager.getLogger();
+	public static Logger LOGGER = LogManager.getLogger("OpenRSC");
 	private Player player;
 	private Player duelRecipient;
 

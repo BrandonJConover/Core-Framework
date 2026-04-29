@@ -107,7 +107,7 @@ public class Functions {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	/**
 	 * Used for the ifstatrandom RuneScript function.

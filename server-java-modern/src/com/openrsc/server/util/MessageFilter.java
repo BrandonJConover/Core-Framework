@@ -19,7 +19,7 @@ public class MessageFilter {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	private static ArrayList<String> badwords = new ArrayList<>();
 	private static ArrayList<String> goodwords = new ArrayList<>();
 	private static ArrayList<String> alertwords = new ArrayList<>();

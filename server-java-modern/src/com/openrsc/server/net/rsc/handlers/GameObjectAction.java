@@ -16,7 +16,7 @@ public class GameObjectAction implements PayloadProcessor<TargetObjectStruct, Op
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	public void process(TargetObjectStruct payload, Player player) throws Exception {
 		OpcodeIn pID = payload.getOpcode();

@@ -16,7 +16,7 @@ import java.util.Optional;
 
 public class ServerConfiguration {
 
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 
 	public boolean DEBUG = false; // enables print out of the config being sent to the client

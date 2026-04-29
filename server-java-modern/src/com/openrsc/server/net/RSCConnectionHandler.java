@@ -19,7 +19,7 @@ import org.apache.logging.log4j.Logger;
 import java.net.InetSocketAddress;
 
 public class RSCConnectionHandler extends ChannelInboundHandlerAdapter implements AttributeMap {
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	public static final AttributeKey<ConnectionAttachment> attachment = AttributeKey.valueOf("conn-attachment");
 

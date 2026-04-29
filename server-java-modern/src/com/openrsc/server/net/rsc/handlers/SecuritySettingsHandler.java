@@ -20,7 +20,7 @@ public class SecuritySettingsHandler implements PayloadProcessor<SecuritySetting
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	@Override
 	public void process(SecuritySettingsStruct payload, Player player) throws Exception {

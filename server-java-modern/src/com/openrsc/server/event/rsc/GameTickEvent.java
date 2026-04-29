@@ -14,7 +14,7 @@ public abstract class GameTickEvent implements Callable<Integer> {
 	/**
 	 * Logger instance
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	protected boolean running = true;
 	private final Mob owner;

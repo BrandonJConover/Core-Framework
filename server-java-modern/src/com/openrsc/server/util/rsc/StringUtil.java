@@ -14,7 +14,7 @@ import java.util.Arrays;
 
 public class StringUtil {
 
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private static String[] badwordsJag;
 	private static String[] goodwordsJag;

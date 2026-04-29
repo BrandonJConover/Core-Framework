@@ -40,7 +40,7 @@ public class Npc extends Mob {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private long healTimer = 0;
 	private boolean shouldRespawn = true;

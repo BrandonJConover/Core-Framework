@@ -18,7 +18,7 @@ public abstract class GameStateEvent extends GameTickEvent {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private int eventState = 0;
 	private Map<Integer, StateEventTask> tasks = new HashMap<>();

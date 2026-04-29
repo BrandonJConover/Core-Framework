@@ -144,7 +144,7 @@ public class ObjectCooking implements UseLocTrigger {
 				timeToCook = 5;
 			}
 			if (player.getCarriedItems().getEquipment().hasEquipped(ItemId.COOKING_CAPE.id()))
-				timeToCook *= 0.7;
+				timeToCook = (int) (timeToCook * 0.7);
 			if ((object.getID() == SceneryId.FIRE.id() || object.getID() == SceneryId.FIREPLACE.id()) && needOven) {
 				player.playerServerMessage(MessageType.QUEST, "You need a proper oven to cook this");
 				return;

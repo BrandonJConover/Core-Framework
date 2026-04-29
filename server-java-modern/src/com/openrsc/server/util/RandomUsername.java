@@ -31,7 +31,7 @@ public class RandomUsername {
 
 		// Very unlikely to reach this point, but if choosing a random shakespeare name fails enough times,
 		// fall back to choosing completely random names.
-		Logger LOGGER = LogManager.getLogger();
+		Logger LOGGER = LogManager.getLogger("OpenRSC");
 		LOGGER.warn("You have probably run out of Shakespeare character names somehow...!");
 		String validUsernameCharacters = "abcdefghijklmnopqrstuvxyz0123456789";
 		while (true) {

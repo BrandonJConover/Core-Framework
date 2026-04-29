@@ -18,7 +18,7 @@ public abstract class PluginTask extends GameTickEvent implements Callable<Integ
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	/**
 	 * List of PluginTasks indexed by thread to retrieve from a static context

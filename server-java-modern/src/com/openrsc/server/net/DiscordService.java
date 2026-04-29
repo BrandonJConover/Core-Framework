@@ -61,7 +61,7 @@ public class DiscordService implements Runnable{
 	private final Queue<DiscordEmbed> naughtyWordsRequests = new ConcurrentLinkedQueue<>();
 	private final Queue<DiscordEmbed> downtimeReports = new ConcurrentLinkedQueue<>();
 
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	private long monitoringLastUpdate = 0;
 	private Boolean running = false;
 

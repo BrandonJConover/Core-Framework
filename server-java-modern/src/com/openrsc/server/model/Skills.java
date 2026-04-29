@@ -17,7 +17,7 @@ import org.apache.logging.log4j.Logger;
 
 
 public class Skills {
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
 	private final Mob mob;
 	private final World world; // TODO: Redundant and wastes memory. Needed for LoginPacketHandler to send a null mob to this method.

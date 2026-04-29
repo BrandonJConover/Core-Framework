@@ -27,7 +27,7 @@ public class InterfaceOptionHandler implements PayloadProcessor<OptionsStruct, O
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	private static String[] badWords = {
 		"fuck", "ass", "bitch", "admin", "mod", "dev", "developer", "nigger", "niger",
 		"whore", "pussy", "porn", "penis", "chink", "faggot", "cunt", "clit", "cock"};
