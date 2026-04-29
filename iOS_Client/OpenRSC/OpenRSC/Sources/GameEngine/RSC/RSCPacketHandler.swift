@@ -376,7 +376,7 @@ final class RSCPacketHandler {
             break
 
         case 255: // updateEquipmentSlot
-            break // Equipment slot update — handled by opcode 254 full update
+            handleUpdateEquipmentSlot(buf: buf, ws: ws)
 
         case 249: // updateBank — individual bank slot update
             if buf.bytesRemaining >= 6 {
@@ -801,8 +801,50 @@ final class RSCPacketHandler {
     }
 
     private func handleUpdateEquipment(buf: ByteBuffer, ws: RSCWorldState) {
-        // Equipment format varies — for now just track that equipment changed
-        print("[Packet] Equipment update (\(buf.bytesRemaining) bytes)")
+        let count = buf.getUnsignedByte()
+        var slots: [RSCEquipmentSlot] = []
+        for _ in 0..<count {
+            guard buf.bytesRemaining >= 3 else { break }
+            let serverSlot = buf.getByte()
+            let itemId = buf.getUnsignedShort()
+            guard let slot = canonicalEquipmentSlot(serverSlot) else { continue }
+            let amount = ItemDefinitions.isStackable(itemId) && buf.bytesRemaining >= 4 ? buf.get32() : 1
+            slots.append(RSCEquipmentSlot(id: slot, itemId: itemId, amount: amount))
+        }
+        ws.equipment = slots.sorted { $0.id < $1.id }
+        print("[Packet] Equipment: \(ws.equipment.count) items")
+    }
+
+    private func handleUpdateEquipmentSlot(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining >= 3 else { return }
+        let serverSlot = buf.getByte()
+        let rawItemId = buf.getUnsignedShort()
+        guard let slot = canonicalEquipmentSlot(serverSlot) else { return }
+
+        if rawItemId == 0xFFFF {
+            ws.equipment.removeAll { $0.id == slot }
+            return
+        }
+
+        let amount = ItemDefinitions.isStackable(rawItemId) && buf.bytesRemaining >= 4 ? buf.get32() : 1
+        let nextSlot = RSCEquipmentSlot(id: slot, itemId: rawItemId, amount: amount)
+        if let existing = ws.equipment.firstIndex(where: { $0.id == slot }) {
+            ws.equipment[existing] = nextSlot
+        } else {
+            ws.equipment.append(nextSlot)
+            ws.equipment.sort { $0.id < $1.id }
+        }
+    }
+
+    private func canonicalEquipmentSlot(_ serverSlot: Int) -> Int? {
+        switch serverSlot {
+        case 5: return 0
+        case 6: return 1
+        case 7: return 2
+        case let slot where slot > 7: return slot - 3
+        case let slot where slot >= 0: return slot
+        default: return nil
+        }
     }
 
     // Port of PacketHandler.java updateEquipmentStats() — opcode 153
