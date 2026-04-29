@@ -332,6 +332,13 @@ final class RSCWorldState: ObservableObject {
     @Published var optionHideKillFeed: Bool = false
     @Published var optionHideNameTag: Bool = false
 
+    /// Chat/privacy block flags from opcode 51. Values match the desktop
+    /// client: 0 = allow all, 1 = block strangers, 2 = block all.
+    @Published var blockChat: Int = 0
+    @Published var blockPrivate: Int = 0
+    @Published var blockTrade: Int = 0
+    @Published var blockDuel: Int = 0
+
     /// Damage splat for the local player. Java counts down combatTimeout
     /// from 200 and draws the splat while it stays > 150 (~50 render ticks).
     @Published var localDamageTaken: Int = 0

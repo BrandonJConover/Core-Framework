@@ -291,7 +291,12 @@ final class RSCPacketHandler {
             ws.sleepStatusText = ""
 
         case 51:  // PRIVACY_SETTINGS
-            break
+            if buf.bytesRemaining >= 4 {
+                ws.blockChat = buf.getUnsignedByte()
+                ws.blockPrivate = buf.getUnsignedByte()
+                ws.blockTrade = buf.getUnsignedByte()
+                ws.blockDuel = buf.getUnsignedByte()
+            }
 
         case 52:  // UPDATE_SYSTEM_UPDATE_TIMER
             // Java mudclient.java:413 — server sends ticks, multiplies by 32
