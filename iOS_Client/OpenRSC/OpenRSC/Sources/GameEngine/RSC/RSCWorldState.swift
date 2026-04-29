@@ -21,6 +21,12 @@ struct RSCPlayer: Identifiable {
     var projectileRange: Int = 0
     var projectileSourceServerIndex: Int = -1
     var projectileSourceIsNpc: Bool = false
+    /// Floating chat message bubble shown above the player's head.
+    /// Java drawNearbyPlayers (opcode 234 case 1/7) writes player.message
+    /// and player.messageTimeout = 150 (~4.5s). Cleared by decay in the
+    /// engine tick loop, same path the NPC bubble uses.
+    var message: String = ""
+    var messageTimeout: Int = 0
 }
 
 /// Appearance data delivered by opcode 234 case 5 (full appearance update).
@@ -209,6 +215,13 @@ final class RSCWorldState: ObservableObject {
     @Published var playerMax: Int = 0
     @Published var isMembersWorld: Bool = false
     @Published var fatigue: Int = 0
+    @Published var fatigueAuthentic: Int = 0
+    @Published var petFatigue: Int = 0
+    @Published var expShared: Int = 0
+    @Published var openPKPoints: Int64 = 0
+    @Published var kills2: Int = 0
+    @Published var lastNpcKilledId: Int = 0
+    @Published var kills3: Int = 0
     @Published var isDead: Bool = false
 
     /// Ticks remaining until the server reboots (opcode 52). Server sends
@@ -397,6 +410,12 @@ final class RSCWorldState: ObservableObject {
     /// from 200 and draws the splat while it stays > 150 (~50 render ticks).
     @Published var localDamageTaken: Int = 0
     @Published var localDamageTimeout: Int = 0
+
+    /// Floating chat bubble for the local player. Mirrors the message field
+    /// on remote players — set when our own opcode 234 case 1/7 echo lands
+    /// or when we send a public chat. Bubble shows while messageTimeout > 0.
+    @Published var localMessage: String = ""
+    @Published var localMessageTimeout: Int = 0
     @Published var localBubbleItem: Int = -1
     @Published var localBubbleTimeout: Int = 0
     @Published var localProjectileSprite: Int = -1

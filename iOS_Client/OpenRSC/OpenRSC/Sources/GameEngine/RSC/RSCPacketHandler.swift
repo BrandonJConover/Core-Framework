@@ -17,7 +17,7 @@ final class RSCPacketHandler {
             // Format: INT crown, BYTE msgType (enum), BYTE formatFlags, STRING message
             // If formatFlags & 1: STRING sender, STRING clan
             // If formatFlags & 2: STRING colour
-            let crown131 = buf.get32()
+            _ = buf.get32() // crown
             let msgTypeRaw = buf.getUnsignedByte()
             let formatFlags = buf.getUnsignedByte()
             let message131 = buf.getString()
@@ -208,7 +208,8 @@ final class RSCPacketHandler {
             ws.exitCombat()
 
         case 114: // SET_FATIGUE
-            ws.fatigue = buf.getShort()
+            if buf.bytesRemaining >= 2 { ws.fatigue = buf.getShort() }
+            if buf.bytesRemaining >= 2 { ws.fatigueAuthentic = buf.getShort() }
 
         case 42:  // showBank
             handleShowBank(buf: buf, ws: ws)
@@ -487,18 +488,32 @@ final class RSCPacketHandler {
         case 71:  // friend list init — same format as 149, handled by those updates
             break
 
-        case 147: // updateExperienceCounter — XP gained notification
-            if buf.bytesRemaining >= 5 {
-                let skill = buf.getUnsignedByte()
-                let xp = buf.get32()
-                // Could show XP drop notification
-                _ = skill; _ = xp
+        case 147: // SEND_KILLS2 — Java reads 3x INT
+            if buf.bytesRemaining >= 12 {
+                ws.kills2 = buf.get32()
+                ws.lastNpcKilledId = buf.get32()
+                ws.kills3 = buf.get32()
+            }
+
+        case 148: // Set OpenPK points — Java reads LONG
+            if buf.bytesRemaining >= 8 {
+                ws.openPKPoints = getInt64(buf)
+            }
+
+        case 98: // shared XP percentage
+            if buf.bytesRemaining >= 2 {
+                ws.expShared = buf.getShort()
+            }
+
+        case 140: // pet fatigue
+            if buf.bytesRemaining >= 2 {
+                ws.petFatigue = buf.getShort()
             }
 
         // Remaining opcodes — skip their data to keep things clean
         case 7, 16, 21, 23, 28, 29, 32, 34, 37, 39, 49, 50, 54, 55,
-             94, 95, 98, 113, 115, 119, 132, 133, 134, 135, 136, 140, 144,
-             148, 150, 157, 224, 232, 237, 244, 246, 250:
+             94, 95, 113, 115, 119, 132, 133, 134, 135, 136, 144,
+             150, 157, 224, 232, 237, 246, 250:
             break
 
         default:
@@ -508,6 +523,12 @@ final class RSCPacketHandler {
     }
 
     // MARK: - Packet parsers (matching PacketHandler.java methods)
+
+    private func getInt64(_ buf: ByteBuffer) -> Int64 {
+        let high = UInt64(UInt32(bitPattern: Int32(buf.get32())))
+        let low = UInt64(UInt32(bitPattern: Int32(buf.get32())))
+        return Int64(bitPattern: (high << 32) | low)
+    }
 
     private func handleServerConfig(buf: ByteBuffer, ws: RSCWorldState) {
         ws.serverName = buf.getString()
@@ -977,8 +998,17 @@ final class RSCPacketHandler {
                     let _ = buf.getUnsignedByte() // onTutorial
                 }
                 let message = buf.getString()
-                // Find player and set their chat
-                if let idx = ws.players.firstIndex(where: { $0.id == serverIndex }) {
+                // Java drawNearbyPlayers also sets player.message and
+                // player.messageTimeout = 150 so the bubble floats above
+                // the head, not just in the chat log.
+                if serverIndex == ws.playerServerIndex {
+                    ws.localMessage = message
+                    ws.localMessageTimeout = 150
+                    ws.addChat(sender: ws.localPlayerName.isEmpty ? "You" : ws.localPlayerName,
+                               text: message, isLocal: true)
+                } else if let idx = ws.players.firstIndex(where: { $0.id == serverIndex }) {
+                    ws.players[idx].message = message
+                    ws.players[idx].messageTimeout = 150
                     ws.addChat(sender: ws.players[idx].name, text: message)
                 }
 

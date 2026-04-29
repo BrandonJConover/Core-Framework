@@ -236,10 +236,12 @@ final class RSCGameEngine: ObservableObject {
             if worldState.players[i].damageTimeout > 0 { worldState.players[i].damageTimeout -= 1 }
             if worldState.players[i].bubbleTimeout > 0 { worldState.players[i].bubbleTimeout -= 1 }
             if worldState.players[i].projectileRange > 0 { worldState.players[i].projectileRange -= 1 }
+            if worldState.players[i].messageTimeout > 0 { worldState.players[i].messageTimeout -= 1 }
         }
         if worldState.localDamageTimeout > 0 { worldState.localDamageTimeout -= 1 }
         if worldState.localBubbleTimeout > 0 { worldState.localBubbleTimeout -= 1 }
         if worldState.localProjectileRange > 0 { worldState.localProjectileRange -= 1 }
+        if worldState.localMessageTimeout > 0 { worldState.localMessageTimeout -= 1 }
         for i in 0..<worldState.teleportBubbles.count {
             worldState.teleportBubbles[i].time += 1
         }
@@ -499,6 +501,79 @@ final class RSCGameEngine: ObservableObject {
         drawOverheadItemBubbles()
         drawSkullIndicators()
         drawDamageSplats()
+        drawChatBubbles()
+    }
+
+    /// Floats short chat messages above NPCs and players, mirroring Java's
+    /// drawCharacterOverlay path for `messageTimeout > 0`. The message
+    /// projects through the same Scene camera the billboards use so the
+    /// bubble tracks the speaker even as the camera rotates.
+    private func drawChatBubbles() {
+        guard let scene = self.scene else { return }
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+
+        for npc in worldState.npcs where npc.messageTimeout > 0 && !npc.message.isEmpty {
+            let dx = npc.x - px
+            let dz = npc.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: -150,
+                worldZ: Int32(dz) * 128 + 64
+            )
+            if proj.depth < scene.rot1024_zTop { continue }
+            drawChatBubble(centerX: Int(proj.screenX), bottomY: Int(proj.screenY), text: npc.message)
+        }
+
+        for player in worldState.players where player.messageTimeout > 0 && !player.message.isEmpty {
+            let dx = player.x - px
+            let dz = player.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: -150,
+                worldZ: Int32(dz) * 128 + 64
+            )
+            if proj.depth < scene.rot1024_zTop { continue }
+            drawChatBubble(centerX: Int(proj.screenX), bottomY: Int(proj.screenY), text: player.message)
+        }
+
+        if worldState.localMessageTimeout > 0 && !worldState.localMessage.isEmpty {
+            drawChatBubble(
+                centerX: MetalRenderer.gameWidth / 2,
+                bottomY: MetalRenderer.gameHeight / 2 - 30,
+                text: worldState.localMessage
+            )
+        }
+    }
+
+    /// Caption-bar above a head: dark translucent backing, light gold text,
+    /// truncated at ~32 chars to keep it readable through the small font.
+    private func drawChatBubble(centerX: Int, bottomY: Int, text: String) {
+        let w = MetalRenderer.gameWidth
+        let h = MetalRenderer.gameHeight
+        let trimmed = String(text.prefix(32))
+        let glyphW = 4   // 3px font + 1px tracking
+        let textW = max(0, trimmed.count * glyphW - 1)
+        let padX = 3
+        let padY = 2
+        let boxW = textW + padX * 2
+        let boxH = 5 + padY * 2  // 5px font height
+        let boxX = centerX - boxW / 2
+        let boxY = bottomY - boxH - 2  // float above the projected anchor
+        let bg = Int32(bitPattern: 0xCC101010)
+        let border = Int32(bitPattern: 0xFFC8A951)
+        for ry in 0..<boxH {
+            for rx in 0..<boxW {
+                let sx = boxX + rx
+                let sy = boxY + ry
+                if sx < 0 || sx >= w || sy < 0 || sy >= h { continue }
+                let onEdge = ry == 0 || ry == boxH - 1 || rx == 0 || rx == boxW - 1
+                pixelData[sy * w + sx] = onEdge ? border : bg
+            }
+        }
+        drawText(trimmed, x: boxX + padX, y: boxY + padY, color: 0xFFFFEFA8)
     }
 
     /// Draw teleport/telegrab-style bubbles from opcode 36. Java keeps these
