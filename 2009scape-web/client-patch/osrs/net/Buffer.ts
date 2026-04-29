@@ -186,7 +186,14 @@ export class Buffer extends CacheableNode {
         }
     }
 
-    // ── Outgoing opcode translation for 530-server compatibility ──
+    // ── Outgoing opcode handling for the 530 server ──
+    //
+    // New code should prefer putOpcode530() and write the exact rt4/530 body
+    // from the reference client. putOpcode() remains a guarded legacy bridge:
+    // it accepts a narrow allow-list of 377-era opcodes whose payloads have
+    // been audited or rewritten elsewhere, and suppresses everything else so
+    // stale 377 menu/widget packets cannot kick the 530 session.
+    //
     // The 377 client emits 377-format opcodes; the 530 server only knows its
     // own opcode numbering. Unmapped outbound packets are silently dropped
     // (all subsequent put*() calls in that packet no-op). Mapped opcodes get
@@ -225,6 +232,11 @@ export class Buffer extends CacheableNode {
         }
         this._suppressed = false;
         this.buffer[this.currentPosition++] = ((mapped + (this.random ? this.random.nextInt() : 0)) as number) | 0;
+    }
+
+    public putOpcode530(opcode: number) {
+        this._suppressed = false;
+        this.buffer[this.currentPosition++] = ((opcode + (this.random ? this.random.nextInt() : 0)) as number) | 0;
     }
 
     public putByte(value: number) {

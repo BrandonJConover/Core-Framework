@@ -100,6 +100,13 @@ export class GameShell {
     private touchStartTime: number = 0;
     private touchStartX: number = 0;
     private touchStartY: number = 0;
+    private touchLastX: number = 0;
+    private touchLastY: number = 0;
+    private touchMode: "tap" | "swipe" | "pinch" | null = null;
+    private touchLongPressTimer: number = null;
+    private touchLongPressed: boolean = false;
+    private touchActiveKey: number = 0;
+    private touchPinchDistance: number = 0;
     private hiddenInput: HTMLInputElement = null;
     public needsKeyboard: boolean = false;
 
@@ -184,6 +191,7 @@ export class GameShell {
                 this.canvas.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
                 this.canvas.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
                 this.canvas.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
+                this.canvas.addEventListener('touchcancel', this.onTouchCancel.bind(this), { passive: false });
             }
 
             // this.getParentComponent().addMouseListener(this);
@@ -345,42 +353,109 @@ export class GameShell {
         ];
     }
 
+    private touchDistance(first: Touch, second: Touch): number {
+        const dx = first.clientX - second.clientX;
+        const dy = first.clientY - second.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    private clearTouchLongPress() {
+        if (this.touchLongPressTimer !== null) {
+            window.clearTimeout(this.touchLongPressTimer);
+            this.touchLongPressTimer = null;
+        }
+    }
+
+    private setTouchKey(key: number) {
+        if (this.touchActiveKey === key) {
+            return;
+        }
+        this.releaseTouchKey();
+        this.keyStatus[key] = 1;
+        this.touchActiveKey = key;
+    }
+
+    private releaseTouchKey() {
+        if (this.touchActiveKey > 0) {
+            this.keyStatus[this.touchActiveKey] = 0;
+            this.touchActiveKey = 0;
+        }
+    }
+
+    private keyForSwipe(dx: number, dy: number): number {
+        if (Math.abs(dx) > Math.abs(dy)) {
+            return dx < 0 ? 1 : 2;
+        }
+        return dy < 0 ? 3 : 4;
+    }
+
+    private fireTouchClick(x: number, y: number, button: number) {
+        this.eventClickX = x;
+        this.eventClickY = y;
+        this.lastClick = new Date().getTime();
+        this.eventMouseButtonPressed = button;
+        this.mouseButtonPressed = button;
+
+        window.setTimeout(() => {
+            this.mouseButtonPressed = 0;
+        }, 50);
+    }
+
     public onTouchStart(e: TouchEvent) {
         e.preventDefault();
+        this.clearTouchLongPress();
+        this.releaseTouchKey();
+
+        if (e.touches.length === 2) {
+            this.touchMode = "pinch";
+            this.touchPinchDistance = this.touchDistance(e.touches[0], e.touches[1]);
+            this.touchLongPressed = false;
+            return;
+        }
+
         if (e.touches.length !== 1) return;
         const [x, y] = this.getTouchCanvasCoords(e.touches[0]);
         this.touchStartTime = Date.now();
         this.touchStartX = x;
         this.touchStartY = y;
+        this.touchLastX = x;
+        this.touchLastY = y;
+        this.touchMode = "tap";
+        this.touchLongPressed = false;
         this.mouseX = x;
         this.mouseY = y;
         this.idleTime = 0;
+
+        this.touchLongPressTimer = window.setTimeout(() => {
+            if (this.touchMode !== "tap") {
+                return;
+            }
+            this.touchLongPressed = true;
+            this.fireTouchClick(this.touchStartX, this.touchStartY, 2);
+        }, 430);
     }
 
     public onTouchEnd(e: TouchEvent) {
         e.preventDefault();
-        const elapsed = Date.now() - this.touchStartTime;
-        const x = this.touchStartX;
-        const y = this.touchStartY;
+        this.clearTouchLongPress();
+        this.releaseTouchKey();
 
-        this.eventClickX = x;
-        this.eventClickY = y;
-        this.lastClick = new Date().getTime();
-
-        if (elapsed < 300) {
-            // Short tap = left click
-            this.eventMouseButtonPressed = 1;
-            this.mouseButtonPressed = 1;
-        } else {
-            // Long press = right click
-            this.eventMouseButtonPressed = 2;
-            this.mouseButtonPressed = 2;
+        if (this.touchMode === "pinch" || this.touchMode === "swipe") {
+            this.touchMode = null;
+            this.touchPinchDistance = 0;
+            return;
         }
 
-        // Release after a frame
-        setTimeout(() => {
-            this.mouseButtonPressed = 0;
-        }, 50);
+        if (this.touchLongPressed) {
+            this.touchLongPressed = false;
+            this.touchMode = null;
+            return;
+        }
+
+        const elapsed = Date.now() - this.touchStartTime;
+        const button = elapsed < 430 ? 1 : 2;
+        this.fireTouchClick(this.touchLastX, this.touchLastY, button);
+        this.touchMode = null;
 
         // Auto-open keyboard when game needs text input
         if (this.needsKeyboard && this.hiddenInput) {
@@ -390,10 +465,45 @@ export class GameShell {
 
     public onTouchMove(e: TouchEvent) {
         e.preventDefault();
+        if (e.touches.length === 2) {
+            const nextDistance = this.touchDistance(e.touches[0], e.touches[1]);
+            if (this.touchMode !== "pinch") {
+                this.touchMode = "pinch";
+                this.touchPinchDistance = nextDistance;
+                this.clearTouchLongPress();
+                this.releaseTouchKey();
+                return;
+            }
+
+            const delta = this.touchPinchDistance - nextDistance;
+            this.touchPinchDistance = nextDistance;
+            this.mouseWheelDragged(0, delta);
+            return;
+        }
+
         if (e.touches.length !== 1) return;
         const [x, y] = this.getTouchCanvasCoords(e.touches[0]);
         this.mouseX = x;
         this.mouseY = y;
+        this.touchLastX = x;
+        this.touchLastY = y;
+
+        const dx = x - this.touchStartX;
+        const dy = y - this.touchStartY;
+        if (Math.sqrt(dx * dx + dy * dy) > 18) {
+            this.clearTouchLongPress();
+            this.touchMode = "swipe";
+            this.setTouchKey(this.keyForSwipe(dx, dy));
+        }
+    }
+
+    public onTouchCancel(e: TouchEvent) {
+        e.preventDefault();
+        this.clearTouchLongPress();
+        this.releaseTouchKey();
+        this.touchMode = null;
+        this.touchLongPressed = false;
+        this.touchPinchDistance = 0;
     }
 
     public openKeyboard() {

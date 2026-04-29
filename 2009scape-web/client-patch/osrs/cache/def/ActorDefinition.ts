@@ -26,7 +26,7 @@ export class ActorDefinition {
 
     /**
      * 530 fallback. Same role as ItemDefinition.cache530 — populated by a
-     * Game-side preloader from idx7 via NpcType530.load(). When set,
+     * Game-side preloader from idx18 via NpcType530.load(). When set,
      * getDefinition consults it before the empty 377 npc.dat archive.
      */
     public static cache530: Map<number, NpcType530Data> | null = null;
@@ -73,9 +73,7 @@ export class ActorDefinition {
      *   NpcType530.resizeX/Y          → sizeXZ / sizeY (with default 128)
      *
      * Animation IDs (walkAnimationId, standAnimationId, etc.) live in BAS
-     * (idx20 referenced by NpcType530.bastypeid) — those need a separate
-     * BasType port to populate. Until then, NPCs render with -1 anim ids
-     * (no walk/idle animation, but visible).
+     * (idx2 group 32, referenced by NpcType530.bastypeid).
      */
     public static applyNpcType530(def: ActorDefinition, d: NpcType530Data) {
         def.name = d.name || "null";

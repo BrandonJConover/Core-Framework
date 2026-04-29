@@ -31,23 +31,79 @@ export class FloorDefinition {
         if (FloorDefinition.cache == null) FloorDefinition.cache = [];
         for (let id = 0; id < maxId; id++) {
             try {
-                const data = await FloType530.load(js5Cache, id);
-                if (!data) continue;
                 if (FloorDefinition.cache[id] == null) FloorDefinition.cache[id] = new FloorDefinition();
-                FloorDefinition.applyFloType530(FloorDefinition.cache[id], data);
-                loaded++;
+                const underlay = await FloorDefinition.loadFluType530(js5Cache, id);
+                if (underlay) {
+                    FloorDefinition.applyFluType530(FloorDefinition.cache[id], id, underlay);
+                    loaded++;
+                    continue;
+                }
+                const overlay = await FloType530.load(js5Cache, id);
+                if (overlay) {
+                    FloorDefinition.applyFloType530(FloorDefinition.cache[id], overlay);
+                    loaded++;
+                }
             } catch (e) { /* skip */ }
         }
         if (FloorDefinition.count < loaded) FloorDefinition.count = loaded;
         return loaded;
     }
 
+    private static async loadFluType530(js5Cache: Js5Cache, id: number): Promise<{ color: number; texture: number; blockShadow: boolean } | null> {
+        const data = await js5Cache.getFileBytes(2, 1, id);
+        if (!data || data.byteLength === 0) return null;
+        let pos = 0;
+        let color = 0;
+        let texture = -1;
+        let blockShadow = true;
+        while (pos < data.byteLength) {
+            const opcode = data[pos++] & 0xFF;
+            if (opcode === 0) break;
+            if (opcode === 1) {
+                color = ((data[pos] & 0xFF) << 16) | ((data[pos + 1] & 0xFF) << 8) | (data[pos + 2] & 0xFF);
+                pos += 3;
+            } else if (opcode === 2) {
+                texture = ((data[pos] & 0xFF) << 8) | (data[pos + 1] & 0xFF);
+                pos += 2;
+                if (texture === 65535) texture = -1;
+            } else if (opcode === 3) {
+                pos += 2;
+            } else if (opcode === 4) {
+                blockShadow = false;
+            } else {
+                return null;
+            }
+        }
+        return { color, texture, blockShadow };
+    }
+
+    public static applyFluType530(def: FloorDefinition, id: number, d: { color: number; texture: number; blockShadow: boolean }) {
+        def.name = "underlay_" + id;
+        def.rgbColor = d.color;
+        def.textureId = d.texture;
+        def.occlude = d.blockShadow;
+        def.shiftRGBColors(d.color);
+    }
+
     public static applyFloType530(def: FloorDefinition, d: FloType530Data) {
         def.name = "floor_" + d.id;
         def.rgbColor = d.baseColorRgb;
-        def.hslColor2 = d.secondaryColor;
         def.textureId = d.texture;
         def.occlude = d.occludeUnderlay;
+        def.shiftRGBColors(d.baseColorRgb);
+        if (d.secondaryColorRgb >= 0) {
+            const oldHue2 = def.hue2;
+            const oldSaturation = def.saturation;
+            const oldLightness = def.lightness;
+            const oldHue = def.hue;
+            const oldHueDivisor = def.hueDivisor;
+            def.shiftRGBColors(d.secondaryColorRgb);
+            def.hue2 = oldHue2;
+            def.saturation = oldSaturation;
+            def.lightness = oldLightness;
+            def.hue = oldHue;
+            def.hueDivisor = oldHueDivisor;
+        }
     }
 
     public anInt311: number;

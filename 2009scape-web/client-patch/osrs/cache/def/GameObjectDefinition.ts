@@ -80,8 +80,8 @@ export class GameObjectDefinition {
         def.modelIds = d.models ?? null;
         def.modelTypes = d.shapes ?? null;
         def.options = (d.ops?.filter((o) => o != null) as string[]) ?? null;
-        def.originalModelColors = d.recol_s ?? null;
-        def.modifiedModelColors = d.recol_d ?? null;
+        def.modifiedModelColors = d.recol_s ?? null;
+        def.anIntArray792 = d.recol_d ?? null;
         def.modelSizeX = d.resizex || 128;
         def.modelSizeY = d.resizey || 128;
         def.modelSizeZ = d.resizez || 128;
@@ -336,6 +336,7 @@ export class GameObjectDefinition {
             }}
             if (modelCount > 1) { subModel = new Model(modelCount, GameObjectDefinition.models); }
         } else {
+            if (this.modelIds == null) { return null; }
             let modelType: number = -1;
             for (let index: number = 0; index < this.modelTypes.length; index++) {{
                 if (this.modelTypes[index] !== type) { continue; }

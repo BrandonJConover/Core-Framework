@@ -632,6 +632,7 @@ export class Model extends Renderable {
                 this.anInt1669 = class50_sub1_sub4_sub4.anInt1669;
                 this.anInt1670 = class50_sub1_sub4_sub4.anInt1670;
                 this.anInt1668 = class50_sub1_sub4_sub4.anInt1668;
+                this.anInt1675 = class50_sub1_sub4_sub4.anInt1675;
             })();
         } else if (
             (typeof flag === "boolean" || flag === null) &&
@@ -931,6 +932,15 @@ export class Model extends Renderable {
                 this.texturedTrianglePointsX = model.texturedTrianglePointsX;
                 this.texturedTrianglePointsY = model.texturedTrianglePointsY;
                 this.texturedTrianglePointsZ = model.texturedTrianglePointsZ;
+                this.modelHeight = model.modelHeight;
+                this.maxY = model.maxY;
+                this.shadowIntensity = model.shadowIntensity;
+                this.anInt1674 = model.anInt1674;
+                this.anInt1673 = model.anInt1673;
+                this.anInt1669 = model.anInt1669;
+                this.anInt1670 = model.anInt1670;
+                this.anInt1668 = model.anInt1668;
+                this.anInt1675 = model.anInt1675;
             })();
         } else if (
             (typeof flag === "number" || flag === null) &&
@@ -2575,6 +2585,15 @@ export class Model extends Renderable {
         this.texturedTrianglePointsX = model.texturedTrianglePointsX;
         this.texturedTrianglePointsY = model.texturedTrianglePointsY;
         this.texturedTrianglePointsZ = model.texturedTrianglePointsZ;
+        this.modelHeight = model.modelHeight;
+        this.maxY = model.maxY;
+        this.shadowIntensity = model.shadowIntensity;
+        this.anInt1674 = model.anInt1674;
+        this.anInt1673 = model.anInt1673;
+        this.anInt1669 = model.anInt1669;
+        this.anInt1670 = model.anInt1670;
+        this.anInt1668 = model.anInt1668;
+        this.anInt1675 = model.anInt1675;
     }
 
     public getFirstIdenticalVertexIndex(model: Model, vertex: number): number {

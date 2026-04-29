@@ -10,6 +10,7 @@
 import { Buffer } from "./net/Buffer";
 
 export class PacketHandler530 {
+    private static equipmentObjIds530: number[] | null = null;
 
     static handle(opcode530: number, buf: Buffer, size: number, game: any): boolean {
         const startPos = buf.currentPosition;
@@ -145,6 +146,13 @@ export class PacketHandler530 {
                 ((buf.buffer[buf.currentPosition - 3] & 0xFF) << 16) |
                 ((buf.buffer[buf.currentPosition - 2] & 0xFF) << 8) |
                  (buf.buffer[buf.currentPosition - 1] & 0xFF)) >>> 0;
+    }
+    static ig4(buf: Buffer): number {
+        buf.currentPosition += 4;
+        return ((buf.buffer[buf.currentPosition - 4] & 0xFF) |
+                ((buf.buffer[buf.currentPosition - 3] & 0xFF) << 8) |
+                ((buf.buffer[buf.currentPosition - 2] & 0xFF) << 16) |
+                ((buf.buffer[buf.currentPosition - 1] & 0xFF) << 24)) | 0;
     }
     static mg4(buf: Buffer): number {
         // Middle-endian "BADC": rt4-client Buffer.mg4 reads bytes in read-order
@@ -288,6 +296,7 @@ export class PacketHandler530 {
             game.anIntArray858[i] = 0;
         }
         let pending = count * 2;
+        game.regionPopulatePending530 = pending;
         const fillSlot = (which: 0 | 1, slotIdx: number, bytes: Uint8Array | null) => {
             const slotArr = which === 0 ? game.aByteArrayArray838 : game.aByteArrayArray1232;
             const idArr = which === 0 ? game.anIntArray857 : game.anIntArray858;
@@ -302,6 +311,7 @@ export class PacketHandler530 {
                 slotArr[slotIdx] = null;
             }
             pending--;
+            game.regionPopulatePending530 = pending;
             if (pending === 0) {
                 console.log("region populate complete: " + count + " regions filled");
             }
@@ -469,35 +479,21 @@ export class PacketHandler530 {
         //   For each new (up to 10): 11+1+5+3+1+5 = 26 bits
         //   11 bits sentinel (2047) if any mask updates, then byte-aligned mask data.
         //
-        // We only decode the local player's own position on teleport — that lets the
-        // camera anchor correctly. All other blocks are bit-consumed so the stream
-        // stays aligned.
+        // Keep the 377 actor-list state in sync with the native 530 bitstream:
+        // local movement, tracked remote movement/removal, and newly visible
+        // remote players are applied here. Appearance/chat/animation masks are
+        // still byte-skipped below until those 530 mask bodies are ported.
         const startPos = buf.currentPosition;
         buf.initBitAccess();
         try {
+            game.removePlayerCount = 0;
+            game.updatedPlayerCount = 0;
             this.parseLocalPlayerPosition(buf, game);
-            const trackedCount = buf.getBits(8);
-            for (let i = 0; i < trackedCount && i < 2047; i++) {
-                this.skipRenderBlock(buf);
-            }
-            // New local players are appended until we see the 2047 sentinel or run out.
-            while (true) {
-                const remainingBits = (size * 8) - (buf.bitPosition - startPos * 8);
-                if (remainingBits < 11) break;
-                const index = buf.getBits(11);
-                if (index === 2047) break;
-                // update(1) + offsetX(5) + direction(3) + teleport(1) + offsetY(5) = 15 bits
-                if ((size * 8) - (buf.bitPosition - startPos * 8) < 15) break;
-                const update = buf.getBits(1);
-                buf.getBits(5); // offsetX
-                buf.getBits(3); // direction
-                buf.getBits(1); // teleport
-                buf.getBits(5); // offsetY
-                if (update) {
-                    // Mask data follows byte-aligned at end; we just break to let byte section consume.
-                    break;
-                }
-            }
+            this.parseTrackedPlayers(buf, game);
+            this.parseNewPlayers(buf, size, startPos, game);
+            buf.finishBitAccess();
+            this.parsePlayerMasks(buf, startPos + size, game);
+            this.removeStalePlayers(game);
         } catch (e) {
             // Malformed bit stream — swallow and realign to packet end
         }
@@ -505,37 +501,11 @@ export class PacketHandler530 {
         return true;
     }
 
-    /**
-     * 8-direction step deltas. Index = walkDir / runDir from the bit stream.
-     * Layout matches rt4 PathFinder.tileDirX / tileDirY:
-     *   0=NW 1=N 2=NE 3=W 4=E 5=SW 6=S 7=SE
-     * worldX increases east, worldY increases south (towards higher Z).
-     */
-    static readonly DIR_DX: number[] = [-1, 0, 1, -1, 1, -1, 0, 1];
-    static readonly DIR_DY: number[] = [-1, -1, -1, 0, 0, 1, 1, 1];
-
     static parseLocalPlayerPosition(buf: Buffer, game: any): void {
         const updating = buf.getBits(1);
         if (!updating) return;
         const subOpcode = buf.getBits(2);
-        // 530-compat: ensure the local player slot exists. The 377 client
-        // creates it inside the LOGIN bytes handler we bypass under the
-        // 530 protocol — without instantiating here, every reference to
-        // game.localPlayer.worldX/Y stays null, the camera anchor never
-        // sets, and the entire viewport renders outside the visible
-        // window (apparent symptom: black world even when method93 runs).
-        let localPlayer = game.players ? game.players[game.thisPlayerId] : null;
-        if (!localPlayer && game.players && game.thisPlayerId >= 0) {
-            // Late-import keeps this module free of static cycles.
-            // tslint:disable-next-line:no-var-requires
-            const PlayerClass = require("./media/renderable/actor/Player").Player;
-            localPlayer = new PlayerClass();
-            game.players[game.thisPlayerId] = localPlayer;
-            // The 377 client also publishes Game.localPlayer (static field)
-            // so renderer/minimap code reads a non-null reference.
-            const GameClass = require("./Game").Game;
-            GameClass.localPlayer = localPlayer;
-        }
+        const localPlayer = this.ensureLocalPlayer(game);
         if (subOpcode === 3) {
             // Teleport: sceneY(7) + teleport(1) + z(2) + maskRequired(1) + sceneX(7)
             const sceneY = buf.getBits(7);
@@ -545,35 +515,373 @@ export class PacketHandler530 {
             const sceneX = buf.getBits(7);
             game.plane = z & 3;
             if (localPlayer) {
-                localPlayer.worldX = sceneX * 128 + 64;
-                localPlayer.worldY = sceneY * 128 + 64;
+                if (localPlayer.setPosition) {
+                    localPlayer.setPosition(sceneX, sceneY, teleporting === 1);
+                } else {
+                    localPlayer.pathX[0] = sceneX;
+                    localPlayer.pathY[0] = sceneY;
+                    localPlayer.worldX = sceneX * 128 + 64;
+                    localPlayer.worldY = sceneY * 128 + 64;
+                }
                 if (game.cameraX === 0 && game.cameraY === 0) {
                     game.cameraX = localPlayer.worldX;
                     game.cameraY = localPlayer.worldY;
                 }
             }
         } else if (subOpcode === 2) {
-            // Run: walkDir(3) + runDir(3) + maskRequired(1).
-            // Order seen in rt4-client / 2009scape: walkDir then runDir.
+            // rt4 readSelfPlayerInfo type 2:
+            //   if double-step bit is 1: dir(3) + dir(3), both speed 2
+            //   else: dir(3), speed 0
+            const doubleStep = buf.getBits(1);
             const walkDir = buf.getBits(3);
-            const runDir = buf.getBits(3);
-            const maskRequired = buf.getBits(1);
-            if (localPlayer) {
-                localPlayer.worldX += (PacketHandler530.DIR_DX[walkDir & 7] + PacketHandler530.DIR_DX[runDir & 7]) * 128;
-                localPlayer.worldY += (PacketHandler530.DIR_DY[walkDir & 7] + PacketHandler530.DIR_DY[runDir & 7]) * 128;
+            if (localPlayer && localPlayer.move) {
+                localPlayer.move(walkDir, doubleStep === 1);
             }
+            if (doubleStep === 1) {
+                const runDir = buf.getBits(3);
+                if (localPlayer && localPlayer.move) {
+                    localPlayer.move(runDir, true);
+                }
+            }
+            const maskRequired = buf.getBits(1);
         } else if (subOpcode === 1) {
             // Walk: walkDir(3) + maskRequired(1)
             const walkDir = buf.getBits(3);
             const maskRequired = buf.getBits(1);
-            if (localPlayer) {
-                localPlayer.worldX += PacketHandler530.DIR_DX[walkDir & 7] * 128;
-                localPlayer.worldY += PacketHandler530.DIR_DY[walkDir & 7] * 128;
+            if (localPlayer && localPlayer.move) {
+                localPlayer.move(walkDir, false);
             }
         } else {
             // subOpcode 0: maskRequired only — position unchanged.
             buf.getBits(1);
         }
+    }
+
+    static parseTrackedPlayers(buf: Buffer, game: any): void {
+        const trackedCount = buf.getBits(8);
+        const oldCount = game.localPlayerCount || 0;
+        if (trackedCount < oldCount) {
+            for (let i = trackedCount; i < oldCount; i++) {
+                game.removePlayers[game.removePlayerCount++] = game.playerList[i];
+            }
+        }
+
+        game.localPlayerCount = 0;
+        const safeTrackedCount = Math.min(trackedCount, oldCount, 2047);
+        for (let i = 0; i < safeTrackedCount; i++) {
+            const id = game.playerList[i];
+            const player = game.players[id];
+            if (!player) {
+                this.skipRenderBlock(buf);
+                continue;
+            }
+            this.parseTrackedPlayerBlock(buf, game, id, player);
+        }
+
+        // If the server reports more tracked players than this bridge knows
+        // about, consume their movement blocks to preserve stream alignment.
+        for (let i = safeTrackedCount; i < trackedCount && i < 2047; i++) {
+            this.skipRenderBlock(buf);
+        }
+    }
+
+    static parseTrackedPlayerBlock(buf: Buffer, game: any, id: number, player: any): void {
+        const updating = buf.getBits(1);
+        if (!updating) {
+            game.playerList[game.localPlayerCount++] = id;
+            player.pulseCycle = game.constructor.pulseCycle;
+            return;
+        }
+        const subOpcode = buf.getBits(2);
+        if (subOpcode === 0) {
+            game.playerList[game.localPlayerCount++] = id;
+            player.pulseCycle = game.constructor.pulseCycle;
+            game.updatedPlayers[game.updatedPlayerCount++] = id;
+        } else if (subOpcode === 1) {
+            game.playerList[game.localPlayerCount++] = id;
+            player.pulseCycle = game.constructor.pulseCycle;
+            player.move(buf.getBits(3), false);
+            if (buf.getBits(1) === 1) {
+                game.updatedPlayers[game.updatedPlayerCount++] = id;
+            }
+        } else if (subOpcode === 2) {
+            game.playerList[game.localPlayerCount++] = id;
+            player.pulseCycle = game.constructor.pulseCycle;
+            const doubleStep = buf.getBits(1);
+            player.move(buf.getBits(3), doubleStep === 1);
+            if (doubleStep === 1) {
+                player.move(buf.getBits(3), true);
+            }
+            if (buf.getBits(1) === 1) {
+                game.updatedPlayers[game.updatedPlayerCount++] = id;
+            }
+        } else {
+            game.removePlayers[game.removePlayerCount++] = id;
+        }
+    }
+
+    static parseNewPlayers(buf: Buffer, size: number, startPos: number, game: any): void {
+        while (true) {
+            const remainingBits = (size * 8) - (buf.bitPosition - startPos * 8);
+            if (remainingBits < 11) break;
+            const id = buf.getBits(11);
+            if (id === 2047) break;
+            if ((size * 8) - (buf.bitPosition - startPos * 8) < 15) break;
+
+            const player = this.ensurePlayer(game, id);
+            game.playerList[game.localPlayerCount++] = id;
+            player.pulseCycle = game.constructor.pulseCycle;
+
+            const update = buf.getBits(1);
+            let offsetX = buf.getBits(5);
+            const direction = buf.getBits(3);
+            const teleport = buf.getBits(1);
+            let offsetY = buf.getBits(5);
+            if (offsetX > 15) offsetX -= 32;
+            if (offsetY > 15) offsetY -= 32;
+            player.nextStepOrientation = PacketHandler530.ANGLES[direction & 7];
+            const localPlayer = this.ensureLocalPlayer(game);
+            player.setPosition(localPlayer.pathX[0] + offsetX, localPlayer.pathY[0] + offsetY, teleport === 1);
+            if (update === 1) {
+                game.updatedPlayers[game.updatedPlayerCount++] = id;
+            }
+        }
+    }
+
+    static parsePlayerMasks(buf: Buffer, endPos: number, game: any): void {
+        for (let i = 0; i < game.updatedPlayerCount && buf.currentPosition < endPos; i++) {
+            const id = game.updatedPlayers[i];
+            const player = id === 2047 ? this.ensureLocalPlayer(game) : this.ensurePlayer(game, id);
+            let flags = buf.getUnsignedByte();
+            if ((flags & 0x10) !== 0 && buf.currentPosition < endPos) {
+                flags += buf.getUnsignedByte() << 8;
+            }
+            this.parsePlayerMask(flags, id, player, buf, game);
+        }
+    }
+
+    static parsePlayerMask(flags: number, id: number, player: any, buf: Buffer, game: any): void {
+        // Order follows server PlayerFlags530 ordinal order / rt4 Protocol.readExtendedPlayerInfo.
+        if ((flags & 0x80) !== 0) {
+            buf.currentPosition += 2; // chat effects (ip2)
+            buf.currentPosition += 1; // chat icon
+            const length = buf.getUnsignedByte();
+            buf.currentPosition += length;
+        }
+        if ((flags & 0x1) !== 0) {
+            this.skipSmart(buf);
+            buf.currentPosition += 2; // hit type + hp ratio
+        }
+        if ((flags & 0x8) !== 0) {
+            const animation = this.g2(buf);
+            const delay = this.g1(buf);
+            if (player) {
+                player.emoteAnimation = animation === 65535 ? -1 : animation;
+                player.animationDelay = delay;
+                player.displayedEmoteFrames = 0;
+                player.anInt1626 = 0;
+                player.anInt1628 = 0;
+            }
+        }
+        if ((flags & 0x4) !== 0) {
+            this.parseAppearanceMask(buf, id, player, game);
+        }
+        if ((flags & 0x2) !== 0) {
+            if (player) {
+                player.anInt1609 = this.g2add(buf);
+                if (player.anInt1609 === 65535) player.anInt1609 = -1;
+            } else {
+                buf.currentPosition += 2;
+            }
+        }
+        if ((flags & 0x400) !== 0) {
+            buf.currentPosition += 9;
+            if (player && player.resetPath) player.resetPath();
+        }
+        if ((flags & 0x20) !== 0) {
+            const text = this.gjstr(buf);
+            if (player) {
+                player.forcedChat = text.charAt(0) === "~" ? text.substring(1) : text;
+                player.textColour = 0;
+                player.textEffect = 0;
+                player.textCycle = 150;
+            }
+        }
+        if ((flags & 0x200) !== 0) {
+            this.skipSmart(buf);
+            buf.currentPosition += 1; // secondary hit type
+        }
+        if ((flags & 0x800) !== 0) {
+            // 2009scape's 530 AnimationSequence mask is still TODO server-side.
+        }
+        if ((flags & 0x100) !== 0) {
+            if (player) {
+                player.graphic = this.ig2(buf);
+                const heightAndDelay = this.mg4(buf);
+                player.spotAnimationDelay = heightAndDelay >> 16;
+                player.anInt1617 = game.constructor.pulseCycle + (heightAndDelay & 65535);
+                player.currentAnimation = player.anInt1617 > game.constructor.pulseCycle ? -1 : 0;
+                player.anInt1616 = 0;
+                if (player.graphic === 65535) player.graphic = -1;
+            } else {
+                buf.currentPosition += 6;
+            }
+        }
+        if ((flags & 0x40) !== 0) {
+            if (player) {
+                player.anInt1598 = this.g2(buf);
+                player.anInt1599 = this.ig2add(buf);
+            } else {
+                buf.currentPosition += 4;
+            }
+        }
+    }
+
+    static parseAppearanceMask(buf: Buffer, id: number, player: any, game: any): void {
+        const length = buf.getByteAdded();
+        const start = buf.currentPosition;
+        const bytes: number[] = [];
+        const pushByte = (value: number) => bytes.push(value & 0xFF);
+        const pushShort = (value: number) => {
+            pushByte(value >> 8);
+            pushByte(value);
+        };
+
+        const settings = this.g1(buf);
+        pushByte(settings & 1); // 377 only understands the gender bit.
+        pushByte(this.g1b(buf)); // skull
+        pushByte(this.g1b(buf)); // prayer/head icon
+
+        let npcTransform = false;
+        for (let part = 0; part < 12; part++) {
+            const upper = this.g1(buf);
+            if (upper === 0) {
+                pushByte(0);
+                continue;
+            }
+            const lower = this.g1(buf);
+            const raw = (upper << 8) | lower;
+            if (part === 0 && raw === 65535) {
+                npcTransform = true;
+                pushShort(65535);
+                pushShort(this.g2(buf));
+                buf.currentPosition += 1; // 530 team byte; 377 derives team from items.
+                break;
+            }
+            const converted = this.convertAppearancePart530(raw);
+            pushShort(converted);
+        }
+
+        for (let color = 0; color < 5; color++) {
+            pushByte(this.g1(buf));
+        }
+
+        const basId = this.g2(buf);
+        const bas = this.getBas(game, basId);
+        const idle = bas ? bas.idleAnimationId : -1;
+        const walk = bas ? bas.walkAnimation : -1;
+        const turnAround = bas && bas.walkFullTurnAnimationId !== -1 ? bas.walkFullTurnAnimationId : walk;
+        const turnRight = bas && bas.walkCWTurnAnimationId !== -1 ? bas.walkCWTurnAnimationId : walk;
+        const turnLeft = bas && bas.walkCCWTurnAnimationId !== -1 ? bas.walkCCWTurnAnimationId : walk;
+        const run = bas ? bas.runAnimationId : -1;
+        pushShort(idle === -1 ? 65535 : idle);
+        pushShort(bas && bas.standingCWTurn !== -1 ? bas.standingCWTurn : (idle === -1 ? 65535 : idle));
+        pushShort(walk === -1 ? 65535 : walk);
+        pushShort(turnAround === -1 ? 65535 : turnAround);
+        pushShort(turnRight === -1 ? 65535 : turnRight);
+        pushShort(turnLeft === -1 ? 65535 : turnLeft);
+        pushShort(run === -1 ? 65535 : run);
+
+        for (let i = 0; i < 8; i++) pushByte(this.g1(buf)); // base37 username
+        pushByte(this.g1(buf)); // combat level
+        const showSkillLevel = (settings & 0x4) !== 0;
+        if (showSkillLevel) {
+            pushShort(this.g2(buf));
+        } else {
+            buf.currentPosition += 2; // combat with summoning + combat range
+            pushShort(0);
+        }
+        const soundRadius = this.g1(buf);
+        if (soundRadius !== 0) {
+            buf.currentPosition += 8;
+        }
+
+        if (player && !npcTransform) {
+            const appearance = new Buffer(bytes);
+            game.cachedAppearances[id] = appearance;
+            player.updateAppearance(appearance);
+        } else if (player) {
+            const appearance = new Buffer(bytes);
+            game.cachedAppearances[id] = appearance;
+            player.updateAppearance(appearance);
+        }
+        buf.currentPosition = start + length;
+    }
+
+    static convertAppearancePart530(raw: number): number {
+        if (raw < 32768) return raw;
+        const equipId = raw - 32768;
+        const equipment = this.getEquipmentObjIds530();
+        const itemId = equipment && equipId >= 0 && equipId < equipment.length ? equipment[equipId] : equipId;
+        return itemId + 512;
+    }
+
+    static getEquipmentObjIds530(): number[] | null {
+        if (this.equipmentObjIds530) return this.equipmentObjIds530;
+        const ItemDefinition = require("./cache/def/ItemDefinition").ItemDefinition;
+        const cache530: Map<number, any> | null = ItemDefinition.cache530;
+        if (!cache530) return null;
+        this.equipmentObjIds530 = Array.from(cache530.entries())
+            .filter((entry) => entry[1] && (entry[1].manwear >= 0 || entry[1].womanwear >= 0))
+            .sort((a, b) => a[0] - b[0])
+            .map((entry) => entry[0]);
+        return this.equipmentObjIds530;
+    }
+
+    static getBas(game: any, id: number): any {
+        if (id === 65535 || id < 0) return null;
+        const ActorDefinition = require("./cache/def/ActorDefinition").ActorDefinition;
+        return ActorDefinition.basCache530 ? ActorDefinition.basCache530.get(id) : null;
+    }
+
+    static removeStalePlayers(game: any): void {
+        for (let i = 0; i < game.removePlayerCount; i++) {
+            const id = game.removePlayers[i];
+            const player = game.players[id];
+            if (player && player.pulseCycle !== game.constructor.pulseCycle) {
+                game.players[id] = null;
+            }
+        }
+    }
+
+    static ensureLocalPlayer(game: any): any {
+        const player = this.ensurePlayer(game, game.thisPlayerId);
+        const GameClass = require("./Game").Game;
+        if (!GameClass.localPlayer) {
+            GameClass.localPlayer = player;
+        }
+        return player;
+    }
+
+    static ensurePlayer(game: any, id: number): any {
+        if (!game.players || id < 0 || id >= game.players.length) return null;
+        let player = game.players[id];
+        if (!player) {
+            const PlayerClass = require("./media/renderable/actor/Player").Player;
+            player = new PlayerClass();
+            game.players[id] = player;
+            if (game.cachedAppearances && game.cachedAppearances[id]) {
+                player.updateAppearance(game.cachedAppearances[id]);
+            }
+        }
+        return player;
+    }
+
+    static readonly ANGLES: number[] = [768, 1024, 1280, 512, 1536, 256, 0, 1792];
+
+    static skipSmart(buf: Buffer): void {
+        const peek = buf.buffer[buf.currentPosition] & 0xFF;
+        buf.currentPosition += peek < 128 ? 1 : 2;
     }
 
     static skipRenderBlock(buf: Buffer): void {
@@ -586,9 +894,11 @@ export class PacketHandler530 {
             buf.getBits(3); // walkDir
             buf.getBits(1); // mask required
         } else if (subOpcode === 2) {
-            buf.getBits(1);
+            const doubleStep = buf.getBits(1);
             buf.getBits(3); // walkDir
-            buf.getBits(3); // runDir
+            if (doubleStep === 1) {
+                buf.getBits(3); // runDir
+            }
             buf.getBits(1); // mask required
         } else {
             buf.getBits(7); // sceneY
@@ -600,10 +910,230 @@ export class PacketHandler530 {
     }
 
     static handleNpcInfo(buf: Buffer, size: number, game: any): boolean {
-        // Opcode 32: NPC_INFO (var-short, bit-packed)
-        // Skip entirely — we don't render NPCs yet, just consume the payload.
-        buf.currentPosition += size;
+        // Opcode 32: NPC_INFO (var-short, bit-packed). Server source:
+        // 2009scape NPCRenderer.kt. This mirrors the 377 actor-list fields
+        // (`anInt1133`, `anIntArray1134`, `npcs`) so the existing scene code
+        // can draw 530 NPC definitions.
+        const startPos = buf.currentPosition;
+        buf.initBitAccess();
+        try {
+            game.removePlayerCount = 0;
+            game.updatedPlayerCount = 0;
+            this.parseTrackedNpcs(buf, game);
+            this.parseNewNpcs(buf, size, startPos, game);
+            buf.finishBitAccess();
+            this.parseNpcMasks(buf, startPos + size, game);
+            this.removeStaleNpcs(game);
+        } catch (e) {
+            // Keep the packet stream aligned if a definition/mask is malformed.
+        }
+        buf.currentPosition = startPos + size;
         return true;
+    }
+
+    static parseTrackedNpcs(buf: Buffer, game: any): void {
+        const npcCount = buf.getBits(8);
+        const oldCount = game.anInt1133 || 0;
+        if (npcCount < oldCount) {
+            for (let i = npcCount; i < oldCount; i++) {
+                game.removePlayers[game.removePlayerCount++] = game.anIntArray1134[i];
+            }
+        }
+        game.anInt1133 = 0;
+        const safeCount = Math.min(npcCount, oldCount, 255);
+        for (let i = 0; i < safeCount; i++) {
+            const id = game.anIntArray1134[i];
+            const npc = game.npcs[id];
+            if (!npc) {
+                this.skipNpcMovementBlock(buf);
+                continue;
+            }
+            const updating = buf.getBits(1);
+            if (updating === 0) {
+                game.anIntArray1134[game.anInt1133++] = id;
+                npc.pulseCycle = game.constructor.pulseCycle;
+                continue;
+            }
+            const type = buf.getBits(2);
+            if (type === 0) {
+                game.anIntArray1134[game.anInt1133++] = id;
+                npc.pulseCycle = game.constructor.pulseCycle;
+                game.updatedPlayers[game.updatedPlayerCount++] = id;
+            } else if (type === 1) {
+                game.anIntArray1134[game.anInt1133++] = id;
+                npc.pulseCycle = game.constructor.pulseCycle;
+                npc.move(buf.getBits(3), false);
+                if (buf.getBits(1) === 1) game.updatedPlayers[game.updatedPlayerCount++] = id;
+            } else if (type === 2) {
+                game.anIntArray1134[game.anInt1133++] = id;
+                npc.pulseCycle = game.constructor.pulseCycle;
+                npc.move(buf.getBits(3), true);
+                npc.move(buf.getBits(3), true);
+                if (buf.getBits(1) === 1) game.updatedPlayers[game.updatedPlayerCount++] = id;
+            } else {
+                game.removePlayers[game.removePlayerCount++] = id;
+            }
+        }
+        for (let i = safeCount; i < npcCount && i < 255; i++) {
+            this.skipNpcMovementBlock(buf);
+        }
+    }
+
+    static parseNewNpcs(buf: Buffer, size: number, startPos: number, game: any): void {
+        while (true) {
+            const remainingBits = (size * 8) - (buf.bitPosition - startPos * 8);
+            if (remainingBits < 15) break;
+            const index = buf.getBits(15);
+            if (index === 32767) break;
+            if ((size * 8) - (buf.bitPosition - startPos * 8) < 29) break;
+
+            const npc = this.ensureNpc(game, index);
+            const teleport = buf.getBits(1);
+            npc.nextStepOrientation = PacketHandler530.ANGLES[buf.getBits(3) & 7];
+            if (buf.getBits(1) === 1) {
+                game.updatedPlayers[game.updatedPlayerCount++] = index;
+            }
+            let offsetY = buf.getBits(5);
+            const typeId = buf.getBits(14);
+            let offsetX = buf.getBits(5);
+            if (offsetX > 15) offsetX -= 32;
+            if (offsetY > 15) offsetY -= 32;
+            this.applyNpcDefinition(npc, typeId);
+            game.anIntArray1134[game.anInt1133++] = index;
+            npc.pulseCycle = game.constructor.pulseCycle;
+            const localPlayer = this.ensureLocalPlayer(game);
+            npc.setPosition(localPlayer.pathX[0] + offsetX, localPlayer.pathY[0] + offsetY, teleport === 1);
+        }
+    }
+
+    static parseNpcMasks(buf: Buffer, endPos: number, game: any): void {
+        for (let i = 0; i < game.updatedPlayerCount && buf.currentPosition < endPos; i++) {
+            const id = game.updatedPlayers[i];
+            const npc = this.ensureNpc(game, id);
+            let flags = buf.getUnsignedByte();
+            if ((flags & 0x8) !== 0 && buf.currentPosition < endPos) {
+                flags += buf.getUnsignedByte() << 8;
+            }
+            if ((flags & 0x40) !== 0) {
+                const damage = this.g1(buf);
+                const type = this.g1neg(buf);
+                if (npc) npc.updateHits(type, damage, game.constructor.pulseCycle);
+                buf.currentPosition += 1; // hp ratio
+            }
+            if ((flags & 0x2) !== 0) {
+                const damage = this.g1neg(buf);
+                const type = this.g1sub(buf);
+                if (npc) npc.updateHits(type, damage, game.constructor.pulseCycle);
+            }
+            if ((flags & 0x10) !== 0) {
+                const animation = this.g2(buf);
+                const delay = this.g1(buf);
+                if (npc) {
+                    npc.emoteAnimation = animation === 65535 ? -1 : animation;
+                    npc.animationDelay = delay;
+                    npc.displayedEmoteFrames = 0;
+                    npc.anInt1626 = 0;
+                    npc.anInt1628 = 0;
+                }
+            }
+            if ((flags & 0x4) !== 0) {
+                if (npc) {
+                    npc.anInt1609 = this.g2add(buf);
+                    if (npc.anInt1609 === 65535) npc.anInt1609 = -1;
+                } else {
+                    buf.currentPosition += 2;
+                }
+            }
+            if ((flags & 0x80) !== 0) {
+                if (npc) {
+                    npc.graphic = this.g2add(buf);
+                    const heightAndDelay = this.ig4(buf);
+                    npc.spotAnimationDelay = heightAndDelay >> 16;
+                    npc.anInt1617 = game.constructor.pulseCycle + (heightAndDelay & 65535);
+                    npc.currentAnimation = npc.anInt1617 > game.constructor.pulseCycle ? -1 : 0;
+                    npc.anInt1616 = 0;
+                    if (npc.graphic === 65535) npc.graphic = -1;
+                } else {
+                    buf.currentPosition += 6;
+                }
+            }
+            if ((flags & 0x1) !== 0) {
+                this.applyNpcDefinition(npc, this.ig2(buf));
+            }
+            if ((flags & 0x20) !== 0) {
+                if (npc) {
+                    npc.forcedChat = this.gjstr(buf);
+                    npc.textColour = 0;
+                    npc.textEffect = 0;
+                    npc.textCycle = 150;
+                } else {
+                    this.gjstr(buf);
+                }
+            }
+            if ((flags & 0x100) !== 0) {
+                // 2009scape's 530 NPC animation-sequence mask is currently TODO.
+            }
+            if ((flags & 0x200) !== 0) {
+                if (npc) {
+                    npc.anInt1598 = this.g2add(buf);
+                    npc.anInt1599 = this.g2(buf);
+                } else {
+                    buf.currentPosition += 4;
+                }
+            }
+        }
+    }
+
+    static removeStaleNpcs(game: any): void {
+        for (let i = 0; i < game.removePlayerCount; i++) {
+            const id = game.removePlayers[i];
+            const npc = game.npcs[id];
+            if (npc && npc.pulseCycle !== game.constructor.pulseCycle) {
+                npc.npcDefinition = null;
+                game.npcs[id] = null;
+            }
+        }
+    }
+
+    static skipNpcMovementBlock(buf: Buffer): void {
+        const updating = buf.getBits(1);
+        if (!updating) return;
+        const type = buf.getBits(2);
+        if (type === 0) {
+            return;
+        } else if (type === 1) {
+            buf.getBits(3);
+            buf.getBits(1);
+        } else if (type === 2) {
+            buf.getBits(3);
+            buf.getBits(3);
+            buf.getBits(1);
+        }
+    }
+
+    static ensureNpc(game: any, id: number): any {
+        if (!game.npcs) return null;
+        let npc = game.npcs[id];
+        if (!npc) {
+            const NpcClass = require("./media/renderable/actor/Npc").Npc;
+            npc = new NpcClass();
+            game.npcs[id] = npc;
+        }
+        return npc;
+    }
+
+    static applyNpcDefinition(npc: any, typeId: number): void {
+        if (!npc) return;
+        const ActorDefinition = require("./cache/def/ActorDefinition").ActorDefinition;
+        npc.npcDefinition = ActorDefinition.getDefinition(typeId);
+        if (!npc.npcDefinition) return;
+        npc.boundaryDimension = npc.npcDefinition.boundaryDimension;
+        npc.anInt1600 = npc.npcDefinition.degreesToTurn;
+        npc.walkAnimationId = npc.npcDefinition.walkAnimationId;
+        npc.turnAroundAnimationId = npc.npcDefinition.turnAroundAnimationId;
+        npc.turnRightAnimationId = npc.npcDefinition.turnRightAnimationId;
+        npc.turnLeftAnimationId = npc.npcDefinition.turnLeftAnimationId;
+        npc.idleAnimation = npc.npcDefinition.standAnimationId;
     }
 
     // ── Camera packets ──

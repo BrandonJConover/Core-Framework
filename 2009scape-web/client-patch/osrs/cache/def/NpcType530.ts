@@ -9,11 +9,13 @@
  * Source of truth:
  *   reference/rt4-client/client/src/main/java/rt4/NpcType.java        (decode opcodes)
  *   reference/rt4-client/client/src/main/java/rt4/NpcTypeList.java    (idx layout)
+ *   reference/rt4-client/client/src/main/java/rt4/client.java         (archive wiring)
  *
- * 530 NPC defs live in idx7. NpcTypeList resolves a flat NPC id to:
+ * 530 NPC definitions live in idx18. NpcTypeList resolves a flat NPC id to:
  *   groupId = id >>> 7
  *   fileId  = id & 0x7F
  * i.e. 128 NPCs per group, multi-file group with one file per NPC.
+ * Npc model ids referenced by opcode 1 still point at idx7.
  *
  * Use Js5Cache.getFileBytes(7, groupId, fileId) to fetch the bytes; the
  * Js5Group unpack already happens inside that helper.
@@ -166,6 +168,9 @@ export interface NpcType530Data {
  * Construct via NpcType530.load(cache, id) or new NpcType530() + decode().
  */
 export class NpcType530 implements NpcType530Data {
+    /** rt4 client wires NpcTypeList.init(models=idx7, archive=idx18). */
+    public static readonly INDEX = 18;
+
     id: number = -1;
 
     modelIndices: number[] | null = null;
@@ -408,6 +413,13 @@ export class NpcType530 implements NpcType530Data {
             this.cursor2 = r.g2();
         } else if (opcode === 137) {
             this.attackCursor = r.g2();
+        } else if (opcode === 138) {
+            // Later rev-530 cache extension. This client has no mapped field
+            // for the extra cursor/interface id, but it is a g2 in the data.
+            r.g2();
+        } else if (opcode === 159) {
+            // Later rev-530 cache extension. Preserve stream alignment.
+            r.g2();
         } else if (opcode === 249) {
             // Free-form parameter table.
             //   count        g1
@@ -444,7 +456,8 @@ export class NpcType530 implements NpcType530Data {
      * Resolve and decode a 530 NPC by its flat id.
      *
      * NpcTypeList.java idx mapping (rt4):
-     *   group = id >>> 7   (idx7)
+     *   archive = idx18
+     *   group = id >>> 7
      *   file  = id & 0x7F
      * Returns null if the cache is missing the group or the file is empty.
      */
@@ -452,7 +465,7 @@ export class NpcType530 implements NpcType530Data {
         if (npcId < 0) return null;
         const groupId = npcId >>> 7;
         const fileId = npcId & 0x7F;
-        const data = await cache.getFileBytes(7, groupId, fileId);
+        const data = await cache.getFileBytes(NpcType530.INDEX, groupId, fileId);
         if (!data || data.byteLength === 0) return null;
         const npc = new NpcType530();
         npc.id = npcId;

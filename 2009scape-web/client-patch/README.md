@@ -3,6 +3,11 @@
 Drop-in patches over the upstream 377 web client (`reinismu/runescape-web-client-377`)
 that make it talk to the rev-530 2009scape server.
 
+The active direction is 530-first: the 377 client is the browser/mobile shell,
+but new packet/cache/render behavior should be copied from `reference/rt4-client`
+where possible. Backwards compatibility with 377 data is welcome when it stays
+cheap, but it should not block getting the mobile web client playable on 530.
+
 ## Layout
 
 Files mirror the path they overlay in the upstream client. `setup.sh` does a
@@ -29,7 +34,7 @@ client-patch/osrs/
 │       ├── TypeFace.ts       # Blank-font fallback
 │       └── Widget.ts         # Stub widget for missing IDs
 ├── net/
-│   ├── Buffer.ts             # 377→530 OUTGOING_REMAP, NUL-terminator putString, null-tolerant gets
+│   ├── Buffer.ts             # Native putOpcode530 + guarded 377→530 bridge, NUL-terminator putString, null-tolerant gets
 │   ├── Login530.ts           # NEW — rev 530 login handshake
 │   └── PacketConstants.ts    # 530 packet sizes (RT4 authoritative)
 ├── net/requester/
@@ -83,9 +88,10 @@ with `00`. If this hangs, the `2009scape-server` container may still show as
 
 - Real fonts/sprites from idx8/idx13 — currently stubbed to blank
 - Real widgets from idx3/idx13/idx8 — currently stubbed
-- Real def parsers (Item/NPC/Object/Floor) — 530 byte format ports needed
-- World rendering (RT5 models, skeletons/skins, HD textures)
-- Outgoing interactions (walk/click/inv) — currently suppressed except keepalive + chat-command
+- Textures from idx26 / sprite packs — current 530 models draw as flat-shaded geometry
+- Skeletons/skins — actor BAS data is decoded, but skeletal transforms are still deferred
+- Renderer debug: camera-frustum verification plus `applyLighting()`/triangle raster instrumentation
+- Outgoing interactions beyond walking (click/inv/object/NPC/player ops) — still need native 530 packet bodies
 
 See [project_2009scape_web_state.md](../../.claude/.../memory/project_2009scape_web_state.md) for full status.
 

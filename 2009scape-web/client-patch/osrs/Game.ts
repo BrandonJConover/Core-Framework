@@ -5912,22 +5912,19 @@ export class Game extends GameShell {
             l3--;
             const l5: number = this.anIntArray1123[l3];
             const j6: number = this.anIntArray1124[l3];
-            // 530 body layout (rt4-client ClientProt.method3502):
+            // Native 530 body layout (rt4-client ClientProt.method3502):
             //   opcode, length-byte, ctrl(p1add), destX(p2 BE raw),
             //   destY(p2add BE), then per-waypoint dx(p1add) + dy(p1sub).
-            // 377 layout was destX-first then ctrl then destY using
-            // little-endian-added 16-bit. Wire opcode is mapped by
-            // Buffer.OUTGOING_REMAP (28/213/247 → 215/39/77).
             if (packetType === 0) {
-                this.outBuffer.putOpcode(28);
+                this.outBuffer.putOpcode530(215);
                 this.outBuffer.putByte(j4 + j4 + 3);
             }
             if (packetType === 1) {
-                this.outBuffer.putOpcode(213);
+                this.outBuffer.putOpcode530(39);
                 this.outBuffer.putByte(j4 + j4 + 3 + 14);
             }
             if (packetType === 2) {
-                this.outBuffer.putOpcode(247);
+                this.outBuffer.putOpcode530(77);
                 this.outBuffer.putByte(j4 + j4 + 3);
             }
             this.outBuffer.putByteAdded(this.keyStatus[5] !== 1 ? 0 : 1);
@@ -7180,6 +7177,9 @@ export class Game extends GameShell {
         class50_sub1_sub4_sub3.aBoolean1592 = false;
         if (class50_sub1_sub4_sub3.movementAnimation !== -1) {
             const class14: AnimationSequence = AnimationSequence.animations[class50_sub1_sub4_sub3.movementAnimation];
+            if (!class14) {
+                class50_sub1_sub4_sub3.movementAnimation = -1;
+            } else {
             class50_sub1_sub4_sub3.anInt1590++;
             if (
                 class50_sub1_sub4_sub3.displayedMovementFrames < class14.frameCount &&
@@ -7192,12 +7192,17 @@ export class Game extends GameShell {
                 class50_sub1_sub4_sub3.anInt1590 = 1;
                 class50_sub1_sub4_sub3.displayedMovementFrames = 0;
             }
+            }
         }
         if (class50_sub1_sub4_sub3.graphic !== -1 && Game.pulseCycle >= class50_sub1_sub4_sub3.anInt1617) {
             if (class50_sub1_sub4_sub3.currentAnimation < 0) {
                 class50_sub1_sub4_sub3.currentAnimation = 0;
             }
-            const class14_1: AnimationSequence = SpotAnimation.cache[class50_sub1_sub4_sub3.graphic].sequences;
+            const spot = SpotAnimation.cache[class50_sub1_sub4_sub3.graphic];
+            const class14_1: AnimationSequence = spot ? spot.sequences : null;
+            if (!class14_1) {
+                class50_sub1_sub4_sub3.graphic = -1;
+            } else {
             class50_sub1_sub4_sub3.anInt1616++;
             if (
                 class50_sub1_sub4_sub3.currentAnimation < class14_1.frameCount &&
@@ -7212,9 +7217,13 @@ export class Game extends GameShell {
             ) {
                 class50_sub1_sub4_sub3.graphic = -1;
             }
+            }
         }
         if (class50_sub1_sub4_sub3.emoteAnimation !== -1 && class50_sub1_sub4_sub3.animationDelay <= 1) {
             const class14_2: AnimationSequence = AnimationSequence.animations[class50_sub1_sub4_sub3.emoteAnimation];
+            if (!class14_2) {
+                class50_sub1_sub4_sub3.emoteAnimation = -1;
+            } else {
             if (
                 class14_2.anInt305 === 1 &&
                 class50_sub1_sub4_sub3.anInt1613 > 0 &&
@@ -7224,9 +7233,13 @@ export class Game extends GameShell {
                 class50_sub1_sub4_sub3.animationDelay = 1;
                 return;
             }
+            }
         }
         if (class50_sub1_sub4_sub3.emoteAnimation !== -1 && class50_sub1_sub4_sub3.animationDelay === 0) {
             const class14_3: AnimationSequence = AnimationSequence.animations[class50_sub1_sub4_sub3.emoteAnimation];
+            if (!class14_3) {
+                class50_sub1_sub4_sub3.emoteAnimation = -1;
+            } else {
             class50_sub1_sub4_sub3.anInt1626++;
             if (
                 class50_sub1_sub4_sub3.displayedEmoteFrames < class14_3.frameCount &&
@@ -7249,6 +7262,7 @@ export class Game extends GameShell {
                 }
             }
             class50_sub1_sub4_sub3.aBoolean1592 = class14_3.aBoolean300;
+            }
         }
         if (class50_sub1_sub4_sub3.animationDelay > 0) {
             class50_sub1_sub4_sub3.animationDelay--;
@@ -7263,6 +7277,9 @@ export class Game extends GameShell {
         }
         if (class50_sub1_sub4_sub3.emoteAnimation !== -1 && class50_sub1_sub4_sub3.animationDelay === 0) {
             const class14: AnimationSequence = AnimationSequence.animations[class50_sub1_sub4_sub3.emoteAnimation];
+            if (!class14) {
+                class50_sub1_sub4_sub3.emoteAnimation = -1;
+            } else {
             if (class50_sub1_sub4_sub3.anInt1613 > 0 && class14.anInt305 === 0) {
                 class50_sub1_sub4_sub3.anInt1623++;
                 return;
@@ -7270,6 +7287,7 @@ export class Game extends GameShell {
             if (class50_sub1_sub4_sub3.anInt1613 <= 0 && class14.priority === 0) {
                 class50_sub1_sub4_sub3.anInt1623++;
                 return;
+            }
             }
         }
         const j: number = class50_sub1_sub4_sub3.worldX;
@@ -10420,6 +10438,9 @@ export class Game extends GameShell {
     }
 
     public method144(i: number): number {
+        if (((this as any).regionPopulatePending530 | 0) > 0) {
+            return -1;
+        }
         for (let j: number = 0; j < this.aByteArrayArray838.length; j++) {
             {
                 if (this.aByteArrayArray838[j] == null && this.anIntArray857[j] !== -1) {
@@ -10659,7 +10680,9 @@ export class Game extends GameShell {
                 }
             }
             this.method18((3 as number) | 0);
-        } catch (exception) {}
+        } catch (exception) {
+            console.log("method93 failed: " + ((exception as Error)?.stack || (exception as Error)?.message || exception));
+        }
         GameObjectDefinition.modelCache.removeAll();
         this.outBuffer.putOpcode(78);
         this.outBuffer.putInt(1057001181);

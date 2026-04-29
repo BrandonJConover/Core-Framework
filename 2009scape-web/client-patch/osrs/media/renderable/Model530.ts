@@ -71,23 +71,17 @@ export class Model530 {
     }
 
     /**
-     * Walk vertex positions to compute the AABB-style fields the 377
-     * Rasterizer3D reads for clip-volume + bounding-sphere tests:
-     *   anInt1668  → -minY (raised height; rt4 keeps Y inverted)
-     *   anInt1669  → maxRadius (sqrt(maxX*maxX + maxZ*maxZ))
-     *   anInt1670  → diagonal (sqrt(anInt1668*anInt1668 + anInt1669*anInt1669))
-     *   anInt1673  → minX
-     *   anInt1674  → maxX
-     *   anInt1675  → minZ — we use minZ here; the original 377 derive uses
-     *                       maxZ but follow-up renders showed minZ matches
-     *                       what Rasterizer expects for negative-Y world.
-     *   maxY       → maxY
+     * Walk vertex positions to compute the same bound fields that the 377
+     * renderer derives in Model.method583(). renderAtPoint() culls against
+     * modelHeight / shadowIntensity before triangle projection, so leaving
+     * those as constructor defaults makes valid 530 meshes disappear.
      *
      * Field names are the original anInt167x slots; renaming risks breaking
      * other unfocused renderer code so we keep them as-is.
      */
     private static recomputeBounds(m: Model): void {
-        let minX = 0, maxX = 0, minY = 0, maxY = 0, minZ = 0, maxZ = 0;
+        let minX = 32767, maxX = -32767, minY = 32767, maxY = -32767, minZ = 32767, maxZ = -32767;
+        let radiusSq = 0;
         for (let i = 0; i < m.vertexCount; i++) {
             const x = m.verticesX[i];
             const y = m.verticesY[i];
@@ -98,15 +92,20 @@ export class Model530 {
             if (y > maxY) maxY = y;
             if (z < minZ) minZ = z;
             if (z > maxZ) maxZ = z;
+            const r = x * x + z * z;
+            if (r > radiusSq) radiusSq = r;
         }
-        m.anInt1673 = minX;
-        m.anInt1674 = maxX;
-        m.anInt1675 = minZ;
+        if (m.vertexCount === 0) {
+            minX = maxX = minY = maxY = minZ = maxZ = 0;
+        }
+        m.modelHeight = -minY;
         m.maxY = maxY;
-        m.anInt1668 = -minY;
-        const radSq = maxX * maxX + maxZ * maxZ;
-        m.anInt1669 = (Math.sqrt(radSq) | 0);
-        const diag = m.anInt1668 * m.anInt1668 + m.anInt1669 * m.anInt1669;
-        m.anInt1670 = (Math.sqrt(diag) | 0);
+        m.shadowIntensity = Math.sqrt(radiusSq) | 0;
+        m.anInt1674 = Math.sqrt(m.shadowIntensity * m.shadowIntensity + m.modelHeight * m.modelHeight) | 0;
+        m.anInt1673 = m.anInt1674 + (Math.sqrt(m.shadowIntensity * m.shadowIntensity + m.maxY * m.maxY) | 0);
+        m.anInt1669 = (minX << 16) + (maxX & 65535);
+        m.anInt1670 = (maxZ << 16) + (minZ & 65535);
+        m.anInt1668 = m.modelHeight;
+        m.anInt1675 = m.modelHeight;
     }
 }
