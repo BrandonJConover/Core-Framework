@@ -637,13 +637,24 @@ final class RSCPacketHandler {
                         if i < keptNPCs.count { keptNPCs[i].id = -1 }
                         continue
                     }
-                    let _ = buf.getBitMask(2) // nextSprite
+                    // Java showOtherPlayers (PacketHandler.java:1385):
+                    // animationNext = (needsNextSprite << 2) + 2bit. This
+                    // 4-bit code is the next animation index — for NPCs
+                    // that's still effectively the facing direction.
+                    let nextSprite = buf.getBitMask(2)
+                    if i < keptNPCs.count {
+                        keptNPCs[i].direction = ((needsNextSprite << 2) | nextSprite) & 7
+                    }
                 } else {
                     let dir = buf.getBitMask(3) // movement direction 0-8
-                    // Update position based on direction
+                    // Update position based on direction; also update facing
+                    // — Java setKnownPlayer/showNPCs treats `modelIndex` as
+                    // both motion vector and the new animationNext (which
+                    // CharacterBillboards reads as rsDir).
                     if i < keptNPCs.count && dir < directions.count {
                         keptNPCs[i].x += directions[dir].0
                         keptNPCs[i].y += directions[dir].1
+                        keptNPCs[i].direction = dir & 7
                     }
                 }
             }
