@@ -115,13 +115,15 @@ public final class ApiServer {
         AuthEndpoint auth = new AuthEndpoint(server, jwt);
         WhoamiEndpoint whoami = new WhoamiEndpoint(jwt);
         OnlinePlayersEndpoint online = new OnlinePlayersEndpoint(server);
+        CharacterEndpoint character = new CharacterEndpoint(server);
 
         return new HttpRouter()
-            .route(HttpMethod.GET,  "/api/status",         req -> status.handle())
-            .route(HttpMethod.GET,  "/healthz",            req -> status.handle())
-            .route(HttpMethod.POST, "/api/auth/login",     auth::handle)
-            .route(HttpMethod.GET,  "/api/auth/whoami",    whoami::handle)
-            .route(HttpMethod.GET,  "/api/players/online", req -> online.handle());
+            .route(HttpMethod.GET,  "/api/status",               req -> status.handle())
+            .route(HttpMethod.GET,  "/healthz",                  req -> status.handle())
+            .route(HttpMethod.POST, "/api/auth/login",           auth::handle)
+            .route(HttpMethod.GET,  "/api/auth/whoami",          whoami::handle)
+            .route(HttpMethod.GET,  "/api/players/online",       req -> online.handle())
+            .route(HttpMethod.GET,  "/api/character/{username}", character::handle);
     }
 
     /** Single-shot dispatcher: aggregator gives us a complete request, we reply once. */
