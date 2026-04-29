@@ -235,36 +235,76 @@ export class PacketHandler530 {
         game.nextTopRightTileY = (game.chunkY - 6) * 8;
         game.aBoolean1163 = false;
         if (game.plane === undefined || game.plane === null) game.plane = 0;
-        game.loadingStage = 2;
+        // Mark loading-stage to "loading" so the existing 377 method144
+        // pipeline picks up populated byte arrays + parses regions when
+        // the async fetch below completes.
+        game.loadingStage = 1;
         console.log("REBUILD_NORMAL: regions=" + regionCount + " centre=(" + regionX + "," + regionZ + ") zone=(" + zoneX + "," + zoneZ + ")");
 
-        // One-shot probe to validate the cache + XTEA path end-to-end after
-        // each REBUILD_NORMAL. The probe should print l=<positive byte length>;
-        // null means a regression in mg4 byte-order, sector reader, XTEA, or
-        // gzip/bzip2 decode (see Js5Cache.xteaDecryptInPlace + uncompress).
+        // Tier 2f: populate game's region byte-array slots from idx5 so
+        // method144 can flip to loadingStage=2 and Region.method181 can
+        // parse terrain + locations into the scene. Mirrors the 377
+        // OnDemand path at Game.ts:8627+ but pulls bytes from Js5Cache
+        // synchronously into memory instead of going through Jaggrab.
         const js5 = (globalThis as any).js5Cache;
-        if (js5 && typeof js5.getRegionBytes === "function" && (game as any).__regionProbeDone !== true) {
-            (game as any).__regionProbeDone = true;
-            const centreRegionId = (((regionX / 8) | 0) << 8) | ((regionZ / 8) | 0);
-            const probeIdx = regionBitPacked.indexOf(centreRegionId);
-            (async () => {
-                try {
-                    const terrain = await js5.getRegionBytes("m", centreRegionId, null);
-                    let locs: Uint8Array | null = null;
-                    let usedKeyIdx = -1;
-                    for (let ki = 0; ki < keys.length && !locs; ki++) {
-                        const r = await js5.getRegionBytes("l", centreRegionId, keys[ki]);
-                        if (r) { locs = r; usedKeyIdx = ki; }
-                    }
-                    console.log("region probe: m=" + (terrain?.byteLength ?? "null") +
-                                " l=" + (locs?.byteLength ?? "null") +
-                                " keyIdx=" + usedKeyIdx + " region=" + centreRegionId + " probeIdx=" + probeIdx);
-                } catch (e) {
-                    console.log("region probe failed: " + (e as Error).message);
-                }
-            })();
+        if (js5 && typeof js5.getRegionBytes === "function") {
+            this.populateRegionsFromJs5(game, regionBitPacked, keys, js5);
         }
         return true;
+    }
+
+    /**
+     * Allocates the same byte-array slots the 377 OnDemand path populates
+     * and fills them with idx5 m_X_Z (terrain, no XTEA) + l_X_Z (locations,
+     * XTEA-decrypted with the per-region key from REBUILD_NORMAL). Each
+     * region runs in parallel; once all complete, anIntArray857/858 are
+     * cleared so method144's "still loading" check passes.
+     */
+    static populateRegionsFromJs5(game: any, regionBitPacked: number[], keys: Int32Array[], js5: any): void {
+        const count = regionBitPacked.length;
+        // 377 client uses plain number-arrays here, not Uint8Array (the
+        // existing decoders in Region.method181 read with Buffer.getByte).
+        // We still use the rt4 cache sourced via Js5Cache.
+        const newNumberArr = (n: number, fill: number = 0) => { const a: number[] = []; for (let i = 0; i < n; i++) a.push(fill); return a; };
+        game.aByteArrayArray838 = new Array<number[] | null>(count).fill(null);
+        game.aByteArrayArray1232 = new Array<number[] | null>(count).fill(null);
+        game.coordinates = newNumberArr(count);
+        game.anIntArray857 = newNumberArr(count, -1);
+        game.anIntArray858 = newNumberArr(count, -1);
+        for (let i = 0; i < count; i++) {
+            game.coordinates[i] = regionBitPacked[i];
+            // Use 0 as the "pending" file id; -1 means "no file expected".
+            // method144 returns -1 if anIntArray857[i] !== -1 && byte slot still null.
+            game.anIntArray857[i] = 0;
+            game.anIntArray858[i] = 0;
+        }
+        let pending = count * 2;
+        const fillSlot = (which: 0 | 1, slotIdx: number, bytes: Uint8Array | null) => {
+            const slotArr = which === 0 ? game.aByteArrayArray838 : game.aByteArrayArray1232;
+            const idArr = which === 0 ? game.anIntArray857 : game.anIntArray858;
+            if (bytes && bytes.byteLength > 0) {
+                // Convert Uint8Array → number[] for the legacy Buffer parser
+                const arr: number[] = new Array(bytes.byteLength);
+                for (let i = 0; i < bytes.byteLength; i++) arr[i] = bytes[i];
+                slotArr[slotIdx] = arr;
+            } else {
+                // Mark "no file" so method144 doesn't keep waiting forever.
+                idArr[slotIdx] = -1;
+                slotArr[slotIdx] = null;
+            }
+            pending--;
+            if (pending === 0) {
+                console.log("region populate complete: " + count + " regions filled");
+            }
+        };
+        for (let i = 0; i < count; i++) {
+            const regionId = regionBitPacked[i];
+            const key = keys[i];
+            ((idx: number, rid: number, k: Int32Array) => {
+                js5.getRegionBytes("m", rid, null).then((b: Uint8Array | null) => fillSlot(0, idx, b)).catch(() => fillSlot(0, idx, null));
+                js5.getRegionBytes("l", rid, k).then((b: Uint8Array | null) => fillSlot(1, idx, b)).catch(() => fillSlot(1, idx, null));
+            })(i, regionId, key);
+        }
     }
 
     static handleInstancedLocationUpdate(buf: Buffer, size: number, game: any): boolean {
