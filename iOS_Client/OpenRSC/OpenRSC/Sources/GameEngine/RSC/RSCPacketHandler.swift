@@ -495,7 +495,12 @@ final class RSCPacketHandler {
             break // Party data
 
         case 36:  // drawTeleportBubbles
-            break // Visual effect
+            if buf.bytesRemaining >= 3, ws.teleportBubbles.count < 50 {
+                let type = buf.getUnsignedByte()
+                let x = ws.localPlayerX + buf.getByte()
+                let z = ws.localPlayerY + buf.getByte()
+                ws.teleportBubbles.append(RSCTeleportBubble(type: type, x: x, y: z))
+            }
 
         case 71:  // friend list init — same format as 149, handled by those updates
             break

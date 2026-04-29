@@ -240,6 +240,10 @@ final class RSCGameEngine: ObservableObject {
         if worldState.localDamageTimeout > 0 { worldState.localDamageTimeout -= 1 }
         if worldState.localBubbleTimeout > 0 { worldState.localBubbleTimeout -= 1 }
         if worldState.localProjectileRange > 0 { worldState.localProjectileRange -= 1 }
+        for i in 0..<worldState.teleportBubbles.count {
+            worldState.teleportBubbles[i].time += 1
+        }
+        worldState.teleportBubbles.removeAll { $0.time > 50 }
         // Tick down the system-update countdown (50ms per tick = engine timer
         // interval). Banner hides automatically when it reaches 0.
         if worldState.systemUpdateTicks > 0 {
@@ -482,9 +486,39 @@ final class RSCGameEngine: ObservableObject {
         drawText(pn, x: cx - pn.count * 2, y: cy - 20, color: 0xFFFFFF00)
 
         drawProjectiles()
+        drawTeleportBubbles()
         drawOverheadItemBubbles()
         drawSkullIndicators()
         drawDamageSplats()
+    }
+
+    /// Draw teleport/telegrab-style bubbles from opcode 36. Java keeps these
+    /// for 50 ticks and draws an expanding fading circle; type 0 is blue-ish,
+    /// type 1 is red-ish.
+    private func drawTeleportBubbles() {
+        guard let scene = self.scene else { return }
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+
+        for bubble in worldState.teleportBubbles {
+            let dx = bubble.x - px
+            let dz = bubble.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: 0,
+                worldZ: Int32(dz) * 128 + 64
+            )
+            if proj.depth < scene.rot1024_zTop { continue }
+
+            let radius = bubble.type == 0 ? 20 + bubble.time * 2 : 10 + bubble.time
+            let alpha = max(0, 255 - bubble.time * 5)
+            let color = bubble.type == 0
+                ? UInt32(0x0000FF + bubble.time * 0x0500)
+                : UInt32(0xFF0000 + bubble.time * 0x0500)
+            drawCircleOutline(centerX: Int(proj.screenX), centerY: Int(proj.screenY), radius: radius, rgb: color, alpha: alpha)
+        }
     }
 
     /// Draw skull markers over skulled players/NPCs. Mirrors Java's overlay
@@ -864,6 +898,29 @@ final class RSCGameEngine: ObservableObject {
         let dmgStr = "\(damage)"
         let textW = dmgStr.count * 4 - 1   // 3px glyph + 1px advance, minus trailing
         drawText(dmgStr, x: centerX - textW / 2, y: centerY - 2, color: 0xFFFFFFFF)
+    }
+
+    private func drawCircleOutline(centerX: Int, centerY: Int, radius: Int, rgb: UInt32, alpha: Int) {
+        let w = MetalRenderer.gameWidth
+        let h = MetalRenderer.gameHeight
+        guard radius > 0, alpha > 0 else { return }
+        let outer = radius * radius
+        let innerRadius = max(0, radius - 2)
+        let inner = innerRadius * innerRadius
+        let a = UInt32(max(0, min(255, alpha)))
+        let color = Int32(bitPattern: (a << 24) | (rgb & 0x00FFFFFF))
+
+        for dy in -radius...radius {
+            for dx in -radius...radius {
+                let d2 = dx * dx + dy * dy
+                guard d2 <= outer && d2 >= inner else { continue }
+                let sx = centerX + dx
+                let sy = centerY + dy
+                if sx >= 0 && sx < w && sy >= 0 && sy < h {
+                    pixelData[sy * w + sx] = color
+                }
+            }
+        }
     }
 
     // Simple 3x5 pixel font for rendering text on the map

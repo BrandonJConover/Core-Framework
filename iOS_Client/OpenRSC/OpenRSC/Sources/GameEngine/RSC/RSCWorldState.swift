@@ -90,6 +90,14 @@ struct RSCGroundItem: Identifiable {
     var amount: Int
 }
 
+struct RSCTeleportBubble: Identifiable {
+    let id = UUID()
+    var type: Int
+    var x: Int
+    var y: Int
+    var time: Int = 0
+}
+
 struct RSCChatMessage: Identifiable {
     let id: UUID = UUID()
     let sender: String
@@ -167,6 +175,7 @@ final class RSCWorldState: ObservableObject {
     @Published var groundItems: [RSCGroundItem] = []
     @Published var gameObjects: [RSCGameObject] = []
     @Published var wallObjects: [RSCWallObject] = []
+    @Published var teleportBubbles: [RSCTeleportBubble] = []
     @Published var chatMessages: [RSCChatMessage] = []
     @Published var inventory: [RSCInventoryItem] = []
     @Published var equipment: [RSCEquipmentSlot] = []
