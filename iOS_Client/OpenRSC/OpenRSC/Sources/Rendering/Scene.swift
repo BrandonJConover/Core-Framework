@@ -83,9 +83,15 @@ final class Scene {
         self.modelCount = 0
         self.models = [RSModel?](repeating: nil, count: modelCount)
 
-        // Initialize polygon array
+        // Initialize polygon array. Polygon is a class, so the
+        // `[Polygon](repeating: Polygon(), count: N)` form would have
+        // produced N references to one shared instance — every stored
+        // polygon would have collapsed onto the last one filled, which
+        // is exactly the symptom we were seeing in the device log
+        // (370 "visible" polys reporting an identical bounding box).
+        // Allocate N distinct Polygon instances instead.
         self.m_zb = 0
-        self.polygons = [Polygon](repeating: Polygon(), count: polyCount)
+        self.polygons = (0..<polyCount).map { _ in Polygon() }
 
         // Initialize sprite model (2 verts per sprite)
         self.m_T = RSModel()
