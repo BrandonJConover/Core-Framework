@@ -425,6 +425,22 @@ final class RSCWorldState: ObservableObject {
     @Published var walkTargetX: Int = 0
     @Published var walkTargetY: Int = 0
     @Published var walkTargetTimeout: Int = 0
+
+    /// Wilderness state. Mirrors Java mudclient.java:5326-5349:
+    /// `centerX = -playerLocalZ - worldOffsetZ - (midRegionBaseZ - 2203)`,
+    /// where positive centerX puts the player in PvP territory and the
+    /// (centerX / 6) + 1 derived level shows in the bottom-right corner.
+    /// We surface the same data here so HUD pieces can render the level
+    /// chip and a one-shot warning overlay when crossing the ditch.
+    @Published var inWilderness: Bool = false
+    @Published var wildernessLevel: Int = 0
+    /// Drives the "Warning! Proceed with caution" panel. Set true when
+    /// the player walks within ~10 tiles of the ditch for the first
+    /// time this session; the panel flips it back to false on dismiss.
+    @Published var wildernessWarningOpen: Bool = false
+    /// Sticky session marker so the warning only ever fires once per
+    /// login (Java mudclient guards on `showUiWildWarn == 0`).
+    @Published var wildernessWarningSeen: Bool = false
     @Published var localBubbleItem: Int = -1
     @Published var localBubbleTimeout: Int = 0
     @Published var localProjectileSprite: Int = -1

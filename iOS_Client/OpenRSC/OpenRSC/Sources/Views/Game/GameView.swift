@@ -265,6 +265,9 @@ struct GameView: View {
         if engine.worldState.welcomeOpen {
             WelcomePanel(worldState: engine.worldState)
         }
+        if engine.worldState.wildernessWarningOpen {
+            WildernessWarningPanel(worldState: engine.worldState)
+        }
         if engine.worldState.isSleeping {
             SleepPanel(worldState: engine.worldState, engine: engine)
         }

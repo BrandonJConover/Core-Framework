@@ -523,6 +523,30 @@ final class RSCGameEngine: ObservableObject {
         let pn = worldState.localPlayerName.isEmpty ? "YOU" : worldState.localPlayerName.uppercased()
         drawText(pn, x: cx - pn.count * 2, y: cy - 20, color: 0xFFFFFF00)
 
+        // Bottom-right wilderness chip — Java client puts this where the
+        // skull sprite + "Wilderness / Level: N" text sits at gameWidth-47
+        // (mudclient.java:5335-5339). Until SoundManager-managed sprites
+        // include the skull, we mock it with a small dark capsule.
+        if worldState.inWilderness {
+            let chipW = 60
+            let chipH = 24
+            let cxR = w - chipW - 4
+            let cyB = h - chipH - 4
+            let bg = Int32(bitPattern: 0xCC1A0000)
+            let border = Int32(bitPattern: 0xFFFFFF00)
+            for ry in 0..<chipH {
+                for rx in 0..<chipW {
+                    let sx = cxR + rx
+                    let sy = cyB + ry
+                    if sx < 0 || sx >= w || sy < 0 || sy >= h { continue }
+                    let onEdge = ry == 0 || ry == chipH - 1 || rx == 0 || rx == chipW - 1
+                    pixelData[sy * w + sx] = onEdge ? border : bg
+                }
+            }
+            drawText("WILD", x: cxR + 4, y: cyB + 4, color: 0xFFFFFF00)
+            drawText("LVL \(worldState.wildernessLevel)", x: cxR + 4, y: cyB + 13, color: 0xFFFFFF00)
+        }
+
         drawProjectiles()
         drawTeleportBubbles()
         drawGroundItems3D()
