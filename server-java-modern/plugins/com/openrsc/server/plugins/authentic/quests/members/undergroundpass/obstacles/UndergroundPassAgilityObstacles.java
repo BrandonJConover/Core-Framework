@@ -118,7 +118,7 @@ public class UndergroundPassAgilityObstacles implements OpLocTrigger {
 	private void failBlackAreaObstacle(Player player, GameObject obj) {
 		player.message("..but you slip and tumble into the darkness");
 		fallTeleportLocation(player, obj);
-		player.damage(((int) getCurrentLevel(player, Skill.HITS.id()) / 5) + 5); // 6 lowest, 25 max.
+		player.damage((getCurrentLevel(player, Skill.HITS.id()) / 5) + 5); // 6 lowest, 25 max.
 		say(player, null, "ouch!");
 		if (player.getQuestStage(Quests.UNDERGROUND_PASS) >= 4) {
 			if (player.getQuestStage(Quests.UNDERGROUND_PASS) == 4) {

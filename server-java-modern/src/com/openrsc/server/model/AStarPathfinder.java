@@ -374,6 +374,7 @@ public class AStarPathfinder {
 
 	/*debug code*/
 	class JPanel2 extends JPanel {
+		private static final long serialVersionUID = 1L;
 		int width = 20;
 		JPanel2() {
 		}

@@ -121,7 +121,7 @@ public class UndergroundPassObstaclesMap1 implements OpLocTrigger {
 			}
 		}
 		else if (inArray(obj.getID(), MAIN_ROCKS)) {
-			doRock(obj, player, (int) (getCurrentLevel(player, Skill.HITS.id()) / 42) + 1, true, -1);
+			doRock(obj, player, getCurrentLevel(player, Skill.HITS.id()) / 42 + 1, true, -1);
 		}
 		else if (obj.getID() == FIRST_SWAMP) {
 			mes("you try to cross but you're unable to");
@@ -132,7 +132,7 @@ public class UndergroundPassObstaclesMap1 implements OpLocTrigger {
 			say(player, null, "gulp!");
 			player.teleport(674, 3462);
 			say(player, null, "aargh");
-			player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 42) + 1);
+			player.damage(getCurrentLevel(player, Skill.HITS.id()) / 42 + 1);
 			delay(3);
 			player.teleport(677, 3462);
 			delay();
@@ -147,7 +147,7 @@ public class UndergroundPassObstaclesMap1 implements OpLocTrigger {
 			player.teleport(687, 3462);
 			delay();
 			say(player, null, "aargh");
-			player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 42) + 1);
+			player.damage(getCurrentLevel(player, Skill.HITS.id()) / 42 + 1);
 			player.teleport(690, 3461);
 			mes("you tumble deep into the cravass");
 			delay(3);
@@ -155,7 +155,7 @@ public class UndergroundPassObstaclesMap1 implements OpLocTrigger {
 			delay(3);
 		}
 		else if (inArray(obj.getID(), FAIL_SWAMP_ROCKS)) {
-			doRock(obj, player, (int) (getCurrentLevel(player, Skill.HITS.id()) / 42) + 1, true, -1);
+			doRock(obj, player, getCurrentLevel(player, Skill.HITS.id()) / 42 + 1, true, -1);
 		}
 		else if (obj.getID() == PILE_OF_MUD_MAP_LEVEL_1) {
 			mes("you climb up the mud pile");
@@ -167,7 +167,7 @@ public class UndergroundPassObstaclesMap1 implements OpLocTrigger {
 			delay(3);
 		}
 		else if (inArray(obj.getID(), MAIN_LEDGE)) {
-			doLedge(obj, player, (int) (getCurrentLevel(player, Skill.HITS.id()) / 42) + 1);
+			doLedge(obj, player, getCurrentLevel(player, Skill.HITS.id()) / 42 + 1);
 		}
 		else if (obj.getID() == LEVER) {
 			mes("you pull back on the old lever");
@@ -227,7 +227,7 @@ public class UndergroundPassObstaclesMap1 implements OpLocTrigger {
 					new GameObject(obj.getWorld(), obj.getLocation(), 805, obj.getDirection(), obj
 						.getType()));
 				obj.getWorld().delayedSpawnObject(obj.getLoc(), 5000);
-				player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 6) + 1);
+				player.damage(getCurrentLevel(player, Skill.HITS.id()) / 6 + 1);
 				say(player, null, "aaarghh");
 			} else {
 				mes("you search the rock");
@@ -254,7 +254,7 @@ public class UndergroundPassObstaclesMap1 implements OpLocTrigger {
 							new GameObject(obj.getWorld(), obj.getLocation(), 805, obj.getDirection(), obj
 								.getType()));
 						obj.getWorld().delayedSpawnObject(obj.getLoc(), 5000);
-						player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 6) + 1);
+						player.damage(getCurrentLevel(player, Skill.HITS.id()) / 6 + 1);
 						say(player, null, "aaarghh");
 					}
 

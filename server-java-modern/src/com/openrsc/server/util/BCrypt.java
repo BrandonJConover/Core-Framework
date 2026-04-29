@@ -639,7 +639,7 @@ public class BCrypt {
 
 		B = new BCrypt();
 		hashed = B.crypt_raw(passwordb, saltb, rounds,
-			(int[])bf_crypt_ciphertext.clone());
+			bf_crypt_ciphertext.clone());
 
 		rs.append("$2");
 		if (minor >= 'y')

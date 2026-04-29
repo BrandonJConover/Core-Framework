@@ -1,6 +1,7 @@
 package com.openrsc.server.plugins;
 
 public class ScriptEndedException extends RuntimeException {
+	private static final long serialVersionUID = 1L;
 	public ScriptEndedException(final String message) {
 		super(message);
 	}

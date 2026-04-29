@@ -466,7 +466,7 @@ public final class Formulae {
 	 * Check what height we are currently at on the map
 	 */
 	private static int getHeight(int y) {
-		return (int) (y / 944);
+		return y / 944;
 	}
 
 	/**

@@ -3,6 +3,7 @@ package com.openrsc.server.net;
 import com.openrsc.server.constants.AppearanceId;
 import com.openrsc.server.util.rsc.CipheredMessage;
 import com.openrsc.server.util.rsc.DataConversions;
+import com.openrsc.server.util.rsc.StringEncryption;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
@@ -300,7 +301,7 @@ public class PacketBuilder {
 
 	public void writeRSCString(String string) {
 		CipheredMessage message = new CipheredMessage();
-		DataConversions.encryption.encipher(string, message);
+		StringEncryption.encipher(string, message);
 
 		writeSmart08_16(message.decipheredLength);
 		payload.writeBytes(message.messageBuffer, 0, message.encipheredLength);

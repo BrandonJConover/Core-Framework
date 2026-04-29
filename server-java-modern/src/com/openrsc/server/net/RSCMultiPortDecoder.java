@@ -7,7 +7,6 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.ssl.OptionalSslHandler;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
@@ -58,7 +57,6 @@ public final class RSCMultiPortDecoder extends ByteToMessageDecoder implements A
 		ctx.pipeline().addBefore(Server.rscConnectionHandlerId, "httpcodec", new HttpServerCodec());
 		ctx.pipeline().addBefore(Server.rscConnectionHandlerId, "aggregator", new HttpObjectAggregator(65536));
 		ctx.pipeline().addBefore(Server.rscConnectionHandlerId, "httphandler", new HttpRequestHandler("/"));
-		ctx.pipeline().addBefore(Server.rscConnectionHandlerId, "compreshandler", new WebSocketServerCompressionHandler());
 		ctx.pipeline().addBefore(Server.rscConnectionHandlerId, "wshandler", new WebSocketServerProtocolHandler("/", "binary", true));
 		ctx.pipeline().addBefore(Server.rscConnectionHandlerId, "framehandler", new WebSocketFrameHandler());
 	}

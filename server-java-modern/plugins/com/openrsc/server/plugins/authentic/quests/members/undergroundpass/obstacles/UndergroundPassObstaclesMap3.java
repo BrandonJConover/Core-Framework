@@ -62,7 +62,7 @@ public class UndergroundPassObstaclesMap3 implements OpLocTrigger {
 					if (player.getCarriedItems().getEquipment().hasEquipped(ItemId.KLANKS_GAUNTLETS.id())) {
 						player.message("klanks gaunlett protects you");
 					} else {
-						player.damage(((int) getCurrentLevel(player, Skill.HITS.id()) / 10) + 5);
+						player.damage((getCurrentLevel(player, Skill.HITS.id()) / 10) + 5);
 						say(player, null, "aaarrgghh");
 					}
 				}
@@ -93,7 +93,7 @@ public class UndergroundPassObstaclesMap3 implements OpLocTrigger {
 					player.message("klanks gaunlett protects you");
 					player.message("but you find find nothing");
 				} else {
-					player.damage(((int) getCurrentLevel(player, Skill.HITS.id()) / 10) + 5);
+					player.damage((getCurrentLevel(player, Skill.HITS.id()) / 10) + 5);
 					say(player, null, "aaarrgghh");
 					player.message("you find nothing");
 				}

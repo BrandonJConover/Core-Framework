@@ -692,7 +692,7 @@ public class Thieving implements OpLocTrigger, OpNpcTrigger, OpBoundTrigger {
 			player.playerServerMessage(MessageType.QUEST, "You manage to pick the lock");
 			doDoor(obj, player);
 			player.message("You go through the door");
-			player.incExp(Skill.THIEVING.id(), (int) exp, true);
+			player.incExp(Skill.THIEVING.id(), exp, true);
 		} else {
 			player.playerServerMessage(MessageType.QUEST, "You fail to pick the lock");
 

@@ -12,6 +12,7 @@ import com.openrsc.server.plugins.triggers.PlayerLoginTrigger;
 import com.openrsc.server.util.rsc.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -29,7 +30,7 @@ public class LoginPacketHandler {
 	/**
 	 * The asynchronous logger.
 	 */
-	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Logger LOGGER = LogManager.getLogger(LoginPacketHandler.class);
 
 	private int loginResponse = -1;
 
@@ -68,6 +69,28 @@ public class LoginPacketHandler {
 			s.writeZeroQuotedString(loadedPlayer.getCurrentIP());
 			attachment.pcapLogger.get().addPacket(s.toPacket(), true);
 		}
+	}
+
+	private void rejectMalformedLogin(Channel channel, String ip, String reason) {
+		LOGGER.warn("Rejecting malformed login packet from {}: {}", ip, reason);
+		if (channel.isActive()) {
+			channel.writeAndFlush(new PacketBuilder().writeByte((byte) LoginResponse.UNRECOGNIZED_LOGIN).toPacket())
+				.addListener(ChannelFutureListener.CLOSE);
+		}
+	}
+
+	private String readZeroTerminatedLoginString(ByteBuffer loginBlock, String field, String ip, Channel channel) {
+		StringBuilder builder = new StringBuilder();
+		while (loginBlock.hasRemaining()) {
+			char ch = (char)(loginBlock.get() & 0xFF);
+			if (ch == 10) {
+				return builder.toString().trim();
+			}
+			builder.append(ch);
+		}
+
+		rejectMalformedLogin(channel, ip, "missing " + field + " terminator");
+		return null;
 	}
 
 	public void processLogin(Packet packet, Channel channel, Server server) {
@@ -230,46 +253,46 @@ public class LoginPacketHandler {
 							}
 						};
 						server.getLoginExecutor().add(request);
-					} else if (clientVersion.get() > 177) {
-						// login block with initial ISAAC
+						} else if (clientVersion.get() > 177) {
+							// login block with initial ISAAC
 
-						packet.readShort();
+							if (packet.getReadableBytes() < 2) {
+								rejectMalformedLogin(channel, IP, "missing login block header");
+								return;
+							}
+							packet.readShort();
 
-						int rsaLength = packet.getReadableBytes();
-						ByteBuffer loginBlock = ByteBuffer.wrap(Crypto.decryptRSA(packet.readBytes(rsaLength), 0, rsaLength));
+							int rsaLength = packet.getReadableBytes();
+							if (rsaLength <= 0) {
+								rejectMalformedLogin(channel, IP, "empty RSA login block");
+								return;
+							}
+							ByteBuffer loginBlock = ByteBuffer.wrap(Crypto.decryptRSA(packet.readBytes(rsaLength), 0, rsaLength));
 
-						// Handle RSA encrypted block
+							// Handle RSA encrypted block
 
-						if (loginBlock.get() != 10) { // Authentic client will only send 10 here, probably as a 99.6% reliable "checksum" that it was able to decrypt correctly
-							//return LOGIN_REJECT;
-						}
+							if (loginBlock.remaining() < 21) {
+								rejectMalformedLogin(channel, IP, "RSA login block too short: " + loginBlock.remaining());
+								return;
+							}
+							if (loginBlock.get() != 10) { // Authentic client will only send 10 here, probably as a 99.6% reliable "checksum" that it was able to decrypt correctly
+								//return LOGIN_REJECT;
+							}
 
 						for (int i = 0; i < 4; i++) {
 							loginInfo.keys[i] = loginBlock.getInt();
 						}
 
-						int uid = loginBlock.getInt();
+							int uid = loginBlock.getInt();
 
-						var b = new StringBuilder();
-						char ch;
-
-						while ((ch = (char)(loginBlock.get() & 0xFF)) != 10) {
-							b.append(ch);
-						}
-
-						String username = b.toString().trim();
-
-						b = new StringBuilder();
-
-						try {
-							while ((ch = (char)(loginBlock.get() & 0xFF)) != 10) {
-								b.append(ch);
+							String username = readZeroTerminatedLoginString(loginBlock, "username", IP, channel);
+							if (username == null) {
+								return;
 							}
-						} catch (Exception e) {
-							// will overread buffer
-						}
-
-						String password = b.toString().trim();
+							String password = readZeroTerminatedLoginString(loginBlock, "password", IP, channel);
+							if (password == null) {
+								return;
+							}
 
 						ClientLimitations cl = new ClientLimitations(clientVersion.get());
 

@@ -470,7 +470,7 @@ public class AgilityShortcuts implements OpLocTrigger,
 						delay(3);
 						mes("After being nearly half drowned");
 						delay(3);
-						player.damage((int) (player.getSkills().getLevel(Skill.HITS.id()) / 4) + 2);
+						player.damage(player.getSkills().getLevel(Skill.HITS.id()) / 4 + 2);
 						return;
 					}
 					teleport(player, 346, 808);
@@ -485,7 +485,7 @@ public class AgilityShortcuts implements OpLocTrigger,
 						delay(3);
 						mes("After being nearly half drowned");
 						delay(3);
-						player.damage((int) (player.getSkills().getLevel(Skill.HITS.id()) / 4) + 2);
+						player.damage(player.getSkills().getLevel(Skill.HITS.id()) / 4 + 2);
 						return;
 					}
 					teleport(player, 347, 805);

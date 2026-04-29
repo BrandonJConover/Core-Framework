@@ -203,11 +203,11 @@ public class StringEncryption {
 				if (var9 >= 0) {
 					++var7;
 				} else {
-					var7 = this.cipherDictionary[var7];
+					var7 = cipherDictionary[var7];
 				}
 
 				int var10;
-				if ((var10 = this.cipherDictionary[var7]) < 0) {
+				if ((var10 = cipherDictionary[var7]) < 0) {
 					dest[destOffset++] = (byte) (~var10);
 					if (destOffset >= count) {
 						break;
@@ -217,12 +217,12 @@ public class StringEncryption {
 				}
 
 				if ((64 & var9) != 0) {
-					var7 = this.cipherDictionary[var7];
+					var7 = cipherDictionary[var7];
 				} else {
 					++var7;
 				}
 
-				if ((var10 = this.cipherDictionary[var7]) < 0) {
+				if ((var10 = cipherDictionary[var7]) < 0) {
 					dest[destOffset++] = (byte) (~var10);
 					if (count <= destOffset) {
 						break;
@@ -234,10 +234,10 @@ public class StringEncryption {
 				if ((var9 & 32) == 0) {
 					++var7;
 				} else {
-					var7 = this.cipherDictionary[var7];
+					var7 = cipherDictionary[var7];
 				}
 
-				if ((var10 = this.cipherDictionary[var7]) < 0) {
+				if ((var10 = cipherDictionary[var7]) < 0) {
 					dest[destOffset++] = (byte) (~var10);
 					if (count <= destOffset) {
 						break;
@@ -247,12 +247,12 @@ public class StringEncryption {
 				}
 
 				if ((16 & var9) != 0) {
-					var7 = this.cipherDictionary[var7];
+					var7 = cipherDictionary[var7];
 				} else {
 					++var7;
 				}
 
-				if ((var10 = this.cipherDictionary[var7]) < 0) {
+				if ((var10 = cipherDictionary[var7]) < 0) {
 					dest[destOffset++] = (byte) (~var10);
 					if (destOffset >= count) {
 						break;
@@ -262,12 +262,12 @@ public class StringEncryption {
 				}
 
 				if ((var9 & 8) != 0) {
-					var7 = this.cipherDictionary[var7];
+					var7 = cipherDictionary[var7];
 				} else {
 					++var7;
 				}
 
-				if ((var10 = this.cipherDictionary[var7]) < 0) {
+				if ((var10 = cipherDictionary[var7]) < 0) {
 					dest[destOffset++] = (byte) (~var10);
 					if (destOffset >= count) {
 						break;
@@ -277,12 +277,12 @@ public class StringEncryption {
 				}
 
 				if ((4 & var9) != 0) {
-					var7 = this.cipherDictionary[var7];
+					var7 = cipherDictionary[var7];
 				} else {
 					++var7;
 				}
 
-				if ((var10 = this.cipherDictionary[var7]) < 0) {
+				if ((var10 = cipherDictionary[var7]) < 0) {
 					dest[destOffset++] = (byte) (~var10);
 					if (destOffset >= count) {
 						break;
@@ -294,10 +294,10 @@ public class StringEncryption {
 				if ((2 & var9) == 0) {
 					++var7;
 				} else {
-					var7 = this.cipherDictionary[var7];
+					var7 = cipherDictionary[var7];
 				}
 
-				if ((var10 = this.cipherDictionary[var7]) < 0) {
+				if ((var10 = cipherDictionary[var7]) < 0) {
 					dest[destOffset++] = (byte) (~var10);
 					if (destOffset >= count) {
 						break;
@@ -307,12 +307,12 @@ public class StringEncryption {
 				}
 
 				if ((1 & var9) != 0) {
-					var7 = this.cipherDictionary[var7];
+					var7 = cipherDictionary[var7];
 				} else {
 					++var7;
 				}
 
-				if ((var10 = this.cipherDictionary[var7]) < 0) {
+				if ((var10 = cipherDictionary[var7]) < 0) {
 					dest[destOffset++] = (byte) (~var10);
 					if (destOffset >= count) {
 						break;

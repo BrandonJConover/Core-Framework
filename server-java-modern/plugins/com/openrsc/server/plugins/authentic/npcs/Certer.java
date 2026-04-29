@@ -285,7 +285,7 @@ public class Certer implements TalkNpcTrigger, UseNpcTrigger {
 				player.message("As an Ultimate Ironman. you cannot use certer bank exchange.");
 				return;
 			}
-			certAmount = (int) (player.getBank().countId(itemID) / 5);
+			certAmount = player.getBank().countId(itemID) / 5;
 			int itemAmount = certAmount * 5;
 			if (itemAmount <= 0) {
 				player.message("You don't have any " + names[useIndex] + " to certificate");

@@ -73,13 +73,13 @@ public final class DataConversions {
 		int dd = 0;
 		left = (int) (diffMSec / 1000);
 		ss = left % 60;
-		left = (int) left / 60;
+		left = left / 60;
 		if (left > 0) {
 			mm = left % 60;
-			left = (int) left / 60;
+			left = left / 60;
 			if (left > 0) {
 				hh = left % 24;
-				left = (int) left / 24;
+				left = left / 24;
 				if (left > 0) {
 					dd = left;
 				}
@@ -344,7 +344,7 @@ public final class DataConversions {
 		for (int value : values) {
 			total += value;
 		}
-		return (int) (total / values.length);
+		return total / values.length;
 	}
 
 	public static String getEncryptedString(Packet src) {
@@ -524,9 +524,9 @@ public final class DataConversions {
 
 	public static String timeSince(long time) {
 		int seconds = (int) ((System.currentTimeMillis() - time) / 1000);
-		int minutes = (int) (seconds / 60);
-		int hours = (int) (minutes / 60);
-		int days = (int) (hours / 24);
+		int minutes = seconds / 60;
+		int hours = minutes / 60;
+		int days = hours / 24;
 		return days + " days " + (hours % 24) + " hours " + (minutes % 60) + " mins";
 	}
 

@@ -113,7 +113,7 @@ public class UndergroundPassObstaclesMap2 implements OpLocTrigger, OpBoundTrigge
 				player.message("you climb the ledge");
 				if (DataConversions.getRandom().nextInt(10) <= 1) {
 					player.message("but you slip");
-					player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 42) + 1);
+					player.damage(getCurrentLevel(player, Skill.HITS.id()) / 42 + 1);
 					say(player, null, "aargh");
 				} else
 					player.teleport(764, 3463);
@@ -123,7 +123,7 @@ public class UndergroundPassObstaclesMap2 implements OpLocTrigger, OpBoundTrigge
 				player.teleport(764, 3461);
 				delay(3);
 				player.message("you land way short of the other platform");
-				player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 5) + 5);
+				player.damage(getCurrentLevel(player, Skill.HITS.id()) / 5 + 5);
 				player.teleport(764, 3467);
 				say(player, null, "ooof");
 			}
@@ -147,18 +147,18 @@ public class UndergroundPassObstaclesMap2 implements OpLocTrigger, OpBoundTrigge
 		}
 		else if (inArray(obj.getID(), ROCKS)) {
 			switch (obj.getID()) {
-				case 859, 858 -> UndergroundPassObstaclesMap1.doRock(obj, player, (int) (getCurrentLevel(player, Skill.HITS.id()) / 5) + 5, false, 5); // fall side 5.
-				case 854, 853, 855, 857 -> UndergroundPassObstaclesMap1.doRock(obj, player, (int) (getCurrentLevel(player, Skill.HITS.id()) / 5) + 5, false, 4); // fall side 4.
-				case 852 -> UndergroundPassObstaclesMap1.doRock(obj, player, (int) (getCurrentLevel(player, Skill.HITS.id()) / 5) + 5, false, 3); // fall side 3.
-				case 851 -> UndergroundPassObstaclesMap1.doRock(obj, player, (int) (getCurrentLevel(player, Skill.HITS.id()) / 5) + 5, false, 2); // fall side 2.
-				default -> UndergroundPassObstaclesMap1.doRock(obj, player, (int) (getCurrentLevel(player, Skill.HITS.id()) / 5) + 5, false, 1); // fall side 1
+				case 859, 858 -> UndergroundPassObstaclesMap1.doRock(obj, player, getCurrentLevel(player, Skill.HITS.id()) / 5 + 5, false, 5); // fall side 5.
+				case 854, 853, 855, 857 -> UndergroundPassObstaclesMap1.doRock(obj, player, getCurrentLevel(player, Skill.HITS.id()) / 5 + 5, false, 4); // fall side 4.
+				case 852 -> UndergroundPassObstaclesMap1.doRock(obj, player, getCurrentLevel(player, Skill.HITS.id()) / 5 + 5, false, 3); // fall side 3.
+				case 851 -> UndergroundPassObstaclesMap1.doRock(obj, player, getCurrentLevel(player, Skill.HITS.id()) / 5 + 5, false, 2); // fall side 2.
+				default -> UndergroundPassObstaclesMap1.doRock(obj, player, getCurrentLevel(player, Skill.HITS.id()) / 5 + 5, false, 1); // fall side 1
 			}
 		}
 		else if (obj.getID() == HIJACK_ROCK) {
 			player.message("you climb onto the rock");
 			if (DataConversions.getRandom().nextInt(5) == 4) {
 				player.message("but you slip");
-				player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 5) + 5);
+				player.damage(getCurrentLevel(player, Skill.HITS.id()) / 5 + 5);
 				player.teleport(734, 3483);
 				say(player, null, "aargh");
 			} else {
@@ -184,7 +184,7 @@ public class UndergroundPassObstaclesMap2 implements OpLocTrigger, OpBoundTrigge
 				new GameObject(obj.getWorld(), obj.getLocation(), 826, obj.getDirection(), obj
 					.getType()));
 			player.getWorld().delayedSpawnObject(obj.getLoc(), 5000);
-			player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 5) + 5);
+			player.damage(getCurrentLevel(player, Skill.HITS.id()) / 5 + 5);
 			say(player, null, "aaarghh");
 		}
 		else if (obj.getID() == CAGE_REMAINS) {

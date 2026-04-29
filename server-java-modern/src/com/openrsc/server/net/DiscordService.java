@@ -160,7 +160,7 @@ public class DiscordService implements Runnable{
 						}
 					}
 				} else if (message.getContentRaw().startsWith("!auctions")) {
-					final ArrayList<MarketItem> auctionList = (ArrayList<MarketItem>)this.server.getWorld().getMarket().getAuctionItems().clone();
+					final ArrayList<MarketItem> auctionList = new ArrayList<>(this.server.getWorld().getMarket().getAuctionItems());
 					var e = auctionList.iterator();
 					if (e.hasNext()) {
 							int dbID = 0;

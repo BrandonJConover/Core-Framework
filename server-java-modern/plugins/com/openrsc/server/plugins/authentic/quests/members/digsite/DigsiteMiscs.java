@@ -30,7 +30,7 @@ public class DigsiteMiscs implements DropObjTrigger {
 		else if (item.getCatalogId() == ItemId.MIXED_CHEMICALS_1.id() || item.getCatalogId() == ItemId.MIXED_CHEMICALS_2.id()) {
 			player.message("bang!");
 			player.getCarriedItems().remove(new Item(item.getCatalogId()));
-			player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 2 + 6));
+			player.damage(getCurrentLevel(player, Skill.HITS.id()) / 2 + 6);
 			say(player, null, "Ow!");
 			player.message("The chemicals exploded!");
 			player.message("You were injured by the exploding liquid");
@@ -38,7 +38,7 @@ public class DigsiteMiscs implements DropObjTrigger {
 		else if (item.getCatalogId() == ItemId.NITROGLYCERIN.id()) {
 			player.message("bang!");
 			player.getCarriedItems().remove(new Item(ItemId.NITROGLYCERIN.id()));
-			player.damage((int) (getCurrentLevel(player, Skill.HITS.id()) / 2 - 3));
+			player.damage(getCurrentLevel(player, Skill.HITS.id()) / 2 - 3);
 			say(player, null, "Ow!");
 			player.message("The nitroglycerin exploded!");
 			player.message("You were injured by the exploding liquid");
