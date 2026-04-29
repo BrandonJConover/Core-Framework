@@ -257,6 +257,20 @@ final class RSCGameEngine: ObservableObject {
             worldState.teleportBubbles[i].time += 1
         }
         worldState.teleportBubbles.removeAll { $0.time > 50 }
+        // Wilderness check — Java mudclient.java:5326-5349. Positive
+        // distance from the ditch (Z=2203) puts the player in PvP territory;
+        // wilderness level scales every 6 tiles. Fire the once-per-session
+        // warning when the player approaches the ditch (-10 .. 0 window).
+        if worldState.localPlayerX != 0 || worldState.localPlayerY != 0 {
+            let absZ = worldState.worldOffsetZ + worldState.localPlayerY
+            let centerX = 2203 - absZ
+            worldState.inWilderness = centerX > 0
+            worldState.wildernessLevel = worldState.inWilderness ? max(1, centerX / 6 + 1) : 0
+            if !worldState.wildernessWarningSeen, centerX > -10, centerX <= 0 {
+                worldState.wildernessWarningOpen = true
+                worldState.wildernessWarningSeen = true
+            }
+        }
         // Tick down the system-update countdown (50ms per tick = engine timer
         // interval). Banner hides automatically when it reaches 0.
         if worldState.systemUpdateTicks > 0 {
@@ -1525,6 +1539,42 @@ final class RSCGameEngine: ObservableObject {
         return best
     }
 
+    @discardableResult
+    private func sendWalkPath(toX destX: Int, toZ destZ: Int, walkToEntity: Bool) async -> [(x: Int, z: Int)] {
+        let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
+        let path = pathfinder.findPath(
+            fromX: worldState.localPlayerX,
+            fromZ: worldState.localPlayerY,
+            toX: destX,
+            toZ: destZ,
+            maxSteps: 25
+        )
+
+        let markerEnd = path.last
+        worldState.walkTargetX = markerEnd?.x ?? destX
+        worldState.walkTargetY = markerEnd?.z ?? destZ
+        worldState.walkTargetTimeout = 80
+
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: walkToEntity ? 16 : 187)
+        // Same packet layout as WALK_TO_POINT: [SHORT startX][SHORT startZ]
+        // followed by signed waypoint deltas from the starting tile. Opcode 16
+        // uses the same path payload but tells the server this walk is attached
+        // to an entity action.
+        let startX = worldState.localPlayerX
+        let startZ = worldState.localPlayerY
+        buf.putShort(startX)
+        buf.putShort(startZ)
+        for wp in path {
+            let dx = max(-128, min(127, wp.x - startX))
+            let dz = max(-128, min(127, wp.z - startZ))
+            buf.putByte(dx)
+            buf.putByte(dz)
+        }
+        try? await connection.send(buf.finishPacket())
+        return path
+    }
+
     private func handleTap(x: Int, y: Int) {
         let target = worldTileNearestScreenPoint(gameX: Double(x), gameY: Double(y))
         let destX = target.x
@@ -1574,12 +1624,8 @@ final class RSCGameEngine: ObservableObject {
             // Tap near NPC → talk to it
             print("[Input] Talk to NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
             Task {
-                // First walk to NPC (opcode 16 = WALK_TO_ENTITY)
-                let walkBuf = ByteBuffer()
-                walkBuf.newPacket(opcode: 16)
-                walkBuf.putShort(npc.x)
-                walkBuf.putShort(npc.y)
-                try? await connection.send(walkBuf.finishPacket())
+                // First walk to NPC (opcode 16 = WALK_TO_ENTITY path payload)
+                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
 
                 // Then send talk command (opcode 153)
                 let talkBuf = ByteBuffer()
@@ -1593,28 +1639,8 @@ final class RSCGameEngine: ObservableObject {
             let path = pathfinder.findPath(fromX: worldState.localPlayerX, fromZ: worldState.localPlayerY,
                                            toX: destX, toZ: destZ, maxSteps: 25)
             print("[Input] Walk to (\(destX),\(destZ)) path=\(path.count) waypoints")
-            // Drop a fading X on the requested tile (use the last reachable
-            // waypoint when the path was clipped by walls so the marker
-            // tracks where the avatar will actually end up).
-            let markerEnd = path.last
-            worldState.walkTargetX = markerEnd?.x ?? destX
-            worldState.walkTargetY = markerEnd?.z ?? destZ
-            worldState.walkTargetTimeout = 80   // ~4s at 50ms ticks
             Task {
-                let buf = ByteBuffer()
-                buf.newPacket(opcode: 187)  // WALK_TO_POINT
-                // First point = start position. Per mudclient.java:17432-17452
-                // server expects [SHORT startX][SHORT startZ][BYTE dx,BYTE dz]*N
-                // where each waypoint pair is a signed delta from start (-128..127).
-                buf.putShort(worldState.localPlayerX)
-                buf.putShort(worldState.localPlayerY)
-                for wp in path {
-                    let dx = max(-128, min(127, wp.x - worldState.localPlayerX))
-                    let dz = max(-128, min(127, wp.z - worldState.localPlayerY))
-                    buf.putByte(dx)
-                    buf.putByte(dz)
-                }
-                try? await connection.send(buf.finishPacket())
+                await sendWalkPath(toX: destX, toZ: destZ, walkToEntity: false)
             }
         }
     }
@@ -1758,6 +1784,9 @@ final class RSCGameEngine: ObservableObject {
 
     func attackNPC(serverIndex: Int) {
         Task {
+            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcAttack.rawValue))
             buf.putShort(serverIndex)
@@ -1789,6 +1818,9 @@ final class RSCGameEngine: ObservableObject {
 
     func talkToNPC(serverIndex: Int) {
         Task {
+            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcTalkTo.rawValue))
             buf.putShort(serverIndex)
@@ -2183,6 +2215,9 @@ final class RSCGameEngine: ObservableObject {
 
     func npcCommand(serverIndex: Int) {
         Task {
+            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand.rawValue))
             buf.putShort(serverIndex)
@@ -2192,6 +2227,9 @@ final class RSCGameEngine: ObservableObject {
 
     func npcCommand2(serverIndex: Int) {
         Task {
+            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand2.rawValue))
             buf.putShort(serverIndex)
