@@ -915,7 +915,14 @@ final class RSCPacketHandler {
 
             switch updateType {
             case 0: // Bubble item
-                let _ = buf.getShort() // itemType
+                let itemType = buf.getShort()
+                if serverIndex == ws.playerServerIndex {
+                    ws.localBubbleItem = itemType
+                    ws.localBubbleTimeout = 150
+                } else if let idx = ws.players.firstIndex(where: { $0.id == serverIndex }) {
+                    ws.players[idx].bubbleItem = itemType
+                    ws.players[idx].bubbleTimeout = 150
+                }
 
             case 1, 7: // Chat message
                 let _ = buf.get32() // crownID
@@ -1203,7 +1210,11 @@ final class RSCPacketHandler {
                 let _ = buf.getUnsignedByte() // wield2
 
             case 7: // Bubble item
-                let _ = buf.getShort() // itemType
+                let itemType = buf.getShort()
+                if let idx = ws.npcs.firstIndex(where: { $0.id == serverIndex }) {
+                    ws.npcs[idx].bubbleItem = itemType
+                    ws.npcs[idx].bubbleTimeout = 150
+                }
 
             default:
                 break

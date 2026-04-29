@@ -15,6 +15,8 @@ struct RSCPlayer: Identifiable {
     /// combatTimeout > 150 — about 50 render ticks (~1.5s).
     var damageTaken: Int = 0
     var damageTimeout: Int = 0
+    var bubbleItem: Int = -1
+    var bubbleTimeout: Int = 0
 }
 
 /// Appearance data delivered by opcode 234 case 5 (full appearance update).
@@ -48,6 +50,8 @@ struct RSCNPC: Identifiable {
     var combatTimeout: Int = 0
     var message: String = ""
     var messageTimeout: Int = 0
+    var bubbleItem: Int = -1
+    var bubbleTimeout: Int = 0
     /// 0..7 facing direction captured from showNPCs's per-NPC 4-bit field.
     /// Defaults to 4 (south) so the renderer always has a valid value.
     var direction: Int = 4
@@ -309,6 +313,8 @@ final class RSCWorldState: ObservableObject {
     /// from 200 and draws the splat while it stays > 150 (~50 render ticks).
     @Published var localDamageTaken: Int = 0
     @Published var localDamageTimeout: Int = 0
+    @Published var localBubbleItem: Int = -1
+    @Published var localBubbleTimeout: Int = 0
 
     // Active prayers — index matches the prayer slot (0..49 capacity, 14 used in RSC)
     @Published var activePrayers: [Bool] = Array(repeating: false, count: 50)

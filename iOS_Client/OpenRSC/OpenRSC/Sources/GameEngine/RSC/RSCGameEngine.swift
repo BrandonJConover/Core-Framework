@@ -226,13 +226,16 @@ final class RSCGameEngine: ObservableObject {
         for i in 0..<worldState.npcs.count {
             if worldState.npcs[i].combatTimeout > 0 { worldState.npcs[i].combatTimeout -= 1 }
             if worldState.npcs[i].messageTimeout > 0 { worldState.npcs[i].messageTimeout -= 1 }
+            if worldState.npcs[i].bubbleTimeout > 0 { worldState.npcs[i].bubbleTimeout -= 1 }
         }
         // Decay player damage splat timeouts (set to 200 by opcode 234 case 2;
         // splat visible while > 150).
         for i in 0..<worldState.players.count {
             if worldState.players[i].damageTimeout > 0 { worldState.players[i].damageTimeout -= 1 }
+            if worldState.players[i].bubbleTimeout > 0 { worldState.players[i].bubbleTimeout -= 1 }
         }
         if worldState.localDamageTimeout > 0 { worldState.localDamageTimeout -= 1 }
+        if worldState.localBubbleTimeout > 0 { worldState.localBubbleTimeout -= 1 }
         // Tick down the system-update countdown (50ms per tick = engine timer
         // interval). Banner hides automatically when it reaches 0.
         if worldState.systemUpdateTicks > 0 {
@@ -474,7 +477,94 @@ final class RSCGameEngine: ObservableObject {
         let pn = worldState.localPlayerName.isEmpty ? "YOU" : worldState.localPlayerName.uppercased()
         drawText(pn, x: cx - pn.count * 2, y: cy - 20, color: 0xFFFFFF00)
 
+        drawOverheadItemBubbles()
         drawDamageSplats()
+    }
+
+    /// Draw item bubbles over characters that received the Java bubble-item
+    /// update (players: opcode 234 case 0, NPCs: opcode 104 case 7). The
+    /// desktop client uses a GUI clipping bubble plus the item sprite; we draw
+    /// a compact rounded-looking frame and use the item sprite when the bundle
+    /// has one, falling back to the item name/id so the game event is visible.
+    private func drawOverheadItemBubbles() {
+        guard let scene = self.scene else { return }
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+
+        for npc in worldState.npcs where npc.bubbleTimeout > 0 && npc.bubbleItem >= 0 {
+            let dx = npc.x - px
+            let dz = npc.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: -120,
+                worldZ: Int32(dz) * 128 + 64
+            )
+            if proj.depth < scene.rot1024_zTop { continue }
+            drawItemBubble(itemId: npc.bubbleItem, centerX: Int(proj.screenX), topY: Int(proj.screenY) - 20)
+        }
+
+        for player in worldState.players where player.bubbleTimeout > 0 && player.bubbleItem >= 0 {
+            let dx = player.x - px
+            let dz = player.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: -120,
+                worldZ: Int32(dz) * 128 + 64
+            )
+            if proj.depth < scene.rot1024_zTop { continue }
+            drawItemBubble(itemId: player.bubbleItem, centerX: Int(proj.screenX), topY: Int(proj.screenY) - 20)
+        }
+
+        if worldState.localBubbleTimeout > 0 && worldState.localBubbleItem >= 0 {
+            drawItemBubble(
+                itemId: worldState.localBubbleItem,
+                centerX: MetalRenderer.gameWidth / 2,
+                topY: MetalRenderer.gameHeight / 2 - 48
+            )
+        }
+    }
+
+    private func drawItemBubble(itemId: Int, centerX: Int, topY: Int) {
+        let w = MetalRenderer.gameWidth
+        let h = MetalRenderer.gameHeight
+        let bw = 34
+        let bh = 24
+        let left = centerX - bw / 2
+        let top = topY
+        let bg = Int32(bitPattern: 0xEED8D8D8)
+        let border = Int32(bitPattern: 0xFF303030)
+        for y in 0..<bh {
+            for x in 0..<bw {
+                let sx = left + x
+                let sy = top + y
+                guard sx >= 0 && sx < w && sy >= 0 && sy < h else { continue }
+                let edge = x == 0 || x == bw - 1 || y == 0 || y == bh - 1
+                pixelData[sy * w + sx] = edge ? border : bg
+            }
+        }
+
+        // The Java client's item sprites live at/after spriteItem (2150), but
+        // only a subset is bundled in sprites_v2.dat. Try that first; if the
+        // sprite is absent, draw a short name/id so the bubble still conveys
+        // the action.
+        let spriteId = 2150 + itemId
+        if let sprite = spriteLoader.getSprite(spriteId), sprite.width <= bw, sprite.height <= bh {
+            spriteLoader.drawSprite(
+                spriteId,
+                onto: &pixelData,
+                bufferWidth: w,
+                bufferHeight: h,
+                atX: centerX - sprite.width / 2,
+                atY: top + (bh - sprite.height) / 2,
+                scale: 1
+            )
+        } else {
+            let name = ItemNames.name(for: itemId)
+            let label = name == "Item" ? "\(itemId)" : String(name.prefix(7))
+            drawText(label, x: centerX - (label.count * 2), y: top + 9, color: 0xFF111111)
+        }
     }
 
     /// Draws RSC's red damage splats over any character whose damage-timeout
