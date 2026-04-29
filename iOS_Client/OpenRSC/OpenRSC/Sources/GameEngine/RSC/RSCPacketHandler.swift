@@ -272,7 +272,7 @@ final class RSCPacketHandler {
             handleSetPrayers(buf: buf, ws: ws)
 
         case 211: // UPDATE_ENTITIES — ground item/object/wall counts
-            break // Entity counts
+            handleUpdateEntityCounts(buf: buf, ws: ws)
 
         case 48:  // SCENERY_HANDLER — game objects
             handleShowGameObjects(buf: buf, ws: ws)
@@ -1194,6 +1194,32 @@ final class RSCPacketHandler {
             }
         }
         print("[Packet] Wall objects: \(ws.wallObjects.count)")
+    }
+
+    // Port of PacketHandler.java generateCounts() — opcode 211.
+    // Each pair of signed shorts identifies an 8x8 region being refreshed;
+    // existing ground items, scenery, and wall objects in that region are
+    // pruned before the follow-up showGroundItems/showGameObjects/showWalls
+    // packets add the current contents back.
+    private func handleUpdateEntityCounts(buf: ByteBuffer, ws: RSCWorldState) {
+        var regions: [(x: Int, z: Int)] = []
+        while buf.bytesRemaining >= 4 {
+            let regionX = (ws.localPlayerX + buf.getShort()) >> 3
+            let regionZ = (ws.localPlayerY + buf.getShort()) >> 3
+            regions.append((x: regionX, z: regionZ))
+        }
+
+        guard !regions.isEmpty else { return }
+
+        ws.groundItems.removeAll { item in
+            regions.contains { region in (item.x >> 3) == region.x && (item.y >> 3) == region.z }
+        }
+        ws.gameObjects.removeAll { object in
+            regions.contains { region in (object.x >> 3) == region.x && (object.y >> 3) == region.z }
+        }
+        ws.wallObjects.removeAll { wall in
+            regions.contains { region in (wall.x >> 3) == region.x && (wall.y >> 3) == region.z }
+        }
     }
 
     // MARK: - Trade Updates
