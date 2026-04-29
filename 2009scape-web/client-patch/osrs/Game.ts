@@ -783,7 +783,18 @@ export class Game extends GameShell {
             }
         }
         if (this.loadingStage === 2) {
+            if (!(this as any).__drawGameViewLogged) {
+                (this as any).__drawGameViewLogged = true;
+                console.log("drawGameView reached (loadingStage=2)");
+            }
             this.drawGameView();
+        } else {
+            if (!(this as any).__drawGameViewSkipLogged) {
+                (this as any).__drawGameViewSkipLogged = true;
+                setTimeout(() => {
+                    console.log("drawGameView still skipped: loadingStage=" + this.loadingStage);
+                }, 30000);
+            }
         }
         if (this.menuOpen && this.anInt1304 === 1) {
             this.redrawTabArea = true;
