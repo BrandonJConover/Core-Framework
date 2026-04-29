@@ -1647,13 +1647,23 @@ final class RSCGameEngine: ObservableObject {
         for obj in worldState.gameObjects {
             let odx: Int = obj.x - worldX; let odz: Int = obj.y - worldZ
             if odx * odx + odz * odz <= 4 {
-                let objName = ObjectNames.name(for: obj.objectId)
+                let def = GameObjectDefinitions.get(obj.objectId)
+                let objName = def?.name.isEmpty == false ? def!.name : ObjectNames.name(for: obj.objectId)
                 title = objName
-                actions.append(("Use \(objName)", "hand.tap", { [weak self] in
-                    self?.objectAction1(x: obj.x, z: obj.y)
-                }))
+                let command1 = def?.command1.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let command2 = def?.command2.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if !command1.isEmpty && command1.lowercased() != "walkto" && command1.lowercased() != "null" {
+                    actions.append(("\(command1) \(objName)", "hand.tap", { [weak self] in
+                        self?.objectAction1(x: obj.x, z: obj.y)
+                    }))
+                }
+                if !command2.isEmpty && command2.lowercased() != "examine" && command2.lowercased() != "null" {
+                    actions.append(("\(command2) \(objName)", "ellipsis.circle", { [weak self] in
+                        self?.objectAction2(x: obj.x, z: obj.y)
+                    }))
+                }
                 actions.append(("Examine \(objName)", "eye", { [weak self] in
-                    self?.worldState.addChat(sender: "[Examine]", text: objName)
+                    self?.worldState.addChat(sender: "[Examine]", text: def?.description.isEmpty == false ? def!.description : objName)
                 }))
                 break
             }

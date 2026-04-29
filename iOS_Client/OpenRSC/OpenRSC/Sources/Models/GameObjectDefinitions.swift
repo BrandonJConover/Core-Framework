@@ -8,6 +8,8 @@ struct GameObjectDefinition {
     let id: Int
     let name: String
     let description: String
+    let command1: String
+    let command2: String
     let type: Int
     let width: Int
     let height: Int
@@ -42,12 +44,15 @@ enum GameObjectDefinitions {
         for block in blocks where block.contains("<name>") {
             let name = firstGroup(pattern: "<name>([^<]*)</name>", in: block) ?? ""
             let desc = firstGroup(pattern: "<description>([^<]*)</description>", in: block) ?? ""
+            let command1 = firstGroup(pattern: "<command1>([^<]*)</command1>", in: block) ?? ""
+            let command2 = firstGroup(pattern: "<command2>([^<]*)</command2>", in: block) ?? ""
             let type = Int(firstGroup(pattern: "<type>([^<]*)</type>", in: block) ?? "0") ?? 0
             let width = Int(firstGroup(pattern: "<width>([^<]*)</width>", in: block) ?? "1") ?? 1
             let height = Int(firstGroup(pattern: "<height>([^<]*)</height>", in: block) ?? "1") ?? 1
             let modelID = firstGroup(pattern: "<objectModel>([^<]*)</objectModel>", in: block) ?? ""
             parsed.append(GameObjectDefinition(
-                id: idCounter, name: name, description: desc, type: type,
+                id: idCounter, name: name, description: desc,
+                command1: command1, command2: command2, type: type,
                 width: width, height: height, modelID: modelID
             ))
             idCounter += 1
