@@ -416,6 +416,15 @@ final class RSCWorldState: ObservableObject {
     /// or when we send a public chat. Bubble shows while messageTimeout > 0.
     @Published var localMessage: String = ""
     @Published var localMessageTimeout: Int = 0
+
+    /// Last tile we asked the server to walk us to, plus a fading-marker
+    /// counter so the renderer can pulse a small X on the destination
+    /// while the engine is en route. Java's mudclient doesn't render
+    /// this, but it's a key piece of mobile feedback — without it taps
+    /// can feel like nothing happened until the avatar starts moving.
+    @Published var walkTargetX: Int = 0
+    @Published var walkTargetY: Int = 0
+    @Published var walkTargetTimeout: Int = 0
     @Published var localBubbleItem: Int = -1
     @Published var localBubbleTimeout: Int = 0
     @Published var localProjectileSprite: Int = -1

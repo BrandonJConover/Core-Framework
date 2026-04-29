@@ -28,7 +28,7 @@ final class RSCGameEngine: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     // Camera/zoom state for mobile controls
-    @Published var zoomLevel: CGFloat = 1.6 // 0.5 = zoomed out, 2.0 = zoomed in
+    @Published var zoomLevel: CGFloat = 1.0 // 0.5 = zoomed out, 2.0 = zoomed in
     @Published var cameraAngle: CGFloat = 0.0 // degrees rotation
 
     // Render logging counter
@@ -46,7 +46,7 @@ final class RSCGameEngine: ObservableObject {
     // looking down (matches mudclient.java default).
     private var cameraRotation: Int32 = 0
     private var cameraPitch: Int32 = 64
-    private var cameraZoom: Int32 = 750  // Java default: 750 (mudclient.java:311)
+    private var cameraZoom: Int32 = 1200  // Java default: 750; native starts wider on phone screens
 
     /// Camera rotation in degrees (0..360). Read by gesture handlers in GameView.
     var cameraRotationDegrees: Double { Double(cameraRotation) * 360.0 / 256.0 }
@@ -242,6 +242,17 @@ final class RSCGameEngine: ObservableObject {
         if worldState.localBubbleTimeout > 0 { worldState.localBubbleTimeout -= 1 }
         if worldState.localProjectileRange > 0 { worldState.localProjectileRange -= 1 }
         if worldState.localMessageTimeout > 0 { worldState.localMessageTimeout -= 1 }
+        if worldState.walkTargetTimeout > 0 {
+            // Drop the marker as soon as we step onto the tile; the
+            // timeout is just a safety net for paths that get cancelled
+            // by the server (NPC blocking the destination, etc).
+            if worldState.localPlayerX == worldState.walkTargetX
+                && worldState.localPlayerY == worldState.walkTargetY {
+                worldState.walkTargetTimeout = 0
+            } else {
+                worldState.walkTargetTimeout -= 1
+            }
+        }
         for i in 0..<worldState.teleportBubbles.count {
             worldState.teleportBubbles[i].time += 1
         }
@@ -326,6 +337,7 @@ final class RSCGameEngine: ObservableObject {
             // (World.generateLandscapeModel places verts at tileX*128, tileX in [-half,+half]).
             // So camera center = (0, -cameraY, 0) puts the camera directly above the player
             // origin. Absolute world position doesn't enter the projection math.
+            cameraZoom = Int32(1200.0 / max(0.5, min(3.0, Double(zoomLevel))))
             let cameraY: Int32 = 180  // height above ground
             scene.fogLandscapeDistance = cameraZoom * 6
             scene.setCamera(
@@ -396,8 +408,9 @@ final class RSCGameEngine: ObservableObject {
                 let appearance = worldState.playerAppearances[player.id]
                 let sprites: [Int] = appearance.map { app in
                     // Java zero-fills unequipped slots; treat 0 as "no sprite"
-                    // so CharacterBillboards skips it (matches drawPlayer).
-                    app.layerSprites.map { $0 == 0 ? -1 : $0 }
+                    // and subtract 1 from non-zero layerAnimation values before
+                    // AnimationDef lookup (mudclient.java:6584).
+                    app.layerSprites.map { $0 <= 0 ? -1 : $0 - 1 }
                 } ?? defaultPlayerSprites
                 let hairIdx = appearance?.colourHair ?? defaultHairIdx
                 let topIdx = appearance?.colourTop ?? defaultTopIdx
@@ -422,7 +435,7 @@ final class RSCGameEngine: ObservableObject {
             let localCombatRole: CharacterBillboards.CombatRole = worldState.inCombat ? .combatB : .none
             let localApp = worldState.playerAppearances[worldState.playerServerIndex]
             let localSprites: [Int] = localApp.map { app in
-                app.layerSprites.map { $0 == 0 ? -1 : $0 }
+                app.layerSprites.map { $0 <= 0 ? -1 : $0 - 1 }
             } ?? defaultPlayerSprites
             CharacterBillboards.register(
                 scene: scene, spriteLoader: spriteLoader,
@@ -499,10 +512,36 @@ final class RSCGameEngine: ObservableObject {
         drawProjectiles()
         drawTeleportBubbles()
         drawGroundItems3D()
+        drawWalkTargetMarker()
         drawOverheadItemBubbles()
         drawSkullIndicators()
         drawDamageSplats()
         drawChatBubbles()
+    }
+
+    /// Mobile tap feedback: a small fading X on the server walk target. This
+    /// intentionally uses Scene.projectPoint rather than a second projection
+    /// approximation, so the marker lines up with the same camera as characters.
+    private func drawWalkTargetMarker() {
+        guard worldState.walkTargetTimeout > 0, let scene = self.scene else { return }
+        let dx = worldState.walkTargetX - worldState.localPlayerX
+        let dz = worldState.walkTargetY - worldState.localPlayerY
+        guard abs(dx) <= 32 && abs(dz) <= 32 else { return }
+
+        let proj = scene.projectPoint(
+            worldX: Int32(dx) * 128 + 64,
+            worldY: 0,
+            worldZ: Int32(dz) * 128 + 64
+        )
+        guard proj.depth >= scene.rot1024_zTop else { return }
+
+        let alpha = max(64, min(255, worldState.walkTargetTimeout * 4))
+        let color = (UInt32(alpha) << 24) | 0x00FF3333
+        let x = Int(proj.screenX)
+        let y = Int(proj.screenY)
+        let r = 6 + (renderLogCount / 6) % 3
+        drawLine(x0: x - r, y0: y - r / 2, x1: x + r, y1: y + r / 2, color: color)
+        drawLine(x0: x - r, y0: y + r / 2, x1: x + r, y1: y - r / 2, color: color)
     }
 
     /// Draws dropped ground items in the live 3D view. The packet handler was
@@ -1073,6 +1112,34 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    private func drawLine(x0: Int, y0: Int, x1: Int, y1: Int, color: UInt32) {
+        let w = MetalRenderer.gameWidth
+        let h = MetalRenderer.gameHeight
+        var x = x0
+        var y = y0
+        let dx = abs(x1 - x0)
+        let sx = x0 < x1 ? 1 : -1
+        let dy = -abs(y1 - y0)
+        let sy = y0 < y1 ? 1 : -1
+        var err = dx + dy
+
+        while true {
+            if x >= 0 && x < w && y >= 0 && y < h {
+                pixelData[y * w + x] = Int32(bitPattern: color)
+            }
+            if x == x1 && y == y1 { break }
+            let e2 = err * 2
+            if e2 >= dy {
+                err += dy
+                x += sx
+            }
+            if e2 <= dx {
+                err += dx
+                y += sy
+            }
+        }
+    }
+
     // Simple 3x5 pixel font for rendering text on the map
     private static let font3x5: [Character: [UInt8]] = {
         // Each character is 3 wide x 5 tall, stored as 5 rows of 3 bits
@@ -1412,45 +1479,56 @@ final class RSCGameEngine: ObservableObject {
 
     // MARK: - Input handling
 
+    /// Pick the tile whose projected center is nearest to a game-canvas pixel.
+    /// The previous input code tried to invert the camera with a hand-rolled
+    /// raycast, which drifted badly as soon as camera rotation/zoom changed.
+    /// Sampling projected tile centers is cheap at RSC scale and guarantees
+    /// tap-to-walk and long-press context menus use the same camera math as the
+    /// renderer.
+    private func worldTileNearestScreenPoint(gameX: Double, gameY: Double) -> (x: Int, z: Int) {
+        guard let scene = self.scene else {
+            return (worldState.localPlayerX, worldState.localPlayerY)
+        }
+
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+        var best = (x: px, z: pz)
+        var bestDist = Double.greatestFiniteMagnitude
+
+        for dz in -24...24 {
+            for dx in -24...24 {
+                let localX = dx * 128 + 64
+                let localZ = dz * 128 + 64
+                let elevation = world?.getElevation(x: localX, z: localZ) ?? 0
+                let proj = scene.projectPoint(
+                    worldX: Int32(localX),
+                    worldY: -Int32(elevation),
+                    worldZ: Int32(localZ)
+                )
+                guard proj.depth >= scene.rot1024_zTop else { continue }
+
+                let sx = Double(proj.screenX)
+                let sy = Double(proj.screenY)
+                guard sx >= -64 && sx <= Double(MetalRenderer.gameWidth + 64),
+                      sy >= -64 && sy <= Double(MetalRenderer.gameHeight + 64) else { continue }
+
+                let ddx = sx - gameX
+                let ddy = sy - gameY
+                let dist = ddx * ddx + ddy * ddy
+                if dist < bestDist {
+                    bestDist = dist
+                    best = (x: px + dx, z: pz + dz)
+                }
+            }
+        }
+
+        return best
+    }
+
     private func handleTap(x: Int, y: Int) {
-        // Convert screen tap → world tile by inverting the same camera transform
-        // the renderer uses. The Scene projects with rot1024 yaw/pitch; we
-        // approximate the inverse by raycasting from the camera through the tap
-        // pixel and intersecting the y=0 ground plane.
-        let w = Double(MetalRenderer.gameWidth)
-        let h = Double(MetalRenderer.gameHeight)
-
-        // Tap in normalized device coords (-1..+1)
-        let ndx = (Double(x) - w / 2.0) / (w / 2.0)
-        let ndy = (Double(y) - h / 2.0) / (h / 2.0)
-
-        // Approximate field of view for our perspective: ~60° horizontal at the
-        // current zoom. Larger zoom values pull camera back, narrowing FOV.
-        let zoomFactor = max(0.4, 1500.0 / Double(cameraZoom * 2))
-        let viewX = ndx * zoomFactor                         // ground X offset per unit ray length
-        let viewY = ndy * zoomFactor * (h / w)               // pitch component
-
-        // Camera angles
-        let yawRad = Double(cameraRotation) * 2.0 * .pi / 1024.0
-        let pitchRad = Double(cameraPitch) * 2.0 * .pi / 1024.0
-
-        // Tap point's ground projection in camera-space, then rotated by yaw.
-        // viewY is forward-tilt; multiply by camera height (180 units) and
-        // adjust by pitch to get world-Z (forward) and use viewX for sideways.
-        let groundForward = (1.0 - viewY) * 180.0 / max(0.0001, sin(pitchRad))
-        let groundRight = viewX * groundForward
-
-        // Convert (right, forward) in camera space to world (X, Z) by rotating
-        // by camera yaw. Tile size is 128 game units.
-        let cosY = cos(yawRad), sinY = sin(yawRad)
-        let dxWorld = groundRight * cosY + groundForward * sinY
-        let dzWorld = -groundRight * sinY + groundForward * cosY
-
-        let tileOffsetX = Int(dxWorld / 128.0)
-        let tileOffsetY = Int(dzWorld / 128.0)
-
-        let destX = worldState.localPlayerX + tileOffsetX
-        let destZ = worldState.localPlayerY + tileOffsetY
+        let target = worldTileNearestScreenPoint(gameX: Double(x), gameY: Double(y))
+        let destX = target.x
+        let destZ = target.z
 
         // Check if tap is near an NPC (within 2 tiles)
         var nearestNPC: RSCNPC? = nil
@@ -1515,6 +1593,13 @@ final class RSCGameEngine: ObservableObject {
             let path = pathfinder.findPath(fromX: worldState.localPlayerX, fromZ: worldState.localPlayerY,
                                            toX: destX, toZ: destZ, maxSteps: 25)
             print("[Input] Walk to (\(destX),\(destZ)) path=\(path.count) waypoints")
+            // Drop a fading X on the requested tile (use the last reachable
+            // waypoint when the path was clipped by walls so the marker
+            // tracks where the avatar will actually end up).
+            let markerEnd = path.last
+            worldState.walkTargetX = markerEnd?.x ?? destX
+            worldState.walkTargetY = markerEnd?.z ?? destZ
+            worldState.walkTargetTimeout = 80   // ~4s at 50ms ticks
             Task {
                 let buf = ByteBuffer()
                 buf.newPacket(opcode: 187)  // WALK_TO_POINT
@@ -1537,34 +1622,16 @@ final class RSCGameEngine: ObservableObject {
     // MARK: - Context Menu
 
     func showContextMenu(at screenPoint: CGPoint) {
-        let w = MetalRenderer.gameWidth
-        let h = MetalRenderer.gameHeight
-
         // Convert screen point to game pixel coordinates
         let viewSize = touchTranslator.viewSize
-        let scaleX = CGFloat(w) / max(1, viewSize.width)
-        let scaleY = CGFloat(h) / max(1, viewSize.height)
+        let scaleX = CGFloat(MetalRenderer.gameWidth) / max(1, viewSize.width)
+        let scaleY = CGFloat(MetalRenderer.gameHeight) / max(1, viewSize.height)
         let gx = Double(screenPoint.x) * Double(scaleX)
         let gy = Double(screenPoint.y) * Double(scaleY)
 
-        // Reverse projection — same ground-plane raycast handleTap uses, so the
-        // context-menu picker lines up with where the user actually pressed.
-        let ndx = (gx - Double(w) / 2.0) / (Double(w) / 2.0)
-        let ndy = (gy - Double(h) / 2.0) / (Double(h) / 2.0)
-        let zoomFactor = max(0.4, 1500.0 / Double(cameraZoom * 2))
-        let viewX = ndx * zoomFactor
-        let viewY = ndy * zoomFactor * (Double(h) / Double(w))
-        let yawRad = Double(cameraRotation) * 2.0 * .pi / 1024.0
-        let pitchRad = Double(cameraPitch) * 2.0 * .pi / 1024.0
-        let groundForward = (1.0 - viewY) * 180.0 / max(0.0001, sin(pitchRad))
-        let groundRight = viewX * groundForward
-        let cosY = cos(yawRad), sinY = sin(yawRad)
-        let dxWorld = groundRight * cosY + groundForward * sinY
-        let dzWorld = -groundRight * sinY + groundForward * cosY
-        let tileOffsetX = Int(dxWorld / 128.0)
-        let tileOffsetY = Int(dzWorld / 128.0)
-        let worldX = worldState.localPlayerX + tileOffsetX
-        let worldZ = worldState.localPlayerY + tileOffsetY
+        let target = worldTileNearestScreenPoint(gameX: gx, gameY: gy)
+        let worldX = target.x
+        let worldZ = target.z
 
         var actions: [(label: String, icon: String, action: () -> Void)] = []
         var title = "(\(worldX), \(worldZ))"

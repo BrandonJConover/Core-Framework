@@ -2,10 +2,10 @@ import CoreGraphics
 
 // Maps iOS touch coordinates to RSC game coordinates and gesture types.
 // Port of InputImpl.java (com.openrsc.android.render.InputImpl).
-// Game canvas is always 512x346 logical pixels.
+// Game canvas is always 512x334 logical pixels.
 final class TouchTranslator {
     static let gameWidth:  CGFloat = 512
-    static let gameHeight: CGFloat = 346
+    static let gameHeight: CGFloat = 334
 
     // Callback set by RSCGameEngine to receive translated actions.
     var onTap:       ((Int, Int) -> Void)?     // x, y in game coords

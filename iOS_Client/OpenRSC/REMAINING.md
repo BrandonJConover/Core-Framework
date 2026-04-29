@@ -61,6 +61,29 @@ Must report `BUILD SUCCEEDED`. iPhone 15 Pro device: `Brick the 15th`, id `00008
 - [x] Right-click context menu: long-press already triggers it, but the action list is empty. Build context-menu actions per target type (NPC: Talk to, Attack, Examine; Player: Trade, Duel, Follow, Examine; Object: Use, Examine; Item: Pickup, Examine). _(commit f61a4cb80 — also fixed the picker projection to match the tap-to-walk math)_
 - [x] Friend status notifications: opcode 149 already adds chat — also flash a small toast UI when friends come online/offline. _(commit 3c7c9afdf — top-right capsule toasts, 3s auto-dismiss)_
 
+## Visible polish backlog (each fits one iteration)
+
+- [x] Tap/appearance alignment fixes: player appearance layers now subtract one before AnimationDef lookup like Java, touch scaling matches the 512x334 Metal buffer, pinch zoom drives Scene camera distance, and tap/context-menu targeting chooses the nearest camera-projected tile instead of an approximate inverse raycast.
+- [x] Walk-target X marker: drop a small fading red X on the tile we sent to opcode 187 so the player gets feedback that their tap registered. Persist `walkTargetX/Z/Timeout` on `RSCWorldState`, set in `handleTap` after the walk packet ships, decay in `tick()`, and render via `Scene.projectPoint` in `drawHUDOverlay`. Java's mudclient doesn't draw one, but RSC+ and most modern clones do; high-value affordance for mobile.
+- [ ] Smooth movement interpolation: remote players + NPCs snap a full tile per server tick. Track `prevX/prevZ` plus an interpolation phase advanced each render tick (engine timer is ~50ms, server ticks every ~640ms), so `CharacterBillboards.register` projects from the lerp'd position. Java client interpolates between waypointsX/waypointsZ; we'd port the same idea minus the queue.
+- [ ] XP-drop float-up over the local player: `worldState.xpDrops` already exists but we render it as a static top-right list. Java floats `+12 Strength` upward from the player and fades. Move the renderer to project from the local player's screen anchor and animate Y over the drop's lifetime.
+- [ ] Ground-item stack-count badge: opcode 99 gives ground items but stacks (coins/arrows/runes) all look like singles. Read `ItemDef.stackable` from the bundled JSON and overlay an `xN` count on the world marker when amount > 1.
+- [ ] Channel-coloured chat: `[Quest]`, `[Server]`, `[Trade]`, `[System]` all render white today. `RSCChatMessage` already passes `isPrivate/isLocal/isKill`; widen the enum (or add a `channel` field) so `chatColor` in HUDView paints quest text orange, system yellow, trade green, etc.
+- [ ] Wilderness crossing warning: opcode firing when the player crosses the ditch (Java emits a "Warning! Wilderness" interface). Identify the opcode in PacketHandler.java, capture `wildernessLevel` on world state, and surface it as a one-shot dismissible overlay.
+- [ ] Run/walk toggle + run-energy bar in HUD: `worldState.fatigue/run-energy` already arrives. Add a small "Run/Walk" button next to the existing combat-style chip and a thin energy bar that drains while running.
+
+## Bigger structural gaps (multi-iteration)
+
+- [ ] 3D models for trees / buildings / doors: `ModelArchiveLoader.shared` is in the avoid list and currently a stub. Game objects render as colored blocks instead of RSModels. Real port needs the .ob3 format reader + per-tile elevation blending in Scene; deferred behind the texture-port plan.
+- [ ] Use-item-on-X workflow: long-press shows "Use" but tapping it does nothing — there's no follow-up inventory picker, so the second item never gets selected. Need a transient "select target" mode that consumes the next entity tap.
+- [ ] Bank/Trade/Duel/Shop interaction wiring: panels exist (avoid-listed) but the deposit/withdraw/accept/stake actions don't all fire the corresponding server packets yet. Audit each panel for missing engine calls.
+- [ ] Camera occlusion: Java pulls the camera in when geometry blocks line-of-sight to the player. Currently the iOS camera clips through walls.
+
+## Cheap correctness items
+
+- [ ] Local stash of preferences (chat-channel filters, sound on/off, run-default). Save to `UserDefaults` so settings persist across app launches.
+- [ ] Bubble-item icon ↔ chat-bubble vertical conflict: when both fire on the same character, they currently stack on top of each other. Anchor chat above the bubble icon, not the head.
+
 ## Workflow per iteration
 
 1. Pick top unchecked item.
