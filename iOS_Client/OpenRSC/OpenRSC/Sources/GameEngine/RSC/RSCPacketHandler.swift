@@ -306,21 +306,21 @@ final class RSCPacketHandler {
             print("[Packet] Character creation screen requested")
 
         case 90:  // SET_INVENTORY_SLOT — Java updateInventoryItem()
-            // Format: SHORT slot, SHORT itemID, BYTE equipped, INT amount (if stackable)
-            if buf.bytesRemaining >= 3 {
-                let slot90 = buf.getShort()
-                var itemID90 = buf.getShort()
-                let equipped90 = (itemID90 / 32768) != 0
-                itemID90 &= 32767
-                let amount90 = buf.bytesRemaining >= 4 ? buf.get32() : 1
-                if slot90 < ws.inventory.count {
-                    ws.inventory[slot90].itemId = itemID90
-                    ws.inventory[slot90].equipped = equipped90
-                    ws.inventory[slot90].amount = amount90
-                } else {
-                    // Append new slot
-                    ws.inventory.append(RSCInventoryItem(id: slot90, itemId: itemID90, amount: amount90, equipped: equipped90))
+            // Format: BYTE slot, SHORT itemID-with-equipped-bit, BYTE noted, [INT amount if stackable/noted]
+            if buf.bytesRemaining >= 4 {
+                let slot90 = buf.getUnsignedByte()
+                let rawItemID90 = buf.getUnsignedShort()
+                let noted90 = buf.getUnsignedByte() == 1
+                let equipped90 = (rawItemID90 / 32768) != 0
+                let itemID90 = rawItemID90 & 32767
+                let amount90 = ItemDefinitions.isStackable(itemID90, noted: noted90) && buf.bytesRemaining >= 4 ? buf.get32() : 1
+
+                while ws.inventory.count <= slot90 {
+                    ws.inventory.append(RSCInventoryItem(id: ws.inventory.count, itemId: 0, amount: 0, equipped: false))
                 }
+                ws.inventory[slot90].itemId = itemID90
+                ws.inventory[slot90].equipped = equipped90
+                ws.inventory[slot90].amount = amount90
             }
 
         case 123: // REMOVE_INVENTORY_SLOT — Java removeItem()
@@ -785,18 +785,15 @@ final class RSCPacketHandler {
     }
 
     // Port of PacketHandler.java updateInventory() — opcode 53
-    // Format: BYTE count, then per item: SHORT itemID, BYTE equipped, BYTE noted, [INT amount if stackable]
+    // Format: BYTE count, then per item: SHORT itemID, BYTE equipped, BYTE noted, [INT amount if stackable/noted]
     private func handleUpdateInventory(buf: ByteBuffer, ws: RSCWorldState) {
         let count = buf.getUnsignedByte()
         var items: [RSCInventoryItem] = []
         for i in 0..<count {
-            let itemId = buf.getShort()
+            let itemId = buf.getUnsignedShort()
             let equipped = buf.getByte() != 0
             let noted = buf.getByte() == 1
-            // For stackable items, read 4-byte amount; otherwise amount=1
-            // We don't have item defs to check stackability, so check if there are enough bytes
-            // Simple heuristic: if remaining bytes > expected for rest of items, read amount
-            let amount = 1  // TODO: read get32() for stackable items when item defs available
+            let amount = ItemDefinitions.isStackable(itemId, noted: noted) && buf.bytesRemaining >= 4 ? buf.get32() : 1
             items.append(RSCInventoryItem(id: i, itemId: itemId, amount: amount, equipped: equipped))
         }
         ws.inventory = items
