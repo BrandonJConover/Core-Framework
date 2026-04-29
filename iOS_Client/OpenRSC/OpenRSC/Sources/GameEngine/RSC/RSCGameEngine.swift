@@ -498,10 +498,76 @@ final class RSCGameEngine: ObservableObject {
 
         drawProjectiles()
         drawTeleportBubbles()
+        drawGroundItems3D()
         drawOverheadItemBubbles()
         drawSkullIndicators()
         drawDamageSplats()
         drawChatBubbles()
+    }
+
+    /// Draws dropped ground items in the live 3D view. The packet handler was
+    /// already retaining opcode 99, but the Scene path only showed those items
+    /// on the minimap/fallback map. This projects the tile centre through the
+    /// active camera and uses the Java item sprite range (spriteItem + itemId)
+    /// when available, falling back to a small pickup marker plus short label.
+    private func drawGroundItems3D() {
+        guard let scene = self.scene else { return }
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+        for item in worldState.groundItems {
+            let dx = item.x - px
+            let dz = item.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: -8,
+                worldZ: Int32(dz) * 128 + 64
+            )
+            guard proj.depth >= scene.rot1024_zTop else { continue }
+            drawGroundItemMarker(
+                itemId: item.itemId,
+                amount: item.amount,
+                centerX: Int(proj.screenX),
+                centerY: Int(proj.screenY)
+            )
+        }
+    }
+
+    private func drawGroundItemMarker(itemId: Int, amount: Int, centerX: Int, centerY: Int) {
+        let w = MetalRenderer.gameWidth
+        let h = MetalRenderer.gameHeight
+        let spriteId = 2150 + itemId
+        if let gs = spriteLoader.getSprite(spriteId), gs.width <= 32, gs.height <= 32 {
+            spriteLoader.drawSprite(
+                spriteId,
+                onto: &pixelData,
+                bufferWidth: w,
+                bufferHeight: h,
+                atX: centerX - gs.width / 2,
+                atY: centerY - gs.height / 2,
+                scale: 1
+            )
+            if amount > 1 {
+                let suffix = amount >= 1_000 ? "\(amount / 1_000)K" : "\(amount)"
+                drawText(suffix, x: centerX + 4, y: centerY + 2, color: 0xFFFFFF00)
+            }
+            return
+        }
+
+        let outline = Int32(bitPattern: 0xFF000000)
+        let fill = Int32(bitPattern: 0xFFFF3333)
+        for dy in -4...4 {
+            let span = 4 - abs(dy)
+            for dx in -span...span {
+                let sx = centerX + dx
+                let sy = centerY + dy
+                guard sx >= 0 && sx < w && sy >= 0 && sy < h else { continue }
+                pixelData[sy * w + sx] = abs(dy) == 4 || abs(dx) == span ? outline : fill
+            }
+        }
+        let name = ItemNames.name(for: itemId)
+        let label = name == "Item" ? "\(itemId)" : String(name.prefix(10))
+        drawText(label, x: centerX - label.count * 2, y: centerY + 7, color: 0xFFFF6666)
     }
 
     /// Floats short chat messages above NPCs and players, mirroring Java's
