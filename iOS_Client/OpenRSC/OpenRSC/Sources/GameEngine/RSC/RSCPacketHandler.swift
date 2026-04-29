@@ -560,10 +560,11 @@ final class RSCPacketHandler {
         // Local player absolute position (11-bit X, 13-bit Z, 4-bit direction)
         let localX = buf.getBitMask(11)
         let localZ = buf.getBitMask(13)
-        let _ = buf.getBitMask(4) // direction
+        let localDir = buf.getBitMask(4)
 
         ws.localPlayerX = localX
         ws.localPlayerY = localZ
+        ws.localPlayerDirection = localDir & 7
 
         // Number of known players to update
         let knownCount = buf.getBitMask(8)
@@ -592,12 +593,13 @@ final class RSCPacketHandler {
             if relX > 31 { relX -= 64 }
             var relZ = buf.getBitMask(6)
             if relZ > 31 { relZ -= 64 }
-            let _ = buf.getBitMask(4) // direction
+            let dir = buf.getBitMask(4)
 
             let playerTileX = localX + relX
             let playerTileZ = localZ + relZ
             newPlayers.append(RSCPlayer(id: serverIndex, x: playerTileX, y: playerTileZ,
-                                        name: "Player \(serverIndex)", moving: false, combatLevel: 0))
+                                        name: "Player \(serverIndex)", moving: false, combatLevel: 0,
+                                        direction: dir & 7))
         }
 
         buf.endBitAccess()
@@ -661,13 +663,15 @@ final class RSCPacketHandler {
             if relX > 31 { relX -= 64 }
             var relZ = buf.getBitMask(6)
             if relZ > 31 { relZ -= 64 }
-            let _ = buf.getBitMask(4) // direction
+            let dir = buf.getBitMask(4)
             let npcTypeId = buf.getBitMask(10)
 
             let npcTileX = localX + relX
             let npcTileZ = localZ + relZ
-            keptNPCs.append(RSCNPC(id: serverIndex, x: npcTileX, y: npcTileZ,
-                                    npcId: npcTypeId, name: NPCNames.name(for: npcTypeId)))
+            var npc = RSCNPC(id: serverIndex, x: npcTileX, y: npcTileZ,
+                             npcId: npcTypeId, name: NPCNames.name(for: npcTypeId))
+            npc.direction = dir & 7
+            keptNPCs.append(npc)
             newCount += 1
         }
 

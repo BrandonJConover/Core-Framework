@@ -7,6 +7,9 @@ struct RSCPlayer: Identifiable {
     var name: String
     var moving: Bool
     var combatLevel: Int
+    /// 0..7 facing direction from showOtherPlayers's 4-bit field. Defaults
+    /// to 4 (south) so the renderer keeps working before the first sync.
+    var direction: Int = 4
 }
 
 /// Appearance data delivered by opcode 234 case 5 (full appearance update).
@@ -40,6 +43,9 @@ struct RSCNPC: Identifiable {
     var combatTimeout: Int = 0
     var message: String = ""
     var messageTimeout: Int = 0
+    /// 0..7 facing direction captured from showNPCs's per-NPC 4-bit field.
+    /// Defaults to 4 (south) so the renderer always has a valid value.
+    var direction: Int = 4
 }
 
 struct RSCGameObject: Identifiable {
@@ -129,6 +135,10 @@ struct RSCEquipmentStats {
 final class RSCWorldState: ObservableObject {
     @Published var localPlayerX: Int = 0
     @Published var localPlayerY: Int = 0
+    /// Local player's 0..7 facing direction from showOtherPlayers's
+    /// 4-bit field. The renderer feeds this to CharacterBillboards so the
+    /// local avatar faces the way the server says it's facing.
+    @Published var localPlayerDirection: Int = 4
     @Published var localPlayerName: String = ""
     @Published var players: [RSCPlayer] = []
     /// Per-player appearance keyed by serverIndex. Survives the per-tick

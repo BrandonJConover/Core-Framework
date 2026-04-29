@@ -328,7 +328,7 @@ final class RSCGameEngine: ObservableObject {
                     CharacterBillboards.register(
                         scene: scene, spriteLoader: spriteLoader,
                         tileX: npc.x - px, tileZ: npc.y - pz,
-                        rsDir: 4,  // TODO: track NPC direction from packet updates
+                        rsDir: npc.direction,
                         stepFrame: role == .none ? renderLogCount : combatTick,
                         walkModel: def.walkModel,
                         cameraRotation: cameraRotation,
@@ -361,7 +361,7 @@ final class RSCGameEngine: ObservableObject {
                 CharacterBillboards.register(
                     scene: scene, spriteLoader: spriteLoader,
                     tileX: player.x - px, tileZ: player.y - pz,
-                    rsDir: 4, stepFrame: renderLogCount,
+                    rsDir: player.direction, stepFrame: renderLogCount,
                     walkModel: 6,
                     cameraRotation: cameraRotation,
                     sprites: sprites,
@@ -382,7 +382,7 @@ final class RSCGameEngine: ObservableObject {
             CharacterBillboards.register(
                 scene: scene, spriteLoader: spriteLoader,
                 tileX: 0, tileZ: 0,
-                rsDir: 4, stepFrame: renderLogCount,
+                rsDir: worldState.localPlayerDirection, stepFrame: renderLogCount,
                 walkModel: 6,
                 cameraRotation: cameraRotation,
                 sprites: localSprites,
