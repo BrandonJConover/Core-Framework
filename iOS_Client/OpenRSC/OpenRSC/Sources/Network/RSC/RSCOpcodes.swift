@@ -15,6 +15,7 @@ enum RSCOutOpcode: UInt8 {
     case npcTalkTo          = 153
     case npcAttack          = 190
     case npcCommand         = 202
+    case npcCommand2        = 203
     case playerAttack       = 171
     case playerDuel         = 103
     case playerTrade        = 142

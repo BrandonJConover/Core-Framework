@@ -1579,14 +1579,25 @@ final class RSCGameEngine: ObservableObject {
                 actions.append(("Talk to \(npc.name)", "bubble.left", { [weak self] in
                     self?.talkToNPC(serverIndex: npc.id)
                 }))
-                if let def = NPCDefinitions.get(npc.npcId), def.attackable {
-                    actions.append(("Attack \(npc.name) (lvl \(def.combatLevel))", "bolt.fill", { [weak self] in
-                        self?.attackNPC(serverIndex: npc.id)
-                    }))
+                if let def = NPCDefinitions.get(npc.npcId) {
+                    let command1 = def.command.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if def.attackable {
+                        actions.append(("Attack \(npc.name) (lvl \(def.combatLevel))", "bolt.fill", { [weak self] in
+                            self?.attackNPC(serverIndex: npc.id)
+                        }))
+                    }
+                    if !command1.isEmpty && command1.lowercased() != "null" {
+                        actions.append(("\(command1) \(npc.name)", "hand.raised", { [weak self] in
+                            self?.npcCommand(serverIndex: npc.id)
+                        }))
+                    }
+                    if !command2.isEmpty && command2.lowercased() != "null" {
+                        actions.append(("\(command2) \(npc.name)", "ellipsis.circle", { [weak self] in
+                            self?.npcCommand2(serverIndex: npc.id)
+                        }))
+                    }
                 }
-                actions.append(("Pickpocket \(npc.name)", "hand.raised", { [weak self] in
-                    self?.npcCommand(serverIndex: npc.id)
-                }))
                 actions.append(("Examine \(npc.name)", "eye", { [weak self] in
                     let descr = NPCDefinitions.get(npc.npcId)?.description ?? npc.name
                     self?.worldState.addChat(sender: "[Examine]", text: descr)
@@ -2097,6 +2108,15 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand.rawValue))
+            buf.putShort(serverIndex)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func npcCommand2(serverIndex: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand2.rawValue))
             buf.putShort(serverIndex)
             try? await connection.send(buf.finishPacket())
         }
