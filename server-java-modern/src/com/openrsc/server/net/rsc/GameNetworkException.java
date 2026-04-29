@@ -2,7 +2,9 @@ package com.openrsc.server.net.rsc;
 
 public class GameNetworkException extends RuntimeException  {
 	private static final long serialVersionUID = 1L;
-	private final Object struct;
+	// Object isn't Serializable — mark transient so the exception can still
+	// serialize cleanly without dragging the source struct's class along.
+	private final transient Object struct;
 	private final String reason;
 	private final String exposedDetail; // any exposed detail to send out
 

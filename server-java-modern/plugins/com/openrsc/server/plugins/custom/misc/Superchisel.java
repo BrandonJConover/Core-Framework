@@ -222,6 +222,7 @@ public class Superchisel implements OpInvTrigger, UseInvTrigger, UseNpcTrigger {
 	}
 
 	@Override
+	@SuppressWarnings("fallthrough")
 	public void onUseInv(Player player, Integer invIndex, Item item1, Item item2) {
 		// mes("It does kind of look like those would go together, eh?");
 

@@ -485,6 +485,7 @@ public class PeelingTheOnion implements QuestInterface {
 		}
 	}
 
+	@SuppressWarnings("fallthrough")
 	public static void aggieDialogue(Player player, Npc npc) {
 		int questState = player.getQuestStage(Quests.PEELING_THE_ONION);
 		switch (questState) {

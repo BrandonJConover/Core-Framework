@@ -507,6 +507,7 @@ public class Present implements UsePlayerTrigger, OpInvTrigger {
 		cabbageRollAndAwardPresent(player, player, true);
 	}
 
+	@SuppressWarnings("fallthrough")
 	private void openRSCRollAndAwardPresent(Player player, Player otherPlayer, boolean selfUse) {
 		ArrayList<Item> prizeList = openRSCPresentDrops.rollItem(false, otherPlayer);
 		if (prizeList.size() <= 0) return;

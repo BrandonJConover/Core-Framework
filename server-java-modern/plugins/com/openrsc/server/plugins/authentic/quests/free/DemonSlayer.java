@@ -1210,6 +1210,7 @@ public class DemonSlayer implements QuestInterface,
 	}
 
 	@Override
+	@SuppressWarnings("fallthrough")
 	public void onAttackNpc(Player player, Npc affectedmob) {
 		if (affectedmob.getID() == NpcId.DELRITH.id()) {
 			switch (player.getQuestStage(this)) {
@@ -1218,6 +1219,7 @@ public class DemonSlayer implements QuestInterface,
 				case 2:
 				case 3:
 					say(player, null, "I'd rather not. He looks scary");
+					// fall through
 				case 4:
 					if (!player.getCarriedItems().getEquipment().hasEquipped(ItemId.SILVERLIGHT.id())) {
 						say(player, null, "Maybe I'd better wield silverlight first");

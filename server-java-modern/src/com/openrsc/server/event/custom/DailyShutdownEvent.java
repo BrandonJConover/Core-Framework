@@ -1,5 +1,6 @@
 package com.openrsc.server.event.custom;
 
+import com.openrsc.server.Server;
 import com.openrsc.server.event.rsc.GameTickEvent;
 import com.openrsc.server.model.entity.player.Player;
 import com.openrsc.server.model.world.World;
@@ -27,7 +28,7 @@ public class DailyShutdownEvent extends DailyEvent  {
 
 	public void action() {
 		LOGGER.info("Server shutdown (closeProcess) requested by DailyShutdownEvent");
-		getWorld().getServer().closeProcess(60, "Daily Reboot");
+		Server.closeProcess(60, "Daily Reboot");
 		//getWorld().getServer().shutdown(300);
 
 		for (final Player p : getWorld().getPlayers()) {

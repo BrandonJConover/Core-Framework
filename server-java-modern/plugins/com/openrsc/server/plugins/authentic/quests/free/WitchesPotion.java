@@ -158,6 +158,7 @@ public class WitchesPotion implements QuestInterface, TalkNpcTrigger,
 		}
 	}
 
+	@SuppressWarnings("fallthrough")
 	private void miceToMeetYou(final Player player, final Npc npc) {
 		if (!player.getCache().hasKey("mice_to_meet_you")
 			|| (player.getCache().hasKey("mice_to_meet_you")
@@ -401,6 +402,7 @@ public class WitchesPotion implements QuestInterface, TalkNpcTrigger,
 						"By the way",
 						"If you ever happen to lose Eak, just come back to me",
 						"I should be able to find them for you");
+					// fall through
 				default:
 					npcsay("Ask Eak if you need help",
 						"They're pretty clever!",

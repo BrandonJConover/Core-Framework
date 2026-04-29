@@ -1,5 +1,6 @@
 package com.openrsc.server.plugins.authentic.commands;
 
+import com.openrsc.server.Server;
 import com.openrsc.server.constants.*;
 import com.openrsc.server.database.GameDatabaseException;
 import com.openrsc.server.database.impl.mysql.queries.logging.ChatLog;
@@ -820,7 +821,7 @@ public final class Admins implements CommandTrigger {
 			+ (remainder > 0 ? remainder + " second" + (remainder > 1 ? "s" : "") : "")
 			+ (reason.toString().equals("") ? "" : ": % % " + reason);
 		LOGGER.info("Server update requested by Admin " + player.getUsername());
-		player.getWorld().getServer().closeProcess(seconds, message);
+		Server.closeProcess(seconds, message);
 		// Services.lookup(DatabaseManager.class).addQuery(new
 		// StaffLog(player, 7));
 	}

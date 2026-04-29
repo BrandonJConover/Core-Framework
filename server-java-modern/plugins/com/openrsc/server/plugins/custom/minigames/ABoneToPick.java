@@ -152,6 +152,7 @@ public class ABoneToPick implements TimedEventTrigger, TalkNpcTrigger, KillNpcTr
 		}
 	}
 
+	@SuppressWarnings("fallthrough")
 	public static void oddensteinDialogue(Player player, Npc npc) {
 		switch (getStage(player)) {
 			case HEARD_AMAZING_SONG:

@@ -545,6 +545,7 @@ public final class PlayerModerator implements CommandTrigger {
 		player.getUpdateFlags().setAppearanceChanged(true);
 	}
 
+	@SuppressWarnings("fallthrough")
 	private void setRobes(Player player, String[] args) {
 		if (args.length == 0) {
 			mes("Usage: @mag@::setRobes [colour description] (username)");
@@ -674,6 +675,7 @@ public final class PlayerModerator implements CommandTrigger {
 		affectedPlayer.getUpdateFlags().setAppearanceChanged(true);
 	}
 
+	@SuppressWarnings("fallthrough")
 	private void becomeNpc(Player player, String[] args) {
 		if (args.length == 0) {
 			mes("Usage: @mag@::becomeNpc [npc name] (position) (username)");

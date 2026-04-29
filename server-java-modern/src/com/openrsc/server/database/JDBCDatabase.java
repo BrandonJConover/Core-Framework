@@ -30,6 +30,10 @@ public abstract class JDBCDatabase extends GameDatabase {
         }
     }
 
+    // Sibling overload (CheckedConsumer above) is fine because the functional
+    // interfaces have different shapes (no return vs returns T). Suppressing
+    // the lint that flags potential ambiguity for lambda call sites.
+    @SuppressWarnings("overloads")
     public <T> T withPreparedStatement(
             String query,
             CheckedFunction<Exception, PreparedStatement, T> statementFunction
