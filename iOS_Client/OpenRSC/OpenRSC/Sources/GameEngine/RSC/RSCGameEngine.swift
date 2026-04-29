@@ -205,11 +205,19 @@ final class RSCGameEngine: ObservableObject {
 
     private func tick() {
         guard isRunning else { return }
-        // Decrement NPC combat/message timeouts
+        // Decrement NPC combat/message timeouts. damageTimeout is the same
+        // counter — left as combatTimeout in the struct for legacy reasons —
+        // and the splat is drawn while it's > 150 (Java mudclient.java:6515).
         for i in 0..<worldState.npcs.count {
             if worldState.npcs[i].combatTimeout > 0 { worldState.npcs[i].combatTimeout -= 1 }
             if worldState.npcs[i].messageTimeout > 0 { worldState.npcs[i].messageTimeout -= 1 }
         }
+        // Decay player damage splat timeouts (set to 200 by opcode 234 case 2;
+        // splat visible while > 150).
+        for i in 0..<worldState.players.count {
+            if worldState.players[i].damageTimeout > 0 { worldState.players[i].damageTimeout -= 1 }
+        }
+        if worldState.localDamageTimeout > 0 { worldState.localDamageTimeout -= 1 }
         // Tick down the system-update countdown (50ms per tick = engine timer
         // interval). Banner hides automatically when it reaches 0.
         if worldState.systemUpdateTicks > 0 {
@@ -450,6 +458,82 @@ final class RSCGameEngine: ObservableObject {
         }
         let pn = worldState.localPlayerName.isEmpty ? "YOU" : worldState.localPlayerName.uppercased()
         drawText(pn, x: cx - pn.count * 2, y: cy - 20, color: 0xFFFFFF00)
+
+        drawDamageSplats()
+    }
+
+    /// Draws RSC's red damage splats over any character whose damage-timeout
+    /// is in the 150..200 visible window. Mirrors the Java path
+    /// (mudclient.java:6515-6526 for NPCs, :6719-6729 for players): a small
+    /// red disc centred on the head, with the damage value painted in white
+    /// on top. We project tile coords through the live Scene camera so the
+    /// splats track the same screen positions as the billboard sprites.
+    private func drawDamageSplats() {
+        guard let scene = self.scene else { return }
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+
+        // NPCs in the active damage window
+        for npc in worldState.npcs where npc.damageTaken > 0 && npc.combatTimeout > 150 {
+            let dx = npc.x - px
+            let dz = npc.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: -64,                    // ~half a sprite height above ground
+                worldZ: Int32(dz) * 128 + 64
+            )
+            if proj.depth < scene.rot1024_zTop { continue }
+            drawSplat(centerX: Int(proj.screenX), centerY: Int(proj.screenY), damage: npc.damageTaken)
+        }
+
+        // Remote players
+        for player in worldState.players where player.damageTaken > 0 && player.damageTimeout > 150 {
+            let dx = player.x - px
+            let dz = player.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: -64,
+                worldZ: Int32(dz) * 128 + 64
+            )
+            if proj.depth < scene.rot1024_zTop { continue }
+            drawSplat(centerX: Int(proj.screenX), centerY: Int(proj.screenY), damage: player.damageTaken)
+        }
+
+        // Local player — anchored to screen centre (same place CharacterBillboards puts it).
+        if worldState.localDamageTaken > 0 && worldState.localDamageTimeout > 150 {
+            drawSplat(
+                centerX: MetalRenderer.gameWidth / 2,
+                centerY: MetalRenderer.gameHeight / 2 - 4,
+                damage: worldState.localDamageTaken
+            )
+        }
+    }
+
+    /// Filled red disc with a one-pixel dark outline + white damage number.
+    /// Damage 0 still draws the splat per Java behaviour ("0" splash for
+    /// blocked hits) but only when the caller has already gated on the
+    /// visibility window above.
+    private func drawSplat(centerX: Int, centerY: Int, damage: Int) {
+        let w = MetalRenderer.gameWidth
+        let h = MetalRenderer.gameHeight
+        let radius = 7
+        let bodyColor = Int32(bitPattern: 0xFFCC1818)
+        let outlineColor = Int32(bitPattern: 0xFF400000)
+        for dy in -radius...radius {
+            for dx in -radius...radius {
+                let d2 = dx*dx + dy*dy
+                if d2 > radius*radius { continue }
+                let sx = centerX + dx
+                let sy = centerY + dy
+                if sx < 0 || sx >= w || sy < 0 || sy >= h { continue }
+                pixelData[sy * w + sx] = (d2 > (radius - 1) * (radius - 1)) ? outlineColor : bodyColor
+            }
+        }
+        let dmgStr = "\(damage)"
+        let textW = dmgStr.count * 4 - 1   // 3px glyph + 1px advance, minus trailing
+        drawText(dmgStr, x: centerX - textW / 2, y: centerY - 2, color: 0xFFFFFFFF)
     }
 
     // Simple 3x5 pixel font for rendering text on the map

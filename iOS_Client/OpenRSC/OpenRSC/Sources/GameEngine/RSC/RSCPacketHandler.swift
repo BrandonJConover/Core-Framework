@@ -934,17 +934,23 @@ final class RSCPacketHandler {
                     ws.addChat(sender: "[Quest]", text: message)
                 }
 
-            case 2: // Combat damage
+            case 2: // Combat damage — Java drawNearbyPlayers, sets damageTaken
+                    // and combatTimeout = 200 so the splat is shown for ~50 render
+                    // ticks (timeout > 150 window).
                 let damage = buf.getUnsignedByte()
                 let curhp = buf.getUnsignedByte()
                 let maxhp = buf.getUnsignedByte()
                 if serverIndex == ws.playerServerIndex {
-                    // Update local player HP
                     if let hpIdx = ws.skills.firstIndex(where: { $0.id == 3 }) {
                         ws.skills[hpIdx].current = curhp
                         ws.skills[hpIdx].base = maxhp
                     }
                     ws.lastDamageReceived = damage
+                    ws.localDamageTaken = damage
+                    ws.localDamageTimeout = 200
+                } else if let idx = ws.players.firstIndex(where: { $0.id == serverIndex }) {
+                    ws.players[idx].damageTaken = damage
+                    ws.players[idx].damageTimeout = 200
                 }
 
             case 3, 4: // Projectile

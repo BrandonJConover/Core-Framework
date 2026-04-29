@@ -10,6 +10,11 @@ struct RSCPlayer: Identifiable {
     /// 0..7 facing direction from showOtherPlayers's 4-bit field. Defaults
     /// to 4 (south) so the renderer keeps working before the first sync.
     var direction: Int = 4
+    /// Damage value most recently delivered by opcode 234 case 2. Java
+    /// counts down combatTimeout from 200 and draws the splat while
+    /// combatTimeout > 150 — about 50 render ticks (~1.5s).
+    var damageTaken: Int = 0
+    var damageTimeout: Int = 0
 }
 
 /// Appearance data delivered by opcode 234 case 5 (full appearance update).
@@ -292,6 +297,11 @@ final class RSCWorldState: ObservableObject {
     @Published var combatStyle: Int = 0  // 0=controlled, 1=aggressive, 2=accurate, 3=defensive
     @Published var lastDamageReceived: Int = 0
     @Published var lastDamageDealt: Int = 0
+
+    /// Damage splat for the local player. Java counts down combatTimeout
+    /// from 200 and draws the splat while it stays > 150 (~50 render ticks).
+    @Published var localDamageTaken: Int = 0
+    @Published var localDamageTimeout: Int = 0
 
     // Active prayers — index matches the prayer slot (0..49 capacity, 14 used in RSC)
     @Published var activePrayers: [Bool] = Array(repeating: false, count: 50)
