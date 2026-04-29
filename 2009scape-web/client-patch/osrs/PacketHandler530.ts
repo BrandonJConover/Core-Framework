@@ -509,7 +509,24 @@ export class PacketHandler530 {
         const updating = buf.getBits(1);
         if (!updating) return;
         const subOpcode = buf.getBits(2);
-        const localPlayer = game.players ? game.players[game.thisPlayerId] : null;
+        // 530-compat: ensure the local player slot exists. The 377 client
+        // creates it inside the LOGIN bytes handler we bypass under the
+        // 530 protocol — without instantiating here, every reference to
+        // game.localPlayer.worldX/Y stays null, the camera anchor never
+        // sets, and the entire viewport renders outside the visible
+        // window (apparent symptom: black world even when method93 runs).
+        let localPlayer = game.players ? game.players[game.thisPlayerId] : null;
+        if (!localPlayer && game.players && game.thisPlayerId >= 0) {
+            // Late-import keeps this module free of static cycles.
+            // tslint:disable-next-line:no-var-requires
+            const PlayerClass = require("./media/renderable/actor/Player").Player;
+            localPlayer = new PlayerClass();
+            game.players[game.thisPlayerId] = localPlayer;
+            // The 377 client also publishes Game.localPlayer (static field)
+            // so renderer/minimap code reads a non-null reference.
+            const GameClass = require("./Game").Game;
+            GameClass.localPlayer = localPlayer;
+        }
         if (subOpcode === 3) {
             // Teleport: sceneY(7) + teleport(1) + z(2) + maskRequired(1) + sceneX(7)
             const sceneY = buf.getBits(7);
