@@ -9,6 +9,25 @@ struct RSCPlayer: Identifiable {
     var combatLevel: Int
 }
 
+/// Appearance data delivered by opcode 234 case 5 (full appearance update).
+/// Lives in a dictionary keyed by serverIndex so it survives across ticks
+/// (showPlayers rebuilds the players array from scratch each tick — Java keeps
+/// a persistent ORSCharacter table; we approximate by sidecar-keying here).
+struct RSCPlayerAppearance: Equatable {
+    /// 12-slot animation IDs (0 = unequipped). Order: head, shirt, pants,
+    /// shield, weapon, hat, body, legs, gloves, boots, amulet, cape.
+    var layerSprites: [Int]
+    /// Palette indices into PlayerPalettes — server sends them as bytes 0..N
+    /// then the client looks up the actual ARGB int from the palette tables.
+    var colourHair: Int
+    var colourTop: Int
+    var colourBottom: Int
+    var colourSkin: Int
+    var combatLevel: Int
+    var skulled: Bool
+    var clanTag: String?
+}
+
 struct RSCNPC: Identifiable {
     var id: Int
     var x: Int
@@ -112,6 +131,10 @@ final class RSCWorldState: ObservableObject {
     @Published var localPlayerY: Int = 0
     @Published var localPlayerName: String = ""
     @Published var players: [RSCPlayer] = []
+    /// Per-player appearance keyed by serverIndex. Survives the per-tick
+    /// rebuild of `players`; the renderer looks up this map for each
+    /// drawn player and falls back to a starter avatar when missing.
+    @Published var playerAppearances: [Int: RSCPlayerAppearance] = [:]
     @Published var npcs: [RSCNPC] = []
     @Published var groundItems: [RSCGroundItem] = []
     @Published var gameObjects: [RSCGameObject] = []

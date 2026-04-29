@@ -886,30 +886,45 @@ final class RSCPacketHandler {
                 let _ = buf.getShort() // sprite
                 let _ = buf.getShort() // shooterServerIndex
 
-            case 5: // Full appearance update
+            case 5: // Full appearance update — Java drawNearbyPlayers (PacketHandler.java:2690)
                 let playerName = buf.getString()
                 let itemCount = buf.getUnsignedByte()
-                for _ in 0..<itemCount { let _ = buf.getShort() } // equipment sprites
+                // Java zero-fills layerAnimation[itemCount..12]. We mirror that
+                // so callers always have a 12-slot array.
+                var sprites = [Int](repeating: 0, count: 12)
+                for i in 0..<min(itemCount, 12) { sprites[i] = buf.getShort() }
+                // If the server somehow sent more than 12 (shouldn't happen),
+                // drain the extras to keep the stream aligned.
+                if itemCount > 12 {
+                    for _ in 12..<itemCount { let _ = buf.getShort() }
+                }
                 let hairColour = buf.getUnsignedByte()
                 let topColour = buf.getUnsignedByte()
                 let bottomColour = buf.getUnsignedByte()
                 let skinColour = buf.getUnsignedByte()
                 let combatLevel = buf.getUnsignedByte()
                 let skulled = buf.getUnsignedByte()
-                let hasClan = buf.getByte()
-                if hasClan == 1 { let _ = buf.getString() } // clanTag
+                var clanTag: String? = nil
+                if buf.getByte() == 1 { clanTag = buf.getString() }
                 let _ = buf.getByte() // isInvisible
                 let _ = buf.getByte() // isInvulnerable
                 let _ = buf.getByte() // groupID
                 let _ = buf.get32() // icon
 
-                // Update or add player
+                ws.playerAppearances[serverIndex] = RSCPlayerAppearance(
+                    layerSprites: sprites,
+                    colourHair: hairColour,
+                    colourTop: topColour,
+                    colourBottom: bottomColour,
+                    colourSkin: skinColour,
+                    combatLevel: combatLevel,
+                    skulled: skulled != 0,
+                    clanTag: clanTag
+                )
+
                 if let idx = ws.players.firstIndex(where: { $0.id == serverIndex }) {
                     ws.players[idx].name = playerName
                     ws.players[idx].combatLevel = combatLevel
-                } else if serverIndex != ws.playerServerIndex {
-                    // This is appearance-only, position comes from opcode 191
-                    // We'll match by server index later
                 }
                 if serverIndex == ws.playerServerIndex {
                     ws.localPlayerName = playerName

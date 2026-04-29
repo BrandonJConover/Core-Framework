@@ -307,8 +307,13 @@ final class RSCGameEngine: ObservableObject {
             // and BEFORE endScene (so drawSprite sees them).
             scene.reduceSprites(0)  // clear any stale billboard entries
 
-            // Default starter-avatar sprites for other players (head1, body1, legs1)
+            // Default starter-avatar sprites for other players (head1, body1, legs1).
+            // Used until opcode 234 case 5 delivers the player's actual layerAnimation.
             let defaultPlayerSprites = [0, 1, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+            // Default starter palette indices (Java mudclient defaults from
+            // appearance creation: hair=2 light brown, top=8 light blue,
+            // bottom=8 light blue, skin=0 fair).
+            let defaultHairIdx = 2, defaultTopIdx = 8, defaultBottomIdx = 8, defaultSkinIdx = 0
 
             // Characters are registered in the same player-local coord frame as
             // the terrain mesh — so NPC tile offsets are (npc.x - px, npc.y - pz).
@@ -339,37 +344,52 @@ final class RSCGameEngine: ObservableObject {
                     )
                 }
             }
-            // Default starter-avatar palette for other players — matches the
-            // Java client's defaults when no appearance update has arrived yet.
-            let defaultHair: Int32 = 0xC8B89B   // light brown
-            let defaultTop: Int32 = 0xC83232    // red
-            let defaultBottom: Int32 = 0x3A5AA3 // blue
-            let defaultSkin: Int32 = 0xECC8A6   // tan
+            // Per-player avatar: prefer the real appearance from opcode 234
+            // case 5 when we've received it; else fall back to the starter
+            // palette + sprite triplet so the slot still renders something.
             for player in worldState.players {
+                let appearance = worldState.playerAppearances[player.id]
+                let sprites: [Int] = appearance.map { app in
+                    // Java zero-fills unequipped slots; treat 0 as "no sprite"
+                    // so CharacterBillboards skips it (matches drawPlayer).
+                    app.layerSprites.map { $0 == 0 ? -1 : $0 }
+                } ?? defaultPlayerSprites
+                let hairIdx = appearance?.colourHair ?? defaultHairIdx
+                let topIdx = appearance?.colourTop ?? defaultTopIdx
+                let bottomIdx = appearance?.colourBottom ?? defaultBottomIdx
+                let skinIdx = appearance?.colourSkin ?? defaultSkinIdx
                 CharacterBillboards.register(
                     scene: scene, spriteLoader: spriteLoader,
                     tileX: player.x - px, tileZ: player.y - pz,
                     rsDir: 4, stepFrame: renderLogCount,
                     walkModel: 6,
                     cameraRotation: cameraRotation,
-                    sprites: defaultPlayerSprites,
-                    hairColor: defaultHair, topColor: defaultTop,
-                    bottomColor: defaultBottom, skinColor: defaultSkin
+                    sprites: sprites,
+                    hairColor: PlayerPalettes.hairColour(hairIdx),
+                    topColor: PlayerPalettes.clothingColour(topIdx),
+                    bottomColor: PlayerPalettes.clothingColour(bottomIdx),
+                    skinColor: PlayerPalettes.skinColour(skinIdx)
                 )
             }
             // Local player sits at the origin in local coords. When the engine
             // is in combat with a tracked target, render in the combatB pose so
             // the player faces the NPC mid-fight.
             let localCombatRole: CharacterBillboards.CombatRole = worldState.inCombat ? .combatB : .none
+            let localApp = worldState.playerAppearances[worldState.playerServerIndex]
+            let localSprites: [Int] = localApp.map { app in
+                app.layerSprites.map { $0 == 0 ? -1 : $0 }
+            } ?? defaultPlayerSprites
             CharacterBillboards.register(
                 scene: scene, spriteLoader: spriteLoader,
                 tileX: 0, tileZ: 0,
                 rsDir: 4, stepFrame: renderLogCount,
                 walkModel: 6,
                 cameraRotation: cameraRotation,
-                sprites: defaultPlayerSprites,
-                hairColor: defaultHair, topColor: defaultTop,
-                bottomColor: defaultBottom, skinColor: defaultSkin,
+                sprites: localSprites,
+                hairColor: PlayerPalettes.hairColour(localApp?.colourHair ?? defaultHairIdx),
+                topColor: PlayerPalettes.clothingColour(localApp?.colourTop ?? defaultTopIdx),
+                bottomColor: PlayerPalettes.clothingColour(localApp?.colourBottom ?? defaultBottomIdx),
+                skinColor: PlayerPalettes.skinColour(localApp?.colourSkin ?? defaultSkinIdx),
                 combatRole: localCombatRole,
                 combatModel: 6,
                 combatSprite: 5,
