@@ -1,0 +1,90 @@
+# Production nginx config for server-java-modern with TLS termination.
+#
+# This config terminates TLS for two endpoints the modernized server exposes:
+#   - WSS WebSocket gameplay traffic, proxied to the JVM's plaintext ws://127.0.0.1:43494
+#   - HTTPS JSON REST API (status / auth / public player data),
+#     proxied to the JVM's plaintext http://127.0.0.1:43594/api (Phase 2)
+#
+# The legacy TCP port 43594 is NOT proxied here — desktop clients still
+# connect to it directly (they use ISAAC + RSA, not TLS, by design). If you
+# want to expose the desktop port over the internet, run a stunnel or
+# nginx-stream block in front; the WS path is the modern client lane.
+#
+# Usage:
+#   envsubst '${DOMAIN}' < nginx-ssl.conf.template \
+#     > /etc/nginx/sites-available/server-java-modern
+#   ln -s /etc/nginx/sites-available/server-java-modern \
+#         /etc/nginx/sites-enabled/
+#   nginx -t && systemctl reload nginx
+
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    # ACME http-01 challenge — keep on plain HTTP for Let's Encrypt renewal.
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+
+    # Everything else: redirect to HTTPS.
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    # WebSocket lane for modern clients (iOS native, browser web client).
+    # Path /ws/v1 = the existing legacy binary-over-WS protocol.
+    # Path /ws/v2 = (future) JSON-over-WS modern protocol.
+    # Both are proxied to the same JVM port — the JVM-side WebSocket handler
+    # routes by path. See PROGRESS.md for the wire format spec.
+    location ~ ^/ws/v[12]$ {
+        proxy_pass http://127.0.0.1:43494;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket sessions can sit idle between game ticks; raise read/send
+        # timeouts so the proxy doesn't sever them mid-game.
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+    }
+
+    # JSON REST API for non-game-tick data (status, auth, public profiles).
+    # Phase 2: implemented as an embedded HTTP listener inside the JVM
+    # (Javalin or Netty's HttpServerCodec). Reverse-proxied here so all
+    # public traffic shares the same TLS endpoint.
+    location /api/ {
+        proxy_pass http://127.0.0.1:43595/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Optional: health check that doesn't require auth, useful for upstream
+    # load-balancer probes. Returns 200 if the JVM API listener is alive.
+    location = /healthz {
+        proxy_pass http://127.0.0.1:43595/healthz;
+        access_log off;
+    }
+
+    # Reject anything else served at the root with a clean 404 — the modern
+    # client should always know exactly which path to hit.
+    location / {
+        return 404;
+    }
+}

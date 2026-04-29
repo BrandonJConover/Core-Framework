@@ -101,6 +101,7 @@ public class Server implements Runnable {
 	private EventLoopGroup bossGroup;
 	private EventLoopGroup workerGroupWs;
 	private EventLoopGroup bossGroupWs;
+	private com.openrsc.server.net.api.ApiServer apiServer;
 
 	private volatile AtomicBoolean running = new AtomicBoolean(false);
 	private boolean restarting = false;
@@ -543,6 +544,17 @@ public class Server implements Runnable {
 					serversList.put(this.getName(), this);
 				}
 
+				// Modern client REST/JSON API on a separate port. Independent
+				// of the game protocol — failure to start should not kill the
+				// game world (most public methods will error cleanly).
+				try {
+					apiServer = new com.openrsc.server.net.api.ApiServer(this);
+					apiServer.start();
+				} catch (final Throwable apiEx) {
+					LOGGER.error("API listener failed to start: {}", apiEx.getMessage(), apiEx);
+					apiServer = null;
+				}
+
 				lastTickTimestamp = serverStartedTime = System.nanoTime();
 				running.set(true);
 			} catch (final Throwable t) {
@@ -559,6 +571,10 @@ public class Server implements Runnable {
 					return;
 				}
 				LOGGER.info("Server stop requested");
+				if (apiServer != null) {
+					apiServer.stop();
+					apiServer = null;
+				}
 				getWorld().unloadPlayers();
 
 				scheduledExecutor.shutdown();

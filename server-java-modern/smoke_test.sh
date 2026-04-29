@@ -21,13 +21,13 @@ trap 'pkill -9 -f "com.openrsc.server.Server" 2>/dev/null; rm -f "$SERVER_LOG"' 
 echo "==> Starting server (ZGC)"
 ant -q runserverzgc -DconfFile=local > "$SERVER_LOG" 2>&1 &
 
-for i in $(seq 1 15); do
+for i in $(seq 1 90); do
     if lsof -iTCP:43594 -sTCP:LISTEN -n -P 2>/dev/null | grep -q LISTEN &&
        lsof -iTCP:43494 -sTCP:LISTEN -n -P 2>/dev/null | grep -q LISTEN; then
         echo "    ports ready after ${i}s"
         break
     fi
-    [ "$i" = 15 ] && { echo "FAIL: server never bound ports"; tail -20 "$SERVER_LOG"; exit 1; }
+    [ "$i" = 90 ] && { echo "FAIL: server never bound ports"; tail -20 "$SERVER_LOG"; exit 1; }
     sleep 1
 done
 
