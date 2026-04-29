@@ -12311,6 +12311,53 @@ export class Game extends GameShell {
             await new Promise<void>((res) => setTimeout(res, 0));
         }
         console.log("530 defs preloaded: items=" + items + " npcs=" + npcs + " locs=" + locs + " bas=" + bas);
+
+        // Model preload: walk the loaded NPC + Loc records, gather every
+        // model id they reference, and pull each one through RawModel530 +
+        // Model530.fromRawModel530 into Model.modelCache530. Skips dupes;
+        // failures are silent so a single missing model id can't hold up
+        // the preload pass.
+        try {
+            const RawModel530M = (await import("./cache/def/RawModel530")).RawModel530;
+            const Model530M = (await import("./media/renderable/Model530")).Model530;
+            const ModelM = (await import("./media/renderable/Model")).Model;
+            if (!ModelM.modelCache530) ModelM.modelCache530 = new Map();
+            const modelIds = new Set<number>();
+            ActorDef.cache530!.forEach((n: any) => {
+                if (n.modelIndices) for (const id of n.modelIndices) if (id >= 0) modelIds.add(id);
+                if (n.headmodels) for (const id of n.headmodels) if (id >= 0) modelIds.add(id);
+            });
+            GameObjDef.cache530!.forEach((l: any) => {
+                if (l.models) for (const id of l.models) if (id >= 0) modelIds.add(id);
+            });
+            ItemDef.cache530!.forEach((o: any) => {
+                if (o.model >= 0) modelIds.add(o.model);
+            });
+            const ids = Array.from(modelIds);
+            const MODEL_CHUNK = 32;
+            let models = 0;
+            for (let base = 0; base < ids.length; base += MODEL_CHUNK) {
+                const chunkPromises: Promise<void>[] = [];
+                for (let i = 0; i < MODEL_CHUNK && base + i < ids.length; i++) {
+                    const id = ids[base + i];
+                    chunkPromises.push((async () => {
+                        try {
+                            const raw = await RawModel530M.load(js5Cache, id);
+                            if (raw) {
+                                const m = Model530M.fromRawModel530(raw);
+                                ModelM.modelCache530!.set(id, m);
+                                models++;
+                            }
+                        } catch (e) { /* skip */ }
+                    })());
+                }
+                await Promise.all(chunkPromises);
+                await new Promise<void>((res) => setTimeout(res, 0));
+            }
+            console.log("530 models preloaded: " + models + " / " + ids.length + " referenced ids");
+        } catch (e) {
+            console.log("model preload failed: " + (e as Error).message);
+        }
     }
 
     async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
