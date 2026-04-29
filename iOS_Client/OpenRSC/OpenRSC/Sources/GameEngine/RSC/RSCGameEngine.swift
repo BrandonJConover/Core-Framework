@@ -217,6 +217,7 @@ final class RSCGameEngine: ObservableObject {
     /// Anything past this index is per-frame ephemera (game objects). We
     /// truncate back to this on every tick before re-instantiating objects.
     private var terrainModelCount: Int = 0
+    private let projectileMaxRange = 40
 
     private func tick() {
         guard isRunning else { return }
@@ -227,15 +228,18 @@ final class RSCGameEngine: ObservableObject {
             if worldState.npcs[i].combatTimeout > 0 { worldState.npcs[i].combatTimeout -= 1 }
             if worldState.npcs[i].messageTimeout > 0 { worldState.npcs[i].messageTimeout -= 1 }
             if worldState.npcs[i].bubbleTimeout > 0 { worldState.npcs[i].bubbleTimeout -= 1 }
+            if worldState.npcs[i].projectileRange > 0 { worldState.npcs[i].projectileRange -= 1 }
         }
         // Decay player damage splat timeouts (set to 200 by opcode 234 case 2;
         // splat visible while > 150).
         for i in 0..<worldState.players.count {
             if worldState.players[i].damageTimeout > 0 { worldState.players[i].damageTimeout -= 1 }
             if worldState.players[i].bubbleTimeout > 0 { worldState.players[i].bubbleTimeout -= 1 }
+            if worldState.players[i].projectileRange > 0 { worldState.players[i].projectileRange -= 1 }
         }
         if worldState.localDamageTimeout > 0 { worldState.localDamageTimeout -= 1 }
         if worldState.localBubbleTimeout > 0 { worldState.localBubbleTimeout -= 1 }
+        if worldState.localProjectileRange > 0 { worldState.localProjectileRange -= 1 }
         // Tick down the system-update countdown (50ms per tick = engine timer
         // interval). Banner hides automatically when it reaches 0.
         if worldState.systemUpdateTicks > 0 {
@@ -477,8 +481,132 @@ final class RSCGameEngine: ObservableObject {
         let pn = worldState.localPlayerName.isEmpty ? "YOU" : worldState.localPlayerName.uppercased()
         drawText(pn, x: cx - pn.count * 2, y: cy - 20, color: 0xFFFFFF00)
 
+        drawProjectiles()
         drawOverheadItemBubbles()
         drawDamageSplats()
+    }
+
+    /// Draw active ranged/magic projectiles. Java stores the projectile on the
+    /// target character, points it back at the shooter, and decrements
+    /// projectileRange from 40. We use the same interpolation, then project the
+    /// in-flight point through the live Scene camera.
+    private func drawProjectiles() {
+        guard let scene = self.scene else { return }
+
+        for player in worldState.players where player.projectileRange > 0 && player.projectileSprite >= 0 {
+            guard let source = projectileSourcePosition(
+                serverIndex: player.projectileSourceServerIndex,
+                isNpc: player.projectileSourceIsNpc
+            ) else { continue }
+            drawProjectile(
+                sprite: player.projectileSprite,
+                range: player.projectileRange,
+                sourceTile: source,
+                targetTile: (player.x, player.y),
+                scene: scene
+            )
+        }
+
+        for npc in worldState.npcs where npc.projectileRange > 0 && npc.projectileSprite >= 0 {
+            guard let source = projectileSourcePosition(
+                serverIndex: npc.projectileSourceServerIndex,
+                isNpc: npc.projectileSourceIsNpc
+            ) else { continue }
+            drawProjectile(
+                sprite: npc.projectileSprite,
+                range: npc.projectileRange,
+                sourceTile: source,
+                targetTile: (npc.x, npc.y),
+                scene: scene
+            )
+        }
+
+        if worldState.localProjectileRange > 0 && worldState.localProjectileSprite >= 0,
+           let source = projectileSourcePosition(
+                serverIndex: worldState.localProjectileSourceServerIndex,
+                isNpc: worldState.localProjectileSourceIsNpc
+           ) {
+            drawProjectile(
+                sprite: worldState.localProjectileSprite,
+                range: worldState.localProjectileRange,
+                sourceTile: source,
+                targetTile: (worldState.localPlayerX, worldState.localPlayerY),
+                scene: scene
+            )
+        }
+    }
+
+    private func projectileSourcePosition(serverIndex: Int, isNpc: Bool) -> (x: Int, z: Int)? {
+        if isNpc {
+            return worldState.npcs.first(where: { $0.id == serverIndex }).map { ($0.x, $0.y) }
+        }
+        if serverIndex == worldState.playerServerIndex {
+            return (worldState.localPlayerX, worldState.localPlayerY)
+        }
+        return worldState.players.first(where: { $0.id == serverIndex }).map { ($0.x, $0.y) }
+    }
+
+    private func drawProjectile(sprite: Int,
+                                range: Int,
+                                sourceTile: (x: Int, z: Int),
+                                targetTile: (x: Int, z: Int),
+                                scene: Scene) {
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+        let clampedRange = max(0, min(projectileMaxRange, range))
+        let inv = projectileMaxRange - clampedRange
+
+        let sourceX = sourceTile.x * 128 + 64
+        let sourceZ = sourceTile.z * 128 + 64
+        let targetX = targetTile.x * 128 + 64
+        let targetZ = targetTile.z * 128 + 64
+
+        let worldX = (sourceX * inv + targetX * clampedRange) / projectileMaxRange
+        let worldZ = (sourceZ * inv + targetZ * clampedRange) / projectileMaxRange
+        let height = -96
+        let proj = scene.projectPoint(
+            worldX: Int32(worldX - px * 128),
+            worldY: Int32(height),
+            worldZ: Int32(worldZ - pz * 128)
+        )
+        guard proj.depth >= scene.rot1024_zTop else { return }
+        drawProjectileMarker(sprite: sprite, centerX: Int(proj.screenX), centerY: Int(proj.screenY))
+    }
+
+    private func drawProjectileMarker(sprite: Int, centerX: Int, centerY: Int) {
+        let spriteId = 3160 + sprite
+        if let gs = spriteLoader.getSprite(spriteId), gs.width <= 32, gs.height <= 32 {
+            spriteLoader.drawSprite(
+                spriteId,
+                onto: &pixelData,
+                bufferWidth: MetalRenderer.gameWidth,
+                bufferHeight: MetalRenderer.gameHeight,
+                atX: centerX - gs.width / 2,
+                atY: centerY - gs.height / 2,
+                scale: 1
+            )
+            return
+        }
+
+        let color: UInt32
+        switch sprite {
+        case 1: color = 0xFF66AAFF  // magic
+        case 2: color = 0xFFE8D27A  // ranged
+        case 4: color = 0xFFFF4444  // skull
+        default: color = 0xFFFFFFFF
+        }
+        let w = MetalRenderer.gameWidth
+        let h = MetalRenderer.gameHeight
+        for dy in -4...4 {
+            let span = 4 - abs(dy)
+            for dx in -span...span {
+                let sx = centerX + dx
+                let sy = centerY + dy
+                if sx >= 0 && sx < w && sy >= 0 && sy < h {
+                    pixelData[sy * w + sx] = Int32(bitPattern: color)
+                }
+            }
+        }
     }
 
     /// Draw item bubbles over characters that received the Java bubble-item

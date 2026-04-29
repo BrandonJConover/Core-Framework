@@ -961,9 +961,20 @@ final class RSCPacketHandler {
                     ws.players[idx].damageTimeout = 200
                 }
 
-            case 3, 4: // Projectile
-                let _ = buf.getShort() // sprite
-                let _ = buf.getShort() // shooterServerIndex
+            case 3, 4: // Projectile targeting this player
+                let sprite = buf.getShort()
+                let shooterServerIndex = buf.getShort()
+                if serverIndex == ws.playerServerIndex {
+                    ws.localProjectileSprite = sprite
+                    ws.localProjectileRange = 40
+                    ws.localProjectileSourceServerIndex = shooterServerIndex
+                    ws.localProjectileSourceIsNpc = updateType == 3
+                } else if let idx = ws.players.firstIndex(where: { $0.id == serverIndex }) {
+                    ws.players[idx].projectileSprite = sprite
+                    ws.players[idx].projectileRange = 40
+                    ws.players[idx].projectileSourceServerIndex = shooterServerIndex
+                    ws.players[idx].projectileSourceIsNpc = updateType == 3
+                }
 
             case 5: // Full appearance update — Java drawNearbyPlayers (PacketHandler.java:2690)
                 let playerName = buf.getString()
@@ -1194,13 +1205,25 @@ final class RSCPacketHandler {
                     ws.npcs[idx].combatTimeout = 200
                 }
 
-            case 3: // Projectile (NPC attacking)
-                let _ = buf.getShort() // sprite
-                let _ = buf.getShort() // shooter server index
+            case 3: // Projectile targeting this NPC from another NPC
+                let sprite = buf.getShort()
+                let shooterServerIndex = buf.getShort()
+                if let idx = ws.npcs.firstIndex(where: { $0.id == serverIndex }) {
+                    ws.npcs[idx].projectileSprite = sprite
+                    ws.npcs[idx].projectileRange = 40
+                    ws.npcs[idx].projectileSourceServerIndex = shooterServerIndex
+                    ws.npcs[idx].projectileSourceIsNpc = true
+                }
 
-            case 4: // Projectile (player attacking NPC)
-                let _ = buf.getShort() // sprite
-                let _ = buf.getShort() // shooter server index
+            case 4: // Projectile targeting this NPC from a player
+                let sprite = buf.getShort()
+                let shooterServerIndex = buf.getShort()
+                if let idx = ws.npcs.firstIndex(where: { $0.id == serverIndex }) {
+                    ws.npcs[idx].projectileSprite = sprite
+                    ws.npcs[idx].projectileRange = 40
+                    ws.npcs[idx].projectileSourceServerIndex = shooterServerIndex
+                    ws.npcs[idx].projectileSourceIsNpc = false
+                }
 
             case 5: // Skull visibility
                 let _ = buf.getUnsignedByte()

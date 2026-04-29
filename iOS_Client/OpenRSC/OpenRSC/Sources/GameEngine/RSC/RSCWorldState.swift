@@ -17,6 +17,10 @@ struct RSCPlayer: Identifiable {
     var damageTimeout: Int = 0
     var bubbleItem: Int = -1
     var bubbleTimeout: Int = 0
+    var projectileSprite: Int = -1
+    var projectileRange: Int = 0
+    var projectileSourceServerIndex: Int = -1
+    var projectileSourceIsNpc: Bool = false
 }
 
 /// Appearance data delivered by opcode 234 case 5 (full appearance update).
@@ -52,6 +56,10 @@ struct RSCNPC: Identifiable {
     var messageTimeout: Int = 0
     var bubbleItem: Int = -1
     var bubbleTimeout: Int = 0
+    var projectileSprite: Int = -1
+    var projectileRange: Int = 0
+    var projectileSourceServerIndex: Int = -1
+    var projectileSourceIsNpc: Bool = false
     /// 0..7 facing direction captured from showNPCs's per-NPC 4-bit field.
     /// Defaults to 4 (south) so the renderer always has a valid value.
     var direction: Int = 4
@@ -315,6 +323,10 @@ final class RSCWorldState: ObservableObject {
     @Published var localDamageTimeout: Int = 0
     @Published var localBubbleItem: Int = -1
     @Published var localBubbleTimeout: Int = 0
+    @Published var localProjectileSprite: Int = -1
+    @Published var localProjectileRange: Int = 0
+    @Published var localProjectileSourceServerIndex: Int = -1
+    @Published var localProjectileSourceIsNpc: Bool = false
 
     // Active prayers — index matches the prayer slot (0..49 capacity, 14 used in RSC)
     @Published var activePrayers: [Bool] = Array(repeating: false, count: 50)
