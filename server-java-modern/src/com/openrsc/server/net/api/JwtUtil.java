@@ -8,22 +8,33 @@ import com.auth0.jwt.interfaces.JWTVerifier;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.util.Date;
+import java.util.Set;
 
 /**
  * HMAC256 JWT issuance + verification for the modern client REST API.
  *
  * Design notes:
- * - The signing secret is generated at server start with SecureRandom and
- *   held in memory only. Tokens DO NOT survive a server restart — clients
- *   are expected to re-authenticate after server downtime. This is fine
- *   for a 24h token lifetime and avoids the operational concerns of
- *   persisting a long-lived secret to disk.
+ * - The signing secret is loaded from {@code .jwt-secret} on startup. If the
+ *   file doesn't exist it's generated from SecureRandom and written with
+ *   owner-only permissions (POSIX 0600 on Unix; on Windows the file is
+ *   created without explicit ACL changes since Files.setPosixFilePermissions
+ *   is unsupported). This means tokens DO survive a server restart, which
+ *   matters for 24h lifetimes — operators don't have to bounce all clients
+ *   on every server kick.
  * - Algorithm is HS256 (HMAC + SHA-256). Symmetric is sufficient because
  *   only this server issues + verifies tokens. If/when tokens need to be
  *   verified by a separate auth service, swap to RS256 with an RSA keypair.
  * - Default lifetime 24h. Override via {@link #generateToken(String, long)}.
+ * - To force-rotate the secret (after a suspected compromise), simply delete
+ *   the {@code .jwt-secret} file and restart the server. All existing tokens
+ *   become invalid.
  *
  * Token claims:
  *   sub  : username (canonical lowercased form)
@@ -38,22 +49,68 @@ public final class JwtUtil {
     /** 24 hours in milliseconds. */
     public static final long DEFAULT_LIFETIME_MS = 24L * 60L * 60L * 1000L;
 
+    /** Default location for the persisted secret. Relative to the server's
+     *  working dir. Must be in .gitignore so it never lands in version control. */
+    public static final Path DEFAULT_SECRET_PATH = Path.of(".jwt-secret");
+
     private final Algorithm algorithm;
     private final JWTVerifier verifier;
     private final String issuer;
 
     public JwtUtil(String issuer) {
+        this(issuer, DEFAULT_SECRET_PATH);
+    }
+
+    public JwtUtil(String issuer, Path secretPath) {
         this.issuer = issuer;
-        // 32 random bytes -> hex string used as the HMAC secret. SecureRandom is
-        // seeded from /dev/urandom on Linux/Mac, so this is cryptographically
-        // strong as long as the JVM hasn't been compromised.
+        String secret = loadOrCreateSecret(secretPath);
+        this.algorithm = Algorithm.HMAC256(secret);
+        this.verifier = JWT.require(algorithm).withIssuer(issuer).build();
+    }
+
+    /**
+     * Read the persisted secret from {@code path}, or generate + write a fresh
+     * one if the file is missing/empty. Returned secret is the hex-encoded
+     * 32-byte string.
+     */
+    private static String loadOrCreateSecret(Path path) {
+        try {
+            if (Files.exists(path) && Files.size(path) > 0) {
+                String existing = Files.readString(path).trim();
+                if (existing.length() >= 32) {
+                    LOGGER.info("JwtUtil loaded persisted secret from {}", path);
+                    return existing;
+                }
+                LOGGER.warn("JwtUtil secret file {} is too short ({} chars); regenerating",
+                    path, existing.length());
+            }
+        } catch (IOException ioe) {
+            LOGGER.warn("JwtUtil could not read secret file {}: {}; regenerating",
+                path, ioe.getMessage());
+        }
+
+        // Generate fresh.
         byte[] secretBytes = new byte[32];
         new SecureRandom().nextBytes(secretBytes);
         StringBuilder hex = new StringBuilder(64);
         for (byte b : secretBytes) hex.append(String.format("%02x", b));
-        this.algorithm = Algorithm.HMAC256(hex.toString());
-        this.verifier = JWT.require(algorithm).withIssuer(issuer).build();
-        LOGGER.info("JwtUtil initialised (secret rotates on every server restart)");
+        String secret = hex.toString();
+
+        try {
+            Files.writeString(path, secret);
+            // Restrict to owner-only on Unix — best-effort, Windows just falls through.
+            try {
+                Set<PosixFilePermission> ownerOnly = PosixFilePermissions.fromString("rw-------");
+                Files.setPosixFilePermissions(path, ownerOnly);
+            } catch (UnsupportedOperationException uoe) {
+                // Non-POSIX filesystem; leave default ACLs.
+            }
+            LOGGER.info("JwtUtil generated new secret and wrote to {} (owner-only)", path);
+        } catch (IOException ioe) {
+            LOGGER.error("JwtUtil could not persist secret to {}: {}; tokens will not "
+                + "survive restart this run", path, ioe.getMessage());
+        }
+        return secret;
     }
 
     /** Issue a token with the default 24h lifetime. */
