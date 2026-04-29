@@ -2070,24 +2070,24 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
-    /// Send PLAYER_INIT_TRADE_REQUEST (opcode 62 in the modern server). The
+    /// Send PLAYER_INIT_TRADE_REQUEST (opcode 142 in protocol 235). The
     /// other player gets a "X wishes to trade with you" prompt and either
     /// accepts (TradePanel opens) or declines.
     func requestTrade(serverIndex: Int) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 62)
+            buf.newPacket(opcode: Int(RSCOutOpcode.playerTrade.rawValue))
             buf.putShort(serverIndex)
             try? await connection.send(buf.finishPacket())
         }
     }
 
-    /// Send PLAYER_DUEL request (opcode 217). Same flow as trade — server
+    /// Send PLAYER_DUEL request (opcode 103 in protocol 235). Same flow as trade — server
     /// confirms, the DuelPanel opens for both sides.
     func requestDuel(serverIndex: Int) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 217)
+            buf.newPacket(opcode: Int(RSCOutOpcode.playerDuel.rawValue))
             buf.putShort(serverIndex)
             try? await connection.send(buf.finishPacket())
         }
