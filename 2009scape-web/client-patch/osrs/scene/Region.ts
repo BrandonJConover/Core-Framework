@@ -2055,6 +2055,8 @@ export class Region {
             }
         }
         const class50_sub1_sub2: Buffer = new Buffer(is);
+        const startPos = class50_sub1_sub2.currentPosition;
+        const totalBytes = is ? is.length : 0;
         for (let i_217_: number = 0; i_217_ < 4; i_217_++) {
             {
                 for (let i_218_: number = 0; i_218_ < 64; i_218_++) {
@@ -2065,6 +2067,11 @@ export class Region {
                     }
                 }
             }
+        }
+        const consumed = class50_sub1_sub2.currentPosition - startPos;
+        if (!(globalThis as any).__m174Logged) {
+            (globalThis as any).__m174Logged = true;
+            console.log("method174: parsed terrain — bytes=" + totalBytes + " consumed=" + consumed + " baseTile=(" + i_212_ + "," + i + ")");
         }
     }
 
@@ -2086,6 +2093,8 @@ export class Region {
     }
 
     public method179(i: number, class46s: CollisionMap[], i_237_: number, i_238_: number, class22: Scene, is: number[]) {
+        let placed = 0;
+        let outOfBounds = 0;
         if (i_238_ < 0) {
             const class50_sub1_sub2: Buffer = new Buffer(is);
             let i_239_: number = -1;
@@ -2122,11 +2131,18 @@ export class Region {
                                     class46 = class46s[i_251_];
                                 }
                                 this.renderObject(class22, class46, i_250_, i_245_, i_249_, this.aByte139, i_248_, i_247_, i_239_);
+                                placed++;
+                            } else {
+                                outOfBounds++;
                             }
                         }
                     }
                 }
             }
+        }
+        if (!(globalThis as any).__m179Logged) {
+            (globalThis as any).__m179Logged = true;
+            console.log("method179: locs placed=" + placed + " outOfBounds=" + outOfBounds + " region=(" + i_237_ + "," + i + ")");
         }
     }
 

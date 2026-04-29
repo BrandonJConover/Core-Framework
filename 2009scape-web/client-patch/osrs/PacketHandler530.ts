@@ -229,8 +229,17 @@ export class PacketHandler530 {
         game.regionX = regionX;
         game.regionZ = regionZ;
 
-        game.chunkX = zoneX;
-        game.chunkY = zoneZ;
+        // chunkX / chunkY (377 client term) maps to centralZoneX /
+        // centralZoneZ in 530. Per rt4 LoginManager.method2463 (line 698+),
+        // SceneGraph.centralZoneX = arg2 = local31 (the g2-raw read 3rd in
+        // the packet, which we name regionX here) and centralZoneZ =
+        // arg1 = local60 (g2add read 4th, our regionZ). The 4th g2add we
+        // currently called zoneX is something else (probably the player's
+        // base zone for camera origin) and we were using the wrong values
+        // — consequence: nextTopLeftTileX/Y was 2080+ off, every loc fell
+        // outside the 0..103 scene grid, world rendered black.
+        game.chunkX = regionX;
+        game.chunkY = regionZ;
         game.nextTopLeftTileX = (game.chunkX - 6) * 8;
         game.nextTopRightTileY = (game.chunkY - 6) * 8;
         game.aBoolean1163 = false;
