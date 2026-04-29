@@ -552,6 +552,21 @@ final class RSCPacketHandler {
         ws.isMembersWorld = buf.getByte() != 0
     }
 
+    /// 3-bit movement direction encoding shared by showOtherPlayers and
+    /// showNPCs (PacketHandler.java:1391-1404 and 1827-1842). Index = direction
+    /// code 0..7, value = (deltaX, deltaY) tile offset, also re-used as the
+    /// new facing (`animationNext = modelIndex` in Java).
+    private static let movementDeltas: [(Int, Int)] = [
+        (0, -1),   // 0 N
+        (1, -1),   // 1 NE
+        (1, 0),    // 2 E
+        (1, 1),    // 3 SE
+        (0, 1),    // 4 S
+        (-1, 1),   // 5 SW
+        (-1, 0),   // 6 W
+        (-1, -1)   // 7 NW
+    ]
+
     // Port of PacketHandler.java showOtherPlayers() — bit-packed player position sync
     // Reference: PacketHandler.java:1339-1435
     private func handleShowPlayers(buf: ByteBuffer, ws: RSCWorldState, length: Int) {
@@ -566,27 +581,53 @@ final class RSCPacketHandler {
         ws.localPlayerY = localZ
         ws.localPlayerDirection = localDir & 7
 
-        // Number of known players to update
+        // Number of known (returning) players to update.
         let knownCount = buf.getBitMask(8)
 
-        // Process known player updates (movement/animation)
-        for _ in 0..<knownCount {
+        // Java keeps a per-tick known/active table: snapshot the prior
+        // active list, advance kept entries via the update bits, then fold
+        // genuinely-new players from the tail. We mirror that so the
+        // players array doesn't blink empty between announcements.
+        var kept: [RSCPlayer] = ws.players
+        var keep = Array(repeating: true, count: kept.count)
+
+        for i in 0..<knownCount {
             let needsUpdate = buf.getBitMask(1)
-            if needsUpdate != 0 {
-                let updateType = buf.getBitMask(1)
-                if updateType != 0 {
-                    let needsNextSprite = buf.getBitMask(2)
-                    if needsNextSprite == 3 { continue }
-                    let _ = buf.getBitMask(2)
-                } else {
-                    let _ = buf.getBitMask(3)
+            if needsUpdate == 0 { continue }
+            let updateType = buf.getBitMask(1)
+            if updateType != 0 {
+                // Animation/sprite branch.
+                let needsNextSprite = buf.getBitMask(2)
+                if needsNextSprite == 3 {
+                    // Player removed — drop the kept entry.
+                    if i < kept.count { keep[i] = false }
+                    continue
+                }
+                // Java: animationNext = (needsNextSprite << 2) + 2bit. The
+                // low 3 bits are the new facing direction.
+                let nextSprite = buf.getBitMask(2)
+                if i < kept.count {
+                    kept[i].direction = ((needsNextSprite << 2) | nextSprite) & 7
+                }
+            } else {
+                // Motion branch — 3-bit modelIndex is both the move vector
+                // and the new facing direction.
+                let modelIndex = buf.getBitMask(3)
+                if i < kept.count, modelIndex < Self.movementDeltas.count {
+                    let (dx, dy) = Self.movementDeltas[modelIndex]
+                    kept[i].x += dx
+                    kept[i].y += dy
+                    kept[i].direction = modelIndex & 7
+                    kept[i].moving = true
                 }
             }
         }
 
-        // New players entering view — 24+ bits remaining per player
-        // Format: 11-bit serverIndex, 6-bit signed relX, 6-bit signed relZ, 4-bit direction
-        var newPlayers: [RSCPlayer] = []
+        // Drop removed entries while preserving order.
+        kept = zip(kept, keep).compactMap { $1 ? $0 : nil }
+
+        // New players entering view — 24+ bits remaining per player.
+        // Format: 11-bit serverIndex, 6-bit signed relX, 6-bit signed relZ, 4-bit direction.
         while length * 8 > buf.bitHead + 24 {
             let serverIndex = buf.getBitMask(11)
             var relX = buf.getBitMask(6)
@@ -597,18 +638,25 @@ final class RSCPacketHandler {
 
             let playerTileX = localX + relX
             let playerTileZ = localZ + relZ
-            newPlayers.append(RSCPlayer(id: serverIndex, x: playerTileX, y: playerTileZ,
-                                        name: "Player \(serverIndex)", moving: false, combatLevel: 0,
-                                        direction: dir & 7))
+            // De-dupe: if the server re-announces a known player, prefer the
+            // fresh authoritative coords from this entry over the kept one.
+            if let existing = kept.firstIndex(where: { $0.id == serverIndex }) {
+                kept[existing].x = playerTileX
+                kept[existing].y = playerTileZ
+                kept[existing].direction = dir & 7
+            } else {
+                kept.append(RSCPlayer(id: serverIndex, x: playerTileX, y: playerTileZ,
+                                       name: "Player \(serverIndex)", moving: false, combatLevel: 0,
+                                       direction: dir & 7))
+            }
         }
 
         buf.endBitAccess()
 
-        // Update world state with nearby players
-        ws.players = newPlayers
+        ws.players = kept
 
-        if knownCount > 0 || newPlayers.count > 0 {
-            print("[PLY] len=\(length) known=\(knownCount) new=\(newPlayers.count) localPos=(\(localX),\(localZ))")
+        if knownCount > 0 || kept.count > 0 {
+            print("[PLY] len=\(length) known=\(knownCount) total=\(kept.count) localPos=(\(localX),\(localZ))")
         }
     }
 
@@ -623,9 +671,10 @@ final class RSCPacketHandler {
         // Keep first existingCount NPCs from current list (they're still in view)
         var keptNPCs = Array(ws.npcs.prefix(existingCount))
 
-        // Process movement/animation updates for existing NPCs
+        // Process movement/animation updates for existing NPCs.
         // Java: for (int i = 0; i < existingCount; i++) { npc = npcArray[i]; ... }
-        let directions: [(Int, Int)] = [(0,0), (0,-1), (0,1), (-1,0), (1,0), (-1,-1), (1,-1), (-1,1), (1,1)]
+        // The 3-bit movement direction matches the shared 8-compass encoding
+        // used by showOtherPlayers (PacketHandler.java:1827-1842).
         for i in 0..<existingCount {
             let needsUpdate = buf.getBitMask(1)
             if needsUpdate != 0 {
@@ -646,14 +695,15 @@ final class RSCPacketHandler {
                         keptNPCs[i].direction = ((needsNextSprite << 2) | nextSprite) & 7
                     }
                 } else {
-                    let dir = buf.getBitMask(3) // movement direction 0-8
+                    let dir = buf.getBitMask(3) // 0..7 — N, NE, E, SE, S, SW, W, NW
                     // Update position based on direction; also update facing
                     // — Java setKnownPlayer/showNPCs treats `modelIndex` as
                     // both motion vector and the new animationNext (which
                     // CharacterBillboards reads as rsDir).
-                    if i < keptNPCs.count && dir < directions.count {
-                        keptNPCs[i].x += directions[dir].0
-                        keptNPCs[i].y += directions[dir].1
+                    if i < keptNPCs.count, dir < Self.movementDeltas.count {
+                        let (dx, dy) = Self.movementDeltas[dir]
+                        keptNPCs[i].x += dx
+                        keptNPCs[i].y += dy
                         keptNPCs[i].direction = dir & 7
                     }
                 }
