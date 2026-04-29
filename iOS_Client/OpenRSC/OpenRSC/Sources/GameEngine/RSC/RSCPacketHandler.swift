@@ -471,10 +471,10 @@ final class RSCPacketHandler {
             while buf.bytesRemaining > 0 { let _ = buf.getUnsignedByte() }
 
         case 112: // updateClan
-            break // Clan data
+            handleUpdateClan(buf: buf, ws: ws)
 
         case 116: // updateParty
-            break // Party data
+            handleUpdateParty(buf: buf, ws: ws)
 
         case 36:  // drawTeleportBubbles
             if buf.bytesRemaining >= 3, ws.teleportBubbles.count < 50 {
@@ -1257,6 +1257,133 @@ final class RSCPacketHandler {
         }
         if idx > 0 {
             ws.activePrayers = next
+        }
+    }
+
+    // Port of PacketHandler.java updateClan() — opcode 112. Native iOS does
+    // not yet expose the full clan setup/search UI, but it keeps membership,
+    // invites, and settings in worldState so social surfaces can bind to it.
+    private func handleUpdateClan(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining > 0 else { return }
+        let actionType = buf.getUnsignedByte()
+        switch actionType {
+        case 0: // Send clan
+            ws.clanName = buf.getString()
+            ws.clanTag = buf.getString()
+            ws.clanLeader = buf.getString()
+            ws.isClanLeader = buf.getUnsignedByte() == 1
+            let count = buf.getUnsignedByte()
+            var members: [RSCClanMember] = []
+            for _ in 0..<count {
+                let name = buf.getString()
+                let rank = buf.getUnsignedByte()
+                let online = buf.getUnsignedByte() == 1
+                members.append(RSCClanMember(name: name, rank: rank, online: online))
+            }
+            ws.clanMembers = members
+            ws.inClan = true
+            ws.addChat(sender: "[Clan]", text: "Clan loaded: \(ws.clanName)")
+
+        case 1: // Leave clan
+            ws.inClan = false
+            ws.clanMembers = []
+            ws.clanName = ""
+            ws.clanTag = ""
+            ws.clanLeader = ""
+            ws.isClanLeader = false
+            ws.addChat(sender: "[Clan]", text: "You have left your clan.")
+
+        case 2: // Sent invitation
+            ws.clanInviteFrom = buf.getString()
+            ws.clanInviteName = buf.getString()
+            ws.addChat(sender: "[Clan]", text: "\(ws.clanInviteFrom) invited you to \(ws.clanInviteName).")
+
+        case 3: // Settings
+            ws.clanSettings = [buf.getUnsignedByte(), buf.getUnsignedByte(), buf.getUnsignedByte()]
+            ws.clanAllowed = [buf.getUnsignedByte() == 1, buf.getUnsignedByte() == 1]
+
+        case 4: // Search results; skip until a native search UI owns it.
+            let count = buf.getShort()
+            for _ in 0..<count {
+                guard buf.bytesRemaining > 0 else { break }
+                _ = buf.getShort()       // clanID
+                _ = buf.getString()      // clanName
+                _ = buf.getString()      // clanTag
+                _ = buf.getUnsignedByte() // members
+                _ = buf.getUnsignedByte() // canJoin
+                _ = buf.get32()          // clanPoints
+                _ = buf.getShort()       // clanRank
+            }
+
+        default:
+            while buf.bytesRemaining > 0 { _ = buf.getUnsignedByte() }
+        }
+    }
+
+    // Port of PacketHandler.java updateParty() — opcode 116.
+    private func handleUpdateParty(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining > 0 else { return }
+        let actionType = buf.getUnsignedByte()
+        switch actionType {
+        case 0: // Send party
+            ws.partyLeader = buf.getString()
+            ws.isPartyLeader = buf.getUnsignedByte() == 1
+            let count = buf.getUnsignedByte()
+            var members: [RSCPartyMember] = []
+            for _ in 0..<count {
+                let name = buf.getString()
+                let rank = buf.getUnsignedByte()
+                let online = buf.getUnsignedByte() == 1
+                let curHp = buf.getUnsignedByte()
+                let maxHp = buf.getUnsignedByte()
+                let cbLvl = buf.getUnsignedByte()
+                let skull = buf.getUnsignedByte()
+                _ = buf.getUnsignedByte() // pMemD
+                let shareLoot = buf.getUnsignedByte() == 1
+                _ = buf.getUnsignedByte() // partyMembersTotal
+                _ = buf.getUnsignedByte() // inCombat
+                let shareExp = buf.getUnsignedByte() == 1
+                _ = buf.get32() // expShared high
+                _ = buf.get32() // expShared low
+                members.append(RSCPartyMember(
+                    name: name, rank: rank, online: online,
+                    currentHp: curHp, maxHp: maxHp, combatLevel: cbLvl,
+                    skull: skull, shareLoot: shareLoot, shareExp: shareExp
+                ))
+            }
+            ws.partyMembers = members
+            ws.inParty = true
+            ws.addChat(sender: "[Party]", text: "Party loaded with \(members.count) member(s).")
+
+        case 1: // Leave party
+            ws.inParty = false
+            ws.partyMembers = []
+            ws.partyLeader = ""
+            ws.isPartyLeader = false
+            ws.addChat(sender: "[Party]", text: "You have left your party.")
+
+        case 2: // Sent invitation
+            ws.partyInviteFrom = buf.getString()
+            ws.partyInviteName = buf.getString()
+            ws.addChat(sender: "[Party]", text: "\(ws.partyInviteFrom) invited you to \(ws.partyInviteName).")
+
+        case 3: // Settings
+            ws.partySettings = [buf.getUnsignedByte(), buf.getUnsignedByte(), buf.getUnsignedByte()]
+            ws.partyAllowed = [buf.getUnsignedByte() == 1, buf.getUnsignedByte() == 1]
+
+        case 4: // Search results; skip until a native search UI owns it.
+            let count = buf.getShort()
+            for _ in 0..<count {
+                guard buf.bytesRemaining > 0 else { break }
+                _ = buf.getShort()       // partyID
+                _ = buf.getUnsignedByte() // members
+                _ = buf.getUnsignedByte() // canJoin
+                _ = buf.get32()          // partyPoints
+                _ = buf.getShort()       // partyRank
+            }
+
+        default:
+            while buf.bytesRemaining > 0 { _ = buf.getUnsignedByte() }
         }
     }
 

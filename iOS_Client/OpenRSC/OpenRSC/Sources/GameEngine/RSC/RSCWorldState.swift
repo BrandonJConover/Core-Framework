@@ -100,6 +100,26 @@ struct RSCTeleportBubble: Identifiable {
     var time: Int = 0
 }
 
+struct RSCClanMember: Identifiable {
+    var id: String { name }
+    var name: String
+    var rank: Int
+    var online: Bool
+}
+
+struct RSCPartyMember: Identifiable {
+    var id: String { name }
+    var name: String
+    var rank: Int
+    var online: Bool
+    var currentHp: Int
+    var maxHp: Int
+    var combatLevel: Int
+    var skull: Int
+    var shareLoot: Bool
+    var shareExp: Bool
+}
+
 struct RSCChatMessage: Identifiable {
     let id: UUID = UUID()
     let sender: String
@@ -349,6 +369,29 @@ final class RSCWorldState: ObservableObject {
     @Published var blockPrivate: Int = 0
     @Published var blockTrade: Int = 0
     @Published var blockDuel: Int = 0
+
+    // Clan/party state from opcodes 112 and 116. Full setup/search UI is a
+    // separate surface, but the native client keeps the server state instead
+    // of dropping it.
+    @Published var inClan: Bool = false
+    @Published var clanName: String = ""
+    @Published var clanTag: String = ""
+    @Published var clanLeader: String = ""
+    @Published var isClanLeader: Bool = false
+    @Published var clanMembers: [RSCClanMember] = []
+    @Published var clanInviteFrom: String = ""
+    @Published var clanInviteName: String = ""
+    @Published var clanSettings: [Int] = [0, 0, 0]
+    @Published var clanAllowed: [Bool] = [false, false]
+
+    @Published var inParty: Bool = false
+    @Published var partyLeader: String = ""
+    @Published var isPartyLeader: Bool = false
+    @Published var partyMembers: [RSCPartyMember] = []
+    @Published var partyInviteFrom: String = ""
+    @Published var partyInviteName: String = ""
+    @Published var partySettings: [Int] = [0, 0, 0]
+    @Published var partyAllowed: [Bool] = [false, false]
 
     /// Damage splat for the local player. Java counts down combatTimeout
     /// from 200 and draws the splat while it stays > 150 (~50 render ticks).
