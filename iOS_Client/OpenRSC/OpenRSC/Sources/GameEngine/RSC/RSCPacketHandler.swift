@@ -262,6 +262,7 @@ final class RSCPacketHandler {
                 ws.welcomeRecoveryDays = buf.getShort()
                 ws.welcomeTipOfDay = Int.random(in: 0..<6)
                 ws.welcomeShown = true
+                ws.welcomeOpen = true
             }
             ws.addChat(sender: "[System]", text: "Welcome to \(ws.serverName)")
 

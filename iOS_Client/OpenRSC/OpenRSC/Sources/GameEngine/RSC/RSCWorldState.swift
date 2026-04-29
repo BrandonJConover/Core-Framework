@@ -191,7 +191,14 @@ final class RSCWorldState: ObservableObject {
 
     // Welcome dialog state — populated by opcode 182 (PacketHandler.showLoginDialog).
     // Shown once per session right after the first character/skills sync.
+    /// Sticky session-only flag — true once opcode 182 has been ingested,
+    /// stays true even after the user dismisses the panel so we don't
+    /// re-open it when the server resends 182 (some configs do).
     @Published var welcomeShown: Bool = false
+    /// Drives WelcomePanel visibility. Set true alongside welcomeShown the
+    /// first time opcode 182 arrives, flipped false when the user taps
+    /// "Click here to play" (or the backdrop).
+    @Published var welcomeOpen: Bool = false
     @Published var welcomeLastIP: String = ""
     /// Days since the previous login (0 = today). 65535 means "never logged in".
     @Published var welcomeDaysAgo: Int = 0

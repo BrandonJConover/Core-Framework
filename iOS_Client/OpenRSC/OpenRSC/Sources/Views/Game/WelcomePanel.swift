@@ -36,7 +36,12 @@ struct WelcomePanel: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.7).ignoresSafeArea()
+            // Tap-anywhere-outside backdrop. Acts as a safety net if the
+            // primary button slips off-screen on smaller landscape layouts.
+            Color.black.opacity(0.7)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { worldState.welcomeOpen = false }
             VStack(spacing: 14) {
                 Text("Welcome to \(worldState.serverName.isEmpty ? "OpenRSC" : worldState.serverName)")
                     .font(.system(size: 18, weight: .bold))
@@ -80,7 +85,7 @@ struct WelcomePanel: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Button(action: { worldState.welcomeShown = false }) {
+                Button(action: { worldState.welcomeOpen = false }) {
                     Text("Click here to play")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.black)

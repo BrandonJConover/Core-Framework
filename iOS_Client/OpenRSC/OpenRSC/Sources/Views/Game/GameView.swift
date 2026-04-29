@@ -262,7 +262,7 @@ struct GameView: View {
         if engine.worldState.showAppearanceChange {
             AppearancePanel(worldState: engine.worldState, engine: engine)
         }
-        if engine.worldState.welcomeShown {
+        if engine.worldState.welcomeOpen {
             WelcomePanel(worldState: engine.worldState)
         }
         if engine.worldState.isSleeping {
