@@ -483,7 +483,104 @@ final class RSCGameEngine: ObservableObject {
 
         drawProjectiles()
         drawOverheadItemBubbles()
+        drawSkullIndicators()
         drawDamageSplats()
+    }
+
+    /// Draw skull markers over skulled players/NPCs. Mirrors Java's overlay
+    /// rule that player skulls hide while an item bubble is active; NPC skulls
+    /// are shown whenever their skull flag is positive.
+    private func drawSkullIndicators() {
+        guard let scene = self.scene else { return }
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+
+        for npc in worldState.npcs where npc.skullVisible > 0 {
+            let dx = npc.x - px
+            let dz = npc.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: -142,
+                worldZ: Int32(dz) * 128 + 64
+            )
+            if proj.depth < scene.rot1024_zTop { continue }
+            drawSkullMarker(centerX: Int(proj.screenX), centerY: Int(proj.screenY) - 12, red: npc.skullVisible == 2)
+        }
+
+        for player in worldState.players {
+            guard let appearance = worldState.playerAppearances[player.id],
+                  appearance.skulled,
+                  player.bubbleTimeout == 0 else { continue }
+            let dx = player.x - px
+            let dz = player.y - pz
+            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
+            let proj = scene.projectPoint(
+                worldX: Int32(dx) * 128 + 64,
+                worldY: -142,
+                worldZ: Int32(dz) * 128 + 64
+            )
+            if proj.depth < scene.rot1024_zTop { continue }
+            drawSkullMarker(centerX: Int(proj.screenX), centerY: Int(proj.screenY) - 12, red: false)
+        }
+
+        if let localAppearance = worldState.playerAppearances[worldState.playerServerIndex],
+           localAppearance.skulled,
+           worldState.localBubbleTimeout == 0 {
+            drawSkullMarker(
+                centerX: MetalRenderer.gameWidth / 2,
+                centerY: MetalRenderer.gameHeight / 2 - 52,
+                red: false
+            )
+        }
+    }
+
+    private func drawSkullMarker(centerX: Int, centerY: Int, red: Bool) {
+        let spriteId = 2013 // mudclient.spriteMedia + 13, GUI skull
+        if let gs = spriteLoader.getSprite(spriteId), gs.width <= 24, gs.height <= 24 {
+            spriteLoader.drawSprite(
+                spriteId,
+                onto: &pixelData,
+                bufferWidth: MetalRenderer.gameWidth,
+                bufferHeight: MetalRenderer.gameHeight,
+                atX: centerX - gs.width / 2,
+                atY: centerY - gs.height / 2,
+                scale: 1
+            )
+            return
+        }
+
+        let w = MetalRenderer.gameWidth
+        let h = MetalRenderer.gameHeight
+        let color = Int32(bitPattern: red ? 0xFFFF3333 : 0xFFFFFFFF)
+        let outline = Int32(bitPattern: 0xFF000000)
+        let rows = [
+            "01110",
+            "11111",
+            "10101",
+            "11111",
+            "01110",
+            "10101",
+            "01010"
+        ]
+        for (ry, row) in rows.enumerated() {
+            for (rx, ch) in row.enumerated() where ch == "1" {
+                let sx = centerX - 2 + rx
+                let sy = centerY - 3 + ry
+                for oy in -1...1 {
+                    for ox in -1...1 where abs(ox) + abs(oy) == 1 {
+                        let px = sx + ox
+                        let py = sy + oy
+                        if px >= 0 && px < w && py >= 0 && py < h {
+                            pixelData[py * w + px] = outline
+                        }
+                    }
+                }
+                if sx >= 0 && sx < w && sy >= 0 && sy < h {
+                    pixelData[sy * w + sx] = color
+                }
+            }
+        }
     }
 
     /// Draw active ranged/magic projectiles. Java stores the projectile on the

@@ -60,6 +60,7 @@ struct RSCNPC: Identifiable {
     var projectileRange: Int = 0
     var projectileSourceServerIndex: Int = -1
     var projectileSourceIsNpc: Bool = false
+    var skullVisible: Int = 0
     /// 0..7 facing direction captured from showNPCs's per-NPC 4-bit field.
     /// Defaults to 4 (south) so the renderer always has a valid value.
     var direction: Int = 4
@@ -316,6 +317,20 @@ final class RSCWorldState: ObservableObject {
     @Published var combatStyle: Int = 0  // 0=controlled, 1=aggressive, 2=accurate, 3=defensive
     @Published var lastDamageReceived: Int = 0
     @Published var lastDamageDealt: Int = 0
+
+    // Options-menu settings from opcode 240. These mirror the Java
+    // updateOptionsMenuSettings packet enough for native systems to follow
+    // server/user preferences without touching the SettingsPanel UI.
+    @Published var optionCameraModeAuto: Bool = false
+    @Published var optionMouseButtonOne: Bool = false
+    @Published var optionSoundDisabled: Bool = false
+    @Published var settingsBlockGlobal: Int = 0
+    @Published var optionExperienceDrops: Bool = true
+    @Published var optionHideRoofs: Bool = false
+    @Published var optionHideFog: Bool = false
+    @Published var groundItemsToggle: Int = 0
+    @Published var optionHideKillFeed: Bool = false
+    @Published var optionHideNameTag: Bool = false
 
     /// Damage splat for the local player. Java counts down combatTimeout
     /// from 200 and draws the splat while it stays > 150 (~50 render ticks).

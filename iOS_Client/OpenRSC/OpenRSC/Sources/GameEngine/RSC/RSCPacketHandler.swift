@@ -201,8 +201,7 @@ final class RSCPacketHandler {
             _ = world149
 
         case 240: // GAME_SETTINGS — updateOptionsMenuSettings
-            // Just skip the settings bytes for now
-            while buf.bytesRemaining > 0 { let _ = buf.getUnsignedByte() }
+            handleOptionsMenuSettings(buf: buf, ws: ws)
 
         case 83:  // DISPLAY_DEATH_SCREEN
             ws.isDead = true
@@ -268,9 +267,6 @@ final class RSCPacketHandler {
 
         case 234: // UPDATE_PLAYERS — player appearance/chat/combat updates
             handleUpdatePlayers(buf: buf, ws: ws)
-
-        case 240: // GAME_SETTINGS
-            break // Game options
 
         case 206: // SET_PRAYERS
             break // Prayer data
@@ -551,6 +547,49 @@ final class RSCPacketHandler {
         ws.playerCount = buf.getShort()
         ws.playerMax = buf.getShort()
         ws.isMembersWorld = buf.getByte() != 0
+    }
+
+    /// Port of PacketHandler.java updateOptionsMenuSettings() for the settings
+    /// that native systems currently consume. Some servers send shorter
+    /// packets than the newest Java client expects, so each field is guarded
+    /// and any trailing bytes are drained to keep packet parsing aligned.
+    private func handleOptionsMenuSettings(buf: ByteBuffer, ws: RSCWorldState) {
+        func readByte() -> Int? {
+            guard buf.bytesRemaining > 0 else { return nil }
+            return buf.getUnsignedByte()
+        }
+
+        if let value = readByte() { ws.optionCameraModeAuto = value == 1 } // 0
+        if let value = readByte() { ws.optionMouseButtonOne = value == 1 } // 1
+        if let value = readByte() { ws.optionSoundDisabled = value == 1 } // 2
+        if let value = readByte() { ws.combatStyle = value } // 3
+        if let value = readByte() { ws.settingsBlockGlobal = value } // 4
+
+        // 5..24 are persisted for Java UI/settings only in this native pass.
+        for _ in 5...24 {
+            guard readByte() != nil else { return }
+        }
+
+        if let value = readByte() { ws.optionExperienceDrops = value == 1 } // 25
+        if let value = readByte() { ws.optionHideRoofs = value == 1 } // 26
+        if let value = readByte() { ws.optionHideFog = value == 1 } // 27
+        if let value = readByte() { ws.groundItemsToggle = value } // 28
+
+        // 29..30 are Java UI choices.
+        for _ in 29...30 {
+            guard readByte() != nil else { return }
+        }
+
+        if let value = readByte() { ws.optionHideKillFeed = value == 1 } // 31
+
+        // 32..34 are fight-mode selector / XP counter / inventory count.
+        for _ in 32...34 {
+            guard readByte() != nil else { return }
+        }
+
+        if let value = readByte() { ws.optionHideNameTag = value == 1 } // 35
+
+        while buf.bytesRemaining > 0 { _ = buf.getUnsignedByte() }
     }
 
     /// 3-bit movement direction encoding shared by showOtherPlayers and
@@ -1226,7 +1265,10 @@ final class RSCPacketHandler {
                 }
 
             case 5: // Skull visibility
-                let _ = buf.getUnsignedByte()
+                let skull = buf.getUnsignedByte()
+                if let idx = ws.npcs.firstIndex(where: { $0.id == serverIndex }) {
+                    ws.npcs[idx].skullVisible = skull
+                }
 
             case 6: // Wield change
                 let _ = buf.getUnsignedByte() // wield
