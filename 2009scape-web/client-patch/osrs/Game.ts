@@ -12269,12 +12269,14 @@ export class Game extends GameShell {
         const ObjType530M = (await import("./cache/def/ObjType530")).ObjType530;
         const NpcType530M = (await import("./cache/def/NpcType530")).NpcType530;
         const LocType530M = (await import("./cache/def/LocType530")).LocType530;
+        const BasType530M = (await import("./cache/def/BasType530")).BasType530;
         if (!ItemDef.cache530) ItemDef.cache530 = new Map();
         if (!ActorDef.cache530) ActorDef.cache530 = new Map();
         if (!GameObjDef.cache530) GameObjDef.cache530 = new Map();
+        if (!ActorDef.basCache530) ActorDef.basCache530 = new Map();
         const BOOTSTRAP_MAX = 2048;
         const CHUNK = 64;
-        let items = 0, npcs = 0, locs = 0;
+        let items = 0, npcs = 0, locs = 0, bas = 0;
         for (let base = 0; base < BOOTSTRAP_MAX; base += CHUNK) {
             const promises: Promise<void>[] = [];
             for (let i = 0; i < CHUNK && base + i < BOOTSTRAP_MAX; i++) {
@@ -12297,12 +12299,18 @@ export class Game extends GameShell {
                         if (l) { GameObjDef.cache530!.set(id, l); locs++; }
                     } catch (e) { /* skip */ }
                 })());
+                promises.push((async () => {
+                    try {
+                        const b = await BasType530M.load(js5Cache, id);
+                        if (b) { ActorDef.basCache530!.set(id, b); bas++; }
+                    } catch (e) { /* skip */ }
+                })());
             }
             await Promise.all(promises);
             // Yield to the event loop so rendering / input keeps frame.
             await new Promise<void>((res) => setTimeout(res, 0));
         }
-        console.log("530 defs preloaded: items=" + items + " npcs=" + npcs + " locs=" + locs);
+        console.log("530 defs preloaded: items=" + items + " npcs=" + npcs + " locs=" + locs + " bas=" + bas);
     }
 
     async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

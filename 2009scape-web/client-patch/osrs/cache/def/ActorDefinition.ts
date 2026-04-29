@@ -7,6 +7,7 @@ import { Buffer } from "../../net/Buffer";
 import { Archive } from "../Archive";
 import { Varbit } from "../cfg/Varbit";
 import { NpcType530, NpcType530Data } from "./NpcType530";
+import { BasType530Data } from "./BasType530";
 
 export class ActorDefinition {
 
@@ -29,6 +30,14 @@ export class ActorDefinition {
      * getDefinition consults it before the empty 377 npc.dat archive.
      */
     public static cache530: Map<number, NpcType530Data> | null = null;
+
+    /**
+     * BasType530 lookup table — populated by Game.preloadDefs530 alongside
+     * cache530. NpcType530.bastypeid points into this map for walk/idle/
+     * turn anim ids. When the entry is missing, anim ids stay at -1
+     * (visible NPC, no movement animation).
+     */
+    public static basCache530: Map<number, BasType530Data> | null = null;
 
     public static getDefinition(id: number): ActorDefinition {
         for (let j: number = 0; j < 20; j++) {if (ActorDefinition.cache[j].id === id) { return ActorDefinition.cache[j]; }}
@@ -86,10 +95,26 @@ export class ActorDefinition {
         def.settingId = d.multiNpcVarp;
         def.sizeXZ = d.resizeX || 128;
         def.sizeY = d.resizeY || 128;
-        // Animation id slots default to -1 from the constructor; populated
-        // separately when BasType530 is wired up.
         def.visible = true;
         def.clickable = d.interactive;
+        // BasType lookup: if a preloader populated ActorDefinition.basCache530,
+        // copy the relevant anim ids onto this slot. Field-name translation:
+        //   BasType.idleAnimationId        → standAnimationId (377 client term)
+        //   BasType.walkAnimation          → walkAnimationId
+        //   BasType.walkCCWTurnAnimationId → turnLeftAnimationId
+        //   BasType.walkCWTurnAnimationId  → turnRightAnimationId
+        //   BasType.standingCCWTurn        → turnAroundAnimationId (rough match —
+        //                                    377 lacks separate CW/CCW turn slots
+        //                                    so we pick the CCW form and let the
+        //                                    renderer mirror as needed).
+        const bas = ActorDefinition.basCache530 ? ActorDefinition.basCache530.get(d.bastypeid) : undefined;
+        if (bas) {
+            if (bas.idleAnimationId !== -1) def.standAnimationId = bas.idleAnimationId;
+            if (bas.walkAnimation !== -1) def.walkAnimationId = bas.walkAnimation;
+            if (bas.walkCCWTurnAnimationId !== -1) def.turnLeftAnimationId = bas.walkCCWTurnAnimationId;
+            if (bas.walkCWTurnAnimationId !== -1) def.turnRightAnimationId = bas.walkCWTurnAnimationId;
+            if (bas.standingCCWTurn !== -1) def.turnAroundAnimationId = bas.standingCCWTurn;
+        }
     }
 
     private static opsToActions(ops: (string | null)[] | null | undefined): string[] | null {
