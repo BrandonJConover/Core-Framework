@@ -171,8 +171,12 @@ export class Js5Compression {
 
         if (type === 1) {
             // BZip2. Js5 strips the "BZh1" file header; re-prepend it before decoding.
+            // Hard cap on absolute output size keeps malformed input from
+            // allocating an absurd buffer; the per-blob expansion ratio is
+            // intentionally NOT capped here — master-index metadata routinely
+            // hits 75-100× compression ratios because the same group/file
+            // count patterns repeat across thousands of entries.
             if (uncompressedLen > 16 * 1024 * 1024) return null;
-            if (uncompressedLen > compressedLen * 64) return null;
             const bz2Input = new Uint8Array(4 + compressedLen);
             bz2Input[0] = 0x42; // 'B'
             bz2Input[1] = 0x5A; // 'Z'
@@ -359,26 +363,34 @@ export class Js5Group {
         const trailerStart = groupBlob.byteLength - 1 - stripes * fileCount * 4;
         if (trailerStart < 0) return files;
 
-        const sizes = new Array<number>(fileCount).fill(0);
+        // JSweet runtime quirk: `new Array<number>(n).fill(0)` produces a
+        // length-0 array in this transpiled module. Build the size buffer
+        // explicitly so length === fileCount and indices 0..N-1 are real
+        // zeros (not undefined that turn arithmetic into NaN).
+        const sizes: number[] = [];
+        for (let i = 0; i < fileCount; i++) sizes.push(0);
         let pos = trailerStart;
         for (let s = 0; s < stripes; s++) {
             let running = 0;
             for (let f = 0; f < fileCount; f++) {
-                const delta =
-                    ((groupBlob[pos] & 0xFF) << 24) |
-                    ((groupBlob[pos + 1] & 0xFF) << 16) |
-                    ((groupBlob[pos + 2] & 0xFF) << 8) |
-                     (groupBlob[pos + 3] & 0xFF);
+                const b0 = groupBlob[pos] & 0xFF;
+                const b1 = groupBlob[pos + 1] & 0xFF;
+                const b2 = groupBlob[pos + 2] & 0xFF;
+                const b3 = groupBlob[pos + 3] & 0xFF;
+                const delta = ((b0 << 24) | (b1 << 16) | (b2 << 8) | b3) | 0;
                 pos += 4;
-                running += (delta | 0);
-                sizes[f] += running;
+                running = (running + delta) | 0;
+                sizes[f] = (sizes[f] + running) | 0;
             }
         }
 
-        for (let f = 0; f < fileCount; f++) files[f] = new Uint8Array(sizes[f]);
+        for (let f = 0; f < fileCount; f++) files[f] = new Uint8Array(Math.max(0, sizes[f] | 0));
 
-        // Second pass: copy data.
-        const writePos = new Array<number>(fileCount).fill(0);
+        // Second pass: copy data. Same JSweet quirk — explicit push loop
+        // instead of `new Array(N).fill(0)` so writePos has length=fileCount
+        // with real zeros at every slot.
+        const writePos: number[] = [];
+        for (let i = 0; i < fileCount; i++) writePos.push(0);
         let readPos = 0;
         pos = trailerStart;
         for (let s = 0; s < stripes; s++) {
@@ -465,10 +477,19 @@ export class Js5Cache {
         if (!group) return null;
         const meta = await this.getMeta(idxNum);
         if (!meta) return null;
-        const fileCount = meta.groupCapacities[groupId] || 1;
-        if (fileCount <= 1) return group;
-        const files = Js5Group.unpack(group, fileCount);
-        // Map dense file slot → logical file id via meta.fileIds if sparse.
+        // Unpack uses groupSizes (actual file count), not groupCapacities
+        // (max file-id + 1). For sparse groups, the trailer at the end of
+        // the group blob contains exactly groupSize stripe-delta entries —
+        // passing capacity instead of size reads garbage as deltas and
+        // produces empty files.
+        const groupSize = meta.groupSizes[groupId] || 0;
+        if (groupSize === 0) return null;
+        if (groupSize === 1) {
+            const ids = meta.fileIds[groupId];
+            if (ids && ids[0] !== fileId) return null;
+            return group;
+        }
+        const files = Js5Group.unpack(group, groupSize);
         const ids = meta.fileIds[groupId];
         if (ids) {
             for (let i = 0; i < ids.length; i++) {
@@ -476,7 +497,7 @@ export class Js5Cache {
             }
             return null;
         }
-        return files[fileId] || null;
+        return fileId < files.length ? (files[fileId] || null) : null;
     }
 
     /**

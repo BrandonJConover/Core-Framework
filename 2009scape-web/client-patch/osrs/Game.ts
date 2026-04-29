@@ -12148,6 +12148,13 @@ export class Game extends GameShell {
             (this as any).cacheMain = main;
             if (extraIdx[255]) {
                 const indexBuffers: (ArrayBuffer | null)[] = [];
+                // Js5Cache also needs idx0..idx4 — those were loaded as
+                // legacy `stores[]` for the 377 archive path but Js5Cache
+                // only got idx5+. Without entry 2, FloType (idx2 group 4)
+                // and ParamType/etc all return null. Map them in here too.
+                for (let n = 0; n < 5; n++) {
+                    indexBuffers[n] = promises[1 + n];
+                }
                 for (const n of extraIdxNumbers) {
                     if (n !== 255) { indexBuffers[n] = extraIdx[n]; }
                 }
@@ -12160,6 +12167,11 @@ export class Game extends GameShell {
                 // withTimeout(1000ms) so a slow/missing idx13 sector can't stall startup.
                 // Worst case `fonts530` ends up empty and TypeFace falls back to stubs.
                 await this.preloadFonts530(js5Cache);
+                // Tier 3c: kick off background population of the def cache530
+                // maps (item / npc / loc / floor). These are NOT awaited so a
+                // slow idx2/7/16/19 fetch can't stall startup; the existing
+                // 377 fallback path stays in effect until a slot is filled.
+                this.preloadDefs530(js5Cache).catch((e) => console.log("preloadDefs530 failed: " + (e as Error).message));
             }
             const present = extraIdxNumbers.filter((n) => extraIdx[n] != null);
             console.log("530 extra indexes loaded: " + present.join(","));
@@ -12225,6 +12237,72 @@ export class Game extends GameShell {
         }
         (globalThis as any).fonts530 = fonts;
         console.log("530 fonts decoded: " + Object.keys(fonts).join(","));
+    }
+
+    /**
+     * Tier 3c: populate the cache530 maps on Item/Actor/GameObject
+     * definitions, plus FloorDefinition.cache via FloType530. Each id-range
+     * is processed in chunks with a yield between chunks so the main thread
+     * stays responsive — these are background fills, not blocking work.
+     *
+     * Item/Npc/Loc are LAZY: we only fill ids the server references via
+     * incoming packets (handled by hooks added to the lookup paths in
+     * follow-up commits). For now we proactively fill a small bootstrap
+     * range (0..2048) so common items + nearby NPCs render with real data.
+     * Floors are eager because the renderer reads them directly by id.
+     */
+    async preloadDefs530(js5Cache: Js5Cache) {
+        // Floors first — small set, eager fill, renderer reads cache[id] directly.
+        try {
+            const FloorDef = (await import("./cache/def/FloorDefinition")).FloorDefinition;
+            const n = await FloorDef.loadFrom530(js5Cache, 200);
+            console.log("530 floors loaded: " + n);
+        } catch (e) {
+            console.log("preloadDefs530 floors failed: " + (e as Error).message);
+        }
+        // Bootstrap-range items, NPCs, locs. The cache530 maps stay open so
+        // later lookups (e.g. server sends item id 13099) can fill on demand
+        // — a follow-up commit hooks the lookup paths to async-fill misses.
+        const ItemDef = (await import("./cache/def/ItemDefinition")).ItemDefinition;
+        const ActorDef = (await import("./cache/def/ActorDefinition")).ActorDefinition;
+        const GameObjDef = (await import("./cache/def/GameObjectDefinition")).GameObjectDefinition;
+        const ObjType530M = (await import("./cache/def/ObjType530")).ObjType530;
+        const NpcType530M = (await import("./cache/def/NpcType530")).NpcType530;
+        const LocType530M = (await import("./cache/def/LocType530")).LocType530;
+        if (!ItemDef.cache530) ItemDef.cache530 = new Map();
+        if (!ActorDef.cache530) ActorDef.cache530 = new Map();
+        if (!GameObjDef.cache530) GameObjDef.cache530 = new Map();
+        const BOOTSTRAP_MAX = 2048;
+        const CHUNK = 64;
+        let items = 0, npcs = 0, locs = 0;
+        for (let base = 0; base < BOOTSTRAP_MAX; base += CHUNK) {
+            const promises: Promise<void>[] = [];
+            for (let i = 0; i < CHUNK && base + i < BOOTSTRAP_MAX; i++) {
+                const id = base + i;
+                promises.push((async () => {
+                    try {
+                        const o = await ObjType530M.load(js5Cache, id);
+                        if (o) { ItemDef.cache530!.set(id, o); items++; }
+                    } catch (e) { /* skip */ }
+                })());
+                promises.push((async () => {
+                    try {
+                        const n = await NpcType530M.load(js5Cache, id);
+                        if (n) { ActorDef.cache530!.set(id, n); npcs++; }
+                    } catch (e) { /* skip */ }
+                })());
+                promises.push((async () => {
+                    try {
+                        const l = await LocType530M.load(js5Cache, id);
+                        if (l) { GameObjDef.cache530!.set(id, l); locs++; }
+                    } catch (e) { /* skip */ }
+                })());
+            }
+            await Promise.all(promises);
+            // Yield to the event loop so rendering / input keeps frame.
+            await new Promise<void>((res) => setTimeout(res, 0));
+        }
+        console.log("530 defs preloaded: items=" + items + " npcs=" + npcs + " locs=" + locs);
     }
 
     async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
