@@ -3,7 +3,7 @@ import Foundation
 // Client -> Server opcodes (from Opcodes.java Out enum)
 enum RSCOutOpcode: UInt8 {
     case login              = 0
-    case logout             = 1
+    case logout             = 102
     case register           = 2
     case ping               = 67
     case walkToEntity       = 16
@@ -22,6 +22,7 @@ enum RSCOutOpcode: UInt8 {
     case playerTrade        = 142
     case playerFollow       = 165
     case combatStyleChange  = 29
+    case dialogueAnswer     = 116
     case groundItemTake     = 247
     case itemDrop           = 246
     case itemCommand        = 90
@@ -36,7 +37,9 @@ enum RSCOutOpcode: UInt8 {
     case shopBuy            = 236
     case shopSell           = 221
     case shopClose          = 166
+    case tradeOffer         = 46
     case tradeAccept        = 55
+    case tradeConfirmAccept = 104
     case tradeDecline       = 230
     case bankClose          = 212
     case bankDeposit        = 23
@@ -48,11 +51,24 @@ enum RSCOutOpcode: UInt8 {
     case itemEquipFromBank  = 172
     case itemRemoveToBank   = 173
     case castOnSelf         = 137
+    case castOnItem         = 4
     case castOnLand         = 158
     case castOnNpc          = 50
     case castOnPlayer       = 229
     case prayerOn           = 60
     case prayerOff          = 254
+    case addFriend          = 195
+    case removeFriend       = 167
+    case addIgnore          = 132
+    case removeIgnore       = 241
+    case privacySettings    = 64
+    case appearanceChange   = 235
+    case duelAccept         = 176
+    case duelDecline        = 197
+    case duelConfirmAccept  = 77
+    case sleepWord          = 45
+    case duelOffer          = 33
+    case duelSettings       = 8
     case serverConfigRequest = 19
 }
 

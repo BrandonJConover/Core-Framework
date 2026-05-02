@@ -2108,7 +2108,7 @@ final class RSCGameEngine: ObservableObject {
     func answerDialogue(_ optionIndex: Int) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 116)  // QUESTION_DIALOG_ANSWER
+            buf.newPacket(opcode: Int(RSCOutOpcode.dialogueAnswer.rawValue))
             buf.putByte(optionIndex)
             try? await connection.send(buf.finishPacket())
         }
@@ -2117,7 +2117,7 @@ final class RSCGameEngine: ObservableObject {
     func logout() {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 102)  // LOGOUT
+            buf.newPacket(opcode: Int(RSCOutOpcode.logout.rawValue))
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2527,7 +2527,7 @@ final class RSCGameEngine: ObservableObject {
     func castSpellOnItem(spellId: Int, slot: Int) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 4)
+            buf.newPacket(opcode: Int(RSCOutOpcode.castOnItem.rawValue))
             buf.putShort(spellId)  // server reads spellId first per mudclient (idOrZ then indexOrX)
             buf.putShort(slot)
             try? await connection.send(buf.finishPacket())
@@ -2539,7 +2539,7 @@ final class RSCGameEngine: ObservableObject {
     func addFriend(name: String) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 195) // ADD_FRIEND
+            buf.newPacket(opcode: Int(RSCOutOpcode.addFriend.rawValue))
             buf.putZeroPaddedString(name)
             try? await connection.send(buf.finishPacket())
         }
@@ -2548,7 +2548,7 @@ final class RSCGameEngine: ObservableObject {
     func removeFriend(name: String) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 167) // REMOVE_FRIEND
+            buf.newPacket(opcode: Int(RSCOutOpcode.removeFriend.rawValue))
             buf.putZeroPaddedString(name)
             try? await connection.send(buf.finishPacket())
         }
@@ -2557,7 +2557,7 @@ final class RSCGameEngine: ObservableObject {
     func addIgnore(name: String) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 132) // ADD_IGNORE
+            buf.newPacket(opcode: Int(RSCOutOpcode.addIgnore.rawValue))
             buf.putZeroPaddedString(name)
             try? await connection.send(buf.finishPacket())
         }
@@ -2566,7 +2566,7 @@ final class RSCGameEngine: ObservableObject {
     func removeIgnore(name: String) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 241) // REMOVE_IGNORE
+            buf.newPacket(opcode: Int(RSCOutOpcode.removeIgnore.rawValue))
             buf.putZeroPaddedString(name)
             try? await connection.send(buf.finishPacket())
         }
@@ -2580,7 +2580,7 @@ final class RSCGameEngine: ObservableObject {
     func setChatBlockFlags(chat: Int, priv: Int, trade: Int, duel: Int) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 64)
+            buf.newPacket(opcode: Int(RSCOutOpcode.privacySettings.rawValue))
             buf.putByte(chat)
             buf.putByte(priv)
             buf.putByte(trade)
@@ -2652,7 +2652,7 @@ final class RSCGameEngine: ObservableObject {
         worldState.showAppearanceChange = false
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 235) // CHANGE_APPEARANCE
+            buf.newPacket(opcode: Int(RSCOutOpcode.appearanceChange.rawValue))
             buf.putByte(headGender)     // 0=male, 1=female
             buf.putByte(headType)       // head style 0-4
             buf.putByte(bodyGender)     // 0=male, 1=female (usually matches head)
@@ -2661,6 +2661,8 @@ final class RSCGameEngine: ObservableObject {
             buf.putByte(topColour)      // 0-14
             buf.putByte(bottomColour)   // 0-14
             buf.putByte(skinColour)     // 0-4
+            buf.putByte(0)              // ironmanMode
+            buf.putByte(0)              // isOneXp
             try? await connection.send(buf.finishPacket())
             print("[Engine] Appearance sent")
         }
@@ -2671,7 +2673,7 @@ final class RSCGameEngine: ObservableObject {
     func duelAccept() {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 176) // DUEL_ACCEPT
+            buf.newPacket(opcode: Int(RSCOutOpcode.duelAccept.rawValue))
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2681,7 +2683,7 @@ final class RSCGameEngine: ObservableObject {
         worldState.duelConfirmOpen = false
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 197) // DUEL_DECLINE
+            buf.newPacket(opcode: Int(RSCOutOpcode.duelDecline.rawValue))
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2689,7 +2691,7 @@ final class RSCGameEngine: ObservableObject {
     func duelConfirmAccept() {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 77) // DUEL_CONFIRM_ACCEPT
+            buf.newPacket(opcode: Int(RSCOutOpcode.duelConfirmAccept.rawValue))
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2699,7 +2701,7 @@ final class RSCGameEngine: ObservableObject {
     func sendSleepWord(_ word: String) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 45) // SLEEP_WORD
+            buf.newPacket(opcode: Int(RSCOutOpcode.sleepWord.rawValue))
             buf.putZeroPaddedString(word)
             try? await connection.send(buf.finishPacket())
         }
@@ -2736,7 +2738,7 @@ final class RSCGameEngine: ObservableObject {
         worldState.tradePartnerAccepted = false
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 46) // TRADE_OFFER
+            buf.newPacket(opcode: Int(RSCOutOpcode.tradeOffer.rawValue))
             buf.putByte(items.count)
             for it in items {
                 buf.putShort(it.id)
@@ -2751,7 +2753,7 @@ final class RSCGameEngine: ObservableObject {
     func tradeConfirmAccept() {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 104) // TRADE_CONFIRM_ACCEPTED
+            buf.newPacket(opcode: Int(RSCOutOpcode.tradeConfirmAccept.rawValue))
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2767,7 +2769,7 @@ final class RSCGameEngine: ObservableObject {
         worldState.duelOpponentAccepted = false
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 33) // DUEL_OFFER_ITEM
+            buf.newPacket(opcode: Int(RSCOutOpcode.duelOffer.rawValue))
             buf.putByte(items.count)
             for it in items {
                 buf.putShort(it.id)
@@ -2787,7 +2789,7 @@ final class RSCGameEngine: ObservableObject {
         worldState.duelOpponentAccepted = false
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 8) // DUEL_FIRST_SETTINGS_CHANGED
+            buf.newPacket(opcode: Int(RSCOutOpcode.duelSettings.rawValue))
             buf.putByte(retreat ? 1 : 0)
             buf.putByte(magic ? 1 : 0)
             buf.putByte(prayer ? 1 : 0)
