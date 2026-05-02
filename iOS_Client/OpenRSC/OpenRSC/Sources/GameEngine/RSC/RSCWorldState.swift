@@ -1,9 +1,14 @@
 import Foundation
 
+let RSCCharacterInterpolationTicks = 13
+
 struct RSCPlayer: Identifiable {
     let id: Int
     var x: Int
     var y: Int
+    var previousX: Int
+    var previousY: Int
+    var interpolationTicksRemaining: Int
     var name: String
     var moving: Bool
     var combatLevel: Int
@@ -27,6 +32,44 @@ struct RSCPlayer: Identifiable {
     /// engine tick loop, same path the NPC bubble uses.
     var message: String = ""
     var messageTimeout: Int = 0
+
+    init(
+        id: Int,
+        x: Int,
+        y: Int,
+        previousX: Int? = nil,
+        previousY: Int? = nil,
+        interpolationTicksRemaining: Int = 0,
+        name: String,
+        moving: Bool,
+        combatLevel: Int,
+        direction: Int = 4
+    ) {
+        self.id = id
+        self.x = x
+        self.y = y
+        self.previousX = previousX ?? x
+        self.previousY = previousY ?? y
+        self.interpolationTicksRemaining = interpolationTicksRemaining
+        self.name = name
+        self.moving = moving
+        self.combatLevel = combatLevel
+        self.direction = direction
+    }
+
+    var interpolatedX: Double {
+        RSCPlayer.interpolate(from: previousX, to: x, ticksRemaining: interpolationTicksRemaining)
+    }
+
+    var interpolatedY: Double {
+        RSCPlayer.interpolate(from: previousY, to: y, ticksRemaining: interpolationTicksRemaining)
+    }
+
+    private static func interpolate(from previous: Int, to current: Int, ticksRemaining: Int) -> Double {
+        guard ticksRemaining > 0, previous != current else { return Double(current) }
+        let progress = 1.0 - (Double(ticksRemaining) / Double(RSCCharacterInterpolationTicks))
+        return Double(previous) + (Double(current - previous) * min(1.0, max(0.0, progress)))
+    }
 }
 
 /// Appearance data delivered by opcode 234 case 5 (full appearance update).
@@ -52,6 +95,9 @@ struct RSCNPC: Identifiable {
     var id: Int
     var x: Int
     var y: Int
+    var previousX: Int
+    var previousY: Int
+    var interpolationTicksRemaining: Int
     var npcId: Int
     var name: String
     var currentHp: Int = 0
@@ -72,6 +118,42 @@ struct RSCNPC: Identifiable {
     /// 0..7 facing direction captured from showNPCs's per-NPC 4-bit field.
     /// Defaults to 4 (south) so the renderer always has a valid value.
     var direction: Int = 4
+
+    init(
+        id: Int,
+        x: Int,
+        y: Int,
+        previousX: Int? = nil,
+        previousY: Int? = nil,
+        interpolationTicksRemaining: Int = 0,
+        npcId: Int,
+        name: String,
+        direction: Int = 4
+    ) {
+        self.id = id
+        self.x = x
+        self.y = y
+        self.previousX = previousX ?? x
+        self.previousY = previousY ?? y
+        self.interpolationTicksRemaining = interpolationTicksRemaining
+        self.npcId = npcId
+        self.name = name
+        self.direction = direction
+    }
+
+    var interpolatedX: Double {
+        RSCNPC.interpolate(from: previousX, to: x, ticksRemaining: interpolationTicksRemaining)
+    }
+
+    var interpolatedY: Double {
+        RSCNPC.interpolate(from: previousY, to: y, ticksRemaining: interpolationTicksRemaining)
+    }
+
+    private static func interpolate(from previous: Int, to current: Int, ticksRemaining: Int) -> Double {
+        guard ticksRemaining > 0, previous != current else { return Double(current) }
+        let progress = 1.0 - (Double(ticksRemaining) / Double(RSCCharacterInterpolationTicks))
+        return Double(previous) + (Double(current - previous) * min(1.0, max(0.0, progress)))
+    }
 }
 
 struct RSCGameObject: Identifiable {

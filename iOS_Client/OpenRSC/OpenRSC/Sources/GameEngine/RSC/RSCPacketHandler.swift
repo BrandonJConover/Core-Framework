@@ -644,8 +644,11 @@ final class RSCPacketHandler {
                 let modelIndex = buf.getBitMask(3)
                 if i < kept.count, modelIndex < Self.movementDeltas.count {
                     let (dx, dy) = Self.movementDeltas[modelIndex]
+                    kept[i].previousX = kept[i].x
+                    kept[i].previousY = kept[i].y
                     kept[i].x += dx
                     kept[i].y += dy
+                    kept[i].interpolationTicksRemaining = RSCCharacterInterpolationTicks
                     kept[i].direction = modelIndex & 7
                     kept[i].moving = true
                 }
@@ -670,8 +673,14 @@ final class RSCPacketHandler {
             // De-dupe: if the server re-announces a known player, prefer the
             // fresh authoritative coords from this entry over the kept one.
             if let existing = kept.firstIndex(where: { $0.id == serverIndex }) {
+                kept[existing].previousX = kept[existing].x
+                kept[existing].previousY = kept[existing].y
                 kept[existing].x = playerTileX
                 kept[existing].y = playerTileZ
+                kept[existing].interpolationTicksRemaining =
+                    (kept[existing].previousX == playerTileX && kept[existing].previousY == playerTileZ)
+                    ? 0
+                    : RSCCharacterInterpolationTicks
                 kept[existing].direction = dir & 7
             } else {
                 kept.append(RSCPlayer(id: serverIndex, x: playerTileX, y: playerTileZ,
@@ -731,8 +740,11 @@ final class RSCPacketHandler {
                     // CharacterBillboards reads as rsDir).
                     if i < keptNPCs.count, dir < Self.movementDeltas.count {
                         let (dx, dy) = Self.movementDeltas[dir]
+                        keptNPCs[i].previousX = keptNPCs[i].x
+                        keptNPCs[i].previousY = keptNPCs[i].y
                         keptNPCs[i].x += dx
                         keptNPCs[i].y += dy
+                        keptNPCs[i].interpolationTicksRemaining = RSCCharacterInterpolationTicks
                         keptNPCs[i].direction = dir & 7
                     }
                 }

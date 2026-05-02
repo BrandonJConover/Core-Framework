@@ -229,6 +229,9 @@ final class RSCGameEngine: ObservableObject {
             if worldState.npcs[i].messageTimeout > 0 { worldState.npcs[i].messageTimeout -= 1 }
             if worldState.npcs[i].bubbleTimeout > 0 { worldState.npcs[i].bubbleTimeout -= 1 }
             if worldState.npcs[i].projectileRange > 0 { worldState.npcs[i].projectileRange -= 1 }
+            if worldState.npcs[i].interpolationTicksRemaining > 0 {
+                worldState.npcs[i].interpolationTicksRemaining -= 1
+            }
         }
         // Decay player damage splat timeouts (set to 200 by opcode 234 case 2;
         // splat visible while > 150).
@@ -237,6 +240,9 @@ final class RSCGameEngine: ObservableObject {
             if worldState.players[i].bubbleTimeout > 0 { worldState.players[i].bubbleTimeout -= 1 }
             if worldState.players[i].projectileRange > 0 { worldState.players[i].projectileRange -= 1 }
             if worldState.players[i].messageTimeout > 0 { worldState.players[i].messageTimeout -= 1 }
+            if worldState.players[i].interpolationTicksRemaining > 0 {
+                worldState.players[i].interpolationTicksRemaining -= 1
+            }
         }
         if worldState.localDamageTimeout > 0 { worldState.localDamageTimeout -= 1 }
         if worldState.localBubbleTimeout > 0 { worldState.localBubbleTimeout -= 1 }
@@ -398,7 +404,8 @@ final class RSCGameEngine: ObservableObject {
                     }
                     CharacterBillboards.register(
                         scene: scene, spriteLoader: spriteLoader,
-                        tileX: npc.x - px, tileZ: npc.y - pz,
+                        tileX: npc.interpolatedX - Double(px),
+                        tileZ: npc.interpolatedY - Double(pz),
                         rsDir: npc.direction,
                         stepFrame: role == .none ? renderLogCount : combatTick,
                         walkModel: def.walkModel,
@@ -432,7 +439,8 @@ final class RSCGameEngine: ObservableObject {
                 let skinIdx = appearance?.colourSkin ?? defaultSkinIdx
                 CharacterBillboards.register(
                     scene: scene, spriteLoader: spriteLoader,
-                    tileX: player.x - px, tileZ: player.y - pz,
+                    tileX: player.interpolatedX - Double(px),
+                    tileZ: player.interpolatedY - Double(pz),
                     rsDir: player.direction, stepFrame: renderLogCount,
                     walkModel: 6,
                     cameraRotation: cameraRotation,

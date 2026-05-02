@@ -58,8 +58,8 @@ enum CharacterBillboards {
     static func register(
         scene: Scene,
         spriteLoader: SpriteLoader,
-        tileX: Int,
-        tileZ: Int,
+        tileX: Double,
+        tileZ: Double,
         rsDir: Int,
         stepFrame: Int,
         walkModel: Int,
@@ -75,8 +75,8 @@ enum CharacterBillboards {
         overlayMovement: Int = 0
     ) {
         // Convert server tile coords to Scene world units (128 units/tile, + 64 center)
-        let worldX: Int32 = Int32(tileX) * 128 + 64
-        let worldZ: Int32 = Int32(tileZ) * 128 + 64
+        let worldX: Int32 = Int32((tileX * 128.0).rounded()) + 64
+        let worldZ: Int32 = Int32((tileZ * 128.0).rounded()) + 64
         let worldY: Int32 = 0  // ground level (Scene Y is inverted — negative up)
 
         let projected = scene.projectPoint(worldX: worldX, worldY: worldY, worldZ: worldZ)
