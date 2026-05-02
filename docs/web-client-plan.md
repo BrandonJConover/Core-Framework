@@ -62,9 +62,9 @@ These all require the `Component`/`InterfaceList` stack from rt4-client (Tier 7 
 ### Tier 5d — Audio + misc (low impact for now, wire when audio comes online)
 
 - [x] **SOUND_AREA (97) / SYNTH_SOUND (172)** — area-loop and one-shot SFX. Currently `SoundTrack.ts` is the only audio path and even that is gated behind the position-bound break we shipped to avoid an empty-buffer infinite loop. _(2b882a8c1)_
-- [ ] **GENERATE_CHAT_HEAD_FROM_BODY (111)** — quest-NPC chat-head sprite generated from a body model (used in dialog overlays).
-- [ ] **REFLECTION_CHEAT_CHECK (114)** — anti-cheat reflection probe; safe no-op.
-- [ ] **URL_OPEN (42)** — server requests the browser to open a URL (membership upgrade, etc).
+- [x] **GENERATE_CHAT_HEAD_FROM_BODY (111)** — quest-NPC chat-head sprite generated from a body model (used in dialog overlays). _(0a20ca565)_
+- [x] **REFLECTION_CHEAT_CHECK (114)** — anti-cheat reflection probe; safe no-op. _(0a20ca565)_
+- [x] **URL_OPEN (42)** — server requests the browser to open a URL (membership upgrade, etc). _(0a20ca565)_
 
 ## Renderer plan (Tier 6)
 
