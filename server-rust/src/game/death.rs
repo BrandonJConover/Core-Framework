@@ -250,7 +250,7 @@ impl DeathProcessor {
         }
 
         // Equipped items (iterate over all known equipment slots)
-        use super::player::EquipmentSlot;
+        use super::equipment::EquipmentSlot;
         let slots = [
             EquipmentSlot::Head,
             EquipmentSlot::Cape,
@@ -259,13 +259,14 @@ impl DeathProcessor {
             EquipmentSlot::Body,
             EquipmentSlot::Shield,
             EquipmentSlot::Legs,
-            EquipmentSlot::Gloves,
-            EquipmentSlot::Boots,
+            EquipmentSlot::Hands,
+            EquipmentSlot::Feet,
             EquipmentSlot::Ring,
+            EquipmentSlot::Ammo,
         ];
         for slot in &slots {
             if let Some(item) = player.equipment.get(*slot) {
-                items.push((item.id, item.amount));
+                items.push((item.item_id.0, item.amount));
             }
         }
 
@@ -288,7 +289,7 @@ impl DeathProcessor {
         }
 
         // Unequip everything.
-        use super::player::EquipmentSlot;
+        use super::equipment::EquipmentSlot;
         let slots = [
             EquipmentSlot::Head,
             EquipmentSlot::Cape,
@@ -297,9 +298,10 @@ impl DeathProcessor {
             EquipmentSlot::Body,
             EquipmentSlot::Shield,
             EquipmentSlot::Legs,
-            EquipmentSlot::Gloves,
-            EquipmentSlot::Boots,
+            EquipmentSlot::Hands,
+            EquipmentSlot::Feet,
             EquipmentSlot::Ring,
+            EquipmentSlot::Ammo,
         ];
         for slot in &slots {
             player.equipment.unequip(*slot);

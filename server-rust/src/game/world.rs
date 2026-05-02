@@ -1,6 +1,7 @@
 //! World module for game world management.
 
 use super::entity::{Direction, EntityId, Position};
+use rand::Rng;
 use std::collections::HashMap;
 use tracing::{debug, info};
 
@@ -206,7 +207,35 @@ impl Npc {
             return;
         }
 
-        // Wander logic would go here
+        // Wander: ~25% chance per tick the NPC takes one random step.
+        let mut rng = rand::thread_rng();
+        if rng.gen_bool(0.25) {
+            // Cardinal + diagonal directions with (dx, dy, Direction) tuples.
+            let candidates: [(i32, i32, Direction); 8] = [
+                ( 0,  1, Direction::North),
+                ( 0, -1, Direction::South),
+                (-1,  0, Direction::West),
+                ( 1,  0, Direction::East),
+                (-1,  1, Direction::NorthWest),
+                ( 1,  1, Direction::NorthEast),
+                (-1, -1, Direction::SouthWest),
+                ( 1, -1, Direction::SouthEast),
+            ];
+            let (dx, dy, dir) = candidates[rng.gen_range(0..8)];
+            let candidate = Position::new(
+                self.position.x + dx,
+                self.position.y + dy,
+            );
+            // Stay within wander_radius of spawn.
+            let dist_x = (candidate.x - self.spawn_position.x).abs();
+            let dist_y = (candidate.y - self.spawn_position.y).abs();
+            if dist_x <= self.wander_radius as i32 && dist_y <= self.wander_radius as i32 {
+                self.position = candidate;
+                self.direction = dir;
+                self.moved_this_tick = true;
+                debug!("NPC {} wandered {:?}", self.definition_id, dir);
+            }
+        }
     }
 
     pub fn take_damage(&mut self, damage: u32) -> bool {
