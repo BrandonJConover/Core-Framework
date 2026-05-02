@@ -91,6 +91,14 @@ export class PacketHandler530 {
             case 116: return this.consumeKnown(buf, size);              // CSConfigPacket (alt)
             case 65:  return this.consumeKnown(buf, size);              // VarcUpdate / CSConfig
             case 69:  return this.consumeKnown(buf, size);              // VarcUpdate
+            case 2:   return this.handleIfSetColour(buf, game);          // IF_SETCOLOUR
+            case 9:   return this.handleWidgetStructSetting(buf, size, game); // WIDGETSTRUCT_SETTING
+            case 48:  return this.handleIfSetText2(buf, size, game);     // IF_SETTEXT2
+            case 123: return this.handleIfSetText3(buf, size, game);     // IF_SETTEXT3
+            case 176: return this.handleSwitchWidget(buf, game);         // SWITCH_WIDGET
+            case 207: return this.handleInterfaceAnimateRotate(buf, game); // INTERFACE_ANIMATE_ROTATE
+            case 209: return this.handleGameFrameUnk(game);              // GAME_FRAME_UNK
+            case 220: return this.handleIfSetScrollPos(buf, game);       // IF_SETSCROLLPOS
 
             // State update packets with real handlers
             case 13:  return this.handleTeleportLocalPlayer(buf, game); // TELEPORT_LOCAL_PLAYER
@@ -838,6 +846,94 @@ export class PacketHandler530 {
     static handleBuildDynamicScene(buf: Buffer, size: number, game: any): boolean {
         // Opcode 214: BuildDynamicScene (var-short) - complex payload, consume
         if (size > 0) buf.currentPosition += size;
+        return true;
+    }
+
+    // ── Interface drain-only packets (Tier 5c flight recorder) ──
+
+    static recordIfUpdate(game: any, kind: string, compId: number, payload: any) {
+        if (game && game.recordIfUpdate) {
+            game.recordIfUpdate(kind, compId, payload);
+        }
+    }
+
+    static handleIfSetColour(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:1737 — img4(id), g2add(tracknum), ig2add(color).
+        const id = this.img4(buf);
+        const tracknum = this.g2add(buf);
+        const color = this.ig2add(buf);
+        this.recordIfUpdate(game, "IF_SETCOLOUR", id, { tracknum, color });
+        return true;
+    }
+
+    static handleIfSetScrollPos(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:1099 — mg4(id), ig2(pos), g2(tracknum).
+        const id = this.mg4(buf);
+        const pos = this.ig2(buf);
+        const tracknum = this.g2(buf);
+        this.recordIfUpdate(game, "IF_SETSCROLLPOS", id, { pos, tracknum });
+        return true;
+    }
+
+    static handleInterfaceAnimateRotate(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:1432 — mg4(ptr), g2add(tracknum), g2(pitchStep), g2add(yawStep).
+        const ptr = this.mg4(buf);
+        const tracknum = this.g2add(buf);
+        const pitchStep = this.g2(buf);
+        const yawStep = this.g2add(buf);
+        this.recordIfUpdate(game, "INTERFACE_ANIMATE_ROTATE", ptr, { tracknum, pitchStep, yawStep });
+        return true;
+    }
+
+    static handleGameFrameUnk(game: any): boolean {
+        // rt4 Protocol.java:1768 — current reference reads no payload.
+        this.recordIfUpdate(game, "GAME_FRAME_UNK", 0, {});
+        return true;
+    }
+
+    static handleIfSetText2(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1212 — g2(tracknum), gjstr(text), ig2add(id).
+        const start = buf.currentPosition;
+        const tracknum = this.g2(buf);
+        const text = this.gjstr(buf);
+        const id = this.ig2add(buf);
+        this.recordIfUpdate(game, "IF_SETTEXT2", id, { text, tracknum });
+        if (buf.currentPosition - start < size) buf.currentPosition = start + size;
+        return true;
+    }
+
+    static handleIfSetText3(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1078 — ig2(id), g2add(tracknum), gjstr(value).
+        const start = buf.currentPosition;
+        const id = this.ig2(buf);
+        const tracknum = this.g2add(buf);
+        const text = this.gjstr(buf);
+        this.recordIfUpdate(game, "IF_SETTEXT3", id, { text, tracknum });
+        if (buf.currentPosition - start < size) buf.currentPosition = start + size;
+        return true;
+    }
+
+    static handleWidgetStructSetting(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1319 — ig2add(value), ig4(parent), g2add(tracknum), ig2(end), g2add(start).
+        const startOffset = buf.currentPosition;
+        const value = this.ig2add(buf);
+        const parent = this.ig4(buf);
+        const tracknum = this.g2add(buf);
+        let end = this.ig2(buf);
+        if (end === 65535) end = -1;
+        let start = this.g2add(buf);
+        if (start === 65535) start = -1;
+        this.recordIfUpdate(game, "WIDGETSTRUCT_SETTING", parent, { value, tracknum, start, end });
+        if (buf.currentPosition - startOffset < size) buf.currentPosition = startOffset + size;
+        return true;
+    }
+
+    static handleSwitchWidget(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:1694 — img4(source), g2add(tracknum), img4(target).
+        const source = this.img4(buf);
+        const tracknum = this.g2add(buf);
+        const target = this.img4(buf);
+        this.recordIfUpdate(game, "SWITCH_WIDGET", target, { source, target, tracknum });
         return true;
     }
 

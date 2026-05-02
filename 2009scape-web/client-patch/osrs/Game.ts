@@ -363,6 +363,7 @@ export class Game extends GameShell {
     deletedInventories: number[] = [];
     clientVarCacheResetAt: number = 0;
     forceVarpRefreshCount: number = 0;
+    interfaceUpdates: { kind: string; compId: number; payload: any; at: number }[] = [];
     aClass6_1261: LinkedList = new LinkedList();
     friendListStatus: number = 0;
     friendsCount: number = 0;
@@ -9284,6 +9285,13 @@ export class Game extends GameShell {
         this.chatTypes[0] = type;
         this.chatPlayerNames[0] = name;
         this.chatMessages[0] = message;
+    }
+
+    public recordIfUpdate(kind: string, compId: number, payload: any) {
+        this.interfaceUpdates.push({ kind, compId, payload, at: Date.now() });
+        if (this.interfaceUpdates.length > 50) {
+            this.interfaceUpdates.shift();
+        }
     }
 
     /*private*/ public parsePlayerBlock(id: number, player: Player, mask: number, buffer: Buffer) {
