@@ -2610,6 +2610,71 @@ final class RSCGameEngine: ObservableObject {
 
     // MARK: - Settings
 
+    enum GameSettingIndex: Int {
+        case cameraModeAuto = 0
+        case mouseButtonOne = 2
+        case soundDisabled = 3
+        case blockGlobal = 9
+        case experienceDrops = 25
+        case hideRoofs = 26
+        case hideFog = 27
+        case groundItems = 28
+        case killFeed = 31
+        case floatingNameTags = 35
+    }
+
+    /// Send GAME_SETTINGS_CHANGED (opcode 111) with a 1-byte index and value.
+    /// The current custom parser accepts indexes 0...99 and persists modern
+    /// settings such as ground-item display, global-chat block, and mobile UI
+    /// options through this path.
+    func sendGameSetting(index: Int, value: Int) {
+        let clampedIndex = max(0, min(99, index))
+        let clampedValue = max(0, min(255, value))
+        applyGameSettingLocally(index: clampedIndex, value: clampedValue)
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.gameSettings.rawValue))
+            buf.putByte(clampedIndex)
+            buf.putByte(clampedValue)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func sendGameSetting(_ setting: GameSettingIndex, enabled: Bool) {
+        sendGameSetting(index: setting.rawValue, value: enabled ? 1 : 0)
+    }
+
+    func sendGameSetting(_ setting: GameSettingIndex, value: Int) {
+        sendGameSetting(index: setting.rawValue, value: value)
+    }
+
+    private func applyGameSettingLocally(index: Int, value: Int) {
+        switch GameSettingIndex(rawValue: index) {
+        case .cameraModeAuto:
+            worldState.optionCameraModeAuto = value == 1
+        case .mouseButtonOne:
+            worldState.optionMouseButtonOne = value == 1
+        case .soundDisabled:
+            worldState.optionSoundDisabled = value == 1
+        case .blockGlobal:
+            worldState.settingsBlockGlobal = value
+        case .experienceDrops:
+            worldState.optionExperienceDrops = value == 1
+        case .hideRoofs:
+            worldState.optionHideRoofs = value == 1
+        case .hideFog:
+            worldState.optionHideFog = value == 1
+        case .groundItems:
+            worldState.groundItemsToggle = value
+        case .killFeed:
+            worldState.optionHideKillFeed = value == 1
+        case .floatingNameTags:
+            worldState.optionHideNameTag = value == 1
+        case .none:
+            break
+        }
+    }
+
     /// Send privacy/chat-block flags. Mirrors mudclient.java createPacket64
     /// (line 2316) — opcode 64 with four 1-byte values: chat, private, trade,
     /// duel. Each is 0 (allow all) / 1 (block strangers) / 2 (block all).

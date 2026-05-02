@@ -63,6 +63,7 @@ enum RSCOutOpcode: UInt8 {
     case removeFriend       = 167
     case addIgnore          = 132
     case removeIgnore       = 241
+    case gameSettings       = 111
     case privacySettings    = 64
     case appearanceChange   = 235
     case duelAccept         = 176
