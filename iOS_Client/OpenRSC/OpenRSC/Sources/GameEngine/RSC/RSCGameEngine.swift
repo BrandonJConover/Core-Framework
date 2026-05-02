@@ -70,6 +70,7 @@ final class RSCGameEngine: ObservableObject {
 
     init() {
         worldState.preferences = UserPreferences.load()
+        worldState.runEnabled = worldState.preferences.runByDefault
         applyPersistedCameraPreferences()
         packetHandler.worldState = worldState
         // Forward worldState's @Published changes into the engine's own
@@ -2076,6 +2077,19 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    func toggleRun() {
+        worldState.runEnabled.toggle()
+        updatePreferences { prefs in
+            prefs.runByDefault = worldState.runEnabled
+        }
+
+        // The handoff suspected opcode 185, but the modern parser maps 185 to
+        // spell-cast actions for several payload versions. Until the server
+        // exposes a confirmed run-mode input opcode, keep this as local HUD
+        // state instead of risking a wrong movement packet.
+        print("[Input] Run mode \(worldState.runEnabled ? "enabled" : "disabled") locally; no confirmed run opcode available")
+    }
+
     func talkToNPC(serverIndex: Int) {
         Task {
             if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
@@ -2166,12 +2180,10 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func dropItem(slot: Int) {
-        let amount = max(1, worldState.inventory.first(where: { $0.id == slot })?.amount ?? 1)
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemDrop.rawValue))
             buf.putShort(slot)
-            buf.putInt(amount)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
