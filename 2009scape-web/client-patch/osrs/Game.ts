@@ -1587,6 +1587,11 @@ export class Game extends GameShell {
         Rasterizer.resetPixels();
         this.currentScene.method280(this.cameraX, k, 0, this.cameraZ, this.cameraY, this.cameraYaw, this.cameraPitch);
         this.currentScene.method255();
+        if ((this as any).__rendererProbePending && !(this as any).__rendererProbeDone && this.currentScene && (this.currentScene as any).runRendererProbe) {
+            (this as any).__rendererProbePending = false;
+            (this as any).__rendererProbeDone = true;
+            (this.currentScene as any).runRendererProbe(this);
+        }
         this.method121(false);
         this.method127(true);
         this.method65(l2);

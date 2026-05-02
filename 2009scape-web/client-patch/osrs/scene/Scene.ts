@@ -418,6 +418,103 @@ export class Scene {
         this.method241();
     }
 
+    public runRendererProbe(game: any) {
+        const models: any[] = [];
+        const addModel = (renderable: any, worldX: number, worldY: number, worldZ: number, kind: string) => {
+            if (!renderable || !renderable.verticesX || !renderable.verticesY || !renderable.verticesZ) return;
+            models.push({ renderable, worldX, worldY, worldZ, kind });
+        };
+
+        let tileCount = 0;
+        let visibleTiles = 0;
+        let drawTiles = 0;
+        for (let p = 0; p < this.anInt452; p++) {
+            for (let x = 0; x < this.anInt453; x++) {
+                for (let z = 0; z < this.anInt454; z++) {
+                    const tile: any = this.tiles[p][x][z];
+                    if (!tile) continue;
+                    tileCount++;
+                    if (tile.visible) visibleTiles++;
+                    if (tile.draw) drawTiles++;
+                    if (tile.wall) {
+                        addModel(tile.wall.aRenderable769, tile.wall.x, 0, tile.wall.y, "wallA");
+                        addModel(tile.wall.aRenderable770, tile.wall.x, 0, tile.wall.y, "wallB");
+                    }
+                    if (tile.wallDecoration) addModel(tile.wallDecoration.renderable, tile.wallDecoration.x, 0, tile.wallDecoration.y, "wallDecor");
+                    if (tile.floorDecoration) addModel(tile.floorDecoration.renderable, tile.floorDecoration.x, tile.floorDecoration.z, tile.floorDecoration.y, "floorDecor");
+                    for (let i = 0; i < tile.sceneSpawnRequestCount; i++) {
+                        const req: any = tile.sceneSpawnRequests[i];
+                        if (req) addModel(req.renderable, req.x, req.tileHeight, req.y, "spawn");
+                    }
+                }
+            }
+        }
+
+        const raw = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity };
+        const rot = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity };
+        const screen = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        const counters = { triangles: 0, zCulled: 0, screenCulled: 0, visible: 0, drawn: 0 };
+
+        const upd = (b: any, x: number, y: number, z?: number) => {
+            if (x < b.minX) b.minX = x;
+            if (x > b.maxX) b.maxX = x;
+            if (y < b.minY) b.minY = y;
+            if (y > b.maxY) b.maxY = y;
+            if (z !== undefined) {
+                if (z < b.minZ) b.minZ = z;
+                if (z > b.maxZ) b.maxZ = z;
+            }
+        };
+        const clean = (v: number) => v === Infinity || v === -Infinity ? 0 : v;
+
+        for (const entry of models) {
+            const m: any = entry.renderable;
+            const vertexCount = m.vertexCount || 0;
+            const triangleCount = m.triangleCount || 0;
+            counters.triangles += triangleCount;
+            let projectedInFront = 0;
+            let projectedOnScreen = 0;
+            for (let i = 0; i < vertexCount; i++) {
+                const wx = (m.verticesX[i] || 0) + entry.worldX;
+                const wy = (m.verticesY[i] || 0) + entry.worldY;
+                const wz = (m.verticesZ[i] || 0) + entry.worldZ;
+                upd(raw, wx, wy, wz);
+
+                const dx = wx - Scene.cameraX2;
+                const dy = wy - Scene.cameraY2;
+                const dz = wz - Scene.cameraZ2;
+                const xYaw = ((dz * Scene.yawSin + dx * Scene.yawCos) >> 16);
+                const zYaw = ((dz * Scene.yawCos - dx * Scene.yawSin) >> 16);
+                const yPitch = ((dy * Scene.pitchCos - zYaw * Scene.pitchSin) >> 16);
+                const zPitch = ((dy * Scene.pitchSin + zYaw * Scene.pitchCos) >> 16);
+                upd(rot, xYaw, yPitch, zPitch);
+                if (zPitch > 50) {
+                    projectedInFront++;
+                    const sx = Scene.anInt508 + ((xYaw << 9) / zPitch);
+                    const sy = Scene.anInt509 + ((yPitch << 9) / zPitch);
+                    upd(screen, sx, sy);
+                    if (sx >= 0 && sx <= Scene.anInt512 && sy >= 0 && sy <= Scene.anInt513) projectedOnScreen++;
+                }
+            }
+            if (vertexCount > 0 && projectedInFront === 0) counters.zCulled += triangleCount;
+            else if (vertexCount > 0 && projectedOnScreen === 0) counters.screenCulled += triangleCount;
+            else {
+                counters.visible += triangleCount;
+                counters.drawn += triangleCount;
+            }
+        }
+
+        const sample = models.length > 0 ? models[0].renderable : null;
+        console.group("[Probe] renderer state");
+        console.log(`[Probe] models=${models.length} tiles=${tileCount} visibleTiles=${visibleTiles} drawTiles=${drawTiles}`);
+        console.log(`[Probe] worldspace bounds x=[${clean(raw.minX)}..${clean(raw.maxX)}] y=[${clean(raw.minY)}..${clean(raw.maxY)}] z=[${clean(raw.minZ)}..${clean(raw.maxZ)}] sample faces=${sample ? sample.triangleCount || 0 : 0} verts=${sample ? sample.vertexCount || 0 : 0}`);
+        console.log(`[Probe] camera pos=(${game.cameraX},${game.cameraY},${game.cameraZ}) yaw=${game.cameraYaw} pitch=${game.cameraPitch} screen=${Scene.anInt512}x${Scene.anInt513}`);
+        console.log(`[Probe] post-rotate extents x=[${clean(rot.minX)}..${clean(rot.maxX)}] y=[${clean(rot.minY)}..${clean(rot.maxY)}] z=[${clean(rot.minZ)}..${clean(rot.maxZ)}]`);
+        console.table([counters]);
+        console.log(`[Probe] visible-poly screen range x=[${clean(screen.minX)}..${clean(screen.maxX)}] y=[${clean(screen.minY)}..${clean(screen.maxY)}] screen=${Scene.anInt512}x${Scene.anInt513}`);
+        console.groupEnd();
+    }
+
     public method241() {
         for (let i: number = 0; i < this.anInt452; i++) {
             {

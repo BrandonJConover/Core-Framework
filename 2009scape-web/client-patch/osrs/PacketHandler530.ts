@@ -739,6 +739,7 @@ export class PacketHandler530 {
         // pipeline picks up populated byte arrays + parses regions when
         // the async fetch below completes.
         game.loadingStage = 1;
+        game.__rendererProbePending = true;
         console.log("REBUILD_NORMAL: regions=" + regionCount + " centre=(" + regionX + "," + regionZ + ") zone=(" + zoneX + "," + zoneZ + ")");
 
         // Tier 2f: populate game's region byte-array slots from idx5 so
