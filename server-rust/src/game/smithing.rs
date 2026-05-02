@@ -2,7 +2,7 @@
 //! Handles smelting ores into bars and smithing bars into equipment.
 
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::info;
 
 /// Metal bar types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

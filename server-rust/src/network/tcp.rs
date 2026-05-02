@@ -8,14 +8,14 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::game::server::{HandleResult, ServerState};
 use crate::protocol::Packet;
 
 /// Handle a TCP connection with full session lifecycle.
 pub async fn handle_connection(
-    mut socket: TcpStream,
+    socket: TcpStream,
     addr: SocketAddr,
     server_state: Arc<RwLock<ServerState>>,
 ) -> Result<()> {

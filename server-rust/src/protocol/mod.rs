@@ -273,7 +273,7 @@ impl BitReader {
         let mut value: u32 = 0;
         let mut remaining = count;
         let mut byte_idx = self.bit_position >> 3;
-        let mut bit_offset = 8 - (self.bit_position & 7);
+        let bit_offset = 8 - (self.bit_position & 7);
 
         self.bit_position += count;
 

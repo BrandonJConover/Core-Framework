@@ -2,11 +2,10 @@
 //! Handles spell definitions, requirements, and casting logic.
 
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::info;
 
 use super::entity::Position;
 use super::item::ItemId;
-use super::skills::Skills;
 
 /// Rune item IDs for spell requirements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

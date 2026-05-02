@@ -2,7 +2,7 @@
 //! Handles scheduled events, holiday drops, and minigame instances.
 
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use super::entity::Position;
 use super::item::ItemId;

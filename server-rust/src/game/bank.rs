@@ -4,8 +4,7 @@
 //! deposit, withdrawal, and organization features.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Maximum number of different item types in bank.
 pub const MAX_BANK_SLOTS: usize = 192;

@@ -1,9 +1,8 @@
 //! Chat and messaging system.
 //! Handles player chat, private messages, and system messages.
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::time::Instant;
-use tracing::{debug, info, warn};
+use std::collections::{HashSet, VecDeque};
+use tracing::{info, warn};
 
 /// Maximum message length.
 pub const MAX_MESSAGE_LENGTH: usize = 80;

@@ -771,3 +771,110 @@ Removed 4 stale TODO comments from `NpcDrops.java` where the implementation was 
 3. Wire NPC snapshot collection into `send_entity_updates()` once NPC spawning produces a snapshot API
 4. Wire appearance encoding (`appearance::build_appearance_data`) into PlayerSnapshot so appearance packets go out correctly
 5. Fix 967 Rust warnings (77 auto-fixable via `cargo fix`)
+
+---
+
+## May 2, 2026 — Session 2: NPC Snapshot Collection + Appearance Encoding Wired
+
+### Rust Server: World Snapshot Pass added to send_entity_updates
+
+`send_entity_updates` now runs a three-pass pipeline:
+
+**Pass 0 — World snapshot** (single `RwLock::read()` on "Main World"):
+- Iterates `World::npcs: HashMap<EntityId, world::Npc>` → builds `Vec<NpcSnapshot>`:
+  - `entity_id`: HashMap key (already an `EntityId`)
+  - `npc_index`: sequential enumerate index → u16
+  - `def_id`: `npc.definition_id`
+  - `position`: `npc.position`
+  - `direction`: `Direction::South` (world::Npc has no direction field yet)
+  - `moved_this_tick`: `false` (pending walk-tick tracking in world.rs)
+  - `removed`: `npc.is_dead()`
+- Iterates `World::game_objects` (active only) → builds `Vec<GameObjectSnapshot>`:
+  - `def_id`: `obj.id` (same semantic, different field name in world.rs)
+  - `direction`: `0u8` (world::GameObject has no ObjectDirection)
+  - `object_type`: `ObjectType::Scenery` (default pending richer world.rs objects)
+- Iterates `World::ground_items: HashMap<Position, Vec<GroundItem>>` → builds `Vec<GroundItemSnapshot>`:
+  - Position from the map key (world::GroundItem doesn't carry its own position)
+  - `item_id`: `ItemId(item.item_id)` (u32 → newtype wrapper)
+
+**Pass 1 — Player snapshots** now encodes full appearance blobs:
+- Calls `build_appearance_data(username, &p.appearance, &stub_equip, 0, 0)` when `appearance_changed`
+- Uses canonical `game::equipment::Equipment::new()` as stub (player.rs has a local Equipment type — see below)
+
+**Pass 2 — Per-session send** now filters by view distance:
+- `VIEW_RADIUS: i32 = 16` — matches `state_updater::VIEW_DISTANCE`
+- Objects and ground items filtered with Chebyshev distance before passing to `generate_updates`
+- NPC list is passed globally (same as player list)
+
+### New fields and methods
+
+**`world.rs`**: Added `pub fn tick_count(&self) -> u64` getter (exposes private `tick_count` field)
+
+**`player.rs`**:
+- Added `use super::appearance::PlayerAppearance;`
+- Added `pub appearance: PlayerAppearance` field to `Player` struct
+- `Player::new()` constructs a default `PlayerAppearance` and sets `combat_level = 3`
+
+**`server.rs`**:
+- Added imports: `CanonicalEquipment`, `ObjectType`, `ItemId`, `NpcSnapshot`, `GameObjectSnapshot`, `GroundItemSnapshot`
+
+### Known stub (to resolve)
+`player.rs` defines its own `Equipment` struct (lines 260–282) that shadows `game::equipment::Equipment`.
+`build_appearance_data` requires `game::equipment::Equipment`. Current workaround: stub with `CanonicalEquipment::new()` — colours/gender/skull encode correctly; worn items are absent.
+**Resolution**: consolidate player.rs to use `super::equipment::Equipment` from the canonical module and remove the local duplicate.
+
+### Build result
+`cargo build` — 0 errors, ~35s incremental. All 7 protocol revisions + full entity pipeline active.
+
+### Next Priorities
+1. Unify player.rs local Equipment → use game::equipment::Equipment (removes stub)
+2. Add `direction: Direction` + `moved_this_tick: bool` to world.rs Npc so NPCs animate
+3. PVP combat formula (ca6343c16) Java cherry-pick
+4. Draining spell behavior (5ab866ebe) Java cherry-pick
+5. Resolve 77+ auto-fixable Rust warnings via cargo fix
+
+---
+
+## May 2, 2026 — Session 3: NPC Direction + PVP Combat Formula Cherry-Pick
+
+### Rust Server: NPC Direction & Movement Tracking
+
+**`world.rs` Npc struct** now has:
+- `pub direction: Direction` — initialized to `Direction::South`, updated by walk logic each tick
+- `pub moved_this_tick: bool` — cleared to `false` at the start of each `Npc::tick()` and set `true` by any walk step
+- `world.rs` imports `Direction` from `super::entity`
+
+**`server.rs` snapshot collection** now reads real NPC direction and movement:
+- `direction: npc.direction` (was hardcoded to `Direction::South`)
+- `moved_this_tick: npc.moved_this_tick` (was hardcoded to `false`)
+
+### Java: PVP Combat Formula (cherry-pick ca6343c16)
+
+**New file: `PVPCombatFormulaType.java`** (`com.openrsc.server.event.rsc.impl.combat`)
+Three formula variants:
+- `STORMY` (default) — existing OpenRSC formula `(rand(maxRoll) + 320) / 640`, biasing mid-range hits. Matches PvE behaviour.
+- `AUTHENTIC` — uniform `rand(0, maxHit + 1)`, matching the original RSC damage roll.
+- `OSRS` — same as AUTHENTIC range; reserved for future OSRS-formula refinements.
+`fromString(String)` parses config values case-insensitively; unknown values fall back to STORMY.
+
+**`ServerConfiguration.java`** changes:
+- Added `import com.openrsc.server.event.rsc.impl.combat.PVPCombatFormulaType;`
+- Added `public PVPCombatFormulaType PVP_COMBAT_FORMULA_TYPE;` field (near other PVP fields at line ~339)
+- Added loading: `PVP_COMBAT_FORMULA_TYPE = PVPCombatFormulaType.fromString(tryReadString("pvp_combat_formula_type").orElse("stormy"));`
+- Config key `pvp_combat_formula_type: stormy` was already present in `default.conf` and `openrsc.conf`
+
+**`CombatFormula.java`** changes:
+- Added `calculateMeleeDamagePvp(Mob source, PVPCombatFormulaType formulaType)` — dispatches via switch expression to the correct damage roll
+- `doMeleeDamage()` now: when both source AND victim are players (PvP), calls `calculateMeleeDamagePvp` with `source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE`; otherwise falls back to the standard `calculateMeleeDamage` (PvE)
+
+**Compilation verified** with Java 19 full classpath — exit 0. Only pre-existing preview-API warnings (virtual threads, unrelated to these changes).
+
+### Build Results
+- Rust: `cargo build` — 0 errors, 6.38s incremental
+- Java: javac exit 0 (Java 19, release 19 override; actual target is Java 21)
+
+### Next Priorities
+1. Draining spell behavior (5ab866ebe) — `SpellHandler.java` changes + `WANT_BUGGED_CLAWS_XP` config
+2. Unify `player.rs` local `Equipment` with `game::equipment::Equipment` (removes appearance-encoding stub)
+3. NPC wander walk logic in `world.rs` (sets `direction` and `moved_this_tick` properly per tick)
+4. Wire `PVP_COMBAT_FORMULA_TYPE` into ranged PvP (`doRangedDamage` — analogous `calculateRangedDamagePvp`)

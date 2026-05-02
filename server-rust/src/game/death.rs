@@ -9,7 +9,7 @@ use tracing::{debug, info};
 
 use super::entity::{EntityId, Position};
 use super::item::ItemId;
-use super::player::{Item, Player, SkillId};
+use super::player::{Player, SkillId};
 use super::prayer::PrayerState;
 use super::protocol::{Packet, ServerOpcode};
 

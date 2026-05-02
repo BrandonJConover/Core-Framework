@@ -2,6 +2,7 @@ package com.openrsc.server;
 
 import com.google.common.collect.ImmutableList;
 import com.openrsc.server.database.DatabaseType;
+import com.openrsc.server.event.rsc.impl.combat.PVPCombatFormulaType;
 import com.openrsc.server.util.EntityList;
 import com.openrsc.server.util.SystemUtil;
 import com.openrsc.server.util.YMLReader;
@@ -335,6 +336,7 @@ public class ServerConfiguration {
 	public int PVP_CATCHING_DISTANCE;
 	public int PVP_REATTACK_TIMER;
 	public int MAX_PVP_MELEE_ATTACK_DISTANCE;
+	public PVPCombatFormulaType PVP_COMBAT_FORMULA_TYPE;
 	public int BABY_MODE_LEVEL_THRESHOLD;
 	public boolean SHUFFLE_PID_ORDER;
 	public int SHUFFLE_PID_ORDER_INTERVAL;
@@ -488,6 +490,7 @@ public class ServerConfiguration {
 		PVP_CATCHING_DISTANCE = tryReadInt("pvp_catching_distance").orElse(1);
 		PVP_REATTACK_TIMER = tryReadInt("pvp_reattack_timer").orElse(5);
 		MAX_PVP_MELEE_ATTACK_DISTANCE = tryReadInt("max_pvp_melee_attack_distance").orElse(2);
+		PVP_COMBAT_FORMULA_TYPE = PVPCombatFormulaType.fromString(tryReadString("pvp_combat_formula_type").orElse("stormy"));
 		BABY_MODE_LEVEL_THRESHOLD = tryReadInt("baby_mode_level_threshold").orElse(0);
 		SHUFFLE_PID_ORDER = tryReadBool("shuffle_pid_order").orElse(true);
 		SHUFFLE_PID_ORDER_INTERVAL = tryReadInt("shuffle_pid_order_interval").orElse(500);

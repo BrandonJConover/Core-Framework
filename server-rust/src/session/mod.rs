@@ -5,13 +5,13 @@ pub mod handler;
 
 use crate::game::player::Player;
 use crate::protocol::{Packet, PacketBuilder};
-use crate::protocol::opcodes::{OpcodeIn, OpcodeOut};
+use crate::protocol::opcodes::OpcodeOut;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Session state enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -2,8 +2,7 @@
 //! Handles item spawning, ownership, pickup, and despawning.
 
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use super::entity::{EntityId, Position};
 use super::item::ItemId;

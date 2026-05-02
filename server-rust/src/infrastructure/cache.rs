@@ -3,7 +3,7 @@ use deadpool_redis::{Config, Pool, Runtime};
 use redis::AsyncCommands;
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tracing::{debug, warn};
+use tracing::debug;
 
 use super::config::RedisConfig;
 
@@ -57,9 +57,9 @@ impl RedisCache {
         let json = serde_json::to_string(value)?;
 
         if ttl_seconds > 0 {
-            conn.set_ex(&full_key, json, ttl_seconds).await?;
+            conn.set_ex::<_, _, ()>(&full_key, json, ttl_seconds).await?;
         } else {
-            conn.set(&full_key, json).await?;
+            conn.set::<_, _, ()>(&full_key, json).await?;
         }
 
         Ok(())
@@ -88,7 +88,7 @@ impl RedisCache {
 
         let result: bool = conn.set_nx(&full_key, &json).await?;
         if result && ttl_seconds > 0 {
-            conn.expire(&full_key, ttl_seconds as i64).await?;
+            conn.expire::<_, ()>(&full_key, ttl_seconds as i64).await?;
         }
         Ok(result)
     }
@@ -106,7 +106,7 @@ impl RedisCache {
     pub async fn leaderboard_update(&self, board: &str, member: &str, score: f64) -> Result<()> {
         let mut conn = self.pool.get().await?;
         let key = self.prefix_key(&format!("leaderboard:{}", board));
-        conn.zadd(&key, member, score).await?;
+        conn.zadd::<_, _, _, ()>(&key, member, score).await?;
         Ok(())
     }
 
@@ -146,7 +146,7 @@ impl RedisCache {
 
         let current: i64 = conn.incr(&full_key, 1i64).await?;
         if current == 1 {
-            conn.expire(&full_key, window_seconds as i64).await?;
+            conn.expire::<_, ()>(&full_key, window_seconds as i64).await?;
         }
 
         Ok(current <= max_requests as i64)
@@ -172,8 +172,8 @@ impl RedisCache {
         let all_key = self.prefix_key("online:all");
         let servers_key = self.prefix_key("online:servers");
 
-        conn.sadd(&all_key, username).await?;
-        conn.hset(&servers_key, username, server_id).await?;
+        conn.sadd::<_, _, ()>(&all_key, username).await?;
+        conn.hset::<_, _, _, ()>(&servers_key, username, server_id).await?;
         Ok(())
     }
 
@@ -183,8 +183,8 @@ impl RedisCache {
         let all_key = self.prefix_key("online:all");
         let servers_key = self.prefix_key("online:servers");
 
-        conn.srem(&all_key, username).await?;
-        conn.hdel(&servers_key, username).await?;
+        conn.srem::<_, _, ()>(&all_key, username).await?;
+        conn.hdel::<_, _, ()>(&servers_key, username).await?;
         Ok(())
     }
 

@@ -2,9 +2,9 @@
 //! Handles worn items, equipment bonuses, and equipment validation.
 
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
-use super::item::{CombatBonuses, EquipSlot, ItemDef, ItemId, ItemRepository, ItemRequirements};
+use super::item::{CombatBonuses, EquipSlot, ItemDef, ItemId, ItemRepository};
 use super::inventory::{Inventory, InventoryItem};
 use super::skills::Skills;
 

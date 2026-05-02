@@ -2,7 +2,7 @@
 //! Handles cooking mechanics, burn rates, and food definitions.
 
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::info;
 
 /// Cooking heat sources.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -8,7 +8,7 @@ use tracing::{debug, info, warn};
 
 use super::entity::Position;
 use super::player::SkillId;
-use super::quest::{QuestDef, QuestProgress, QuestRepository, QuestRequirement, QuestReward, QUEST_COMPLETE, QUEST_NOT_STARTED};
+use super::quest::{QuestDef, QuestRepository, QuestRequirement, QuestReward};
 use crate::protocol::opcodes::OpcodeOut;
 use crate::protocol::{Packet, PacketBuilder};
 

@@ -2,10 +2,9 @@
 //! Handles duel requests, rules, stakes, and combat resolution.
 
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use super::item::ItemId;
-use super::inventory::InventoryItem;
 
 /// Duel settings/rules.
 #[derive(Debug, Clone, Default)]

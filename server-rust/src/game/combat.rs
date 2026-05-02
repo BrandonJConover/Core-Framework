@@ -1,8 +1,6 @@
 //! Combat module for combat mechanics.
 
-use super::entity::Position;
 use super::player::{Player, SkillId};
-use super::world::Npc;
 use rand::Rng;
 
 /// Combat style enumeration.

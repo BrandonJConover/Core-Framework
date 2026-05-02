@@ -3,7 +3,7 @@
 //! This module provides a framework for handling timed actions like
 //! mining, fishing, cooking, and other skill-based activities.
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use serde::{Deserialize, Serialize};
 
 /// Result of an action execution.

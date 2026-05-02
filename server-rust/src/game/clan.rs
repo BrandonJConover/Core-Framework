@@ -1,9 +1,9 @@
 //! Clan system.
 //! Handles player clans, ranks, and clan management.
 
-use std::collections::{HashMap, HashSet};
-use std::time::{Duration, Instant};
-use tracing::{info, warn};
+use std::collections::HashMap;
+use std::time::Instant;
+use tracing::info;
 
 /// Clan ranks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

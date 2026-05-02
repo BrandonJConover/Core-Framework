@@ -2,8 +2,7 @@
 //! Tracks player accomplishments and unlocks rewards.
 
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
-use tracing::{debug, info};
+use tracing::info;
 
 /// Achievement categories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

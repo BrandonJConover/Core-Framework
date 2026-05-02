@@ -35,6 +35,33 @@ public class CombatFormula {
 		return chosenHit;
 	}
 
+
+	/**
+	 * Gets a dice roll for melee damage in a PvP encounter using the formula
+	 * selected by {@link PVPCombatFormulaType} in the server configuration.
+	 *
+	 * <ul>
+	 *   <li><b>STORMY</b> — same as PvE: {@code (rand(maxRoll) + 320) / 640}</li>
+	 *   <li><b>AUTHENTIC</b> — uniform random in {@code [0, maxHit]}, matching
+	 *       the original RSC damage roll.</li>
+	 *   <li><b>OSRS</b> — uniform random in {@code [0, maxHit]} (reserved for
+	 *       future OSRS-formula refinements).</li>
+	 * </ul>
+	 *
+	 * @param source      The attacking player.
+	 * @param formulaType The PvP formula type from server config.
+	 * @return The randomized damage value.
+	 */
+	private static int calculateMeleeDamagePvp(final Mob source, final PVPCombatFormulaType formulaType) {
+		int maxRoll = getMeleeDamage(source);
+		if (maxRoll <= 0) return 0;
+		int maxHit = (maxRoll + 320) / 640;
+		return switch (formulaType) {
+			case STORMY    -> (DataConversions.getRandom().nextInt(maxRoll) + 320) / 640;
+			case AUTHENTIC -> DataConversions.getRandom().nextInt(maxHit + 1);
+			case OSRS      -> DataConversions.getRandom().nextInt(maxHit + 1);
+		};
+	}
 	/**
 	 * Gets a dice roll for ranged damage for a single attack
 	 * The result is an int sourced from randomness effectively from 0.5 - maxHit.
@@ -154,7 +181,10 @@ public class CombatFormula {
 	public static int doMeleeDamage(final Mob source, final Mob victim) {
 		boolean isHit = calculateMeleeAccuracy(source, victim);
 		boolean wasHit = isHit;
-		int damage = calculateMeleeDamage(source);
+		// In PvP encounters use the configured formula; PvE always uses STORMY.
+		int damage = (source.isPlayer() && victim.isPlayer())
+			? calculateMeleeDamagePvp(source, source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE)
+			: calculateMeleeDamage(source);
 		if (victim instanceof Player playerVictim) {
 			// Track the damage dealt to the player
 			if (isHit) {

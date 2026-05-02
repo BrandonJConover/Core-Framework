@@ -5,14 +5,14 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
-use super::{HealthStatus, InfrastructureManager};
+use super::InfrastructureManager;
 
 /// HTTP server for health checks, metrics, and admin endpoints.
 pub struct HttpServer {

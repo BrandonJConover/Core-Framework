@@ -1,9 +1,7 @@
 //! Network protocol handling.
 //! Defines packet structures, opcodes, and protocol encoding/decoding.
 
-use std::collections::HashMap;
-use std::io::{self, Read, Write};
-use tracing::{debug, trace, warn};
+use std::io::{self, Read};
 
 /// Protocol version.
 pub const PROTOCOL_VERSION: u32 = 235;

@@ -2,7 +2,6 @@
 //! Handles obstacle courses and shortcuts.
 
 use std::collections::HashMap;
-use tracing::info;
 
 use super::entity::Position;
 

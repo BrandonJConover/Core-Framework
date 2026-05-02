@@ -2,8 +2,6 @@
 //! Handles poison, stat drains, buffs, debuffs, and timed effects.
 
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
-use tracing::{debug, info};
 
 /// Types of status effects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
