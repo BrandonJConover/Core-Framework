@@ -13,7 +13,9 @@ Each plan in this folder is a self-contained ChatGPT brief for one tier of the r
 | 5 | (tier 6b — renderer fix) | **Unwritten.** Conditioned on tier 6a output. Don't write ahead of the data. |
 | 6 | [tier7 — widget skeleton](web-client-tier7-widget-skeleton.md) | Hooks the Tier 5c flight recorder onto a real component tree. |
 | 7 | (tier 7b — widget renderer) | **Unwritten.** Render the widget tree the skeleton built. |
-| 8 | [tier8 — textures (idx26 + TextureOps)](web-client-tier8-textures.md) | Last because it depends on a verified rasterizer (Tier 6) and a stable widget path (Tier 7). |
+| 8 | [tier8 — textures (idx26 + TextureOps)](web-client-tier8-textures.md) | Last visible-rendering tier; depends on verified rasterizer (Tier 6). |
+| 9 | [tier9 — BAS skeletons + skin transforms](web-client-tier9-bas-skeletons.md) | Animations (walk / idle / attack). Comes after textures so debugging splits cleanly between "is the model on screen?" and "is it animating?". |
+| 5d | [tier5d — audio (SoundBank + 2 opcodes)](web-client-tier5d-audio.md) | Independent of 5a/b/c — can run in parallel with any of them. |
 
 ## Conventions every plan follows
 
