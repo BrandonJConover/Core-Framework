@@ -878,3 +878,47 @@ Three formula variants:
 2. Unify `player.rs` local `Equipment` with `game::equipment::Equipment` (removes appearance-encoding stub)
 3. NPC wander walk logic in `world.rs` (sets `direction` and `moved_this_tick` properly per tick)
 4. Wire `PVP_COMBAT_FORMULA_TYPE` into ranged PvP (`doRangedDamage` — analogous `calculateRangedDamagePvp`)
+
+---
+
+## May 2, 2026 — Session 4: Ranged PvP Formula + Rust Equipment Unification + NPC Wander Walk
+
+### Java: Ranged PvP Formula (mirrors Session 3 melee work)
+
+**`CombatFormula.java`** additions:
+- Added `calculateRangedDamagePvp(Mob source, int bowId, int arrowId, PVPCombatFormulaType formulaType)` — dispatches via switch expression to the correct ranged damage roll per formula type (STORMY/AUTHENTIC/OSRS)
+- `doRangedDamage()` now routes through `calculateRangedDamagePvp` when both source AND victim are players (PvP), passing `source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE`; PvE falls back to `calculateRangedDamage`
+
+### Java: Draining Spell Behavior (5ab866ebe) — VERIFIED ALREADY PRESENT
+
+`server-java-modern/SpellHandler.java` already has the combat-rounds check BEFORE the rune check (the correct post-cherry-pick order). This cherry-pick is already applied in the `ios/phase1-foundation` baseline.
+
+### Rust: NPC Wander Walk Logic
+
+`world.rs::Npc::tick()` now runs real wander logic each tick:
+- 25% probability per tick the NPC takes one step (avoids all NPCs moving every tick)
+- Picks a random direction from all 8 cardinal + diagonal directions
+- Calculates candidate position and checks it is within `wander_radius` of `spawn_position` (Chebyshev distance)
+- If in bounds: updates `position`, `direction`, and sets `moved_this_tick = true`
+- Added `use rand::Rng;` import (`rand = "0.8"` was already in Cargo.toml)
+
+### Rust: Equipment Type Unification (player.rs → game::equipment)
+
+Removed duplicate `Equipment` and `EquipmentSlot` types from `player.rs`; `Player.equipment` now uses the canonical `game::equipment::Equipment` (backed by `HashMap<EquipmentSlot, EquippedItem>`).
+
+**Files changed:**
+- `player.rs` — removed local `Equipment` struct (HashMap<EquipmentSlot, Item>), local `EquipmentSlot` enum, and their impls; added `use super::equipment::{Equipment, EquipmentSlot}`; `Player.equipment` is now `game::equipment::Equipment`
+- `server.rs` — removed `CanonicalEquipment` stub import; `build_appearance_data` call now uses `&p.equipment` directly; `build_equipment_packet` updated to use canonical `EquipmentSlot`/`EquippedItem` from `game::equipment`, correct slot names (`Hands`, `Feet`, `Ammo`), and `item.item_id.0` instead of `item.id`
+- `death.rs` — both `collect_items` and `clear_items` functions updated to use `super::equipment::EquipmentSlot`, correct slot names, and `item.item_id.0` for equipped item IDs
+
+**Effect:** Player equipment items now encode correctly into the appearance blob — equipped items will appear in the protocol-level appearance packet rather than showing a stub empty set.
+
+### Build Results
+- Rust: `cargo build` — 0 errors, 1m 46s full build (Equipment type changes required full recompile)
+- Java: javac exit 0 (Java 19, release 19 override)
+
+### Next Priorities
+1. Wire `calculateMagicDamagePvp` into magic combat path — `doMagicDamage` / `doGodSpellDamage` for full PvP formula coverage
+2. NPC respawn logic in `world.rs` — NPCs marked dead should respawn at `spawn_position` after `respawn_ticks`
+3. Apply next batch of Java cherry-picks: gem rocks XP (c36a26fb1), SQL backups race condition (69ef62a2b), new ranged combat formulas (7ba801875)
+4. Wire `player.equipment` into inventory packet properly (verify `build_inventory_packet` uses the canonical Item type)

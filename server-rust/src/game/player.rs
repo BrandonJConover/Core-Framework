@@ -2,6 +2,7 @@
 
 use super::appearance::PlayerAppearance;
 use super::entity::{Direction, Entity, EntityId, Position};
+use super::equipment::{Equipment, EquipmentSlot};
 use super::skills::Skills;
 use std::collections::HashMap;
 
@@ -251,51 +252,6 @@ impl Inventory {
     pub fn items(&self) -> &Vec<Option<Item>> {
         &self.items
     }
-}
-
-/// Player equipment slots.
-#[derive(Debug, Default)]
-pub struct Equipment {
-    slots: HashMap<EquipmentSlot, Item>,
-}
-
-impl Equipment {
-    pub fn new() -> Self {
-        Self {
-            slots: HashMap::new(),
-        }
-    }
-
-    pub fn equip(&mut self, slot: EquipmentSlot, item: Item) -> Option<Item> {
-        self.slots.insert(slot, item)
-    }
-
-    pub fn unequip(&mut self, slot: EquipmentSlot) -> Option<Item> {
-        self.slots.remove(&slot)
-    }
-
-    pub fn get(&self, slot: EquipmentSlot) -> Option<&Item> {
-        self.slots.get(&slot)
-    }
-
-    pub fn has_equipped(&self, item_id: u32) -> bool {
-        self.slots.values().any(|i| i.id == item_id)
-    }
-}
-
-/// Equipment slot types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum EquipmentSlot {
-    Head,
-    Cape,
-    Amulet,
-    Weapon,
-    Body,
-    Shield,
-    Legs,
-    Gloves,
-    Boots,
-    Ring,
 }
 
 /// Item representation.

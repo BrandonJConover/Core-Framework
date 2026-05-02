@@ -78,6 +78,33 @@ public class CombatFormula {
 	}
 
 	/**
+	 * Gets a dice roll for ranged damage in a PvP encounter using the formula
+	 * selected by {@link PVPCombatFormulaType} in the server configuration.
+	 *
+	 * <ul>
+	 *   <li><b>STORMY</b>    — same as PvE: {@code (rand(maxRoll) + 320) / 640}</li>
+	 *   <li><b>AUTHENTIC</b> — uniform random in {@code [0, maxHit]}</li>
+	 *   <li><b>OSRS</b>      — uniform random in {@code [0, maxHit]} (reserved)</li>
+	 * </ul>
+	 *
+	 * @param source      The attacking player.
+	 * @param bowId       Bow item ID.
+	 * @param arrowId     Arrow item ID.
+	 * @param formulaType The PvP formula type from server config.
+	 * @return The randomized damage value.
+	 */
+	private static int calculateRangedDamagePvp(final Mob source, final int bowId, final int arrowId, final PVPCombatFormulaType formulaType) {
+		int maxRoll = getRangedDamage(source, bowId, arrowId);
+		if (maxRoll <= 0) return 0;
+		int maxHit = (maxRoll + 320) / 640;
+		return switch (formulaType) {
+			case STORMY    -> (DataConversions.getRandom().nextInt(maxRoll) + 320) / 640;
+			case AUTHENTIC -> DataConversions.getRandom().nextInt(maxHit + 1);
+			case OSRS      -> DataConversions.getRandom().nextInt(maxHit + 1);
+		};
+	}
+
+	/**
 	 * Gets a dice roll for magic damage for a single attack.
 	 * @param spellPower      The max hit of the spell
 	 * @return The randomized value.
@@ -240,7 +267,10 @@ public class CombatFormula {
 
 		//LOGGER.info(source + " " + (isHit ? "hit" : "missed") + " " + victim + ", Damage: " + damage);
 
-		return calculateRangedDamage(source, bowId, arrowId);
+		// In PvP encounters use the configured formula; PvE uses STORMY.
+		return (source.isPlayer() && victim.isPlayer())
+			? calculateRangedDamagePvp(source, bowId, arrowId, source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE)
+			: calculateRangedDamage(source, bowId, arrowId);
 	}
 
 	/**

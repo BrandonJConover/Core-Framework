@@ -3,7 +3,6 @@
 use crate::database::player_repository::PlayerRepository;
 use crate::game::{GameState, Player, Entity, EntityId, Position};
 use crate::game::appearance::build_appearance_data;
-use crate::game::equipment::Equipment as CanonicalEquipment;
 use crate::game::game_object::ObjectType;
 use crate::game::item::ItemId;
 use crate::game::state_updater::{
@@ -632,12 +631,7 @@ impl ServerState {
                 // Build the full appearance blob (username, equipment,
                 // colours, skull, clan tag) — sent once per new observer.
                 let appearance_data = if p.appearance_changed {
-                    // Player uses its own local Equipment type; the canonical
-                    // Equipment (expected by build_appearance_data) is separate.
-                    // Stub with an empty canonical Equipment until the two types
-                    // are unified — all colours/gender/skull still encode correctly.
-                    let stub_equip = CanonicalEquipment::new();
-                    build_appearance_data(&p.username, &p.appearance, &stub_equip, 0, 0)
+                    build_appearance_data(&p.username, &p.appearance, &p.equipment, 0, 0)
                 } else {
                     Vec::new()
                 };
@@ -799,15 +793,15 @@ fn build_inventory_packet(player: &Player) -> Packet {
 }
 
 fn build_equipment_packet(player: &Player) -> Packet {
-    use crate::game::player::EquipmentSlot;
-    const SLOTS: [EquipmentSlot; 10] = [
+    use crate::game::equipment::{EquipmentSlot, EquippedItem};
+    const SLOTS: [EquipmentSlot; 11] = [
         EquipmentSlot::Head, EquipmentSlot::Cape, EquipmentSlot::Amulet,
         EquipmentSlot::Weapon, EquipmentSlot::Body, EquipmentSlot::Shield,
-        EquipmentSlot::Legs, EquipmentSlot::Gloves, EquipmentSlot::Boots,
-        EquipmentSlot::Ring,
+        EquipmentSlot::Legs, EquipmentSlot::Hands, EquipmentSlot::Feet,
+        EquipmentSlot::Ring, EquipmentSlot::Ammo,
     ];
 
-    let equipped: Vec<(u8, &crate::game::player::Item)> = SLOTS
+    let equipped: Vec<(u8, &EquippedItem)> = SLOTS
         .iter()
         .enumerate()
         .filter_map(|(idx, slot)| player.equipment.get(*slot).map(|i| (idx as u8, i)))
@@ -818,7 +812,7 @@ fn build_equipment_packet(player: &Player) -> Packet {
     for (slot_idx, item) in equipped {
         builder = builder
             .write_byte(slot_idx)
-            .write_short(item.id as u16)
+            .write_short(item.item_id.0 as u16)
             .write_int(item.amount);
     }
     builder.build()
