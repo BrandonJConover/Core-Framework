@@ -2274,6 +2274,7 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.shopBuy.rawValue))
             buf.putShort(itemId)
+            buf.putShort(worldState.shopItems.first(where: { $0.id == itemId })?.stock ?? 0)
             buf.putShort(amount)
             try? await connection.send(buf.finishPacket())
         }
@@ -2284,6 +2285,7 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.shopSell.rawValue))
             buf.putShort(itemId)
+            buf.putShort(worldState.shopItems.first(where: { $0.id == itemId })?.stock ?? 0)
             buf.putShort(amount)
             try? await connection.send(buf.finishPacket())
         }
