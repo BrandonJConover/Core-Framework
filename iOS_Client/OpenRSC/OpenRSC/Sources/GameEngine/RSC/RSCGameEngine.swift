@@ -2129,7 +2129,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.chatMessage.rawValue))
-            buf.putString(text)
+            buf.putEncryptedString(text)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
@@ -2140,8 +2140,8 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.privateMessage.rawValue))
-            buf.putString(recipient)
-            buf.putString(text)
+            buf.putZeroPaddedString(recipient)
+            buf.putEncryptedString(text)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
@@ -2151,7 +2151,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.command.rawValue))
-            buf.putString(command)
+            buf.putZeroPaddedString(command)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
@@ -2180,18 +2180,10 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func dropItem(slot: Int) {
-        // Java mudclient.java:13074-13077 always sends [SHORT slot][INT amount]
-        // for opcode 246; the modern server's PayloadCustomParser validates
-        // ITEM_DROP body >= 4 bytes (>= 6 when WANT_DROP_X is on) and silently
-        // drops anything shorter. We default to dropping the entire stack —
-        // the Java client does the same when not in DROP_X prompt mode
-        // (mudclient.java case ITEM_DROP_ALL).
-        let amount = worldState.inventory.first(where: { $0.id == slot })?.amount ?? 1
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemDrop.rawValue))
             buf.putShort(slot)
-            buf.putInt(amount)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
@@ -2495,8 +2487,8 @@ final class RSCGameEngine: ObservableObject {
     func addFriend(name: String) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 167) // ADD_FRIEND
-            buf.putString(name)
+            buf.newPacket(opcode: 195) // ADD_FRIEND
+            buf.putZeroPaddedString(name)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2504,8 +2496,8 @@ final class RSCGameEngine: ObservableObject {
     func removeFriend(name: String) {
         Task {
             let buf = ByteBuffer()
-            buf.newPacket(opcode: 195) // REMOVE_FRIEND
-            buf.putString(name)
+            buf.newPacket(opcode: 167) // REMOVE_FRIEND
+            buf.putZeroPaddedString(name)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2514,7 +2506,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: 132) // ADD_IGNORE
-            buf.putString(name)
+            buf.putZeroPaddedString(name)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2523,7 +2515,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: 241) // REMOVE_IGNORE
-            buf.putString(name)
+            buf.putZeroPaddedString(name)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2656,7 +2648,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: 45) // SLEEP_WORD
-            buf.putString(word)
+            buf.putZeroPaddedString(word)
             try? await connection.send(buf.finishPacket())
         }
         worldState.sleepStatusText = "Checking..."

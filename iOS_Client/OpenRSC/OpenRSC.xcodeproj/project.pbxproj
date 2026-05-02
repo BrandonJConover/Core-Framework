@@ -18,6 +18,7 @@
 		1C69A0A877D02C70BAB61037 /* LandscapeLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6B9F41201F6AE4126D67AF /* LandscapeLoader.swift */; };
 		1F05133FAB0524EC26661315 /* GraphicsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C023BDFCCE3322E38787E6 /* GraphicsController.swift */; };
 		1F13FB4369B1983A1DA68B2D /* AnimationDefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FBC620FEE34BCB304CCA49 /* AnimationDefs.swift */; };
+		267F7DDF56BBD1DBEC777E95 /* RSCStringCipher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768F1EA39D6B57B64CD4E728 /* RSCStringCipher.swift */; };
 		295E2A677F0E7DADBE03EC41 /* ObjectNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED06FB5405C413FFB721D92 /* ObjectNames.swift */; };
 		3014C9952753A6CE34CE0042 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85989A2D185A0C6B9D712DC5 /* RegisterView.swift */; };
 		338FA91C1E0E26BAAEA38C25 /* WebClient in Resources */ = {isa = PBXBuildFile; fileRef = E51923D95FF7E811C424EE3D /* WebClient */; };
@@ -26,6 +27,7 @@
 		3D751413D47F84684101DEC1 /* Polygon.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2188BC35B6FD7A3DFDBCA4 /* Polygon.swift */; };
 		406DA2FFE25D7DA56EC24D73 /* models.orsc in Resources */ = {isa = PBXBuildFile; fileRef = F96FB7917C1BE2A428AA3513 /* models.orsc */; };
 		42639A01C5A6A4A50E55E50F /* Authentic_Landscape.orsc in Resources */ = {isa = PBXBuildFile; fileRef = 66DF674CB40A4F01E8EBEEC1 /* Authentic_Landscape.orsc */; };
+		4273B54AE7E39DF3ECE163A2 /* UserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D9BF081F24BC3018C86C2F /* UserPreferences.swift */; };
 		476AD837C7512706C19396F1 /* SpriteLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8ADEBB716923D01590135A4 /* SpriteLoader.swift */; };
 		48198E65F85056BF3CD2BCE6 /* ModelArchiveLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9F6A909F89CE0F94742AF5 /* ModelArchiveLoader.swift */; };
 		49BE2E9E20608DF7F8491734 /* landscape.dat in Resources */ = {isa = PBXBuildFile; fileRef = EB1994B23C1113BEF842C514 /* landscape.dat */; };
@@ -109,6 +111,7 @@
 		690046C4CF8B28809E819546 /* Shader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shader.swift; sourceTree = "<group>"; };
 		6D54F169977103F6BA3CE019 /* ItemDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemDefinitions.swift; sourceTree = "<group>"; };
 		6EA8AE1F76A6030168425450 /* CharacterBillboards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterBillboards.swift; sourceTree = "<group>"; };
+		768F1EA39D6B57B64CD4E728 /* RSCStringCipher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCStringCipher.swift; sourceTree = "<group>"; };
 		77082BCCC301983216C93E70 /* TradePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradePanel.swift; sourceTree = "<group>"; };
 		79470D5C002A690DB639638F /* FastMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastMath.swift; sourceTree = "<group>"; };
 		7A06C782469867C78107848F /* RSCPacketHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCPacketHandler.swift; sourceTree = "<group>"; };
@@ -117,6 +120,7 @@
 		82C6EF63288E0ECBA6862BC3 /* ServerProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerProfile.swift; sourceTree = "<group>"; };
 		85989A2D185A0C6B9D712DC5 /* RegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterView.swift; sourceTree = "<group>"; };
 		86C61DBD09EB20B0BF2CC077 /* ServerBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerBrowserView.swift; sourceTree = "<group>"; };
+		87D9BF081F24BC3018C86C2F /* UserPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPreferences.swift; sourceTree = "<group>"; };
 		8B57ED468FC1209E7D5335BC /* Audio */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Audio; path = OpenRSC/Audio; sourceTree = SOURCE_ROOT; };
 		8DBA10602CA01E71FF2E52EF /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebGameView.swift; sourceTree = "<group>"; };
@@ -217,6 +221,7 @@
 				5576569325B6C2223C6DEE7E /* NPCNames.swift */,
 				3ED06FB5405C413FFB721D92 /* ObjectNames.swift */,
 				82C6EF63288E0ECBA6862BC3 /* ServerProfile.swift */,
+				87D9BF081F24BC3018C86C2F /* UserPreferences.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -311,6 +316,7 @@
 				63B049FFEB87A145A0D3F9BC /* ISAACCipher.swift */,
 				7D4A8C89190272EFC205D26A /* RSCLoginHandler.swift */,
 				7B4A1905E095D026FE16EA83 /* RSCOpcodes.swift */,
+				768F1EA39D6B57B64CD4E728 /* RSCStringCipher.swift */,
 				990619EF9FCF13064CD17511 /* TCPConnection.swift */,
 			);
 			path = RSC;
@@ -466,6 +472,7 @@
 				056348FA1DEC564CF4D734D0 /* RSCLoginHandler.swift in Sources */,
 				8D061CA1AC54B0CBBD451140 /* RSCOpcodes.swift in Sources */,
 				A2FEAD959F5162454E49F9CE /* RSCPacketHandler.swift in Sources */,
+				267F7DDF56BBD1DBEC777E95 /* RSCStringCipher.swift in Sources */,
 				4EDFD6C354CB77D0C3011728 /* RSCWorldState.swift in Sources */,
 				B8725914B85D1E9DFE630D12 /* RSModel.swift in Sources */,
 				3014C9952753A6CE34CE0042 /* RegisterView.swift in Sources */,
@@ -483,6 +490,7 @@
 				D52601860204DA30D7B28639 /* TCPConnection.swift in Sources */,
 				378B96EA683C267A82C4C8AA /* TouchTranslator.swift in Sources */,
 				0499D33505237234EC1FEEB2 /* TradePanel.swift in Sources */,
+				4273B54AE7E39DF3ECE163A2 /* UserPreferences.swift in Sources */,
 				9BF9A498F47DACC733867A2D /* WebGameView.swift in Sources */,
 				7255140007F553B7E76E835B /* WelcomePanel.swift in Sources */,
 				F36655D5F48D23FF885D8D57 /* WildernessWarningPanel.swift in Sources */,

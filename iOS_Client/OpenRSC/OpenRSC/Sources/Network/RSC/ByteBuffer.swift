@@ -21,6 +21,14 @@ final class ByteBuffer {
         writePos += 1
     }
 
+    func putBytes(_ bytes: [UInt8]) {
+        ensureCapacity(bytes.count)
+        for byte in bytes {
+            data[writePos] = byte
+            writePos += 1
+        }
+    }
+
     func putShort(_ v: Int) {
         ensureCapacity(2)
         data[writePos]     = UInt8((v >> 8) & 0xFF)
@@ -52,6 +60,34 @@ final class ByteBuffer {
         }
         data[writePos] = 0x0A
         writePos += 1
+    }
+
+    func putZeroPaddedString(_ s: String) {
+        let bytes = Array(s.utf8)
+        ensureCapacity(bytes.count + 2)
+        data[writePos] = 0
+        writePos += 1
+        for b in bytes {
+            data[writePos] = b
+            writePos += 1
+        }
+        data[writePos] = 0
+        writePos += 1
+    }
+
+    func putSmart08_16(_ v: Int) {
+        precondition(v >= 0 && v < 32768, "smart08_16 out of range")
+        if v < 128 {
+            putByte(v)
+        } else {
+            putShort(0x8000 + v)
+        }
+    }
+
+    func putEncryptedString(_ s: String) {
+        let encoded = RSCStringCipher.encode(s)
+        putSmart08_16(encoded.plainLength)
+        putBytes(encoded.cipherBytes)
     }
 
     // MARK: - Packet framing (matches Network_Base.newPacket / finishPacket)
