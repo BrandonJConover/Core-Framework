@@ -99,8 +99,12 @@ struct LoginView: View {
     private func login() {
         isLoggingIn = true
         appState.loginError = ""
-        // Navigate to game view — engine connects and logs in with these credentials
-        appState.currentView = .game(server, username, password)
+        if server.gameType == .rscWeb {
+            appState.currentView = .webGame(server, username, password)
+        } else {
+            // Navigate to game view — engine connects and logs in with these credentials
+            appState.currentView = .game(server, username, password)
+        }
         isLoggingIn = false
     }
 }

@@ -17,6 +17,7 @@ enum RSCOutOpcode: UInt8 {
     case npcCommand         = 202
     case npcCommand2        = 203
     case playerAttack       = 171
+    case playerUseItem      = 113
     case playerDuel         = 103
     case playerTrade        = 142
     case playerFollow       = 165
@@ -28,6 +29,8 @@ enum RSCOutOpcode: UInt8 {
     case itemUnequip        = 170
     case itemUseOnItem      = 91
     case itemUseOnNpc       = 135
+    case itemUseOnObject    = 115
+    case itemUseOnGround    = 53
     case objectCommand1     = 136
     case objectCommand2     = 79
     case shopBuy            = 236

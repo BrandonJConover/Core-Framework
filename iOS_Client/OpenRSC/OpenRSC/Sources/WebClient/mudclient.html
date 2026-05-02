@@ -13,7 +13,21 @@
             body {
                 width: 100%;
                 height: 100%;
+                min-height: 100dvh;
+                min-height: -webkit-fill-available;
                 margin: 0;
+                box-sizing: border-box;
+                -webkit-text-size-adjust: 100%;
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                user-select: none;
+                overscroll-behavior: none;
+            }
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: inherit;
             }
 
             body {
@@ -24,17 +38,24 @@
                 left: 0;
                 right: 0;
                 bottom: 0;
-                padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+                width: var(--mudclient-vw, 100vw);
+                height: var(--mudclient-vh, 100%);
+                padding: 0;
             }
 
             /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
             canvas.emscripten {
-                width: 100%;
-                height: 100%;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: var(--mudclient-vw, 100vw);
+                height: var(--mudclient-vh, 100vh);
                 border: 0px none;
                 touch-action: none;
                 background-color: black;
                 display: block;
+                image-rendering: pixelated;
+                transform: translateZ(0);
             }
 
             canvas.emscripten:focus {
@@ -73,6 +94,12 @@
                 resize: none;
                 text-align: center;
                 transform-origin: 0 0;
+                -webkit-text-fill-color: transparent;
+                caret-color: transparent;
+                opacity: 0.01;
+                min-height: 32px;
+                min-width: 160px;
+                font-size: 16px;
             }
 
             .mudclient-keyboard:focus {
@@ -83,8 +110,12 @@
                 font-family: monospace;
             }
 
+            #mudclient-login-form {
+                display: contents;
+            }
+
             #ios-keyboard-btn {
-                display: none;
+                display: none !important;
                 position: fixed;
                 bottom: 40px;
                 left: 50%;
@@ -102,6 +133,289 @@
                 -webkit-tap-highlight-color: rgba(255,215,0,0.3);
                 touch-action: manipulation;
             }
+
+            #connection-banner {
+                display: none;
+                position: fixed;
+                left: max(12px, env(safe-area-inset-left));
+                right: max(12px, env(safe-area-inset-right));
+                top: calc(env(safe-area-inset-top) + 12px);
+                z-index: 999997;
+                border: 1px solid rgba(255, 215, 0, 0.55);
+                border-radius: 12px;
+                background: rgba(16, 16, 16, 0.82);
+                color: #ffd700;
+                padding: 10px 12px;
+                font: 600 13px/1.35 -apple-system, BlinkMacSystemFont, sans-serif;
+                text-align: center;
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                pointer-events: none;
+            }
+
+            #connection-banner.is-error {
+                border-color: rgba(255, 91, 91, 0.7);
+                color: #ffb4a8;
+            }
+
+            #mobile-controls {
+                display: none;
+                pointer-events: none;
+                position: fixed;
+                inset: 0;
+                z-index: 999998;
+            }
+
+            body.mudclient-touch #mobile-controls {
+                display: none;
+            }
+
+            body.mudclient-touch.mudclient-browser-mobile:not(.mudclient-native-ios) #mobile-controls {
+                display: none;
+            }
+
+            .mobile-dpad,
+            .mobile-actions,
+            .mobile-toggle {
+                pointer-events: none;
+                position: fixed;
+                user-select: none;
+                -webkit-user-select: none;
+            }
+
+            .mobile-dpad {
+                bottom: calc(env(safe-area-inset-bottom) + 18px);
+                left: calc(env(safe-area-inset-left) + 18px);
+                display: grid;
+                grid-template-columns: repeat(3, 48px);
+                grid-template-rows: repeat(3, 48px);
+                gap: 6px;
+            }
+
+            .mobile-actions {
+                position: fixed;
+                right: calc(env(safe-area-inset-right) + 18px);
+                bottom: calc(env(safe-area-inset-bottom) + 18px);
+                display: grid;
+                grid-template-columns: repeat(2, 48px);
+                gap: 8px;
+            }
+
+            .mobile-toggle {
+                top: calc(env(safe-area-inset-top) + 16px);
+                right: calc(env(safe-area-inset-right) + 16px);
+            }
+
+            .mobile-control {
+                pointer-events: auto;
+                width: 48px;
+                height: 48px;
+                border: 1px solid rgba(255, 215, 0, 0.55);
+                border-radius: 12px;
+                background: rgba(16, 16, 16, 0.58);
+                color: #ffd700;
+                font: 700 24px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+                display: grid;
+                place-items: center;
+                padding: 0;
+                touch-action: none;
+                -webkit-tap-highlight-color: transparent;
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                cursor: grab;
+            }
+
+            .mobile-drag-handle {
+                pointer-events: auto;
+                width: 36px;
+                height: 36px;
+                border: 1px solid rgba(255, 215, 0, 0.45);
+                border-radius: 10px;
+                background: rgba(16, 16, 16, 0.46);
+                color: rgba(255, 215, 0, 0.9);
+                display: grid;
+                place-items: center;
+                padding: 0;
+                touch-action: none;
+                -webkit-tap-highlight-color: transparent;
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+            }
+
+            .mobile-drag-handle::before {
+                content: "";
+                width: 4px;
+                height: 4px;
+                border-radius: 50%;
+                background: currentColor;
+                box-shadow:
+                    8px 0 0 currentColor,
+                    -8px 0 0 currentColor,
+                    0 8px 0 currentColor,
+                    0 -8px 0 currentColor;
+            }
+
+            .mobile-dpad .mobile-drag-handle {
+                grid-column: 2;
+                grid-row: 2;
+                place-self: center;
+            }
+
+            .mobile-actions .mobile-drag-handle {
+                position: absolute;
+                right: 0;
+                top: -44px;
+            }
+
+            .mobile-control:active,
+            .mobile-control.is-active,
+            .mobile-drag-handle:active,
+            .mobile-drag-handle.is-active {
+                background: rgba(255, 215, 0, 0.24);
+                transform: scale(0.96);
+            }
+
+            .mobile-drag-handle:active,
+            .mobile-drag-handle.is-active {
+                cursor: grabbing;
+            }
+
+            #mobile-controls.is-collapsed .mobile-dpad,
+            #mobile-controls.is-collapsed .mobile-actions {
+                display: none;
+            }
+
+            #mobile-controls.is-collapsed .mobile-toggle .mobile-control {
+                opacity: 0.72;
+            }
+
+            #mobile-controls.is-idle:not(.is-collapsed) .mobile-dpad,
+            #mobile-controls.is-idle:not(.is-collapsed) .mobile-actions {
+                opacity: 0.38;
+                transition: opacity 0.2s ease;
+            }
+
+            #mobile-controls:not(.is-idle) .mobile-dpad,
+            #mobile-controls:not(.is-idle) .mobile-actions {
+                opacity: 1;
+                transition: opacity 0.12s ease;
+            }
+
+            .mobile-control[data-key="up"] { grid-column: 2; grid-row: 1; }
+            .mobile-control[data-key="left"] { grid-column: 1; grid-row: 2; }
+            .mobile-control[data-key="right"] { grid-column: 3; grid-row: 2; }
+            .mobile-control[data-key="down"] { grid-column: 2; grid-row: 3; }
+
+            .mobile-arrow {
+                width: 0;
+                height: 0;
+                border-left: 9px solid transparent;
+                border-right: 9px solid transparent;
+                border-bottom: 13px solid currentColor;
+            }
+
+            .mobile-arrow.down { transform: rotate(180deg); }
+            .mobile-arrow.left { transform: rotate(-90deg); }
+            .mobile-arrow.right { transform: rotate(90deg); }
+
+            .mobile-menu-icon,
+            .mobile-keyboard-icon {
+                width: 24px;
+                height: 18px;
+                position: relative;
+                display: block;
+            }
+
+            .mobile-menu-icon::before,
+            .mobile-menu-icon::after,
+            .mobile-menu-icon span {
+                content: "";
+                position: absolute;
+                left: 3px;
+                right: 3px;
+                height: 2px;
+                background: currentColor;
+                border-radius: 2px;
+            }
+
+            .mobile-menu-icon::before { top: 3px; }
+            .mobile-menu-icon span { top: 8px; }
+            .mobile-menu-icon::after { top: 13px; }
+
+            .mobile-collapse-icon {
+                width: 22px;
+                height: 22px;
+                position: relative;
+                display: block;
+            }
+
+            .mobile-collapse-icon::before,
+            .mobile-collapse-icon::after {
+                content: "";
+                position: absolute;
+                left: 2px;
+                right: 2px;
+                top: 10px;
+                height: 2px;
+                background: currentColor;
+                border-radius: 2px;
+            }
+
+            .mobile-collapse-icon::after {
+                transform: rotate(90deg);
+            }
+
+            #mobile-controls:not(.is-collapsed) .mobile-collapse-icon::after {
+                display: none;
+            }
+
+            .mobile-keyboard-icon {
+                border: 2px solid currentColor;
+                border-radius: 4px;
+            }
+
+            .mobile-keyboard-icon::before,
+            .mobile-keyboard-icon::after {
+                content: "";
+                position: absolute;
+                left: 4px;
+                right: 4px;
+                height: 2px;
+                background: currentColor;
+                border-radius: 2px;
+            }
+
+            .mobile-keyboard-icon::before { top: 5px; }
+            .mobile-keyboard-icon::after { bottom: 4px; }
+
+            @media (max-width: 420px), (max-height: 420px) {
+                .mobile-dpad {
+                    grid-template-columns: repeat(3, 42px);
+                    grid-template-rows: repeat(3, 42px);
+                    gap: 5px;
+                    bottom: calc(env(safe-area-inset-bottom) + 12px);
+                    left: calc(env(safe-area-inset-left) + 12px);
+                }
+
+                .mobile-actions {
+                    grid-template-columns: repeat(2, 42px);
+                    gap: 6px;
+                    bottom: calc(env(safe-area-inset-bottom) + 12px);
+                    right: calc(env(safe-area-inset-right) + 12px);
+                }
+
+                .mobile-toggle {
+                    top: calc(env(safe-area-inset-top) + 12px);
+                    right: calc(env(safe-area-inset-right) + 12px);
+                }
+
+                .mobile-control {
+                    width: 42px;
+                    height: 42px;
+                    border-radius: 10px;
+                    font-size: 21px;
+                }
+            }
         </style>
     </head>
     <body>
@@ -113,17 +427,352 @@
             autofocus="autofocus"
         ></canvas>
 
-        <input id="mudclient-keyboard" class="mudclient-keyboard" type="text" />
+        <form id="mudclient-login-form" autocomplete="on" method="post" action="javascript:void 0">
+            <input
+                id="mudclient-keyboard"
+                class="mudclient-keyboard"
+                name="username"
+                type="text"
+                autocomplete="username"
+                autocapitalize="none"
+                autocorrect="off"
+                spellcheck="false"
+                inputmode="text"
+                enterkeyhint="next"
+                aria-label="Username"
+            />
 
-        <input
-            id="mudclient-password"
-            class="mudclient-keyboard"
-            type="password"
-        />
+            <input
+                id="mudclient-password"
+                class="mudclient-keyboard"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                autocapitalize="none"
+                autocorrect="off"
+                spellcheck="false"
+                inputmode="text"
+                enterkeyhint="done"
+                aria-label="Password"
+            />
+        </form>
 
         <button id="ios-keyboard-btn">Tap to type</button>
+        <div id="connection-banner" role="status" aria-live="polite"></div>
+
+        <div id="mobile-controls">
+            <div class="mobile-toggle">
+                <button type="button" class="mobile-control" data-action="controls-toggle" aria-label="Toggle controls"><span class="mobile-collapse-icon"></span></button>
+            </div>
+            <div class="mobile-dpad">
+                <button type="button" class="mobile-control" data-key="up" aria-label="Move up"><span class="mobile-arrow up"></span></button>
+                <button type="button" class="mobile-control" data-key="left" aria-label="Move left"><span class="mobile-arrow left"></span></button>
+                <button type="button" class="mobile-drag-handle" data-drag-target=".mobile-dpad" aria-label="Move controls"></button>
+                <button type="button" class="mobile-control" data-key="right" aria-label="Move right"><span class="mobile-arrow right"></span></button>
+                <button type="button" class="mobile-control" data-key="down" aria-label="Move down"><span class="mobile-arrow down"></span></button>
+            </div>
+            <div class="mobile-actions">
+                <button type="button" class="mobile-drag-handle" data-drag-target=".mobile-actions" aria-label="Move actions"></button>
+                <button type="button" class="mobile-control" data-action="zoom-in" aria-label="Zoom in">+</button>
+                <button type="button" class="mobile-control" data-action="zoom-out" aria-label="Zoom out">-</button>
+                <button type="button" class="mobile-control" data-action="right-click" aria-label="Right click"><span class="mobile-menu-icon"><span></span></span></button>
+                <button type="button" class="mobile-control" data-action="keyboard" aria-label="Keyboard"><span class="mobile-keyboard-icon"></span></button>
+            </div>
+        </div>
 
         <script>
+            (function() {
+                var connectionBanner = document.getElementById('connection-banner');
+                var nativeConfig = window.rscNativeConfig || {};
+                var isNativeIOSWebClient = nativeConfig.platform === 'ios';
+                var isAppleMobile =
+                    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                    (
+                        navigator.platform === 'MacIntel' &&
+                        navigator.maxTouchPoints > 1
+                    );
+                var isBrowserMobile =
+                    !isNativeIOSWebClient &&
+                    (
+                        isAppleMobile ||
+                        navigator.maxTouchPoints > 0 ||
+                        /Android/i.test(navigator.userAgent)
+                    );
+                var isStandalone =
+                    window.navigator.standalone === true ||
+                    (
+                        window.matchMedia &&
+                        window.matchMedia('(display-mode: standalone)').matches
+                    );
+                var browserInfo = {
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    maxTouchPoints: navigator.maxTouchPoints || 0,
+                    standalone: isStandalone,
+                    appleMobile: isAppleMobile,
+                    browserMobile: isBrowserMobile,
+                    nativeIOS: isNativeIOSWebClient
+                };
+
+                document.documentElement.classList.toggle('mudclient-apple-mobile', isAppleMobile);
+                document.body.classList.toggle('mudclient-native-ios', isNativeIOSWebClient);
+                document.body.classList.toggle('mudclient-browser-mobile', isBrowserMobile);
+                document.body.classList.toggle('mudclient-standalone', isStandalone);
+
+                function showConnectionBanner(message, isError) {
+                    if (!connectionBanner) {
+                        return;
+                    }
+                    connectionBanner.textContent = message;
+                    connectionBanner.classList.toggle('is-error', !!isError);
+                    connectionBanner.style.display = 'block';
+                }
+
+                function hideConnectionBanner() {
+                    if (connectionBanner) {
+                        connectionBanner.style.display = 'none';
+                    }
+                }
+
+                function sendNative(type, body) {
+                    try {
+                        if (
+                            window.webkit &&
+                            window.webkit.messageHandlers &&
+                            window.webkit.messageHandlers.nativeBridge
+                        ) {
+                            window.webkit.messageHandlers.nativeBridge.postMessage(
+                                Object.assign({ type: type }, body || {})
+                            );
+                        }
+                    } catch (err) {}
+                }
+
+                function stringify(value) {
+                    if (value instanceof Error) {
+                        return value.stack || value.message;
+                    }
+                    if (typeof value === 'string') {
+                        return value;
+                    }
+                    try {
+                        return JSON.stringify(value);
+                    } catch (err) {
+                        return String(value);
+                    }
+                }
+
+                window._mudclientWelcomeCloseAssistUntil = 0;
+                window._mudclientIsBrowserMobile = isBrowserMobile;
+                window._mudclientIsNativeIOSWebClient = isNativeIOSWebClient;
+                window._mudclientBrowserInfo = browserInfo;
+
+                console.log('[mudclient] Browser info: ' + JSON.stringify(browserInfo));
+
+                if (
+                    isNativeIOSWebClient ||
+                    isBrowserMobile
+                ) {
+                    setInterval(function() {
+                        var canvas = document.getElementById('canvas');
+                        var heapBytes = 0;
+                        var memory = null;
+                        if (Module && Module.HEAP8 && Module.HEAP8.buffer) {
+                            heapBytes = Module.HEAP8.buffer.byteLength;
+                        }
+                        if (typeof performance !== 'undefined' && performance.memory) {
+                            memory = {
+                                jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+                                totalJSHeapSize: performance.memory.totalJSHeapSize,
+                                usedJSHeapSize: performance.memory.usedJSHeapSize
+                            };
+                        }
+                        sendNative('status', {
+                            level: 'heartbeat',
+                            message: JSON.stringify({
+                                href: location.href,
+                                visible: document.visibilityState,
+                                focused: document.hasFocus(),
+                                standalone: isStandalone,
+                                browserMobile: isBrowserMobile,
+                                nativeIOS: isNativeIOSWebClient,
+                                viewport: [window.innerWidth, window.innerHeight],
+                                visualViewport: window.visualViewport
+                                    ? [
+                                        window.visualViewport.offsetLeft,
+                                        window.visualViewport.offsetTop,
+                                        window.visualViewport.width,
+                                        window.visualViewport.height,
+                                        window.visualViewport.scale
+                                    ]
+                                    : null,
+                                dpr: window.devicePixelRatio || 1,
+                                canvas: canvas ? [canvas.width, canvas.height] : null,
+                                canvasCss: canvas ? [canvas.clientWidth, canvas.clientHeight] : null,
+                                heapBytes: heapBytes,
+                                memory: memory
+                            })
+                        });
+                    }, 5000);
+                }
+
+                ['log', 'warn', 'error'].forEach(function(level) {
+                    var original = console[level] || console.log;
+                    console[level] = function() {
+                        var args = Array.prototype.slice.call(arguments);
+                        var text = args.map(stringify).join(' ');
+                        if (/\bLogin response:\s*0\b/.test(text)) {
+                            window._mudclientWelcomeCloseAssistUntil = Date.now() + 90000;
+                        }
+                        sendNative(level === 'error' ? 'error' : 'log', {
+                            level: level,
+                            message: text
+                        });
+                        original.apply(console, args);
+                    };
+                });
+
+                window._mudclientNativeMessage = sendNative;
+                window._mudclientShowConnectionBanner = showConnectionBanner;
+                window._mudclientHideConnectionBanner = hideConnectionBanner;
+
+	                if (typeof window.WebSocket === 'function') {
+	                    var NativeWebSocket = window.WebSocket;
+	                    var CONNECT_TIMEOUT_MS = 12000;
+
+	                    function bytesFromWebSocketPayload(payload) {
+	                        if (payload instanceof ArrayBuffer) {
+	                            return new Uint8Array(payload);
+	                        }
+	                        if (ArrayBuffer.isView(payload)) {
+	                            return new Uint8Array(
+	                                payload.buffer,
+	                                payload.byteOffset,
+	                                payload.byteLength
+	                            );
+	                        }
+	                        return null;
+	                    }
+
+	                    function describeOutgoingPacket(payload) {
+	                        var bytes = bytesFromWebSocketPayload(payload);
+	                        if (!bytes || bytes.length < 3) {
+	                            return null;
+	                        }
+	                        var packetLength = (bytes[0] << 8) | bytes[1];
+	                        var opcode = bytes[2];
+	                        return {
+	                            opcode: opcode,
+	                            packetLength: packetLength,
+	                            byteLength: bytes.length
+	                        };
+	                    }
+
+	                    function MonitoredWebSocket(url, protocols) {
+                            console.log(
+                                '[mudclient] Opening WebSocket: ' +
+                                url +
+                                ' protocols=' +
+                                (protocols === undefined ? '<none>' : JSON.stringify(protocols)) +
+                                ' location=' +
+                                location.href
+                            );
+	                        var socket = protocols === undefined
+	                            ? new NativeWebSocket(url)
+	                            : new NativeWebSocket(url, protocols);
+                        var didOpen = false;
+                        var timer = setTimeout(function() {
+                            if (didOpen || socket.readyState !== NativeWebSocket.CONNECTING) {
+                                return;
+                            }
+                            var message = 'WebSocket connection timed out: ' + url;
+                            showConnectionBanner(message, true);
+                            console.error('[mudclient] ' + message);
+                            sendNative('error', {
+                                level: 'websocket-timeout',
+                                message: message
+                            });
+                            try {
+                                socket.close(4000, 'Connection timed out');
+                            } catch (err) {}
+                        }, CONNECT_TIMEOUT_MS);
+
+	                        socket.addEventListener('open', function() {
+	                            didOpen = true;
+	                            clearTimeout(timer);
+	                            hideConnectionBanner();
+	                            console.log('[mudclient] WebSocket connected: ' + url);
+                            sendNative('status', {
+                                level: 'websocket-open',
+                                message: 'Connected to ' + url
+                            });
+	                        });
+
+	                        socket.addEventListener('error', function(event) {
+	                            clearTimeout(timer);
+	                            showConnectionBanner('WebSocket error: ' + url, true);
+	                            console.error(
+	                                '[mudclient] WebSocket error: ' +
+	                                url +
+	                                ' readyState=' +
+	                                socket.readyState,
+	                                event
+	                            );
+	                            sendNative('error', {
+	                                level: 'websocket-error',
+	                                message: 'WebSocket error: ' +
+	                                    url +
+	                                    ' readyState=' +
+	                                    socket.readyState
+	                            });
+	                        });
+
+	                        socket.addEventListener('close', function(event) {
+	                            clearTimeout(timer);
+	                            var message = 'WebSocket closed: ' + url + ' code=' + event.code;
+	                            if (event.reason) {
+	                                message += ' reason=' + event.reason;
+	                            }
+	                            message += ' wasClean=' + event.wasClean;
+	                            if (!didOpen) {
+	                                showConnectionBanner(message, true);
+	                            }
+                            console.warn('[mudclient] ' + message);
+                            sendNative(didOpen ? 'status' : 'error', {
+                                level: didOpen ? 'websocket-close' : 'websocket-failed',
+	                                message: message
+	                            });
+	                        });
+
+	                        var nativeSend = socket.send;
+	                        socket.send = function(payload) {
+	                            var packet = describeOutgoingPacket(payload);
+	                            if (packet && packet.opcode === 246) {
+	                                var message = 'Outgoing item drop packet: length='
+	                                    + packet.packetLength
+	                                    + ' bytes='
+	                                    + packet.byteLength;
+	                                console.log('[mudclient] ' + message);
+	                                sendNative('status', {
+	                                    level: 'item-drop-packet',
+	                                    message: message
+	                                });
+	                            }
+	                            return nativeSend.call(socket, payload);
+	                        };
+
+	                        return socket;
+	                    }
+
+                    MonitoredWebSocket.prototype = NativeWebSocket.prototype;
+                    MonitoredWebSocket.CONNECTING = NativeWebSocket.CONNECTING;
+                    MonitoredWebSocket.OPEN = NativeWebSocket.OPEN;
+                    MonitoredWebSocket.CLOSING = NativeWebSocket.CLOSING;
+                    MonitoredWebSocket.CLOSED = NativeWebSocket.CLOSED;
+                    window.WebSocket = MonitoredWebSocket;
+                }
+            })();
+
             function LSFS() {
                 if (LSFS.mount) {
                     return LSFS;
@@ -289,15 +938,116 @@
                 }
             }
 
+	            var webSocketScheme = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+	            var nativeConfig = window.rscNativeConfig || {};
+	            var isNativeIOSWebClient =
+	                nativeConfig.platform === 'ios';
+	            var isHostedBrowserWebClient = !isNativeIOSWebClient;
+	            var isHetznerNativeWebClient =
+	                isNativeIOSWebClient &&
+	                nativeConfig.host === '10.8.0.1';
+	            var webSocketPort = window.location.port ||
+	                (window.location.protocol === 'https:' ? '443' : '80');
+	            var webSocketHost = window.location.hostname + ':' + webSocketPort;
+	            var webSocketUrl = isHostedBrowserWebClient
+	                ? webSocketScheme + webSocketHost + '/rsc-ws'
+	                : isHetznerNativeWebClient
+	                    ? 'ws://' + nativeConfig.host + ':8080/rsc-ws'
+	                : webSocketScheme;
+
+            if (isNativeIOSWebClient && window.HTMLCanvasElement) {
+                (function() {
+                    var originalGetContext = HTMLCanvasElement.prototype.getContext;
+                    var stableWebGLAttributes = {
+                        alpha: false,
+                        antialias: false,
+                        preserveDrawingBuffer: false,
+                        failIfMajorPerformanceCaveat: false,
+                        powerPreference: 'high-performance'
+                    };
+
+                    HTMLCanvasElement.prototype.getContext = function(type, attributes) {
+                        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+                            var mergedAttributes = Object.assign(
+                                {},
+                                attributes || {},
+                                stableWebGLAttributes
+                            );
+                            if (window._mudclientNativeMessage) {
+                                window._mudclientNativeMessage('status', {
+                                    level: 'webgl',
+                                    message: 'Requesting stable iOS WebGL context: ' + type
+                                });
+                            }
+                            return originalGetContext.call(this, type, mergedAttributes);
+                        }
+                        return originalGetContext.call(this, type, attributes);
+                    };
+                })();
+            }
+
+            window._mudclientHandleMemoryWarning = function() {
+                try {
+                    if (window._mudclientNativeMessage) {
+                        var canvas = document.getElementById('canvas');
+                        var heapBytes = typeof Module !== 'undefined' && Module.HEAP8 && Module.HEAP8.buffer
+                            ? Module.HEAP8.buffer.byteLength
+                            : 0;
+                        window._mudclientNativeMessage('status', {
+                            level: 'memory',
+                            message: JSON.stringify({
+                                event: 'native-memory-warning',
+                                heapBytes: heapBytes,
+                                canvas: canvas ? [canvas.width, canvas.height] : null,
+                                canvasCss: canvas ? [canvas.clientWidth, canvas.clientHeight] : null
+                            })
+                        });
+                    }
+
+                    if (window._mudclientReleaseActiveTouchState) {
+                        window._mudclientReleaseActiveTouchState();
+                    }
+                } catch (err) {
+                    console.warn('[mudclient] Memory warning handler failed', err);
+                }
+            };
+
             var Module = {
-                // Auto-detect ws:// vs wss:// based on page protocol.
-                // HTTPS pages block ws:// as mixed content, causing
-                // connection failures that crash the WASM on mobile.
+                // Hosted Safari is happiest when the WebSocket upgrade stays on
+                // the same origin as the page. Native iOS keeps using the direct
+                // game server endpoint from the patched world list.
                 websocket: {
-                    url: window.location.protocol === 'https:' ? 'wss://' : 'ws://'
+                    url: webSocketUrl,
+                    subprotocol: isHostedBrowserWebClient ? null : 'binary'
                 },
                 preInit: [
                     function () {
+                        var isAppleMobile =
+                            /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                            (
+                                navigator.platform === 'MacIntel' &&
+                                navigator.maxTouchPoints > 1
+                            );
+                        if (
+                            isAppleMobile ||
+                            (
+                                window.rscNativeConfig &&
+                                window.rscNativeConfig.platform === 'ios'
+                            )
+                        ) {
+                            var resetKey = 'mudclient.iosOptionsReset.v5';
+                            try {
+                                if (localStorage.getItem(resetKey) !== '1') {
+                                    localStorage.removeItem('rsc');
+                                    localStorage.removeItem('mudclient.mobileControlPositions');
+                                    localStorage.removeItem('mudclient.mobileControlsCollapsed');
+                                    localStorage.setItem(resetKey, '1');
+                                    console.log('[mudclient] Reset persisted web-client worldlist, options, and mobile controls for iOS');
+                                }
+                            } catch (err) {
+                                console.warn('[mudclient] Unable to reset persisted options', err);
+                            }
+                        }
                         FS.mkdir('/options');
                         FS.mount(LSFS(), { key: 'rsc' }, '/options');
                     }
@@ -306,8 +1056,22 @@
                     function () {
                         ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = '#canvas';
 
-                        const args = window.location.hash.slice(1).split(',');
-                        arguments_.push(...args);
+                        const nativeConfig = window.rscNativeConfig || {};
+                        const args = Array.isArray(nativeConfig.launchArgs)
+                            ? nativeConfig.launchArgs.slice()
+                            : window.location.hash.slice(1).split(',');
+                        if (
+                            nativeConfig.platform === 'ios' &&
+                            args.length > 1
+                        ) {
+                            args.splice(1);
+                            console.warn('[mudclient] Ignoring iOS runtime host override; using bundled world RSA settings');
+                        }
+                        const filteredArgs = args.filter(function(arg) {
+                            return typeof arg === 'string' && arg.length > 0;
+                        });
+                        console.log('[mudclient] Launch args: ' + filteredArgs.join(','));
+                        arguments_.push(...filteredArgs);
                     }
                 ],
                 postRun: [],
@@ -322,16 +1086,97 @@
                         console.log(text);
                     };
                 })(),
+                onAbort: function(reason) {
+                    console.error('[mudclient] Runtime aborted:', reason);
+                    if (window._mudclientNativeMessage) {
+                        window._mudclientNativeMessage('error', {
+                            level: 'abort',
+                            message: String(reason)
+                        });
+                    }
+                },
+                onRuntimeInitialized: function() {
+                    if (window._mudclientNativeMessage) {
+                        window._mudclientNativeMessage('status', {
+                            level: 'ready',
+                            message: 'Runtime initialized'
+                        });
+                    }
+                },
                 canvas: (function () {
                     var canvas = document.getElementById('canvas');
+                    var nativeGetCanvasRect = canvas.getBoundingClientRect.bind(canvas);
+
+                    canvas.getBoundingClientRect = function() {
+                        var rect = nativeGetCanvasRect();
+                        if (!window._mudclientIsBrowserMobile) {
+                            return rect;
+                        }
+
+                        var viewport = window.visualViewport;
+                        var left = rect.left;
+                        var top = rect.top;
+                        var width = rect.width || (viewport ? viewport.width : window.innerWidth);
+                        var height = rect.height || (viewport ? viewport.height : window.innerHeight);
+
+                        return {
+                            x: left,
+                            y: top,
+                            left: left,
+                            top: top,
+                            right: left + width,
+                            bottom: top + height,
+                            width: width,
+                            height: height,
+                            toJSON: function() {
+                                return {
+                                    x: left,
+                                    y: top,
+                                    left: left,
+                                    top: top,
+                                    right: left + width,
+                                    bottom: top + height,
+                                    width: width,
+                                    height: height
+                                };
+                            }
+                        };
+                    };
 
                     canvas.addEventListener(
                         'webglcontextlost',
                         function (e) {
-                            alert(
-                                'WebGL context lost. You will need to reload the page.'
-                            );
                             e.preventDefault();
+                            console.error('[mudclient] WebGL context lost');
+                            if (window._mudclientNativeMessage) {
+                                window._mudclientNativeMessage('error', {
+                                    level: 'webgl',
+                                    message: 'WebGL context lost'
+                                });
+                            }
+                            if (
+                                window.rscNativeConfig &&
+                                window.rscNativeConfig.platform === 'ios'
+                            ) {
+                                if (window._mudclientShowConnectionBanner) {
+                                    window._mudclientShowConnectionBanner(
+                                        'Graphics context was lost. Go back and reopen the web client.',
+                                        true
+                                    );
+                                }
+                                return;
+                            }
+                            setTimeout(function() {
+                                location.reload();
+                            }, 500);
+                        },
+                        false
+                    );
+
+                    canvas.addEventListener(
+                        'webglcontextrestored',
+                        function () {
+                            console.log('[mudclient] WebGL context restored');
                         },
                         false
                     );
@@ -344,12 +1189,16 @@
                                 event.clientX < 0 ||
                                 event.clientX > window.innerWidth
                             ) {
-                                Module.ccall(
-                                    'browser_mouse_moved',
-                                    null,
-                                    ['number'],
-                                    [event.clientX, event.clientY]
-                                );
+                                try {
+                                    Module.ccall(
+                                        'browser_mouse_moved',
+                                        null,
+                                        ['number', 'number'],
+                                        [event.clientX, event.clientY]
+                                    );
+                                } catch (err) {
+                                    console.error('[mudclient] Camera mouse bridge failed', err);
+                                }
                             }
                         },
                         false
@@ -366,7 +1215,14 @@
 
                     return canvas;
                 })(),
-                setStatus: function (text) {},
+                setStatus: function (text) {
+                    if (window._mudclientNativeMessage && text) {
+                        window._mudclientNativeMessage('status', {
+                            level: 'status',
+                            message: text
+                        });
+                    }
+                },
                 totalDependencies: 0,
                 monitorRunDependencies: function (left) {
                     this.totalDependencies = Math.max(
@@ -409,11 +1265,30 @@
                 event.preventDefault();
             });
 
+            window.addEventListener('pagehide', function(event) {
+                if (window._mudclientNativeMessage) {
+                    window._mudclientNativeMessage('status', {
+                        level: 'pagehide',
+                        message: 'pagehide persisted=' + !!event.persisted
+                    });
+                }
+            });
+
+            document.addEventListener('visibilitychange', function() {
+                if (window._mudclientNativeMessage) {
+                    window._mudclientNativeMessage('status', {
+                        level: 'visibility',
+                        message: document.visibilityState
+                    });
+                }
+            });
+
             const ENTER_KEY_CODE = 13;
             const BACKSPACE_KEY_CODE = 8;
 
             const keyboardInput = document.getElementById('mudclient-keyboard');
             const passwordInput = document.getElementById('mudclient-password');
+            const loginForm = document.getElementById('mudclient-login-form');
 
             /* ============================================================
                iOS Keyboard Fix
@@ -429,6 +1304,199 @@
 
             var iosKeyboardBtn = document.getElementById('ios-keyboard-btn');
             var _activeKeyboardInput = null;
+            var pendingAutofillPassword = '';
+            var lastKeyboardValue = '';
+            var lastPasswordValue = '';
+            var lastTrustedInputGestureAt = 0;
+            var nativeAutoLogin = (function() {
+                var credentials =
+                    window.rscNativeConfig &&
+                    window.rscNativeConfig.autoLogin;
+                var username = credentials && typeof credentials.username === 'string'
+                    ? credentials.username
+                    : '';
+                var password = credentials && typeof credentials.password === 'string'
+                    ? credentials.password
+                    : '';
+
+                return {
+                    username: username,
+                    password: password,
+                    usernameApplied: false,
+                    passwordApplied: false,
+                    submitQueued: false,
+                    lastPromptId: '',
+                    lastAppliedAt: 0
+                };
+            })();
+
+            function markTrustedInputGesture() {
+                lastTrustedInputGestureAt = Date.now();
+            }
+
+            ['touchstart', 'pointerdown', 'mousedown', 'click', 'keydown'].forEach(function(eventName) {
+                window.addEventListener(eventName, markTrustedInputGesture, { capture: true, passive: true });
+            });
+
+            window._mudclientShouldFocusKeyboard = function(input) {
+                if (
+                    !window.rscNativeConfig ||
+                    window.rscNativeConfig.platform !== 'ios'
+                ) {
+                    return true;
+                }
+
+                if (document.activeElement === input) {
+                    return true;
+                }
+
+                if (hasNativeAutoLoginCredentials()) {
+                    return true;
+                }
+
+                return Date.now() - lastTrustedInputGestureAt < 700;
+            };
+
+            window._mudclientFocusKeyboardInput = function(input) {
+                if (nativeAutoLoginInProgress()) {
+                    return true;
+                }
+
+                if (!input || !window._mudclientShouldFocusKeyboard(input)) {
+                    console.log('[keyboard] Deferring iOS keyboard focus outside user gesture');
+                    return false;
+                }
+
+                try {
+                    input.focus();
+                    return true;
+                } catch (err) {
+                    console.warn('[keyboard] Unable to focus input', err);
+                    return false;
+                }
+            };
+
+            window._mudclientShouldShowKeyboardInput = function(input) {
+                if (
+                    !window.rscNativeConfig ||
+                    window.rscNativeConfig.platform !== 'ios'
+                ) {
+                    return true;
+                }
+
+                if (hasNativeAutoLoginCredentials()) {
+                    return true;
+                }
+
+                return window._mudclientShouldFocusKeyboard(input);
+            };
+
+            window._mudclientHideKeyboardInput = function(input) {
+                if (!input) {
+                    return;
+                }
+
+                input.style.left = '-9999px';
+                input.style.top = '-9999px';
+                input.style.width = '1px';
+                input.style.height = '1px';
+                input.style.transform = 'none';
+                input.style.display = 'block';
+            };
+
+            function viewportSize() {
+                var viewport = window.visualViewport;
+                var width = viewport ? viewport.width : window.innerWidth;
+                var height = viewport ? viewport.height : window.innerHeight;
+                return {
+                    left: viewport ? viewport.offsetLeft : 0,
+                    top: viewport ? viewport.offsetTop : 0,
+                    width: Math.max(1, Math.floor(width)),
+                    height: Math.max(1, Math.floor(height))
+                };
+            }
+
+            function isMobileViewport() {
+                return (
+                    navigator.maxTouchPoints > 0 ||
+                    /Android|iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+                );
+            }
+
+            function gameViewportSize(displaySize) {
+                if (!isMobileViewport()) {
+                    return displaySize;
+                }
+
+                var portrait = displaySize.height >= displaySize.width;
+                var targetShortSide = portrait ? 300 : 320;
+                var shortSide = portrait ? displaySize.width : displaySize.height;
+                var scale = shortSide > 0 ? shortSide / targetShortSide : 1;
+
+                if (!Number.isFinite(scale) || scale <= 0) {
+                    scale = 1;
+                }
+
+                return {
+                    width: Math.max(portrait ? 300 : 420, Math.round(displaySize.width / scale)),
+                    height: Math.max(portrait ? 420 : 320, Math.round(displaySize.height / scale))
+                };
+            }
+
+            var cachedViewportSize = gameViewportSize(viewportSize());
+            var viewportUpdateFrame = 0;
+
+            function updateMudclientViewportMetrics() {
+                var displaySize = viewportSize();
+                cachedViewportSize = gameViewportSize(displaySize);
+                document.documentElement.style.setProperty('--mudclient-vx', displaySize.left + 'px');
+                document.documentElement.style.setProperty('--mudclient-vy', displaySize.top + 'px');
+                document.documentElement.style.setProperty('--mudclient-vw', displaySize.width + 'px');
+                document.documentElement.style.setProperty('--mudclient-vh', displaySize.height + 'px');
+                document.documentElement.style.width = displaySize.width + 'px';
+                document.documentElement.style.height = displaySize.height + 'px';
+                document.body.style.width = displaySize.width + 'px';
+                document.body.style.height = displaySize.height + 'px';
+                if (window._mudclientIsBrowserMobile) {
+                    window.scrollTo(0, 0);
+                }
+                return cachedViewportSize;
+            }
+
+            function scheduleViewportUpdate() {
+                if (viewportUpdateFrame) {
+                    return;
+                }
+                viewportUpdateFrame = requestAnimationFrame(function() {
+                    viewportUpdateFrame = 0;
+                    updateMudclientViewportMetrics();
+                    refreshAllKeyboardInputScales();
+                });
+            }
+
+            window._mudclientViewportSize = function() {
+                return cachedViewportSize;
+            };
+
+            updateMudclientViewportMetrics();
+            window.addEventListener('resize', scheduleViewportUpdate);
+            window.addEventListener('orientationchange', function() {
+                setTimeout(scheduleViewportUpdate, 60);
+                setTimeout(scheduleViewportUpdate, 320);
+                setTimeout(scheduleViewportUpdate, 800);
+            });
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', scheduleViewportUpdate);
+                window.visualViewport.addEventListener('scroll', scheduleViewportUpdate);
+            }
+
+            if (loginForm) {
+                loginForm.addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    emscriptenKeyPress(ENTER_KEY_CODE, ENTER_KEY_CODE);
+                });
+            }
 
             function focusCanvas() {
                 keyboardInput.style.left = '-9999px';
@@ -438,6 +1506,76 @@
                 _activeKeyboardInput = null;
                 if (iosKeyboardBtn) iosKeyboardBtn.style.display = 'none';
                 canvas.focus();
+            }
+
+            function displayedCanvasScale() {
+                updateMudclientViewportMetrics();
+                var rect = canvas.getBoundingClientRect();
+                var backingWidth = canvas.width || rect.width || 1;
+                var backingHeight = canvas.height || rect.height || 1;
+                return {
+                    rect: rect,
+                    x: rect.width > 0 ? rect.width / backingWidth : 1,
+                    y: rect.height > 0 ? rect.height / backingHeight : 1
+                };
+            }
+
+            window._mudclientPositionKeyboardInput = function(input, x, y, width, height, isScaled, isRefresh) {
+                if (!input) {
+                    return;
+                }
+
+                var scale = displayedCanvasScale();
+                var baseScale = isScaled ? 2 : 1;
+                var left = scale.rect.left + x * scale.x;
+                var top = scale.rect.top + y * scale.y;
+
+                input.dataset.rawLeft = String(x);
+                input.dataset.rawTop = String(y);
+                input.dataset.rawWidth = String(width);
+                input.dataset.rawHeight = String(height);
+                input.dataset.rawScale = String(baseScale);
+                input.dataset.promptKind = input === passwordInput ? 'password' : 'text';
+                if (!isRefresh) {
+                    input.dataset.promptNonce = String((Number(input.dataset.promptNonce) || 0) + 1);
+                }
+
+                input.style.left = left + 'px';
+                input.style.top = top + 'px';
+                input.style.width = Math.max(width, 160 / Math.max(scale.x, 0.01)) + 'px';
+                input.style.height = Math.max(height, 32 / Math.max(scale.y, 0.01)) + 'px';
+                input.style.transform = 'scale(' + (scale.x * baseScale) + ', ' + (scale.y * baseScale) + ')';
+            };
+
+            function refreshKeyboardInputScale(input) {
+                if (!input || !input.dataset.rawLeft) {
+                    return;
+                }
+
+                window._mudclientPositionKeyboardInput(
+                    input,
+                    Number(input.dataset.rawLeft),
+                    Number(input.dataset.rawTop),
+                    Number(input.dataset.rawWidth),
+                    Number(input.dataset.rawHeight),
+                    Number(input.dataset.rawScale) > 1,
+                    true
+                );
+            }
+
+            function refreshAllKeyboardInputScales() {
+                refreshKeyboardInputScale(keyboardInput);
+                refreshKeyboardInputScale(passwordInput);
+            }
+
+            function applyPendingAutofillFor(input) {
+                if (input !== passwordInput || !pendingAutofillPassword) {
+                    return;
+                }
+
+                passwordInput.value = pendingAutofillPassword;
+                pendingAutofillPassword = '';
+                keyboardInputEvent({ target: passwordInput });
             }
 
             // Hook into the keyboard inputs: poll for when C code positions them.
@@ -451,11 +1589,15 @@
                     if (!isNaN(left) && left >= 0 && parseFloat(el.style.width) > 0) {
                         if (_activeKeyboardInput !== el) {
                             _activeKeyboardInput = el;
-                            if (navigator.maxTouchPoints > 0) {
-                                iosKeyboardBtn.style.display = 'block';
-                                console.log('[keyboard] Input positioned at left=' + left + ', showing tap-to-type');
+                            if (el === keyboardInput) {
+                                lastKeyboardValue = el.value;
+                            } else if (el === passwordInput) {
+                                lastPasswordValue = el.value;
                             }
+                            applyPendingAutofillFor(el);
+                            console.log('[keyboard] Input positioned at left=' + left);
                         }
+                        maybeApplyNativeAutoLogin(el);
                         return;
                     }
                 }
@@ -472,7 +1614,7 @@
                 e.preventDefault();
                 e.stopPropagation();
                 if (_activeKeyboardInput) {
-                    _activeKeyboardInput.focus();
+                    window._mudclientFocusKeyboardInput(_activeKeyboardInput);
                     iosKeyboardBtn.style.display = 'none';
                 }
             });
@@ -480,27 +1622,113 @@
                 e.preventDefault();
                 e.stopPropagation();
                 if (_activeKeyboardInput) {
-                    _activeKeyboardInput.focus();
+                    window._mudclientFocusKeyboardInput(_activeKeyboardInput);
                     iosKeyboardBtn.style.display = 'none';
                 }
             });
 
             function emscriptenKeyPress(code, charCode) {
-                Module.ccall(
-                    'browser_key_pressed',
-                    null,
-                    ['number'],
-                    [code, charCode]
+                try {
+                    Module.ccall(
+                        'browser_key_pressed',
+                        null,
+                        ['number', 'number'],
+                        [code, charCode]
+                    );
+                } catch (err) {
+                    console.error('[keyboard] browser_key_pressed failed', err);
+                }
+            }
+
+            function hasNativeAutoLoginCredentials() {
+                return !!(
+                    nativeAutoLogin &&
+                    nativeAutoLogin.username &&
+                    nativeAutoLogin.password
                 );
             }
 
+            function nativeAutoLoginInProgress() {
+                return !!(
+                    hasNativeAutoLoginCredentials() &&
+                    (!nativeAutoLogin.usernameApplied || !nativeAutoLogin.passwordApplied)
+                );
+            }
+
+            function queueNativeAutoLoginEnter() {
+                setTimeout(function() {
+                    emscriptenKeyPress(ENTER_KEY_CODE, ENTER_KEY_CODE);
+                }, 140);
+            }
+
+            function maybeApplyNativeAutoLogin(input) {
+                if (!hasNativeAutoLoginCredentials() || !input) {
+                    return false;
+                }
+
+                var promptId = (input.dataset.promptKind || 'text') + ':' + (input.dataset.promptNonce || '0');
+                if (nativeAutoLogin.lastPromptId === promptId) {
+                    return false;
+                }
+
+                if (Date.now() - nativeAutoLogin.lastAppliedAt < 120) {
+                    return false;
+                }
+
+                var value = '';
+                var label = '';
+                if (!nativeAutoLogin.usernameApplied) {
+                    value = nativeAutoLogin.username;
+                    label = 'username';
+                    nativeAutoLogin.usernameApplied = true;
+                } else if (!nativeAutoLogin.passwordApplied) {
+                    value = nativeAutoLogin.password;
+                    label = 'password';
+                    nativeAutoLogin.passwordApplied = true;
+                } else {
+                    return false;
+                }
+
+                input.value = value;
+                nativeAutoLogin.lastPromptId = promptId;
+                nativeAutoLogin.lastAppliedAt = Date.now();
+                keyboardInputEvent({ target: input });
+
+                if (label === 'username' || !nativeAutoLogin.submitQueued) {
+                    if (label === 'password') {
+                        nativeAutoLogin.submitQueued = true;
+                    }
+                    queueNativeAutoLoginEnter();
+                }
+
+                console.log('[keyboard] Applied native ' + label + ' on login screen');
+                return true;
+            }
+
             function keyboardInputEvent(event) {
+                if (event.target !== _activeKeyboardInput) {
+                    if (event.target === passwordInput && passwordInput.value) {
+                        pendingAutofillPassword = passwordInput.value;
+                    }
+                    return;
+                }
+
                 for (let i = 0; i < 255; i++) {
                     emscriptenKeyPress(BACKSPACE_KEY_CODE, BACKSPACE_KEY_CODE);
                 }
 
                 for (const character of event.target.value.split('')) {
                     emscriptenKeyPress(-1, character.charCodeAt(0));
+                }
+
+                if (event.target === keyboardInput) {
+                    lastKeyboardValue = keyboardInput.value;
+                    if (passwordInput.value && passwordInput.value !== lastPasswordValue) {
+                        pendingAutofillPassword = passwordInput.value;
+                    }
+                } else if (event.target === passwordInput) {
+                    lastPasswordValue = passwordInput.value;
+                    pendingAutofillPassword = '';
                 }
             }
 
@@ -537,6 +1765,10 @@
             passwordInput.addEventListener('blur', keyboardBlurEvent);
 
             function keyboardFocusEvent(event) {
+                if (event.target === keyboardInput || event.target === passwordInput) {
+                    _activeKeyboardInput = event.target;
+                    applyPendingAutofillFor(event.target);
+                }
                 event.target.selectionStart = event.target.selectionEnd =
                     event.target.value.length;
             }
@@ -549,11 +1781,843 @@
             window._mudclientKeyboard = keyboardInput;
             window._mudclientPassword = passwordInput;
 
-            // Try to lock to landscape on mobile
-            try { screen.orientation.lock("landscape").catch(function(){}); } catch(e) {}
-
             window._mudclientIsTouch =
                 navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+
+            /* ============================================================
+               Mobile game gestures
+               Touch devices do not have arrow keys or a right mouse button.
+               Translate common mobile gestures into the desktop inputs that
+               the original client already understands.
+               ============================================================ */
+            (function() {
+                if (!window._mudclientIsTouch) {
+                    return;
+                }
+
+                document.body.classList.add('mudclient-touch');
+                if (window._mudclientIsBrowserMobile) {
+                    document.body.classList.add('mudclient-browser-fullscreen');
+                }
+
+                var LONG_PRESS_MS = 430;
+                var SWIPE_THRESHOLD = 28;
+                var TAP_MOVE_THRESHOLD = 10;
+                var PINCH_WHEEL_SCALE = 0.85;
+                var BUTTON_WHEEL_DELTA = 84;
+                var CONTROLS_COLLAPSED_KEY = 'mudclient.mobileControlsCollapsed';
+                var CONTROL_POSITIONS_KEY = 'mudclient.mobileControlPositions';
+                var mobileControls = document.getElementById('mobile-controls');
+                var controlsIdleTimer = null;
+                var dragState = null;
+                var lastWheelAt = 0;
+                var wheelRemainder = 0;
+                var touchState = {
+                    mode: null,
+                    startX: 0,
+                    startY: 0,
+                    lastX: 0,
+                    lastY: 0,
+                    lastClientX: 0,
+                    lastClientY: 0,
+                    pinchDistance: 0,
+                    pinchStartDistance: 0,
+                    pinchCenterX: 0,
+                    pinchCenterY: 0,
+                    pinchMoved: false,
+                    activeKey: null,
+                    longPressTimer: null,
+                    longPressed: false
+                };
+                var lastInputBreadcrumbAt = 0;
+
+                function inputBreadcrumb(message, force) {
+                    var now = Date.now();
+                    if (!force && now - lastInputBreadcrumbAt < 700) {
+                        return;
+                    }
+                    lastInputBreadcrumbAt = now;
+                    if (window._mudclientNativeMessage) {
+                        window._mudclientNativeMessage('status', {
+                            level: 'input',
+                            message: message
+                        });
+                    }
+                }
+
+                function setControlsCollapsed(collapsed) {
+                    if (!mobileControls) {
+                        return;
+                    }
+                    mobileControls.classList.toggle('is-collapsed', collapsed);
+                    try {
+                        localStorage.setItem(CONTROLS_COLLAPSED_KEY, collapsed ? '1' : '0');
+                    } catch (err) {}
+                }
+
+                try {
+                    setControlsCollapsed(localStorage.getItem(CONTROLS_COLLAPSED_KEY) === '1');
+                } catch (err) {}
+
+                function readControlPositions() {
+                    try {
+                        return JSON.parse(localStorage.getItem(CONTROL_POSITIONS_KEY) || '{}') || {};
+                    } catch (err) {
+                        return {};
+                    }
+                }
+
+                function writeControlPositions(positions) {
+                    try {
+                        localStorage.setItem(CONTROL_POSITIONS_KEY, JSON.stringify(positions));
+                    } catch (err) {}
+                }
+
+                function controlPanelKey(panel) {
+                    return panel && panel.classList.contains('mobile-actions') ? 'actions' : 'dpad';
+                }
+
+                function viewportBounds() {
+                    var viewport = window.visualViewport;
+                    return {
+                        left: viewport ? viewport.offsetLeft : 0,
+                        top: viewport ? viewport.offsetTop : 0,
+                        width: viewport ? viewport.width : window.innerWidth,
+                        height: viewport ? viewport.height : window.innerHeight
+                    };
+                }
+
+                function clampPanelPosition(panel, x, y) {
+                    var viewport = viewportBounds();
+                    var rect = panel.getBoundingClientRect();
+                    var margin = 8;
+                    var handleAllowance = panel.classList.contains('mobile-actions') ? 48 : 0;
+                    var minX = viewport.left + margin;
+                    var minY = viewport.top + margin + handleAllowance;
+                    var maxX = viewport.left + Math.max(margin, viewport.width - rect.width - margin);
+                    var maxY = viewport.top + Math.max(margin, viewport.height - rect.height - margin);
+                    return {
+                        x: Math.min(Math.max(x, minX), maxX),
+                        y: Math.min(Math.max(y, minY), maxY)
+                    };
+                }
+
+                function setPanelPosition(panel, x, y) {
+                    var position = clampPanelPosition(panel, x, y);
+                    panel.style.left = position.x + 'px';
+                    panel.style.top = position.y + 'px';
+                    panel.style.right = 'auto';
+                    panel.style.bottom = 'auto';
+                    return position;
+                }
+
+                function savePanelPosition(panel) {
+                    if (!panel) {
+                        return;
+                    }
+                    var rect = panel.getBoundingClientRect();
+                    var position = setPanelPosition(panel, rect.left, rect.top);
+                    var positions = readControlPositions();
+                    positions[controlPanelKey(panel)] = position;
+                    writeControlPositions(positions);
+                }
+
+                function restoreControlPositions() {
+                    if (!mobileControls) {
+                        return;
+                    }
+                    var positions = readControlPositions();
+                    [
+                        document.querySelector('.mobile-dpad'),
+                        document.querySelector('.mobile-actions')
+                    ].forEach(function(panel) {
+                        var saved = positions[controlPanelKey(panel)];
+                        if (panel && saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+                            setPanelPosition(panel, saved.x, saved.y);
+                        }
+                    });
+                }
+
+                function clampSavedControlPositions() {
+                    if (!mobileControls) {
+                        return;
+                    }
+                    document.querySelectorAll('#mobile-controls .mobile-dpad, #mobile-controls .mobile-actions')
+                        .forEach(savePanelPosition);
+                }
+
+                function updateViewportHeight() {
+                    if (typeof scheduleViewportUpdate === 'function') {
+                        scheduleViewportUpdate();
+                    }
+                    if (window._mudclientIsBrowserMobile) {
+                        window.scrollTo(0, 0);
+                    }
+                }
+
+                restoreControlPositions();
+                updateViewportHeight();
+                window.addEventListener('resize', updateViewportHeight);
+                window.addEventListener('orientationchange', function() {
+                    setTimeout(updateViewportHeight, 60);
+                    setTimeout(updateViewportHeight, 320);
+                });
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', updateViewportHeight);
+                }
+
+                function wakeControls() {
+                    if (!mobileControls) {
+                        return;
+                    }
+                    mobileControls.classList.remove('is-idle');
+                    if (controlsIdleTimer) {
+                        clearTimeout(controlsIdleTimer);
+                    }
+                    controlsIdleTimer = setTimeout(function() {
+                        mobileControls.classList.add('is-idle');
+                    }, 2600);
+                }
+
+                wakeControls();
+
+                canvas.style.touchAction = 'none';
+                canvas.addEventListener('contextmenu', function(event) {
+                    event.preventDefault();
+                });
+
+                function canvasPoint(clientX, clientY) {
+                    var rect = canvas.getBoundingClientRect();
+                    var backingWidth = canvas.width || rect.width;
+                    var backingHeight = canvas.height || rect.height;
+                    var scaleX = rect.width > 0 ? backingWidth / rect.width : 1;
+                    var scaleY = rect.height > 0 ? backingHeight / rect.height : 1;
+                    return {
+                        x: (clientX - rect.left) * scaleX,
+                        y: (clientY - rect.top) * scaleY,
+                        clientX: clientX,
+                        clientY: clientY
+                    };
+                }
+
+                function haptic(style) {
+                    if (
+                        window.rscNativeConfig &&
+                        window.rscNativeConfig.platform === 'ios'
+                    ) {
+                        return;
+                    }
+
+                    if (
+                        window.webkit &&
+                        window.webkit.messageHandlers &&
+                        window.webkit.messageHandlers.nativeBridge
+                    ) {
+                        window.webkit.messageHandlers.nativeBridge.postMessage({
+                            type: 'haptic',
+                            style: style || 'light'
+                        });
+                    }
+                }
+
+                function dispatchMouse(type, x, y, button) {
+                    if (
+                        !Number.isFinite(x) ||
+                        !Number.isFinite(y) ||
+                        !Number.isFinite(button)
+                    ) {
+                        console.warn('[mudclient] Ignoring invalid synthetic mouse event', type, x, y, button);
+                        return;
+                    }
+
+                    var rect = canvas.getBoundingClientRect();
+                    var backingWidth = canvas.width || rect.width;
+                    var backingHeight = canvas.height || rect.height;
+                    var scaleX = backingWidth > 0 ? rect.width / backingWidth : 1;
+                    var scaleY = backingHeight > 0 ? rect.height / backingHeight : 1;
+                    var clientX = rect.left + x * scaleX;
+                    var clientY = rect.top + y * scaleY;
+                    var event = new MouseEvent(type, {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window,
+                        clientX: clientX,
+                        clientY: clientY,
+                        offsetX: x,
+                        offsetY: y,
+                        screenX: clientX,
+                        screenY: clientY,
+                        button: button,
+                        buttons: type === 'mouseup' ? 0 : 1 << button
+                    });
+                    canvas.dispatchEvent(event);
+                }
+
+                function dispatchKey(type, key, code, keyCode) {
+                    if (!key || !code || !Number.isFinite(keyCode)) {
+                        console.warn('[mudclient] Ignoring invalid synthetic key event', type, key, code, keyCode);
+                        return;
+                    }
+
+                    var event = new KeyboardEvent(type, {
+                        bubbles: true,
+                        cancelable: true,
+                        key: key,
+                        code: code,
+                        keyCode: keyCode,
+                        which: keyCode
+                    });
+                    canvas.dispatchEvent(event);
+                }
+
+                function setActiveKey(nextKey) {
+                    if (!nextKey) {
+                        return;
+                    }
+                    if (touchState.activeKey && touchState.activeKey.keyCode !== nextKey.keyCode) {
+                        releaseActiveKey();
+                    }
+                    if (!touchState.activeKey) {
+                        dispatchKey('keydown', nextKey.key, nextKey.code, nextKey.keyCode);
+                        touchState.activeKey = nextKey;
+                        inputBreadcrumb('keydown ' + nextKey.code, true);
+                    }
+                }
+
+                function releaseActiveKey() {
+                    if (!touchState.activeKey) {
+                        return;
+                    }
+                    dispatchKey(
+                        'keyup',
+                        touchState.activeKey.key,
+                        touchState.activeKey.code,
+                        touchState.activeKey.keyCode
+                    );
+                    inputBreadcrumb('keyup ' + touchState.activeKey.code, true);
+                    touchState.activeKey = null;
+                }
+
+                function keyForDirection(direction) {
+                    switch (direction) {
+                    case 'left':
+                        return { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 };
+                    case 'right':
+                        return { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 };
+                    case 'up':
+                        return { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 };
+                    case 'down':
+                        return { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40 };
+                    default:
+                        return null;
+                    }
+                }
+
+                function keyForSwipe(dx, dy) {
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        return dx < 0
+                            ? { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 }
+                            : { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 };
+                    }
+                    return dy < 0
+                        ? { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
+                        : { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40 };
+                }
+
+                function wheel(deltaY) {
+                    var now = Date.now();
+                    wheelRemainder += deltaY;
+                    if (now - lastWheelAt < 48 && Math.abs(wheelRemainder) < 36) {
+                        return;
+                    }
+                    deltaY = wheelRemainder;
+                    wheelRemainder = 0;
+                    lastWheelAt = now;
+                    canvas.dispatchEvent(new WheelEvent('wheel', {
+                        bubbles: true,
+                        cancelable: true,
+                        deltaY: deltaY
+                    }));
+                    inputBreadcrumb('wheel deltaY=' + Math.round(deltaY));
+                }
+
+                function clearLongPress() {
+                    if (touchState.longPressTimer) {
+                        clearTimeout(touchState.longPressTimer);
+                        touchState.longPressTimer = null;
+                    }
+                }
+
+                function touchPoint(touch) {
+                    var point = canvasPoint(touch.clientX, touch.clientY);
+                    return assistedWelcomeClosePoint(point);
+                }
+
+                function assistedWelcomeClosePoint(point) {
+                    if (
+                        !window.rscNativeConfig ||
+                        window.rscNativeConfig.platform !== 'ios' ||
+                        Date.now() > (window._mudclientWelcomeCloseAssistUntil || 0)
+                    ) {
+                        return point;
+                    }
+
+                    var gameWidth = canvas.width || 0;
+                    var gameHeight = canvas.height || 0;
+                    if (gameWidth <= 0 || gameHeight <= 0) {
+                        return point;
+                    }
+
+                    var dialogHeights = [135, 180];
+                    for (var i = 0; i < dialogHeights.length; i += 1) {
+                        var dialogHeight = dialogHeights[i];
+                        var top = (gameHeight - dialogHeight) / 2;
+                        var closeY = top + dialogHeight - 11;
+                        var left = Math.max(0, (gameWidth - 400) / 2 + 50);
+                        var right = Math.min(gameWidth, (gameWidth - 400) / 2 + 350);
+                        var inHorizontalCloseRange = point.x >= left - 12 && point.x <= right + 12;
+                        var inExpandedCloseBand = point.y >= closeY - 30 && point.y <= closeY + 22;
+
+                        if (inHorizontalCloseRange && inExpandedCloseBand) {
+                            point.x = Math.min(Math.max(point.x, left + 1), right - 1);
+                            point.y = closeY;
+                            if (window._mudclientNativeMessage) {
+                                window._mudclientNativeMessage('status', {
+                                    level: 'touch-assist',
+                                    message: 'Expanded welcome close tap to ' + Math.round(point.x) + ',' + Math.round(point.y)
+                                });
+                            }
+                            return point;
+                        }
+                    }
+
+                    return point;
+                }
+
+                function distance(a, b) {
+                    var dx = a.clientX - b.clientX;
+                    var dy = a.clientY - b.clientY;
+                    return Math.sqrt(dx * dx + dy * dy);
+                }
+
+                function midpoint(a, b) {
+                    return canvasPoint(
+                        (a.clientX + b.clientX) / 2,
+                        (a.clientY + b.clientY) / 2
+                    );
+                }
+
+                function fireRightClick(x, y) {
+                    haptic('medium');
+                    inputBreadcrumb('right-click x=' + Math.round(x) + ' y=' + Math.round(y), true);
+                    dispatchMouse('mousemove', x, y, 2);
+                    dispatchMouse('mousedown', x, y, 2);
+                    dispatchMouse('mouseup', x, y, 2);
+                    var rect = canvas.getBoundingClientRect();
+                    var backingWidth = canvas.width || rect.width;
+                    var backingHeight = canvas.height || rect.height;
+                    canvas.dispatchEvent(new MouseEvent('contextmenu', {
+                        bubbles: true,
+                        cancelable: true,
+                        clientX: rect.left + x * (backingWidth > 0 ? rect.width / backingWidth : 1),
+                        clientY: rect.top + y * (backingHeight > 0 ? rect.height / backingHeight : 1),
+                        button: 2
+                    }));
+                }
+
+                function fireLeftClick(x, y) {
+                    haptic('selection');
+                    inputBreadcrumb('left-click x=' + Math.round(x) + ' y=' + Math.round(y), true);
+                    dispatchMouse('mousemove', x, y, 0);
+                    dispatchMouse('mousedown', x, y, 0);
+                    dispatchMouse('mouseup', x, y, 0);
+                    var rect = canvas.getBoundingClientRect();
+                    var backingWidth = canvas.width || rect.width;
+                    var backingHeight = canvas.height || rect.height;
+                    canvas.dispatchEvent(new MouseEvent('click', {
+                        bubbles: true,
+                        cancelable: true,
+                        clientX: rect.left + x * (backingWidth > 0 ? rect.width / backingWidth : 1),
+                        clientY: rect.top + y * (backingHeight > 0 ? rect.height / backingHeight : 1),
+                        button: 0
+                    }));
+                }
+
+                function centerPoint() {
+                    return {
+                        x: canvas.width / 2,
+                        y: canvas.height / 2
+                    };
+                }
+
+                function showKeyboard() {
+                    if (_activeKeyboardInput) {
+                        window._mudclientFocusKeyboardInput(_activeKeyboardInput);
+                        iosKeyboardBtn.style.display = 'none';
+                    } else {
+                        window._mudclientFocusKeyboardInput(keyboardInput);
+                    }
+                }
+
+                function bindPress(button, onDown, onUp) {
+                    var active = false;
+
+                    function start(event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (active) {
+                            return;
+                        }
+                        active = true;
+                        button.classList.add('is-active');
+                        if (button.getAttribute('data-action') !== 'keyboard') {
+                            focusCanvas();
+                        }
+                        wakeControls();
+                        onDown(event);
+                    }
+
+                    function end(event) {
+                        if (!active) {
+                            return;
+                        }
+                        if (event) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }
+                        active = false;
+                        button.classList.remove('is-active');
+                        if (onUp) {
+                            onUp(event);
+                        }
+                    }
+
+                    if (window.PointerEvent) {
+                        button.addEventListener('pointerdown', start);
+                        button.addEventListener('pointerup', end);
+                        button.addEventListener('pointercancel', end);
+                        button.addEventListener('pointerleave', end);
+                    } else {
+                        button.addEventListener('touchstart', start, { passive: false });
+                        button.addEventListener('touchend', end, { passive: false });
+                        button.addEventListener('touchcancel', end, { passive: false });
+                        button.addEventListener('mousedown', start);
+                        button.addEventListener('mouseup', end);
+                        button.addEventListener('mouseleave', end);
+                    }
+                }
+
+                function bindControlDrag(handle) {
+                    var selector = handle.getAttribute('data-drag-target');
+                    var panel = selector ? document.querySelector(selector) : null;
+
+                    if (!panel) {
+                        return;
+                    }
+
+                    function pointFromEvent(event) {
+                        var source = event.touches && event.touches.length
+                            ? event.touches[0]
+                            : event.changedTouches && event.changedTouches.length
+                                ? event.changedTouches[0]
+                                : event;
+                        return {
+                            x: source.clientX,
+                            y: source.clientY
+                        };
+                    }
+
+                    function start(event) {
+                        var point = pointFromEvent(event);
+                        var rect = panel.getBoundingClientRect();
+
+                        event.preventDefault();
+                        event.stopPropagation();
+                        focusCanvas();
+                        wakeControls();
+                        haptic('selection');
+                        handle.classList.add('is-active');
+
+                        dragState = {
+                            handle: handle,
+                            panel: panel,
+                            pointerId: event.pointerId,
+                            startX: point.x,
+                            startY: point.y,
+                            panelX: rect.left,
+                            panelY: rect.top
+                        };
+
+                        if (handle.setPointerCapture && event.pointerId !== undefined) {
+                            try {
+                                handle.setPointerCapture(event.pointerId);
+                            } catch (err) {}
+                        }
+                    }
+
+                    function move(event) {
+                        if (!dragState || dragState.handle !== handle) {
+                            return;
+                        }
+                        if (
+                            event.pointerId !== undefined &&
+                            dragState.pointerId !== undefined &&
+                            event.pointerId !== dragState.pointerId
+                        ) {
+                            return;
+                        }
+                        var point = pointFromEvent(event);
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setPanelPosition(
+                            dragState.panel,
+                            dragState.panelX + point.x - dragState.startX,
+                            dragState.panelY + point.y - dragState.startY
+                        );
+                    }
+
+                    function end(event) {
+                        if (!dragState || dragState.handle !== handle) {
+                            return;
+                        }
+                        if (
+                            event &&
+                            event.pointerId !== undefined &&
+                            dragState.pointerId !== undefined &&
+                            event.pointerId !== dragState.pointerId
+                        ) {
+                            return;
+                        }
+                        if (event) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }
+                        savePanelPosition(dragState.panel);
+                        handle.classList.remove('is-active');
+                        dragState = null;
+                    }
+
+                    if (window.PointerEvent) {
+                        handle.addEventListener('pointerdown', start);
+                        handle.addEventListener('pointermove', move);
+                        handle.addEventListener('pointerup', end);
+                        handle.addEventListener('pointercancel', end);
+                    } else {
+                        handle.addEventListener('touchstart', start, { passive: false });
+                        handle.addEventListener('touchmove', move, { passive: false });
+                        handle.addEventListener('touchend', end, { passive: false });
+                        handle.addEventListener('touchcancel', end, { passive: false });
+                        handle.addEventListener('mousedown', function(event) {
+                            start(event);
+                            document.addEventListener('mousemove', move);
+                            document.addEventListener('mouseup', function onMouseUp(upEvent) {
+                                document.removeEventListener('mousemove', move);
+                                document.removeEventListener('mouseup', onMouseUp);
+                                end(upEvent);
+                            });
+                        });
+                    }
+                }
+
+                document.querySelectorAll('#mobile-controls [data-drag-target]').forEach(bindControlDrag);
+
+                document.querySelectorAll('#mobile-controls [data-key]').forEach(function(button) {
+                    var key = keyForDirection(button.getAttribute('data-key'));
+                    if (!key) {
+                        return;
+                    }
+                    bindPress(
+                        button,
+                        function() {
+                            haptic('selection');
+                            setActiveKey(key);
+                        },
+                        releaseActiveKey
+                    );
+                });
+
+                document.querySelectorAll('#mobile-controls [data-action]').forEach(function(button) {
+                    var action = button.getAttribute('data-action');
+                    var repeatTimer = null;
+
+                    function stopRepeat() {
+                        if (repeatTimer) {
+                            clearInterval(repeatTimer);
+                            repeatTimer = null;
+                        }
+                    }
+
+                    bindPress(button, function() {
+                        haptic('selection');
+                        if (action === 'zoom-in') {
+                            wheel(-BUTTON_WHEEL_DELTA);
+                            repeatTimer = setInterval(function() {
+                                wheel(-BUTTON_WHEEL_DELTA);
+                            }, 140);
+                        } else if (action === 'zoom-out') {
+                            wheel(BUTTON_WHEEL_DELTA);
+                            repeatTimer = setInterval(function() {
+                                wheel(BUTTON_WHEEL_DELTA);
+                            }, 140);
+                        } else if (action === 'right-click') {
+                            var point = centerPoint();
+                            fireRightClick(point.x, point.y);
+                        } else if (action === 'keyboard') {
+                            inputBreadcrumb('keyboard button', true);
+                            showKeyboard();
+                        } else if (action === 'controls-toggle' && mobileControls) {
+                            inputBreadcrumb('controls-toggle', true);
+                            setControlsCollapsed(!mobileControls.classList.contains('is-collapsed'));
+                        }
+                    }, stopRepeat);
+                });
+
+                function resetTouchState() {
+                    clearLongPress();
+                    releaseActiveKey();
+                    touchState.mode = null;
+                    touchState.pinchDistance = 0;
+                    touchState.pinchStartDistance = 0;
+                    touchState.pinchMoved = false;
+                    touchState.longPressed = false;
+                }
+                window._mudclientReleaseActiveTouchState = resetTouchState;
+
+                canvas.addEventListener('touchstart', function(event) {
+                    focusCanvas();
+                    wakeControls();
+
+                    if (event.touches.length === 2) {
+                        inputBreadcrumb('pinch-start', true);
+                        clearLongPress();
+                        releaseActiveKey();
+                        touchState.mode = 'pinch';
+                        touchState.pinchDistance = distance(event.touches[0], event.touches[1]);
+                        touchState.pinchStartDistance = touchState.pinchDistance;
+                        var center = midpoint(event.touches[0], event.touches[1]);
+                        touchState.pinchCenterX = center.x;
+                        touchState.pinchCenterY = center.y;
+                        touchState.pinchMoved = false;
+                        event.preventDefault();
+                        return;
+                    }
+
+                    if (event.touches.length !== 1) {
+                        return;
+                    }
+
+                    var point = touchPoint(event.touches[0]);
+                    touchState.mode = 'tap';
+                    touchState.startX = point.x;
+                    touchState.startY = point.y;
+                    touchState.lastX = point.x;
+                    touchState.lastY = point.y;
+                    touchState.lastClientX = point.clientX;
+                    touchState.lastClientY = point.clientY;
+                    touchState.longPressed = false;
+                    clearLongPress();
+
+                    touchState.longPressTimer = setTimeout(function() {
+                        touchState.longPressed = true;
+                        inputBreadcrumb('long-press', true);
+                        fireRightClick(touchState.startX, touchState.startY);
+                    }, LONG_PRESS_MS);
+                    event.preventDefault();
+                }, { passive: false });
+
+                canvas.addEventListener('touchmove', function(event) {
+                    if (event.touches.length === 2) {
+                        var nextDistance = distance(event.touches[0], event.touches[1]);
+                        if (touchState.mode !== 'pinch') {
+                            touchState.mode = 'pinch';
+                            touchState.pinchDistance = nextDistance;
+                            clearLongPress();
+                            releaseActiveKey();
+                            event.preventDefault();
+                            return;
+                        }
+
+                        var delta = touchState.pinchDistance - nextDistance;
+                        if (Math.abs(nextDistance - touchState.pinchStartDistance) > 12) {
+                            touchState.pinchMoved = true;
+                        }
+                        touchState.pinchDistance = nextDistance;
+                        wheel(delta * PINCH_WHEEL_SCALE);
+                        event.preventDefault();
+                        return;
+                    }
+
+                    if (event.touches.length !== 1 || !touchState.mode) {
+                        return;
+                    }
+
+                    var point = touchPoint(event.touches[0]);
+                    touchState.lastX = point.x;
+                    touchState.lastY = point.y;
+                    touchState.lastClientX = point.clientX;
+                    touchState.lastClientY = point.clientY;
+
+                    var dx = point.x - touchState.startX;
+                    var dy = point.y - touchState.startY;
+                    var movement = Math.sqrt(dx * dx + dy * dy);
+
+                    if (movement > SWIPE_THRESHOLD) {
+                        clearLongPress();
+                        touchState.mode = 'swipe';
+                        inputBreadcrumb('swipe dx=' + Math.round(dx) + ' dy=' + Math.round(dy), true);
+                        setActiveKey(keyForSwipe(dx, dy));
+                        event.preventDefault();
+                    }
+                }, { passive: false });
+
+                canvas.addEventListener('touchend', function(event) {
+                    if (touchState.mode === 'pinch') {
+                        if (!touchState.pinchMoved) {
+                            fireRightClick(touchState.pinchCenterX, touchState.pinchCenterY);
+                        }
+                        resetTouchState();
+                        event.preventDefault();
+                        return;
+                    }
+
+                    if (touchState.mode === 'swipe') {
+                        resetTouchState();
+                        event.preventDefault();
+                        return;
+                    }
+
+                    clearLongPress();
+                    if (touchState.longPressed) {
+                        resetTouchState();
+                        event.preventDefault();
+                        return;
+                    }
+
+                    if (touchState.mode === 'tap') {
+                        var dx = touchState.lastX - touchState.startX;
+                        var dy = touchState.lastY - touchState.startY;
+                        var movement = Math.sqrt(dx * dx + dy * dy);
+                        if (movement <= TAP_MOVE_THRESHOLD) {
+                            fireLeftClick(touchState.lastX, touchState.lastY);
+                        }
+                        resetTouchState();
+                        event.preventDefault();
+                    }
+                }, { passive: false });
+
+                canvas.addEventListener('touchcancel', function(event) {
+                    resetTouchState();
+                    event.preventDefault();
+                }, { passive: false });
+
+                window.addEventListener('blur', resetTouchState);
+                window.addEventListener('pagehide', resetTouchState);
+                document.addEventListener('visibilitychange', function() {
+                    if (document.hidden) {
+                        resetTouchState();
+                    }
+                });
+            })();
 
             /* ============================================================
                iOS Audio Fix
@@ -596,15 +2660,38 @@
 
             var script = document.createElement('script');
             script.src = "mudclient.js";
+            script.onerror = function() {
+              if (window._mudclientNativeMessage) {
+                window._mudclientNativeMessage('error', {
+                  level: 'error',
+                  message: 'Failed to load mudclient.js'
+                });
+              }
+            };
             document.body.appendChild(script);
 
           }
-          if (!window.WebAssembly || location.search.indexOf('_rwasm=0') > 0) {
+          var isAppleMobile =
+            /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          var shouldLoadWasmFallback =
+            !window.WebAssembly ||
+            (!isAppleMobile && location.search.indexOf('_rwasm=0') > 0);
+
+          if (shouldLoadWasmFallback) {
             // Current browser does not support WebAssembly, load the .wasm.js JavaScript fallback
             // before the main JS runtime.
             var wasm2js = document.createElement('script');
             wasm2js.src = "mudclient.wasm.js";
             wasm2js.onload = loadMainJs;
+            wasm2js.onerror = function() {
+              if (window._mudclientNativeMessage) {
+                window._mudclientNativeMessage('error', {
+                  level: 'error',
+                  message: 'Failed to load mudclient.wasm.js fallback'
+                });
+              }
+            };
             document.body.appendChild(wasm2js);
           } else {
             // Current browser supports Wasm, proceed with loading the main JS runtime.

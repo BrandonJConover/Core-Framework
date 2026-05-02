@@ -42,6 +42,13 @@ public class SqliteGameDatabaseConnection extends JDBCDatabaseConnection {
         }
 
         try {
+            Class.forName("org.sqlite.JDBC");
+        } catch (final ClassNotFoundException e) {
+            LOGGER.catching(e);
+            SystemUtil.exit(1);
+        }
+
+        try {
             connection = DriverManager.getConnection("jdbc:sqlite:" + getDBPath(dbName));
             statement = getConnection().createStatement();
             connected = checkConnection();

@@ -290,6 +290,10 @@ final class RSCWorldState: ObservableObject {
     @Published var inventory: [RSCInventoryItem] = []
     @Published var equipment: [RSCEquipmentSlot] = []
     @Published var equipmentStats: RSCEquipmentStats = RSCEquipmentStats()
+    /// Inventory slot selected by the "Use" command. Java keeps this as
+    /// selectedItemInventoryIndex and consumes it when the next entity/item
+    /// target is chosen.
+    @Published var pendingItemUseSlot: Int? = nil
     @Published var skills: [RSCSkill] = []
     @Published var serverName: String = ""
     @Published var serverWelcomeMessage: String = ""

@@ -16,10 +16,17 @@ struct GameSelectorView: View {
                     Spacer()
 
                     GameCard(
-                        title: "RuneScape Classic",
+                        title: "2001scape",
                         subtitle: "2001 era gameplay",
                         icon: "🗡️",
                         action: { appState.currentView = .serverBrowser(.rsc) }
+                    )
+
+                    GameCard(
+                        title: "2001scape Web",
+                        subtitle: "Bundled web client",
+                        icon: "🌐",
+                        action: { appState.currentView = .serverBrowser(.rscWeb) }
                     )
 
                     GameCard(

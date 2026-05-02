@@ -17,6 +17,8 @@
 set -euo pipefail
 
 # ── Config ────────────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DOMAIN="${DOMAIN:-play.yourdomain.com}"
 RSC_C_DIR="/opt/rsc-c"
 EMSDK_DIR="/opt/emsdk"
@@ -27,6 +29,9 @@ OPENRSC_WS_PORT="43494"
 OPENRSC_TCP_PORT="43594"
 OPENRSC_RSA_EXP="00010001"
 OPENRSC_RSA_MOD="87cef754966ecb19806238d9fecf0f421e816976f74f365c86a584e51049794d41fefbdc5fed3a3ed3b7495ba24262bb7d1dd5d2ff9e306b5bbf5522a2e85b25"
+WORLDLIST_PATCHER="$REPO_ROOT/web-client/worldlist-patch.py"
+WEBCLIENT_PATCHER="$REPO_ROOT/web-client/apply-mobile-patches.py"
+MOBILE_WEBCLIENT_DIR="$REPO_ROOT/iOS_Client/OpenRSC/OpenRSC/Sources/WebClient"
 
 REBUILD=false
 for arg in "$@"; do
@@ -68,25 +73,13 @@ fi
 echo "==> Patching worldlist for $DOMAIN ..."
 WORLDLIST_FILE="$RSC_C_DIR/src/ui/worldlist.c"
 
-# Patch the default world entry (list[0]) to point at OpenRSC
-# Uses sed to replace the host, WS port, and TCP port in worldlist_set_defaults()
-python3 - <<PYEOF
-import re, sys
-
-with open("$WORLDLIST_FILE", "r") as f:
-    src = f.read()
-
-# Replace host
-src = re.sub(
-    r'(strcpy\s*\(\s*list\s*\[\s*0\s*\]\s*\.\s*host\s*,\s*")[^"]*(")',
-    r'\g<1>$DOMAIN\g<2>',
-    src
-)
-
-# Replace port (both USE_WEBSOCKS and TCP paths for list[0])
-# This is a best-effort patch; verify manually if the worldlist structure changes
-print("Worldlist patched.")
-PYEOF
+python3 "$WORLDLIST_PATCHER" \
+  --file "$WORLDLIST_FILE" \
+  --host "$DOMAIN" \
+  --ws-port "$OPENRSC_WS_PORT" \
+  --tcp-port "$OPENRSC_TCP_PORT" \
+  --rsa-exp "$OPENRSC_RSA_EXP" \
+  --rsa-mod "$OPENRSC_RSA_MOD"
 
 # ── 4. Sync cache ─────────────────────────────────────────────────────────────
 echo "==> Syncing game cache ..."
@@ -105,6 +98,14 @@ fi
 if [ "$REBUILD" = true ] || [ ! -f "$RSC_C_DIR/mudclient.html" ]; then
   echo "==> Building WebAssembly client (this takes ~5 minutes) ..."
   cd "$RSC_C_DIR"
+  if grep -q -- "-s MAX_WEBGL_VERSION=2" Makefile.emscripten && ! grep -q -- "-s MIN_WEBGL_VERSION=2" Makefile.emscripten; then
+    echo "==> Pinning Emscripten to WebGL 2 for iOS/Safari shader compatibility ..."
+    sed -i 's/-s MAX_WEBGL_VERSION=2/-s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2/' Makefile.emscripten
+  fi
+  if grep -q -- "-s INITIAL_MEMORY=30MB" Makefile.emscripten; then
+    echo "==> Raising initial WASM memory to avoid Safari heap growth stalls ..."
+    sed -i 's/-s INITIAL_MEMORY=30MB/-s INITIAL_MEMORY=64MB/' Makefile.emscripten
+  fi
   source "$EMSDK_DIR/emsdk_env.sh"
   make -f Makefile.emscripten clean
   make -f Makefile.emscripten
@@ -122,7 +123,13 @@ for f in mudclient.html mudclient.js mudclient.wasm mudclient.data; do
 done
 echo "==> All build artifacts present."
 
-# ── 6. Nginx config ───────────────────────────────────────────────────────────
+# ── 6. Apply mobile web-client shell ──────────────────────────────────────────
+echo "==> Applying mobile web-client HTML and JavaScript patches ..."
+python3 "$WEBCLIENT_PATCHER" \
+  --rsc-c-dir "$RSC_C_DIR" \
+  --source-web-client "$MOBILE_WEBCLIENT_DIR"
+
+# ── 7. Nginx config ───────────────────────────────────────────────────────────
 echo "==> Writing nginx config ..."
 cat > /etc/nginx/sites-available/openrsc-web <<NGINX
 server {
@@ -154,13 +161,26 @@ server {
         add_header Cross-Origin-Embedder-Policy "require-corp" always;
     }
 
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-
-    # Cache large data file aggressively (only changes on rebuild)
-    location ~* \\.data$ {
-        expires 7d;
+	    location / {
+	        try_files \$uri \$uri/ =404;
+	    }
+	
+	    # Keep hosted browsers on the same TLS origin for Safari/iOS.
+	    location /rsc-ws {
+	        proxy_pass http://127.0.0.1:$OPENRSC_WS_PORT/;
+	        proxy_http_version 1.1;
+	        proxy_set_header Upgrade \$http_upgrade;
+	        proxy_set_header Connection "Upgrade";
+	        proxy_set_header Host \$host;
+	        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+	        proxy_read_timeout 86400;
+	        proxy_send_timeout 86400;
+	        proxy_buffering off;
+	    }
+	
+	    # Cache large data file aggressively (only changes on rebuild)
+	    location ~* \\.data$ {
+	        expires 7d;
         add_header Cache-Control "public, immutable";
         add_header Cross-Origin-Opener-Policy "same-origin" always;
         add_header Cross-Origin-Embedder-Policy "require-corp" always;
@@ -170,7 +190,7 @@ NGINX
 
 ln -sf /etc/nginx/sites-available/openrsc-web /etc/nginx/sites-enabled/openrsc-web
 
-# ── 7. SSL certificate ────────────────────────────────────────────────────────
+# ── 8. SSL certificate ────────────────────────────────────────────────────────
 if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ]; then
   echo "==> Obtaining Let's Encrypt certificate for $DOMAIN ..."
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "admin@$DOMAIN" || {
@@ -181,7 +201,7 @@ else
   echo "==> SSL certificate already exists for $DOMAIN"
 fi
 
-# ── 8. Enable and reload nginx ────────────────────────────────────────────────
+# ── 9. Enable and reload nginx ────────────────────────────────────────────────
 nginx -t
 systemctl enable nginx
 systemctl reload nginx

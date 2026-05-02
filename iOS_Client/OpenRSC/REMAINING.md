@@ -76,7 +76,7 @@ Must report `BUILD SUCCEEDED`. iPhone 15 Pro device: `Brick the 15th`, id `00008
 ## Bigger structural gaps (multi-iteration)
 
 - [ ] 3D models for trees / buildings / doors: `ModelArchiveLoader.shared` is in the avoid list and currently a stub. Game objects render as colored blocks instead of RSModels. Real port needs the .ob3 format reader + per-tile elevation blending in Scene; deferred behind the texture-port plan.
-- [ ] Use-item-on-X workflow: long-press shows "Use" but tapping it does nothing — there's no follow-up inventory picker, so the second item never gets selected. Need a transient "select target" mode that consumes the next entity tap.
+- [x] Use-item-on-X workflow: long-press shows "Use" but tapping it does nothing — there's no follow-up inventory picker, so the second item never gets selected. Need a transient "select target" mode that consumes the next entity tap. _("Use" now arms `pendingItemUseSlot` like Java's `selectedItemInventoryIndex`; inventory item-on-item, NPC, player, ground-item, and object targets consume it with the matching Java opcodes.)_
 - [ ] Bank/Trade/Duel/Shop interaction wiring: panels exist (avoid-listed) but the deposit/withdraw/accept/stake actions don't all fire the corresponding server packets yet. Audit each panel for missing engine calls.
 - [ ] Camera occlusion: Java pulls the camera in when geometry blocks line-of-sight to the player. Currently the iOS camera clips through walls.
 

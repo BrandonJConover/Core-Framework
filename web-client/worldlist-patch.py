@@ -50,6 +50,23 @@ def patch(src: str, host: str, ws_port: int, tcp_port: int, rsa_exp: str, rsa_mo
     return src
 
 
+def verify(src: str, host: str, ws_port: int, tcp_port: int, rsa_exp: str, rsa_mod: str) -> list[str]:
+    missing = []
+    checks = {
+        "host": host,
+        "ws-port": str(ws_port),
+        "tcp-port": str(tcp_port),
+        "rsa-exp": rsa_exp,
+        "rsa-mod": rsa_mod,
+    }
+
+    for label, value in checks.items():
+        if value not in src:
+            missing.append(label)
+
+    return missing
+
+
 def main():
     parser = argparse.ArgumentParser(description="Patch rsc-c worldlist.c for a custom server")
     parser.add_argument("--file",    default="src/ui/worldlist.c", help="Path to worldlist.c")
@@ -69,6 +86,15 @@ def main():
         sys.exit(1)
 
     patched = patch(src, args.host, args.ws_port, args.tcp_port, args.rsa_exp, args.rsa_mod)
+    missing = verify(patched, args.host, args.ws_port, args.tcp_port, args.rsa_exp, args.rsa_mod)
+
+    if missing:
+        print(
+            "ERROR: worldlist patch verification failed; missing "
+            + ", ".join(missing),
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     if args.dry_run:
         print(patched)
@@ -79,6 +105,8 @@ def main():
         print(f"  host:    {args.host}")
         print(f"  ws-port: {args.ws_port}")
         print(f"  tcp-port:{args.tcp_port}")
+        print(f"  rsa-exp: {args.rsa_exp}")
+        print(f"  rsa-mod: {args.rsa_mod[:12]}...{args.rsa_mod[-12:]}")
 
 
 if __name__ == "__main__":

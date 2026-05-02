@@ -353,6 +353,16 @@ export class GameShell {
         ];
     }
 
+    private getMouseCanvasCoords(mouseevent: MouseEvent): [number, number] {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.width / rect.width;
+        const scaleY = this.height / rect.height;
+        return [
+            ((mouseevent.clientX - rect.left) * scaleX) | 0,
+            ((mouseevent.clientY - rect.top) * scaleY) | 0
+        ];
+    }
+
     private touchDistance(first: Touch, second: Touch): number {
         const dx = first.clientX - second.clientX;
         const dy = first.clientY - second.clientY;
@@ -519,8 +529,7 @@ export class GameShell {
     }
 
     public mousePressed(mouseevent: MouseEvent) {
-        let mouseX: number = mouseevent.offsetX;
-        let mouseY: number = mouseevent.offsetY;
+        let [mouseX, mouseY] = this.getMouseCanvasCoords(mouseevent);
 
         this.idleTime = 0;
         this.eventClickX = mouseX;
@@ -554,15 +563,14 @@ export class GameShell {
     }
 
     public mouseDragged(mouseevent: DragEvent) {
-        let mouseX: number = mouseevent.offsetX;
-        let mouseY: number = mouseevent.offsetY;
+        let [mouseX, mouseY] = this.getMouseCanvasCoords(mouseevent);
 
         if (this.mouseWheelDown) {
-            mouseY = this.mouseWheelX - mouseevent.x;
-            const k: number = this.mouseWheelY - mouseevent.y;
-            this.mouseWheelDragged(mouseY, -k);
-            this.mouseWheelX = mouseevent.x;
-            this.mouseWheelY = mouseevent.y;
+            const deltaX: number = this.mouseWheelX - mouseX;
+            const deltaY: number = this.mouseWheelY - mouseY;
+            this.mouseWheelDragged(deltaX, -deltaY);
+            this.mouseWheelX = mouseX;
+            this.mouseWheelY = mouseY;
             return;
         }
         this.idleTime = 0;
@@ -573,8 +581,7 @@ export class GameShell {
     public mouseWheelDragged(param1: number, param2: number) {}
 
     public mouseMoved(mouseevent: MouseEvent) {
-        let mouseX: number = mouseevent.offsetX;
-        let mouseY: number = mouseevent.offsetY;
+        let [mouseX, mouseY] = this.getMouseCanvasCoords(mouseevent);
         
         this.idleTime = 0;
         this.mouseX = mouseX;

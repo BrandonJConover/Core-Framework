@@ -17,7 +17,8 @@ upstream peers and modifications overwrite cleanly.
 Root-level upstream client patches live in `client-patch/root/` and are copied
 with the same mirror semantics onto `client/`. This currently patches
 `index.html` (for the legacy `window.__exports` global expected by the Parcel
-bundle) and the tiny Rust/WASM crate so local builds work on modern Rust.
+bundle and mobile viewport metadata), the React page shell, and the tiny
+Rust/WASM crate so local builds work on modern Rust.
 
 ```
 client-patch/osrs/

@@ -108,11 +108,20 @@ public final class ApiServer {
         LOGGER.info("API listener stopped");
     }
 
+    /** Header name used to communicate the channel's remote address from the
+     *  request handler down to endpoints. Always overwritten by the server
+     *  before dispatch; never trusted from the client. */
+    public static final String INTERNAL_REMOTE_ADDR_HEADER = "X-Server-RemoteAddr";
+
     /** Wires endpoint handlers into a router. Add new endpoints here. */
     private static HttpRouter buildRouter(Server server) {
         StatusEndpoint status = new StatusEndpoint(server);
         JwtUtil jwt = new JwtUtil(server.getName());
-        AuthEndpoint auth = new AuthEndpoint(server, jwt);
+        // Anti-brute-force: 10 login attempts per IP per 60 seconds.
+        // Generous enough that legitimate retries (typo, autocomplete) won't
+        // trip; tight enough that automated guessers stall fast.
+        RateLimiter loginLimiter = new RateLimiter(60_000L, 10);
+        AuthEndpoint auth = new AuthEndpoint(server, jwt, loginLimiter);
         WhoamiEndpoint whoami = new WhoamiEndpoint(jwt);
         OnlinePlayersEndpoint online = new OnlinePlayersEndpoint(server);
         CharacterEndpoint character = new CharacterEndpoint(server);
@@ -136,6 +145,19 @@ public final class ApiServer {
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
+            // Stamp the channel's remote address onto the request as an
+            // internal-only header. RateLimiter / endpoint code reads from
+            // this rather than ctx so the dispatch signature stays simple.
+            // Overwrite any value the client may have sent.
+            java.net.SocketAddress addr = ctx.channel().remoteAddress();
+            String remote = addr != null ? addr.toString() : "unknown";
+            // InetSocketAddress.toString prints "/127.0.0.1:50823"; strip
+            // leading slash + trailing port for a cleaner identity string.
+            if (remote.startsWith("/")) remote = remote.substring(1);
+            int colon = remote.lastIndexOf(':');
+            if (colon > 0) remote = remote.substring(0, colon);
+            request.headers().set(INTERNAL_REMOTE_ADDR_HEADER, remote);
+
             FullHttpResponse response = router.dispatch(request);
             ctx.writeAndFlush(response).addListener(io.netty.channel.ChannelFutureListener.CLOSE);
         }

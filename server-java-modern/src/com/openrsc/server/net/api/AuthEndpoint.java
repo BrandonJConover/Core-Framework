@@ -42,13 +42,28 @@ public final class AuthEndpoint {
 
     private final Server server;
     private final JwtUtil jwt;
+    private final RateLimiter limiter;
 
-    public AuthEndpoint(Server server, JwtUtil jwt) {
+    public AuthEndpoint(Server server, JwtUtil jwt, RateLimiter limiter) {
         this.server = server;
         this.jwt = jwt;
+        this.limiter = limiter;
     }
 
     public FullHttpResponse handle(FullHttpRequest request) {
+        // Rate-limit by caller IP first — anti-brute-force. Cheaper than parsing
+        // a body, returns 429 with Retry-After hint so well-behaved clients can
+        // back off without frustrating users typing slowly.
+        String fallback = request.headers().get(ApiServer.INTERNAL_REMOTE_ADDR_HEADER);
+        String identity = RateLimiter.identify(request, fallback);
+        if (!limiter.allow(identity)) {
+            long retryMs = limiter.retryAfterMs(identity);
+            FullHttpResponse resp = JsonHandler.error(HttpResponseStatus.TOO_MANY_REQUESTS,
+                "too many login attempts, slow down");
+            resp.headers().set("Retry-After", Math.max(1L, (retryMs + 999L) / 1000L));
+            return resp;
+        }
+
         // Parse the body first; bad JSON -> 400.
         LoginRequest req;
         try {

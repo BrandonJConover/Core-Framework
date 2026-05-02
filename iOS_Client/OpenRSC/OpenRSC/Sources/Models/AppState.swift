@@ -5,6 +5,7 @@ enum AppView {
     case selector
     case serverBrowser(GameType)
     case login(ServerProfile)
+    case webGame(ServerProfile, String?, String?)
     case game(ServerProfile, String, String)  // server, username, password
 }
 
@@ -17,10 +18,24 @@ final class AppState: ObservableObject {
     @Published var servers: [ServerProfile] = {
         if let data = UserDefaults.standard.data(forKey: "savedServers"),
            let decoded = try? JSONDecoder().decode([ServerProfile].self, from: data) {
-            return decoded
+            return AppState.withDefaultServers(decoded)
         }
-        return [ServerProfile.openRSCDefault]
+        return AppState.withDefaultServers([])
     }()
+
+    private static func withDefaultServers(_ savedServers: [ServerProfile]) -> [ServerProfile] {
+        var servers = savedServers
+
+        if !servers.contains(where: { $0.gameType == .rsc }) {
+            servers.append(.openRSCDefault)
+        }
+
+        if !servers.contains(where: { $0.gameType == .rscWeb }) {
+            servers.append(.openRSCWebDefault)
+        }
+
+        return servers
+    }
 
     func saveServers() {
         if let encoded = try? JSONEncoder().encode(servers) {

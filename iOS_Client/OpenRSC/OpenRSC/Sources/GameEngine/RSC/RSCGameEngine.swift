@@ -1584,6 +1584,66 @@ final class RSCGameEngine: ObservableObject {
         return best
     }
 
+    private func nearestNPC(toX x: Int, z: Int) -> RSCNPC? {
+        var nearest: RSCNPC? = nil
+        var nearestDist = Int.max
+        for npc in worldState.npcs {
+            let dx = npc.x - x
+            let dz = npc.y - z
+            let dist = dx * dx + dz * dz
+            if dist < nearestDist && dist <= 4 {
+                nearestDist = dist
+                nearest = npc
+            }
+        }
+        return nearest
+    }
+
+    private func nearestPlayer(toX x: Int, z: Int) -> RSCPlayer? {
+        var nearest: RSCPlayer? = nil
+        var nearestDist = Int.max
+        for player in worldState.players {
+            let dx = player.x - x
+            let dz = player.y - z
+            let dist = dx * dx + dz * dz
+            if dist < nearestDist && dist <= 4 {
+                nearestDist = dist
+                nearest = player
+            }
+        }
+        return nearest
+    }
+
+    private func nearestGroundItem(toX x: Int, z: Int) -> RSCGroundItem? {
+        var nearest: RSCGroundItem? = nil
+        var nearestDist = Int.max
+        for item in worldState.groundItems {
+            let dx = item.x - x
+            let dz = item.y - z
+            let dist = dx * dx + dz * dz
+            if dist < nearestDist && dist <= 4 {
+                nearestDist = dist
+                nearest = item
+            }
+        }
+        return nearest
+    }
+
+    private func nearestGameObject(toX x: Int, z: Int) -> RSCGameObject? {
+        var nearest: RSCGameObject? = nil
+        var nearestDist = Int.max
+        for object in worldState.gameObjects {
+            let dx = object.x - x
+            let dz = object.y - z
+            let dist = dx * dx + dz * dz
+            if dist < nearestDist && dist <= 4 {
+                nearestDist = dist
+                nearest = object
+            }
+        }
+        return nearest
+    }
+
     @discardableResult
     private func sendWalkPath(toX destX: Int, toZ destZ: Int, walkToEntity: Bool) async -> [(x: Int, z: Int)] {
         let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
@@ -1625,17 +1685,32 @@ final class RSCGameEngine: ObservableObject {
         let destX = target.x
         let destZ = target.z
 
-        // Check if tap is near an NPC (within 2 tiles)
-        var nearestNPC: RSCNPC? = nil
-        var nearestDist = Int.max
-        for npc in worldState.npcs {
-            let dx = npc.x - destX
-            let dz = npc.y - destZ
-            let dist = dx * dx + dz * dz
-            if dist < nearestDist && dist <= 4 { // within 2 tiles
-                nearestDist = dist
-                nearestNPC = npc
+        let targetNPC = nearestNPC(toX: destX, z: destZ)
+        let targetPlayer = nearestPlayer(toX: destX, z: destZ)
+        let targetGroundItem = nearestGroundItem(toX: destX, z: destZ)
+        let targetObject = nearestGameObject(toX: destX, z: destZ)
+
+        // Item-use target mode — armed by inventory "Use". The next tap on a
+        // world entity consumes the pending item instead of doing default walk
+        // or talk behavior.
+        if let itemSlot = worldState.pendingItemUseSlot {
+            worldState.pendingItemUseSlot = nil
+            if let npc = targetNPC {
+                print("[Input] Use item slot \(itemSlot) on NPC \(npc.id)")
+                useItemOnNPC(slot: itemSlot, serverIndex: npc.id)
+            } else if let player = targetPlayer {
+                print("[Input] Use item slot \(itemSlot) on player \(player.id)")
+                useItemOnPlayer(slot: itemSlot, serverIndex: player.id)
+            } else if let item = targetGroundItem {
+                print("[Input] Use item slot \(itemSlot) on ground item \(item.itemId)")
+                useItemOnGroundItem(slot: itemSlot, x: item.x, z: item.y, itemId: item.itemId)
+            } else if let object = targetObject {
+                print("[Input] Use item slot \(itemSlot) on object \(object.objectId)")
+                useItemOnObject(slot: itemSlot, x: object.x, z: object.y)
+            } else {
+                worldState.addChat(sender: "[Use]", text: "No target selected.")
             }
+            return
         }
 
         // Spell-cast target mode — armed by SpellbookPanel / MagicPanelView.
@@ -1643,18 +1718,11 @@ final class RSCGameEngine: ObservableObject {
         // triggering walk/talk. Resolve in priority: NPC > player > ground.
         if let spellId = worldState.pendingSpellId {
             worldState.pendingSpellId = nil
-            if let npc = nearestNPC {
+            if let npc = targetNPC {
                 print("[Input] Cast spell \(spellId) on NPC \(npc.id)")
                 castSpellOnNPC(spellId: spellId, npcServerIndex: npc.id)
             } else {
-                var nearestPlayer: RSCPlayer? = nil
-                var nearestPlayerDist = Int.max
-                for p in worldState.players {
-                    let pdx = p.x - destX; let pdz = p.y - destZ
-                    let pd = pdx * pdx + pdz * pdz
-                    if pd < nearestPlayerDist && pd <= 4 { nearestPlayerDist = pd; nearestPlayer = p }
-                }
-                if let player = nearestPlayer {
+                if let player = targetPlayer {
                     print("[Input] Cast spell \(spellId) on player \(player.id)")
                     castSpellOnPlayer(spellId: spellId, playerServerIndex: player.id)
                 } else {
@@ -1665,7 +1733,7 @@ final class RSCGameEngine: ObservableObject {
             return
         }
 
-        if let npc = nearestNPC {
+        if let npc = targetNPC {
             // Tap near NPC → talk to it
             print("[Input] Talk to NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
             Task {
@@ -1706,6 +1774,10 @@ final class RSCGameEngine: ObservableObject {
 
         var actions: [(label: String, icon: String, action: () -> Void)] = []
         var title = "(\(worldX), \(worldZ))"
+        let pendingItemSlot = worldState.pendingItemUseSlot
+        let pendingItemName = pendingItemSlot
+            .flatMap { slot in worldState.inventory.first(where: { $0.id == slot })?.itemId }
+            .map { ItemNames.name(for: $0) } ?? "item"
 
         // Check NPCs (within 2 tiles). Always offer Examine; offer Attack only
         // for combat-eligible NPCs (NPCDef.attackable == true).
@@ -1714,6 +1786,11 @@ final class RSCGameEngine: ObservableObject {
             let distSq: Int = dx * dx + dz * dz
             if distSq <= 4 {
                 title = npc.name
+                if let pendingItemSlot {
+                    actions.append(("Use \(pendingItemName) with \(npc.name)", "hand.point.up.left", { [weak self] in
+                        self?.useItemOnNPC(slot: pendingItemSlot, serverIndex: npc.id)
+                    }))
+                }
                 actions.append(("Talk to \(npc.name)", "bubble.left", { [weak self] in
                     self?.talkToNPC(serverIndex: npc.id)
                 }))
@@ -1749,6 +1826,11 @@ final class RSCGameEngine: ObservableObject {
             let pdx: Int = player.x - worldX; let pdz: Int = player.y - worldZ
             if pdx * pdx + pdz * pdz <= 4 {
                 title = player.name
+                if let pendingItemSlot {
+                    actions.append(("Use \(pendingItemName) with \(player.name)", "hand.point.up.left", { [weak self] in
+                        self?.useItemOnPlayer(slot: pendingItemSlot, serverIndex: player.id)
+                    }))
+                }
                 actions.append(("Attack \(player.name)", "bolt.fill", { [weak self] in
                     self?.attackPlayer(serverIndex: player.id)
                 }))
@@ -1774,6 +1856,11 @@ final class RSCGameEngine: ObservableObject {
             if idx * idx + idz * idz <= 4 {
                 let itemName = ItemNames.name(for: item.itemId)
                 title = itemName
+                if let pendingItemSlot {
+                    actions.append(("Use \(pendingItemName) with \(itemName)", "hand.point.up.left", { [weak self] in
+                        self?.useItemOnGroundItem(slot: pendingItemSlot, x: item.x, z: item.y, itemId: item.itemId)
+                    }))
+                }
                 actions.append(("Take \(itemName)", "arrow.down.circle", { [weak self] in
                     self?.pickupGroundItem(x: item.x, y: item.y, itemId: item.itemId)
                 }))
@@ -1790,6 +1877,11 @@ final class RSCGameEngine: ObservableObject {
                 title = objName
                 let command1 = def?.command1.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let command2 = def?.command2.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if let pendingItemSlot {
+                    actions.append(("Use \(pendingItemName) with \(objName)", "hand.point.up.left", { [weak self] in
+                        self?.useItemOnObject(slot: pendingItemSlot, x: obj.x, z: obj.y)
+                    }))
+                }
                 if !command1.isEmpty && command1.lowercased() != "walkto" && command1.lowercased() != "null" {
                     actions.append(("\(command1) \(objName)", "hand.tap", { [weak self] in
                         self?.objectAction1(x: obj.x, z: obj.y)
@@ -1963,12 +2055,91 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func useItem(slot: Int) {
+        if let pending = worldState.pendingItemUseSlot {
+            if pending == slot {
+                cancelItemUse()
+            } else {
+                useItemOnItem(slot1: pending, slot2: slot)
+            }
+            return
+        }
+
+        worldState.pendingSpellId = nil
+        worldState.pendingItemUseSlot = slot
+        if let item = worldState.inventory.first(where: { $0.id == slot }) {
+            worldState.addChat(sender: "[Use]", text: "Select a target for \(ItemNames.name(for: item.itemId))")
+        }
+    }
+
+    func cancelItemUse() {
+        worldState.pendingItemUseSlot = nil
+        worldState.addChat(sender: "[Use]", text: "Cancelled")
+    }
+
+    private func clearPendingItemUse() {
+        worldState.pendingItemUseSlot = nil
+    }
+
+    func itemUseLabel(for slot: Int?) -> String {
+        guard let slot,
+              let item = worldState.inventory.first(where: { $0.id == slot }) else {
+            return "item"
+        }
+        return ItemNames.name(for: item.itemId)
+    }
+
+    func useItemOnNPC(slot: Int, serverIndex: Int) {
         Task {
+            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemCommand.rawValue))
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnNpc.rawValue))
+            buf.putShort(serverIndex)
             buf.putShort(slot)
-            let data = buf.finishPacket()
-            try? await connection.send(data)
+            try? await connection.send(buf.finishPacket())
+            clearPendingItemUse()
+        }
+    }
+
+    func useItemOnPlayer(slot: Int, serverIndex: Int) {
+        Task {
+            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
+            }
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.playerUseItem.rawValue))
+            buf.putShort(serverIndex)
+            buf.putShort(slot)
+            try? await connection.send(buf.finishPacket())
+            clearPendingItemUse()
+        }
+    }
+
+    func useItemOnGroundItem(slot: Int, x: Int, z: Int, itemId: Int) {
+        Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnGround.rawValue))
+            buf.putShort(x)
+            buf.putShort(z)
+            buf.putShort(itemId)
+            buf.putShort(slot)
+            try? await connection.send(buf.finishPacket())
+            clearPendingItemUse()
+        }
+    }
+
+    func useItemOnObject(slot: Int, x: Int, z: Int) {
+        Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnObject.rawValue))
+            buf.putShort(x)
+            buf.putShort(z)
+            buf.putShort(slot)
+            try? await connection.send(buf.finishPacket())
+            clearPendingItemUse()
         }
     }
 
@@ -1990,6 +2161,7 @@ final class RSCGameEngine: ObservableObject {
             buf.putShort(slot1)
             buf.putShort(slot2)
             try? await connection.send(buf.finishPacket())
+            clearPendingItemUse()
         }
     }
 
