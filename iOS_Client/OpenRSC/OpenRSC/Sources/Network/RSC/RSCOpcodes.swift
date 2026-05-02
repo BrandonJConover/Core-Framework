@@ -53,6 +53,8 @@ enum RSCOutOpcode: UInt8 {
     case castOnSelf         = 137
     case castOnItem         = 4
     case castOnLand         = 158
+    case castOnGroundItem   = 249
+    case castOnObject       = 99
     case castOnNpc          = 50
     case castOnPlayer       = 229
     case prayerOn           = 60

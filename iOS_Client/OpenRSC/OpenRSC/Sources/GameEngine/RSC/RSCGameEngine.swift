@@ -1839,20 +1839,25 @@ final class RSCGameEngine: ObservableObject {
 
         // Spell-cast target mode — armed by SpellbookPanel / MagicPanelView.
         // The next world tap is consumed as the spell target instead of
-        // triggering walk/talk. Resolve in priority: NPC > player > ground.
+        // triggering walk/talk. Resolve specific entities before falling back
+        // to a bare land cast.
         if let spellId = worldState.pendingSpellId {
             worldState.pendingSpellId = nil
             if let npc = targetNPC {
                 print("[Input] Cast spell \(spellId) on NPC \(npc.id)")
                 castSpellOnNPC(spellId: spellId, npcServerIndex: npc.id)
+            } else if let player = targetPlayer {
+                print("[Input] Cast spell \(spellId) on player \(player.id)")
+                castSpellOnPlayer(spellId: spellId, playerServerIndex: player.id)
+            } else if let item = targetGroundItem {
+                print("[Input] Cast spell \(spellId) on ground item \(item.itemId)")
+                castSpellOnGroundItem(spellId: spellId, x: item.x, z: item.y, itemId: item.itemId)
+            } else if let object = targetObject {
+                print("[Input] Cast spell \(spellId) on object \(object.objectId)")
+                castSpellOnObject(spellId: spellId, x: object.x, z: object.y)
             } else {
-                if let player = targetPlayer {
-                    print("[Input] Cast spell \(spellId) on player \(player.id)")
-                    castSpellOnPlayer(spellId: spellId, playerServerIndex: player.id)
-                } else {
-                    print("[Input] Cast spell \(spellId) on ground (\(destX),\(destZ))")
-                    castSpellOnGround(spellId: spellId, x: destX, z: destZ)
-                }
+                print("[Input] Cast spell \(spellId) on ground (\(destX),\(destZ))")
+                castSpellOnGround(spellId: spellId, x: destX, z: destZ)
             }
             return
         }
@@ -2469,6 +2474,31 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnPlayer.rawValue))
             buf.putShort(spellId)
             buf.putShort(playerServerIndex)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func castSpellOnGroundItem(spellId: Int, x: Int, z: Int, itemId: Int) {
+        Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.castOnGroundItem.rawValue))
+            buf.putShort(spellId)
+            buf.putShort(x)
+            buf.putShort(z)
+            buf.putShort(itemId)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func castSpellOnObject(spellId: Int, x: Int, z: Int) {
+        Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.castOnObject.rawValue))
+            buf.putShort(spellId)
+            buf.putShort(x)
+            buf.putShort(z)
             try? await connection.send(buf.finishPacket())
         }
     }
