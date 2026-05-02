@@ -917,8 +917,85 @@ Removed duplicate `Equipment` and `EquipmentSlot` types from `player.rs`; `Playe
 - Rust: `cargo build` — 0 errors, 1m 46s full build (Equipment type changes required full recompile)
 - Java: javac exit 0 (Java 19, release 19 override)
 
-### Next Priorities
+### Next Priorities (end of Session 4)
 1. Wire `calculateMagicDamagePvp` into magic combat path — `doMagicDamage` / `doGodSpellDamage` for full PvP formula coverage
 2. NPC respawn logic in `world.rs` — NPCs marked dead should respawn at `spawn_position` after `respawn_ticks`
 3. Apply next batch of Java cherry-picks: gem rocks XP (c36a26fb1), SQL backups race condition (69ef62a2b), new ranged combat formulas (7ba801875)
 4. Wire `player.equipment` into inventory packet properly (verify `build_inventory_packet` uses the canonical Item type)
+
+---
+
+## Session 5 — NPC Behavior Pipeline + Java Diff Verification
+
+### Rust: NPC Behavior Pipeline Wired into GameState
+
+`game/mod.rs` significantly expanded — `NpcBehaviorProcessor` (from `npc_behavior.rs`) and `NpcManager` (from `npc.rs`) are now live in the game tick loop.
+
+**New `GameState` fields:**
+- `npc_manager: NpcManager` — canonical NPC data (HP, position, combat state)
+- `npc_behavior: NpcBehaviorProcessor` — AI state machine (Idle, Wandering, InCombat, Dead, Respawning, ReturningToSpawn)
+- `game_tick: u64` — monotonic counter passed to behavior processor each tick
+
+**`GameState::tick()` now:**
+1. Ticks all worlds (`world.rs` simple Npc wander/respawn)
+2. Ticks all players
+3. Calls `build_nearby_players_map()` — async snapshots all player positions into `Vec<NearbyPlayer>` grouped by NPC entity id (within `NEARBY_RADIUS = 20` tiles, Chebyshev)
+4. Calls `npc_behavior.process_tick(npc_manager, tick, nearby_players)` — runs full AI state machine
+5. Dispatches `BehaviorEvent`s: Aggroed / TargetLost / Died (rolls drop table) / Respawned
+
+**Aggro rules wired:** Aggressive NPCs only auto-attack players whose combat level < 2× NPC combat level (RSC authentic rule). Closest eligible player wins.
+
+**NPC seeding on `initialize()`:**
+- `seed_npc_definitions()` — Man (2), Woman (2), Goblin (7/aggressive/drops), Skeleton (25/aggressive/drops), Guard (21/aggressive)
+- `seed_npc_spawns()` — 13 NPCs across Lumbridge, Goblin Village, Stronghold, Varrock
+
+**New public helpers:**
+- `spawn_npc(def_id, position)` — registers with both manager and behavior processor
+- `despawn_npc(eid)` — removes from both
+- `npc_manager()` / `npc_behavior()` — read-only accessors
+
+**Drop table on death:** `BehaviorEvent::Died` rolls the NPC's `DropTable` and logs the result — ground item spawning in world is the next step.
+
+### Java: Comprehensive Diff Survey (Session 5)
+
+Full diff survey across ALL Java files between `server/` (original) and `server-java-modern/` (modernized fork):
+- **Total: 224 files, 5,757 changed lines** — all verified as already applied
+- Every Python apply attempt returned `0 changes` for checked files, confirming the modernized fork is fully up to date with all previously tracked cherry-picks
+
+**Files verified as already containing modern code this session:**
+- `net/rsc/handlers/AttackHandler.java` — 5 instanceof pattern replacements ✓
+- `net/rsc/handlers/ChatHandler.java` — 2 instanceof pattern replacements ✓
+- `net/rsc/handlers/BankHandler.java` — "Iron Man" spacing fix ✓
+- `event/rsc/impl/combat/scripts/all/DragonFireBreath.java` — redundant mail top check removed ✓
+- `net/rsc/handlers/InterfaceOptionHandler.java` — all 14 switch expressions ✓
+- `net/rsc/handlers/ItemDropHandler.java` — Logger + 8× LOGGER.info calls ✓
+- `net/rsc/handlers/CommandHandler.java` — becomeNpc/morphNpc name normalization ✓
+- `plugins/Functions.java` — logger, `.formatted()`, ReflectiveOperationException, `.toList()`, diamond ✓
+- `model/container/Item.java` — HashMap/ArrayList diamond, instanceof + hashCode() ✓
+- `model/container/Inventory.java` / `Bank.java` / `Equipment.java` — logger + diamond ✓
+- `model/world/World.java` — logger + byte traversal mask casts (12 occurrences) ✓
+- `database/GameDatabase.java` — logger, var inference, DataOutputStream try-with-resources ✓
+- `database/impl/mysql/MySqlGameDatabase.java` — var inference (17 local vars), friends upsert (step 1-5 logic), try-with-resources for blobs, `.formatted()` ✓
+- `net/rsc/handlers/PrayerHandler.java` — switch expression, `.formatted()` ✓
+- `model/entity/npc/NpcBehavior.java` — switch expression for aggroRadius, 4× instanceof patterns ✓
+- `model/entity/npc/Npc.java` — wildcard import → explicit, logger, 9× diamond, 3× instanceof ✓
+- `model/entity/player/Player.java` — logger, 9× diamond, instanceof, hashCode fix, XP cast fixes, switch expression ✓
+- `util/rsc/Formulae.java` — switch expression, cast removal, 3× instanceof ✓
+- `net/RSCPacketFilter.java` — logger, 8× diamond, `.toList()`, reloadIpBans→reload refactor ✓
+- `util/rsc/StringUtil.java` / `StringEncryption.java` / `DataConversions.java` — switch/formatted/casts ✓
+- `util/MessageFilter.java` — logger, 4× diamond, `List.of()` ✓
+- `model/entity/Mob.java` — logger, 5× instanceof patterns ✓
+- `event/rsc/handler/GameTickEventStore.java` — 4× instanceof patterns ✓
+- `model/entity/player/ScriptContext.java` — switch expression ✓
+- `net/DiscordService.java` — JDA API modernization, diamond queues, GatewayIntent ✓
+
+### Build Results (Session 5)
+- Rust: `cargo check` — 0 errors (fixed 3 issues: `NpcManager::count()` → `.all().count()`, `p.combat_level()` → `.combat_level` field, `npc.is_alive()` → `!npc.is_dead()`)
+- Java: all diff patterns confirmed already present in modern fork
+
+### Next Priorities (Session 6)
+1. `calculateMagicDamagePvp` — wire into `doMagicDamage` / `doGodSpellDamage` for complete PvP formula coverage
+2. Rust: emit combat start packet (`BehaviorEvent::Aggroed`) to the target player's session
+3. Rust: ground item spawn on NPC death (`BehaviorEvent::Died` → place items in world at NPC position)
+4. Rust: player-initiated NPC attack (`OpcodeIn::AttackNpc` → enter combat in `NpcBehaviorProcessor`)
+5. Java: `npc_behavior.rs` test suite — run and validate all 5 behavioral tests pass

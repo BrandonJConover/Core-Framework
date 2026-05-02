@@ -35,10 +35,15 @@ impl World {
     pub async fn tick(&mut self) {
         self.tick_count += 1;
 
-        // Process NPCs
-        for (id, npc) in &mut self.npcs {
-            npc.tick();
+        // Process live NPCs
+        for (_id, npc) in &mut self.npcs {
+            if npc.is_alive() {
+                npc.tick();
+            }
         }
+
+        // Respawn dead NPCs whose timer has expired
+        self.process_npc_respawns();
 
         // Process ground item timers
         self.process_ground_items();
@@ -125,6 +130,24 @@ impl World {
     }
 
     /// Current world tick counter.
+    fn process_npc_respawns(&mut self) {
+        let current_tick = self.tick_count;
+        for (_id, npc) in &mut self.npcs {
+            if let Some(death_tick) = npc.dead_since_tick {
+                if current_tick >= death_tick + npc.respawn_ticks as u64 {
+                    // Respawn: restore HP, return to spawn point, clear death flag
+                    npc.current_hits = npc.max_hits;
+                    npc.position = npc.spawn_position;
+                    npc.direction = Direction::South;
+                    npc.moved_this_tick = false;
+                    npc.in_combat = false;
+                    npc.dead_since_tick = None;
+                    info!("NPC {} respawned at spawn position", npc.definition_id);
+                }
+            }
+        }
+    }
+
     pub fn tick_count(&self) -> u64 {
         self.tick_count
     }
@@ -180,6 +203,8 @@ pub struct Npc {
     pub wander_radius: u32,
     /// Set `true` by the walk logic for the duration of one tick then cleared.
     pub moved_this_tick: bool,
+    /// Tick on which this NPC died; `None` if the NPC is alive.
+    pub dead_since_tick: Option<u64>,
 }
 
 impl Npc {
@@ -195,6 +220,7 @@ impl Npc {
             respawn_ticks: 100,
             wander_radius: 5,
             moved_this_tick: false,
+            dead_since_tick: None,
         }
     }
 
@@ -238,18 +264,32 @@ impl Npc {
         }
     }
 
+    /// Apply damage. Returns `true` if the NPC has just been reduced to 0 HP.
+    /// The caller is responsible for calling `die(tick)` when this returns true.
     pub fn take_damage(&mut self, damage: u32) -> bool {
         if damage >= self.current_hits {
             self.current_hits = 0;
-            true // NPC died
+            true
         } else {
             self.current_hits -= damage;
             false
         }
     }
 
+    /// Mark the NPC as dead, recording the tick on which it died.
+    pub fn die(&mut self, current_tick: u64) {
+        self.current_hits = 0;
+        self.dead_since_tick = Some(current_tick);
+        self.in_combat = false;
+    }
+
     pub fn is_dead(&self) -> bool {
-        self.current_hits == 0
+        self.dead_since_tick.is_some()
+    }
+
+    /// True if the NPC is alive and visible to players.
+    pub fn is_alive(&self) -> bool {
+        self.dead_since_tick.is_none()
     }
 }
 
