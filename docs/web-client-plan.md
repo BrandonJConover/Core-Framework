@@ -94,6 +94,12 @@ Currently stubbed; fully deferred until Tiers 5–7 are in:
 - [ ] BAS skeletal transforms (BAS data is decoded; transform application is still TODO).
 - [ ] `SoundBank` + PCM mixer (rt4 `Sound`/`SoundBank`/`SoundPcmStream`/`SoundPlayer` chain).
 
+## Music streaming (Tier 10)
+
+- [x] rt4 Song container → standard MIDI extraction pipeline for idx6, plus manifest generation. Local probe converted 668 cache groups into valid `MThd` MIDI files. _(064fdb786)_
+- [x] Manifest-backed `MusicPlayer` with WebAudio crossfade, `MIDI_SONG` (4), `MIDI_JINGLE` (208), and `Preferences.musicMuted` fade-out wiring. _(640b6eb2)_
+- [ ] Generate and commit/ship the OGG catalog after installing FluidSynth + a GM soundfont. `convert-music.sh` is ready, but this machine currently has `ffmpeg` only; `fluidsynth` is missing.
+
 ## Goal
 
 Deploy a browser-playable OpenRSC web client on the Hetzner VPS so players can connect without installing anything. The client uses `rsc-c` compiled to WebAssembly via Emscripten, served over HTTPS/WSS.
