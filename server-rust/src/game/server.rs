@@ -183,6 +183,12 @@ impl ServerState {
                 }
                 self.handle_command(session, packet).await
             }
+            OpcodeIn::GROUND_ITEM_TAKE => {
+                if session_state != SessionState::LoggedIn {
+                    return HandleResult::Continue;
+                }
+                self.handle_take_ground_item(session, packet).await
+            }
             OpcodeIn::PrivateMessage => {
                 if session_state != SessionState::LoggedIn {
                     return HandleResult::Continue;
@@ -621,6 +627,71 @@ impl ServerState {
             }
             _ => {
                 s.message(&format!("Unknown command: {}", parts[0])).await;
+            }
+        }
+
+        HandleResult::Continue
+    }
+
+    /// Handle ground item pickup.
+    async fn handle_take_ground_item(
+        &mut self,
+        session: Arc<RwLock<Session>>,
+        packet: Packet,
+    ) -> HandleResult {
+        let mut reader = PacketReader::new(&packet);
+        let x = match reader.read_short() {
+            Ok(v) => v as u16,
+            Err(_) => return HandleResult::Continue,
+        };
+        let y = match reader.read_short() {
+            Ok(v) => v as u16,
+            Err(_) => return HandleResult::Continue,
+        };
+        let item_id = match reader.read_short() {
+            Ok(v) => v as u32,
+            Err(_) => return HandleResult::Continue,
+        };
+
+        let (session_id, player_pos) = {
+            let s = session.read().await;
+            let Some(ref player) = s.player else {
+                return HandleResult::Continue;
+            };
+            let p = player.read().await;
+            (s.id, p.position)
+        };
+
+        if player_pos.x != x as i32 || player_pos.y != y as i32 {
+            debug!(
+                session = session_id,
+                item = item_id,
+                x = x,
+                y = y,
+                "Ignored ground-item pickup at stale position"
+            );
+            return HandleResult::Continue;
+        }
+
+        if let Some(world_arc) = self.game.get_world("Main World") {
+            let mut world = world_arc.write().await;
+            if let Some(item) = world.pickup_item(Position::new(x as i32, y as i32), item_id) {
+                debug!(
+                    session = session_id,
+                    item = item.item_id,
+                    amount = item.amount,
+                    x = x,
+                    y = y,
+                    "Player picked up ground item"
+                );
+            } else {
+                debug!(
+                    session = session_id,
+                    item = item_id,
+                    x = x,
+                    y = y,
+                    "Ground item pickup failed"
+                );
             }
         }
 
