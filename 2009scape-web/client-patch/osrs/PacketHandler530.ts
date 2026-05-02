@@ -14,6 +14,7 @@ import { ChatFilterSettings } from "./util/ChatFilterSettings";
 import { ClanState, PrivateMessage } from "./util/PrivateMessageQueue";
 import { SoundPlayer } from "./sound/SoundPlayer";
 import { MusicPlayer } from "./sound/MusicPlayer";
+import { InterfaceList } from "./InterfaceList";
 import Long from "long";
 
 export class PacketHandler530 {
@@ -905,6 +906,9 @@ export class PacketHandler530 {
     static recordIfUpdate(game: any, kind: string, compId: number, payload: any) {
         if (game && game.recordIfUpdate) {
             game.recordIfUpdate(kind, compId, payload);
+        }
+        if (compId !== 0) {
+            InterfaceList.applyUpdate(game, kind, compId, payload);
         }
     }
 
@@ -2182,6 +2186,12 @@ export class PacketHandler530 {
         const windowId = this.ig2add(buf);
         const type = this.g1s(buf);
         const packetCount = this.ig2add(buf);
+        if (game) {
+            game.windowPaneId = windowId;
+            game.windowPaneType = type;
+            game.windowPanePacketCount = packetCount;
+        }
+        InterfaceList.openModal(windowId, windowId << 16);
         return true;
     }
 }
