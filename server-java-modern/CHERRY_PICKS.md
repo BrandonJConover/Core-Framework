@@ -715,3 +715,59 @@ Added missing `getMagicSkills()` + `getPrayerSkills()` methods to Skills.java. U
 - **Diamond operator cleanup:** 229 sites remaining
 - **var keyword:** 802 sites remaining
 - **Virtual threads for IO-heavy paths:** Login, DB writes, network
+
+---
+
+## May 2, 2026 — Rust Server: Build Fix + Protocol Completion + GameStateUpdater Wiring
+
+### Rust Server Build Fix
+- **Issue:** OpenSSL not found (`openssl-sys` built by reqwest/redis/etcd-client)
+- **Fix:** Installed `pkg-config` + `openssl` system dependencies via Nix
+- **Follow-on:** `etcd-client v0.12.4` requires protobuf compiler — installed `protobuf` Nix package
+- **schema.rs fix:** `match` arms returned `MySqlQueryResult` vs `SqliteQueryResult` — unified with `.map(|_| ())`
+- **Result:** `cargo build` completes successfully (~54s cold, ~4s incremental). 967 warnings, 0 errors.
+
+### Rust Protocol: All Six Legacy Revisions Ported
+Completed the `server-rust/src/protocol/legacy/` module — all authentic RSC client revisions now have full opcode tables:
+
+| New file | Revision | Key additions over predecessor |
+|----------|----------|-------------------------------|
+| `v38.rs` | mudclient38 | Earliest RSC; no duel/banking/prayer |
+| `v69.rs` | mudclient69 | Same byte table as v38 (delegates to it) |
+| `v115.rs` | mudclient115 | Duel, banking, prayer, FORGOT_PASSWORD |
+| `v177.rs` | mudclient177 | NPC_COMMAND (195), SLEEPWORD (193), REPORT_ABUSE (51), new WALK_TO_POINT byte (194) |
+| `v235.rs` | mudclient235 | Post-2009 retro-revival; RSC175 SecuritySettings creates 4 conflict bytes (4, 8, 197, 247) |
+
+`v235.rs` includes both a static `decode()` (logged-in path for conflict bytes) and a `decode_with_context()` function that accepts `is_logged_in`, `packet_len`, and `duel_active` for full Java-matching runtime disambiguation.
+
+Updated `legacy/mod.rs`:
+- Added `V177` variant to `ProtocolVersion` enum
+- Added `revision()` → `u32` and `from_revision(u32)` → `Option<Self>` helpers
+- Wired all 7 revisions into `decode_opcode()` dispatch
+- Added `decode_opcode_with_context()` for v235 conflict-byte callers
+
+### Rust Server: Full GameStateUpdater Wiring
+`server.rs::send_entity_updates()` now uses the fully-implemented `GameStateUpdater` (1080-line `state_updater.rs`) instead of the simple single-player coords packet:
+
+**Changes to `ServerState`:**
+- Added `use crate::game::state_updater::{GameStateUpdater, KnownEntityList, PlayerSnapshot}`
+- Added `known_lists: HashMap<u64, (KnownEntityList, KnownEntityList)>` field — per-session known-entity tracking lazily created on first tick
+- `handle_logout()` now calls `self.known_lists.remove(&session_id)` to prevent memory leaks
+
+**New `send_entity_updates(&mut self)` pipeline (2 passes):**
+1. Read-pass: collect `PlayerSnapshot` from every `LoggedIn` session (position, direction, moved_this_tick, appearance_changed)
+2. Per-session: retrieve/create KnownEntityList pair → `GameStateUpdater::generate_updates()` → convert `game::protocol::Packet` → `crate::protocol::Packet` → send. NPC/object/ground-item slices passed empty until world-state snapshot API lands.
+3. After send: `appearance_changed` cleared on player via `try_write()` (non-blocking, best-effort)
+
+### Java: NpcDrops TODO Cleanup
+Removed 4 stale TODO comments from `NpcDrops.java` where the implementation was already present:
+- `TODO CHAOS DRUID DOUBLE HERB DROP` → replaced with implementation note (11/128 double-drop table already coded)
+- Two `TODO: Fix up drop table` on Chaos Druid Warrior (555) and Salarin the Twisted (567) → replaced with sub-table presence note
+- `TODO: FIND REAL RATES, THESE ARE COPIED FROM GOBLIN LEVEL 13` → replaced with audit note (rates unchanged, need replay research)
+
+### Next Priorities (carry forward)
+1. PVP combat formula (ca6343c16) — requires PVPCombatFormulaType enum + ServerConfiguration changes
+2. Draining spell behavior (5ab866ebe) — SpellHandler changes
+3. Wire NPC snapshot collection into `send_entity_updates()` once NPC spawning produces a snapshot API
+4. Wire appearance encoding (`appearance::build_appearance_data`) into PlayerSnapshot so appearance packets go out correctly
+5. Fix 967 Rust warnings (77 auto-fixable via `cargo fix`)
