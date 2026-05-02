@@ -72,6 +72,7 @@ use tracing::{debug, info, warn};
 
 use npc::{DropEntry, DropTable, NpcDef, NpcManager};
 use npc_behavior::{BehaviorEvent, NearbyPlayer, NpcBehaviorProcessor};
+use world::GroundItem;
 
 pub use player::Player;
 pub use world::World;
@@ -244,7 +245,11 @@ impl GameState {
     }
 
     /// Process a single game tick.
-    pub async fn tick(&mut self) {
+    ///
+    /// Returns a `Vec<BehaviorEvent>` so the caller (`ServerState::tick`)
+    /// can dispatch any events that require session access (e.g. sending
+    /// aggro notification packets to individual players).
+    pub async fn tick(&mut self) -> Vec<BehaviorEvent> {
         self.game_tick += 1;
         let tick = self.game_tick;
 
@@ -269,9 +274,11 @@ impl GameState {
             .npc_behavior
             .process_tick(&mut self.npc_manager, tick, &nearby_players);
 
-        // --- Phase 4: Dispatch behavior events ---
+        // --- Phase 4: Handle events that need game-state writes (ground items).
+        //     Events that need session access are forwarded to the caller.
+        let mut pending = Vec::with_capacity(events.len());
         for event in events {
-            match event {
+            match &event {
                 BehaviorEvent::Aggroed { entity_id, target_id } => {
                     debug!(
                         tick,
@@ -279,7 +286,8 @@ impl GameState {
                         player = target_id,
                         "NPC aggroed player"
                     );
-                    // TODO: enqueue CombatStart packet for the target session.
+                    // Forward to ServerState so the player session can be notified.
+                    pending.push(event);
                 }
                 BehaviorEvent::TargetLost { entity_id, target_id } => {
                     debug!(
@@ -288,12 +296,14 @@ impl GameState {
                         player = target_id,
                         "NPC lost combat target"
                     );
+                    pending.push(event);
                 }
                 BehaviorEvent::Died { entity_id } => {
                     debug!(tick, npc = ?entity_id, "NPC died");
-                    // TODO: roll drop table and place ground items.
-                    if let Some(npc) = self.npc_manager.get(entity_id) {
+                    // Roll the drop table and spawn ground items in the world.
+                    let drop_result = if let Some(npc) = self.npc_manager.get(*entity_id) {
                         let def_id = npc.def_id;
+                        let position = npc.position;
                         if let Some(table) = self.npc_manager.get_drop_table(def_id) {
                             let drops = table.roll();
                             debug!(
@@ -303,15 +313,43 @@ impl GameState {
                                 drops = ?drops,
                                 "NPC drop table rolled"
                             );
-                            // TODO: spawn ground items at npc.position in the world.
+                            Some((position, drops))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    // Spawn each dropped item in the world's ground-item map.
+                    // roll() returns Vec<(item_id, amount, noted)>.
+                    if let Some((position, drops)) = drop_result {
+                        if let Some(world_arc) = self.worlds.get("Main World") {
+                            let mut world = world_arc.write().await;
+                            for (item_id, amount, _noted) in &drops {
+                                let ground_item = GroundItem::new(*item_id, *amount)
+                                    .with_owner(*entity_id, tick + 200);
+                                world.drop_item(position, ground_item);
+                                debug!(
+                                    item = item_id,
+                                    amount = amount,
+                                    x = position.x,
+                                    y = position.y,
+                                    "Spawned ground item from NPC death"
+                                );
+                            }
                         }
                     }
+                    pending.push(event);
                 }
                 BehaviorEvent::Respawned { entity_id } => {
                     debug!(tick, npc = ?entity_id, "NPC respawned");
+                    pending.push(event);
                 }
             }
         }
+
+        pending
     }
 
     /// Build a `nearby_players` map keyed by NPC `EntityId`.
@@ -414,5 +452,10 @@ impl GameState {
     /// Borrow the NPC behavior processor.
     pub fn npc_behavior(&self) -> &NpcBehaviorProcessor {
         &self.npc_behavior
+    }
+
+    /// Mutably borrow the NPC behavior processor (for entering/exiting combat).
+    pub fn npc_behavior_mut(&mut self) -> &mut NpcBehaviorProcessor {
+        &mut self.npc_behavior
     }
 }

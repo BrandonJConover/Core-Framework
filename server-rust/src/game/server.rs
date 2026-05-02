@@ -88,8 +88,35 @@ impl ServerState {
             debug!("Session {} timed out", session_id);
         }
 
-        // Phase 2: Update game state (worlds, NPCs, timers)
-        self.game.tick().await;
+        // Phase 2: Update game state (worlds, NPCs, timers).
+        // game.tick() returns behavior events that need session access to dispatch.
+        let behavior_events = self.game.tick().await;
+
+        // Phase 2b: Dispatch behavior events that need session packets.
+        for event in behavior_events {
+            use crate::game::npc_behavior::BehaviorEvent;
+            match event {
+                BehaviorEvent::Aggroed { entity_id, target_id } => {
+                    // Send "you are under attack" notification to the targeted player.
+                    // Visual combat stance is driven by entity-update sprites; this
+                    // message gives the player immediate feedback.
+                    if let Some(session) = self.sessions.get_session(target_id) {
+                        let s = session.read().await;
+                        s.message("You are under attack!").await;
+                        debug!(npc = ?entity_id, player = target_id, "Sent aggro message to player session");
+                    }
+                }
+                BehaviorEvent::TargetLost { entity_id, target_id } => {
+                    debug!(npc = ?entity_id, player = target_id, "NPC lost combat target");
+                }
+                BehaviorEvent::Died { entity_id } => {
+                    debug!(npc = ?entity_id, "NPC died — ground items already spawned in game.tick()");
+                }
+                BehaviorEvent::Respawned { entity_id } => {
+                    debug!(npc = ?entity_id, "NPC respawned");
+                }
+            }
+        }
 
         // Phase 3: Send entity updates to all logged-in sessions
         self.send_entity_updates().await;
@@ -162,14 +189,17 @@ impl ServerState {
                 }
                 self.handle_private_message(session, packet).await
             }
-            OpcodeIn::AttackNpc | OpcodeIn::AttackPlayer => {
+            OpcodeIn::AttackNpc => {
                 if session_state != SessionState::LoggedIn {
                     return HandleResult::Continue;
                 }
-                // Combat is intentionally unimplemented in this revision — the
-                // Rust port is targeted at protocol+tick benchmarking, not
-                // gameplay parity. Java server remains authoritative for combat.
-                debug!("attack opcode {:?} dropped (combat not implemented)", opcode);
+                self.handle_attack_npc(session, packet).await
+            }
+            OpcodeIn::AttackPlayer => {
+                if session_state != SessionState::LoggedIn {
+                    return HandleResult::Continue;
+                }
+                debug!("player attack opcode received (not implemented)");
                 HandleResult::Continue
             }
             _ => {
@@ -356,6 +386,64 @@ impl ServerState {
 
         info!("Session {} logged out", session_id);
         HandleResult::Disconnect
+    }
+
+    /// Handle NPC attack packet.
+    ///
+    /// RSC wire format: `[short: npc_index]`
+    /// `npc_index` is the sequential index assigned in `send_entity_updates`
+    /// (world NPC list enumerated in insertion order).
+    async fn handle_attack_npc(
+        &mut self,
+        session: Arc<RwLock<Session>>,
+        packet: Packet,
+    ) -> HandleResult {
+        let mut reader = PacketReader::new(&packet);
+        let npc_index = match reader.read_short() {
+            Ok(v) => v as usize,
+            Err(_) => return HandleResult::Continue,
+        };
+
+        // Get the player's session_id (used as target_id in the behavior layer).
+        let session_id = {
+            let s = session.read().await;
+            s.id
+        };
+
+        // Look up the NPC entity_id at the given index from the world's NPC list.
+        let npc_entity_id = if let Some(world_arc) = self.game.get_world("Main World") {
+            let world = world_arc.read().await;
+            world
+                .npcs
+                .iter()
+                .enumerate()
+                .find(|(idx, _)| *idx == npc_index)
+                .map(|(_, (eid, _))| *eid)
+        } else {
+            None
+        };
+
+        let npc_entity_id = match npc_entity_id {
+            Some(id) => id,
+            None => {
+                debug!(npc_index, "AttackNpc: no NPC at index");
+                return HandleResult::Continue;
+            }
+        };
+
+        // Enter combat in the NPC behavior processor.
+        self.game.npc_behavior_mut().enter_combat(npc_entity_id, session_id);
+        info!(
+            session = session_id,
+            npc = ?npc_entity_id,
+            "Player initiated attack on NPC"
+        );
+
+        // Acknowledge to the attacking player.
+        let s = session.read().await;
+        s.message("You attack!").await;
+
+        HandleResult::Continue
     }
 
     /// Handle walk packet.
