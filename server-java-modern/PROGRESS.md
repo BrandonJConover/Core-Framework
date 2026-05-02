@@ -3,7 +3,50 @@
 ## Overview
 `server-java-modern/` is a Java 21+ modernized variant of the OpenRSC server running parallel to the legacy Java 8 `server/` directory. This document tracks progress toward feature parity with the upstream develop branch.
 
-## Current Status (April 27, 2026)
+## Current Status (May 1, 2026)
+
+### Modern client REST API — complete
+
+A full HTTPS-friendly JSON API for non-game-tick traffic (launchers, web
+clients, third-party tools) lives at `src/com/openrsc/server/net/api/`.
+Listens on port 43595 alongside the existing TCP (43594) and WS (43494)
+game protocol. Designed to be reverse-proxied behind nginx; see
+`nginx-ssl.conf.template` for the production config.
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/status` | GET | Server up/playerCount/uptime/tick latency |
+| `/healthz` | GET | LB-probe alias for status |
+| `/api/auth/login` | POST | Username/password → JWT (rate-limited 10/60s/IP) |
+| `/api/auth/whoami` | GET | Verify Bearer token → return claims |
+| `/api/players/online` | GET | Public list of online players (filters invisibles) |
+| `/api/character/{username}` | GET | Public profile w/ skills (online OR offline) |
+
+**Key infrastructure files:**
+- `JsonHandler` — Jackson ↔ Netty bridge
+- `HttpRouter` — exact-match + `{var}` path-param routing
+- `ApiServer` — Netty bootstrap + lifecycle
+- `JwtUtil` — HMAC256 signer/verifier; secret persisted to `.jwt-secret`
+- `RateLimiter` — sliding-window per-IP limiter
+
+**Tests:** `./api_test.sh` runs 14 endpoint scenarios covering status codes,
+JSON shape, auth round-trip, and rate-limit behavior. 19/19 assertions
+passing as of May 1, 2026.
+
+**Dependencies added:** `lib/java-jwt-4.4.0.jar` (Auth0, 64KB, zero
+transitive deps). No new framework — uses Netty's existing `HttpServerCodec`.
+
+### Remaining work for the modern-client effort
+
+| Item | Effort | Why deferred |
+|---|---|---|
+| nginx + Let's Encrypt cert in production | Operational | Requires deploying to your VPS; out-of-band of this codebase |
+| `ActionSender` event-emitter refactor | ~2 weeks | Heaviest piece. Splits packet serialization from event emission so the modern WS-JSON gameplay protocol on `/ws/v2` can hook the same events as the binary backend. |
+| iOS native client integration | iOS-side work | The server side now exposes everything the iOS app needs (auth + player list + profile). |
+| Token revocation / blacklist | Optional | JWT is stateless; true revocation needs a revocation cache. Acceptable for 24h tokens. |
+| `/api/character/{username}` over the wire to web clients | Front-end work | Server-side is done; client integration is a 2009scape-web concern. |
+
+## Earlier status (April 27, 2026)
 
 ### Round 2 modernization — Java 11→21 idiom upgrades (now on develop)
 

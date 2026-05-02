@@ -1,7 +1,6 @@
 package com.openrsc.server.net.api;
 
 import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpHeaderNames;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,7 +92,10 @@ public final class RateLimiter {
 
     /** Extract a caller identity from the request, preferring forwarded headers. */
     public static String identify(FullHttpRequest req, String fallbackRemoteAddr) {
-        String fwd = req.headers().get(HttpHeaderNames.X_FORWARDED_FOR);
+        // X-Forwarded-For isn't an enum constant in Netty 4.1's HttpHeaderNames
+        // (it's a non-standard header), so use the literal name. nginx + most
+        // CDNs set it; we trust the leftmost entry as the original client.
+        String fwd = req.headers().get("X-Forwarded-For");
         if (fwd != null && !fwd.isBlank()) {
             // X-Forwarded-For: client, proxy1, proxy2 — first entry is the original client.
             int comma = fwd.indexOf(',');
