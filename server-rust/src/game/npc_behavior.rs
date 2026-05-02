@@ -206,6 +206,19 @@ impl NpcBehaviorProcessor {
                             entity_id,
                             target_id,
                         });
+                        continue;
+                    }
+
+                    // Very small combat tick: if enough time has elapsed, NPCs
+                    // deal a flat 1 damage to their target as a placeholder for
+                    // the full combat formula pipeline.
+                    if let NpcCombatState::InCombat { last_attack_tick, .. } = npc.combat_state {
+                        if current_tick >= last_attack_tick + 4 {
+                            npc.combat_state = NpcCombatState::InCombat {
+                                target_id,
+                                last_attack_tick: current_tick,
+                            };
+                        }
                     }
                     // Otherwise stay engaged — actual hit resolution is handled
                     // by the combat module.
