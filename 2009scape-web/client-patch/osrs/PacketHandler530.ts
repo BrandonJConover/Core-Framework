@@ -101,6 +101,9 @@ export class PacketHandler530 {
             case 207: return this.handleInterfaceAnimateRotate(buf, game); // INTERFACE_ANIMATE_ROTATE
             case 209: return this.handleGameFrameUnk(game);              // GAME_FRAME_UNK
             case 220: return this.handleIfSetScrollPos(buf, game);       // IF_SETSCROLLPOS
+            case 42:  return this.handleUrlOpen(buf, size, game);         // URL_OPEN
+            case 111: return this.handleGenerateChatHeadFromBody(buf, game); // GENERATE_CHAT_HEAD_FROM_BODY
+            case 114: return this.handleReflectionCheatCheck(buf, size, game); // REFLECTION_CHEAT_CHECK
 
             // State update packets with real handlers
             case 13:  return this.handleTeleportLocalPlayer(buf, game); // TELEPORT_LOCAL_PLAYER
@@ -955,6 +958,42 @@ export class PacketHandler530 {
         const tracknum = this.g2add(buf);
         const target = this.img4(buf);
         this.recordIfUpdate(game, "SWITCH_WIDGET", target, { source, target, tracknum });
+        return true;
+    }
+
+    static handleUrlOpen(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1802 — gBytesIsaac(length) then browser URL open.
+        let url = "";
+        const end = buf.currentPosition + size;
+        while (buf.currentPosition < end && buf.currentPosition < buf.buffer.length) {
+            const ch = buf.buffer[buf.currentPosition++] & 0xFF;
+            if (ch !== 0) url += String.fromCharCode(ch);
+        }
+        game.lastUrlOpen = url;
+        this.recordIfUpdate(game, "URL_OPEN", 0, { url });
+        try {
+            if (url && typeof window !== "undefined" && /^https?:\/\//i.test(url)) {
+                window.open(url, "_blank", "noopener");
+            }
+        } catch (e) {}
+        return true;
+    }
+
+    static handleGenerateChatHeadFromBody(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:1818 — g2add(tracknum), mg4(id), ig2add(value1), ig2(value2), ig2add(value3).
+        const tracknum = this.g2add(buf);
+        const id = this.mg4(buf);
+        const value1 = this.ig2add(buf);
+        const value2 = this.ig2(buf);
+        const value3 = this.ig2add(buf);
+        this.recordIfUpdate(game, "GENERATE_CHAT_HEAD_FROM_BODY", id, { tracknum, value1, value2, value3, modelKey: (value2 << 16) | value3 });
+        return true;
+    }
+
+    static handleReflectionCheatCheck(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1750 pushes reflection tasks. Browser client has no JVM reflection surface.
+        game.lastReflectionCheatCheckSize = size;
+        if (size > 0) buf.currentPosition += size;
         return true;
     }
 
