@@ -69,6 +69,8 @@ final class RSCGameEngine: ObservableObject {
     }
 
     init() {
+        worldState.preferences = UserPreferences.load()
+        applyPersistedCameraPreferences()
         packetHandler.worldState = worldState
         // Forward worldState's @Published changes into the engine's own
         // objectWillChange. GameView is @StateObject'd to the engine and
@@ -104,6 +106,34 @@ final class RSCGameEngine: ObservableObject {
 
         touchTranslator.onTap = { [weak self] x, y in
             self?.handleTap(x: x, y: y)
+        }
+    }
+
+    /// Mutates the live preferences mirror and flushes the result to
+    /// UserDefaults. Future settings UI should use this as the only write path
+    /// so observation and persistence stay in lockstep.
+    func updatePreferences(_ mutate: (inout UserPreferences) -> Void) {
+        var prefs = worldState.preferences
+        mutate(&prefs)
+        guard prefs != worldState.preferences else { return }
+        worldState.preferences = prefs
+        UserPreferences.save(prefs)
+    }
+
+    private func applyPersistedCameraPreferences() {
+        let prefs = worldState.preferences
+        if prefs.lastCameraYawDegrees != 0 {
+            setCameraRotationDegrees(prefs.lastCameraYawDegrees)
+            cameraAngle = CGFloat(prefs.lastCameraYawDegrees)
+        }
+        if prefs.lastCameraPitchDegrees != 0 {
+            setCameraPitchDegrees(prefs.lastCameraPitchDegrees)
+        }
+        if prefs.lastCameraZoom > 0 {
+            let persistedZoom = max(400.0, min(2400.0, prefs.lastCameraZoom))
+            cameraZoom = Int32(persistedZoom)
+            cameraOcclusionZoom = Int32(persistedZoom)
+            zoomLevel = CGFloat(1200.0 / persistedZoom)
         }
     }
 
@@ -284,6 +314,7 @@ final class RSCGameEngine: ObservableObject {
             worldState.systemUpdateTicks = max(0, worldState.systemUpdateTicks - 50)
         }
         worldState.pruneExpiredXPDrops()
+        persistCameraPreferencesIfNeeded()
 
         // Real 3D Scene renderer (matches Java client mudclient.java render path):
         // - World generates a terrain mesh for the current region
@@ -1270,6 +1301,27 @@ final class RSCGameEngine: ObservableObject {
         return cameraOcclusionZoom
     }
 
+    private func persistCameraPreferencesIfNeeded() {
+        // Save at most every ~5 seconds (100 ticks x 50ms). UserDefaults writes
+        // are tiny here, but this keeps gesture-heavy camera rotation from
+        // turning into a disk-write stream.
+        guard renderLogCount > 0, renderLogCount % 100 == 0 else { return }
+
+        let yaw = cameraRotationDegrees
+        let pitch = cameraPitchDegrees
+        let zoom = Double(cameraZoom)
+        let prefs = worldState.preferences
+        guard abs(yaw - prefs.lastCameraYawDegrees) > 1
+            || abs(pitch - prefs.lastCameraPitchDegrees) > 1
+            || abs(zoom - prefs.lastCameraZoom) > 50 else { return }
+
+        updatePreferences { p in
+            p.lastCameraYawDegrees = yaw
+            p.lastCameraPitchDegrees = pitch
+            p.lastCameraZoom = zoom
+        }
+    }
+
     // Simple 3x5 pixel font for rendering text on the map
     private static let font3x5: [Character: [UInt8]] = {
         // Each character is 3 wide x 5 tall, stored as 5 rows of 3 bits
@@ -2244,6 +2296,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.bankDeposit.rawValue))
             buf.putShort(itemId)
             buf.putInt(amount)
+            buf.putInt(0)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2254,6 +2307,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.bankWithdraw.rawValue))
             buf.putShort(itemId)
             buf.putInt(amount)
+            buf.putInt(0)
             try? await connection.send(buf.finishPacket())
         }
     }

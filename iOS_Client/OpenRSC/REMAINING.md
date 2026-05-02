@@ -77,12 +77,12 @@ Must report `BUILD SUCCEEDED`. iPhone 15 Pro device: `Brick the 15th`, id `00008
 
 - [ ] 3D models for trees / buildings / doors: `ModelArchiveLoader.shared` is in the avoid list and currently a stub. Game objects render as colored blocks instead of RSModels. Real port needs the .ob3 format reader + per-tile elevation blending in Scene; deferred behind the texture-port plan.
 - [x] Use-item-on-X workflow: long-press shows "Use" but tapping it does nothing — there's no follow-up inventory picker, so the second item never gets selected. Need a transient "select target" mode that consumes the next entity tap. _("Use" now arms `pendingItemUseSlot` like Java's `selectedItemInventoryIndex`; inventory item-on-item, NPC, player, ground-item, and object targets consume it with the matching Java opcodes.)_
-- [ ] Bank/Trade/Duel/Shop interaction wiring: panels exist (avoid-listed) but the deposit/withdraw/accept/stake actions don't all fire the corresponding server packets yet. Audit each panel for missing engine calls. _(shop buy/sell engine payloads now include the Java-required current stock/count short between item id and amount; broader panel audit remains deferred because the panels are avoid-listed.)_
+- [ ] Bank/Trade/Duel/Shop interaction wiring: panels exist (avoid-listed) but the deposit/withdraw/accept/stake actions don't all fire the corresponding server packets yet. Audit each panel for missing engine calls. _(bank deposit/withdraw engine payloads now include the protocol-235 legacy int, and shop buy/sell payloads include the Java-required current stock/count short between item id and amount; broader panel audit remains deferred because the panels are avoid-listed.)_
 - [x] Camera occlusion: Java pulls the camera in when geometry blocks line-of-sight to the player. Currently the iOS camera clips through walls. _(native camera now samples the tile ray behind the player using current yaw/pitch and smoothly shortens zoom when a wall/object occupies that path.)_
 
 ## Cheap correctness items
 
-- [ ] Local stash of preferences (chat-channel filters, sound on/off, run-default). Save to `UserDefaults` so settings persist across app launches.
+- [x] Local stash of preferences (chat-channel filters, sound on/off, run-default). Save to `UserDefaults` so settings persist across app launches. _(UserPreferences stores chat/privacy mutes, sound/music, run-default, and last camera pose; RSCGameEngine loads on init, exposes updatePreferences(...), and periodically persists camera yaw/pitch/zoom.)_
 - [x] Bubble-item icon ↔ chat-bubble vertical conflict: when both fire on the same character, they currently stack on top of each other. Anchor chat above the bubble icon, not the head. _(chat bubbles now detect active item bubbles and shift their projected anchor upward for NPCs, remote players, and the local player.)_
 
 ## Workflow per iteration

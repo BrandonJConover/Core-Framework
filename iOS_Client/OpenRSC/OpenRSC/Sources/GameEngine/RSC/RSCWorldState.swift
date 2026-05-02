@@ -294,6 +294,10 @@ final class RSCWorldState: ObservableObject {
     /// selectedItemInventoryIndex and consumes it when the next entity/item
     /// target is chosen.
     @Published var pendingItemUseSlot: Int? = nil
+    /// Local-only UI/UX preferences persisted through UserDefaults. Views
+    /// should mutate this via RSCGameEngine.updatePreferences(...) so disk
+    /// state stays aligned with the observable mirror.
+    @Published var preferences: UserPreferences = UserPreferences()
     @Published var skills: [RSCSkill] = []
     @Published var serverName: String = ""
     @Published var serverWelcomeMessage: String = ""
