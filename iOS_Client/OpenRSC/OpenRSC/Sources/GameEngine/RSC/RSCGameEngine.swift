@@ -666,38 +666,50 @@ final class RSCGameEngine: ObservableObject {
         let pz = worldState.localPlayerY
 
         for npc in worldState.npcs where npc.messageTimeout > 0 && !npc.message.isEmpty {
-            let dx = npc.x - px
-            let dz = npc.y - pz
-            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
-            let proj = scene.projectPoint(
-                worldX: Int32(dx) * 128 + 64,
-                worldY: -150,
-                worldZ: Int32(dz) * 128 + 64
+            drawCharacterChatBubble(
+                scene: scene,
+                tileX: npc.x - px,
+                tileZ: npc.y - pz,
+                text: npc.message,
+                hasItemBubble: npc.bubbleTimeout > 0 && npc.bubbleItem >= 0
             )
-            if proj.depth < scene.rot1024_zTop { continue }
-            drawChatBubble(centerX: Int(proj.screenX), bottomY: Int(proj.screenY), text: npc.message)
         }
 
         for player in worldState.players where player.messageTimeout > 0 && !player.message.isEmpty {
-            let dx = player.x - px
-            let dz = player.y - pz
-            guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
-            let proj = scene.projectPoint(
-                worldX: Int32(dx) * 128 + 64,
-                worldY: -150,
-                worldZ: Int32(dz) * 128 + 64
+            drawCharacterChatBubble(
+                scene: scene,
+                tileX: player.x - px,
+                tileZ: player.y - pz,
+                text: player.message,
+                hasItemBubble: player.bubbleTimeout > 0 && player.bubbleItem >= 0
             )
-            if proj.depth < scene.rot1024_zTop { continue }
-            drawChatBubble(centerX: Int(proj.screenX), bottomY: Int(proj.screenY), text: player.message)
         }
 
         if worldState.localMessageTimeout > 0 && !worldState.localMessage.isEmpty {
             drawChatBubble(
                 centerX: MetalRenderer.gameWidth / 2,
-                bottomY: MetalRenderer.gameHeight / 2 - 30,
+                bottomY: worldState.localBubbleTimeout > 0 && worldState.localBubbleItem >= 0
+                    ? MetalRenderer.gameHeight / 2 - 50
+                    : MetalRenderer.gameHeight / 2 - 30,
                 text: worldState.localMessage
             )
         }
+    }
+
+    private func drawCharacterChatBubble(scene: Scene, tileX: Int, tileZ: Int, text: String, hasItemBubble: Bool) {
+        guard abs(tileX) <= 32 && abs(tileZ) <= 32 else { return }
+        let proj = scene.projectPoint(
+            worldX: Int32(tileX) * 128 + 64,
+            worldY: hasItemBubble ? -120 : -150,
+            worldZ: Int32(tileZ) * 128 + 64
+        )
+        if proj.depth < scene.rot1024_zTop { return }
+        // Item bubbles draw from topY = projectedY - 20 and are 24px tall.
+        // When both overlays are present, use that top edge as the chat
+        // baseline so the caption stacks above the item icon instead of
+        // crossing through it.
+        let bottomY = hasItemBubble ? Int(proj.screenY) - 22 : Int(proj.screenY)
+        drawChatBubble(centerX: Int(proj.screenX), bottomY: bottomY, text: text)
     }
 
     /// Caption-bar above a head: dark translucent backing, light gold text,

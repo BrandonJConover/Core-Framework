@@ -83,7 +83,7 @@ Must report `BUILD SUCCEEDED`. iPhone 15 Pro device: `Brick the 15th`, id `00008
 ## Cheap correctness items
 
 - [ ] Local stash of preferences (chat-channel filters, sound on/off, run-default). Save to `UserDefaults` so settings persist across app launches.
-- [ ] Bubble-item icon ↔ chat-bubble vertical conflict: when both fire on the same character, they currently stack on top of each other. Anchor chat above the bubble icon, not the head.
+- [x] Bubble-item icon ↔ chat-bubble vertical conflict: when both fire on the same character, they currently stack on top of each other. Anchor chat above the bubble icon, not the head. _(chat bubbles now detect active item bubbles and shift their projected anchor upward for NPCs, remote players, and the local player.)_
 
 ## Workflow per iteration
 
