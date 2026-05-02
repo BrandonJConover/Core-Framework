@@ -28,6 +28,9 @@ These plans wire data-side ports (already shipped + offline-verified) into the l
 | P3b | [TerrainMesh530 → Scene wire](web-client-p3b-terrain-render-wire.md) | Pickable now |
 | P4 (data) | PlayerAppearance530 compositor | **Shipped** offline-verified — see `2009scape-web/client-patch/.player-appearance-trace.txt` |
 | P4 (wire) | [PlayerAppearance530 → Scene wire](web-client-p4-player-avatar-wire.md) | Pickable now (parallel-safe with P3b — different files) |
+| P3c | [Terrain texture pass (6-op provider)](web-client-p3c-terrain-textures.md) | Gates on P3b shipped. Replaces flat-colour fill with idx26 texture sample. |
+| P5 | [NpcAppearance530 → Scene wire](web-client-p5-npc-render-wire.md) | Gates on P4 wire shipped. NPC composite via NpcType530.modelIds + recolor/retex; same bridge plumbing as P4. |
+| P6 | [BAS animation driver wire](web-client-p6-bas-animation-wire.md) | Gates on P4 + P5 shipped (need actors visible to animate them). Drives Tier 9's already-shipped frame data through the bridged models per render tick. |
 
 ## iOS plans
 
