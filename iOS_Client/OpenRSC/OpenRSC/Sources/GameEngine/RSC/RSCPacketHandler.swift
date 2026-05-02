@@ -362,6 +362,18 @@ final class RSCPacketHandler {
             }
             ws.ignoreList = ignores
 
+        case 237: // updateIgnoreListBecauseNameChange
+            let name = buf.getZeroPaddedString()
+            let _ = buf.getZeroPaddedString() // duplicate current name
+            let formerName = buf.getZeroPaddedString()
+            let _ = buf.getZeroPaddedString() // duplicate formerName
+            let updateExisting = buf.getUnsignedByte() == 1
+            if updateExisting, let idx = ws.ignoreList.firstIndex(of: formerName) {
+                ws.ignoreList[idx] = name
+            } else if !ws.ignoreList.contains(name) {
+                ws.ignoreList.append(name)
+            }
+
         case 203: // CLOSE_BANK
             ws.bankOpen = false
 
@@ -535,7 +547,7 @@ final class RSCPacketHandler {
         // Remaining opcodes — skip their data to keep things clean
         case 7, 16, 21, 23, 28, 29, 32, 34, 37, 39, 49, 50, 54, 55,
              94, 95, 113, 115, 119, 132, 133, 134, 135, 136, 144,
-             150, 157, 224, 232, 237, 246, 250:
+             150, 157, 224, 232, 246, 250:
             break
 
         default:
