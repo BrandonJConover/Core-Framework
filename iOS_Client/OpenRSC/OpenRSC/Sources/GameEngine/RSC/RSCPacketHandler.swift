@@ -33,16 +33,17 @@ final class RSCPacketHandler {
             // Message types: 1=chat, 2=private, 3=quest/NPC, 4=trade, 5=system, 6=global
             let prefix: String
             let isPriv: Bool
+            let channel: ChatChannel
             switch msgTypeRaw {
-            case 1: prefix = sender131.isEmpty ? "[Chat]" : sender131; isPriv = false
-            case 2: prefix = sender131.isEmpty ? "[PM]" : sender131; isPriv = true
-            case 3: prefix = sender131.isEmpty ? "[Quest]" : sender131; isPriv = false
-            case 4: prefix = "[Trade]"; isPriv = false
-            case 5, 6: prefix = "[System]"; isPriv = false
-            default: prefix = sender131.isEmpty ? "[Msg]" : sender131; isPriv = false
+            case 1: prefix = sender131.isEmpty ? "[Chat]" : sender131; isPriv = false; channel = .chat
+            case 2: prefix = sender131.isEmpty ? "[PM]" : sender131; isPriv = true; channel = .privateMsg
+            case 3: prefix = sender131.isEmpty ? "[Quest]" : sender131; isPriv = false; channel = .quest
+            case 4: prefix = "[Trade]"; isPriv = false; channel = .trade
+            case 5, 6: prefix = "[System]"; isPriv = false; channel = .system
+            default: prefix = sender131.isEmpty ? "[Msg]" : sender131; isPriv = false; channel = .chat
             }
             let displayName = clan131.isEmpty ? prefix : "[\(clan131)] \(prefix)"
-            ws.addChat(sender: displayName, text: message131, isPrivate: isPriv)
+            ws.addChat(sender: displayName, text: message131, isPrivate: isPriv, channel: channel)
 
         case 120: // receivePrivateMsg — Java: STRING sender, STRING formerName, INT icon, STRING message
             let pmSender = buf.getString()
@@ -210,6 +211,7 @@ final class RSCPacketHandler {
         case 114: // SET_FATIGUE
             if buf.bytesRemaining >= 2 { ws.fatigue = buf.getShort() }
             if buf.bytesRemaining >= 2 { ws.fatigueAuthentic = buf.getShort() }
+            ws.runEnergy = Self.runEnergy(fromFatigue: ws.fatigue)
 
         case 42:  // showBank
             handleShowBank(buf: buf, ws: ws)
@@ -520,6 +522,14 @@ final class RSCPacketHandler {
             print("[Packet] Unhandled opcode \(opcode) (\(payload.count) bytes)")
             break
         }
+    }
+
+    private static func runEnergy(fromFatigue fatigue: Int) -> Int {
+        // Authentic servers use 0...7500 internally; several custom payloads
+        // already downscale to 0...100. Accept either shape and render energy
+        // as the inverse of fatigue.
+        let fatiguePercent = fatigue > 100 ? fatigue / 75 : fatigue
+        return max(0, min(100, 100 - fatiguePercent))
     }
 
     // MARK: - Packet parsers (matching PacketHandler.java methods)
