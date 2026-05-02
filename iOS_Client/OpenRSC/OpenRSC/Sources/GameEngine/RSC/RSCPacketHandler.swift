@@ -547,7 +547,7 @@ final class RSCPacketHandler {
         // Remaining opcodes — skip their data to keep things clean
         case 7, 16, 21, 23, 28, 29, 32, 34, 37, 39, 49, 50, 54, 55,
              94, 95, 113, 115, 119, 132, 133, 134, 135, 136, 144,
-             150, 157, 224, 232, 246, 250:
+             150, 157, 189, 224, 232, 246, 250:
             break
 
         default:
