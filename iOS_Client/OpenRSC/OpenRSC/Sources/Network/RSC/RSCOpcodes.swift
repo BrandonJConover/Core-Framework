@@ -41,6 +41,12 @@ enum RSCOutOpcode: UInt8 {
     case bankClose          = 212
     case bankDeposit        = 23
     case bankWithdraw       = 22
+    case bankDepositAllInventory = 24
+    case bankDepositAllEquipment = 26
+    case bankSavePreset     = 27
+    case bankLoadPreset     = 28
+    case itemEquipFromBank  = 172
+    case itemRemoveToBank   = 173
     case castOnSelf         = 137
     case castOnLand         = 158
     case castOnNpc          = 50

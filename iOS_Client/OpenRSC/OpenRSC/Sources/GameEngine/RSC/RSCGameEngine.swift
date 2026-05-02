@@ -2324,6 +2324,58 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    func bankDepositAllFromInventory() {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.bankDepositAllInventory.rawValue))
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func bankDepositAllFromEquipment() {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.bankDepositAllEquipment.rawValue))
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func bankSavePreset(slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.bankSavePreset.rawValue))
+            buf.putShort(slot)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func bankLoadPreset(slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.bankLoadPreset.rawValue))
+            buf.putShort(slot)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func bankEquipItem(slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemEquipFromBank.rawValue))
+            buf.putShort(slot)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func bankRemoveEquipment(slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemRemoveToBank.rawValue))
+            buf.putByte(slot)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
     func closeBank() {
         worldState.bankOpen = false
         Task {
