@@ -12,6 +12,7 @@ import { ObjStack, ProjAnim, SpotAnim } from "./cache/def/ObjStackNode";
 import { TextUtils } from "./util/TextUtils";
 import { ChatFilterSettings } from "./util/ChatFilterSettings";
 import { ClanState, PrivateMessage } from "./util/PrivateMessageQueue";
+import { SoundPlayer } from "./sound/SoundPlayer";
 import Long from "long";
 
 export class PacketHandler530 {
@@ -59,6 +60,7 @@ export class PacketHandler530 {
             case 202: return this.handleLocAddChange(buf, game);      // LOC_ADD_CHANGE
             case 235: return this.handleLocAnimSpecific(buf, game);   // LOC_ANIM_SPECIFIC
             case 240: return this.handleObjDel(buf, game);            // OBJ_DEL
+            case 97:  return this.handleSoundArea(buf, game);         // SOUND_AREA
 
             // Camera packets
             case 154: return this.handleCamPosition(buf, game);        // CamPosition (8)
@@ -123,6 +125,7 @@ export class PacketHandler530 {
             case 226: return this.handleVarpLarge(buf, game);           // 6 bytes
             case 38:  return this.handleUpdateStat(buf, game);          // 6 bytes
             case 70:  return this.handleGameMessage(buf, size, game);   // var-byte
+            case 172: return this.handleSynthSound(buf, game);          // SYNTH_SOUND
             case 192: return this.handleMinimapState(buf, game);        // 1 byte
             case 234: return this.handleRunEnergy(buf, game);           // 1 byte
             case 174: return this.handleWeightUpdate(buf, game);        // 2 bytes
@@ -603,6 +606,23 @@ export class PacketHandler530 {
                 if (idx >= 0) stack.splice(idx, 1);
                 if (stack.length === 0) game.groundObjects[this.currentPlane(game)][local23][local19] = null;
             }
+        }
+        return true;
+    }
+
+    static handleSoundArea(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:361 — g1 packed local tile, g2 track, g1 range/loops, g1 delay.
+        const local15 = this.g1(buf);
+        const chunkX = game.chunkX + ((local15 >> 4) & 0x7);
+        const chunkZ = game.chunkY + (local15 & 0x7);
+        let trackId = this.g2(buf);
+        if (trackId === 65535) trackId = -1;
+        const local31 = this.g1(buf);
+        const range = (local31 >> 4) & 0xF;
+        const loops = local31 & 0x7;
+        const delay = this.g1(buf);
+        if (chunkX >= 0 && chunkZ >= 0 && chunkX < 104 && chunkZ < 104 && trackId >= 0) {
+            SoundPlayer.playArea(trackId, chunkX, chunkZ, range, loops, delay);
         }
         return true;
     }
@@ -1279,6 +1299,16 @@ export class PacketHandler530 {
         if (game.addChatMessage) {
             game.addChatMessage("", message, 0);
         }
+        return true;
+    }
+
+    static handleSynthSound(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:2032 — g2 trackId, g1 volume, g2 delay.
+        let trackId = this.g2(buf);
+        const volume = this.g1(buf);
+        if (trackId === 65535) trackId = -1;
+        const delay = this.g2(buf);
+        if (trackId >= 0) SoundPlayer.play(volume, trackId, delay);
         return true;
     }
 

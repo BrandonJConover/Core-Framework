@@ -5,6 +5,7 @@ import { Font } from "./graphics/Font";
 import { Color } from "./graphics/Color";
 import { Game } from "./Game";
 import { sleep } from "./ParallelExecutor";
+import { AudioContextHolder } from "./sound/AudioContextHolder";
 
 interface LoopData {
     opos: number;
@@ -413,6 +414,7 @@ export class GameShell {
 
     public onTouchStart(e: TouchEvent) {
         e.preventDefault();
+        AudioContextHolder.unlock();
         this.clearTouchLongPress();
         this.releaseTouchKey();
 
@@ -529,6 +531,7 @@ export class GameShell {
     }
 
     public mousePressed(mouseevent: MouseEvent) {
+        AudioContextHolder.unlock();
         let [mouseX, mouseY] = this.getMouseCanvasCoords(mouseevent);
 
         this.idleTime = 0;

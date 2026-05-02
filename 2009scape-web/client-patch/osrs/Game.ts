@@ -51,6 +51,7 @@ import { ISAACCipher } from "./net/ISAACCipher";
 import { LinkedList } from "./util/LinkedList";
 import { PacketConstants } from "./util/PacketConstants";
 import { SoundPlayer } from "./sound/SoundPlayer";
+import { SoundBank } from "./sound/SoundBank";
 import { Item } from "./media/renderable/Item";
 import { Renderable } from "./media/renderable/Renderable";
 import { SpawnObjectNode } from "./scene/SpawnObjectNode";
@@ -7547,6 +7548,10 @@ export class Game extends GameShell {
     }
 
     public method152() {
+        const localPlayer = (Game as any).localPlayer;
+        if (localPlayer && localPlayer.pathX && localPlayer.pathY) {
+            SoundPlayer.tick(localPlayer.pathX[0] | 0, localPlayer.pathY[0] | 0);
+        }
         for (let index: number = 0; index < this.currentSound; index++) {
             {
                 let flag1: boolean = false;
@@ -12226,6 +12231,7 @@ export class Game extends GameShell {
                 const js5Cache = new Js5Cache(main, indexBuffers, extraIdx[255]);
                 (this as any).js5Cache = js5Cache;
                 (globalThis as any).js5Cache = js5Cache;
+                SoundBank.attach(js5Cache);
                 console.log("Js5Cache initialized");
                 await this.preloadSprites530(js5Cache);
                 // Try font preload — each fetch in preloadFonts530 is wrapped in
