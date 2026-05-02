@@ -121,8 +121,13 @@ public final class ApiServer {
         // Generous enough that legitimate retries (typo, autocomplete) won't
         // trip; tight enough that automated guessers stall fast.
         RateLimiter loginLimiter = new RateLimiter(60_000L, 10);
+        // Registration is more conservative — 3 per hour per IP. Real users
+        // create one account and move on; sweepers get a wall.
+        RateLimiter registerLimiter = new RateLimiter(60L * 60_000L, 3);
         AuthEndpoint auth = new AuthEndpoint(server, jwt, loginLimiter);
         WhoamiEndpoint whoami = new WhoamiEndpoint(jwt);
+        RefreshEndpoint refresh = new RefreshEndpoint(jwt);
+        RegisterEndpoint register = new RegisterEndpoint(server, jwt, registerLimiter);
         OnlinePlayersEndpoint online = new OnlinePlayersEndpoint(server);
         CharacterEndpoint character = new CharacterEndpoint(server);
 
@@ -130,6 +135,8 @@ public final class ApiServer {
             .route(HttpMethod.GET,  "/api/status",               req -> status.handle())
             .route(HttpMethod.GET,  "/healthz",                  req -> status.handle())
             .route(HttpMethod.POST, "/api/auth/login",           auth::handle)
+            .route(HttpMethod.POST, "/api/auth/register",        register::handle)
+            .route(HttpMethod.POST, "/api/auth/refresh",         refresh::handle)
             .route(HttpMethod.GET,  "/api/auth/whoami",          whoami::handle)
             .route(HttpMethod.GET,  "/api/players/online",       req -> online.handle())
             .route(HttpMethod.GET,  "/api/character/{username}", character::handle);

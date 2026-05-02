@@ -158,7 +158,61 @@ expect_json_field "offline profile has 'username'" "username" "$RESP"
 expect_json_field "offline profile has 'skills'" "skills" "$RESP"
 expect_json_field "offline profile has 'online'" "online" "$RESP"
 
-echo "==> Test 14: rate limit kicks in on POST /api/auth/login"
+echo "==> Test 14: POST /api/auth/refresh with valid token"
+RESP=$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" "$API_BASE/api/auth/refresh")
+NEW_TOKEN=$(echo "$RESP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('token',''))" 2>/dev/null)
+if [ -n "$NEW_TOKEN" ] && [ "$NEW_TOKEN" != "" ] && [ "$NEW_TOKEN" != "$TOKEN" ]; then
+    echo "    PASS: refresh issued a new (different) token"
+    pass=$((pass + 1))
+elif [ "$NEW_TOKEN" = "$TOKEN" ]; then
+    echo "    NOTE: refresh returned the same token (may be sub-second iat collision); accepting"
+    pass=$((pass + 1))
+else
+    echo "    FAIL: refresh did not return a token: $RESP"
+    fail=$((fail + 1))
+fi
+
+echo "==> Test 15: POST /api/auth/refresh with no header (401)"
+RESP=$(curl -sS -o /dev/null -w "%{http_code}" -X POST "$API_BASE/api/auth/refresh")
+expect_status "refresh without auth returns 401" "401" "$RESP"
+
+echo "==> Test 16: POST /api/auth/register with bad password (400)"
+RESP=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" \
+    -d '{"username":"newuser","password":"x"}' "$API_BASE/api/auth/register")
+expect_status "short password returns 400" "400" "$RESP"
+
+echo "==> Test 17: POST /api/auth/register with existing username (409)"
+RESP=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" \
+    -d "{\"username\":\"$APITEST_USER\",\"password\":\"goodlongpass\"}" \
+    "$API_BASE/api/auth/register")
+expect_status "duplicate username returns 409" "409" "$RESP"
+
+echo "==> Test 18: POST /api/auth/register with fresh username (201)"
+# Use a name unlikely to already exist; clean up after the run.
+NEW_USER="apitest$(date +%s | tail -c 6)"
+RESP=$(curl -sS -X POST -H "Content-Type: application/json" \
+    -d "{\"username\":\"$NEW_USER\",\"password\":\"freshpass1\"}" \
+    "$API_BASE/api/auth/register")
+NEW_USER_TOKEN=$(echo "$RESP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('token',''))" 2>/dev/null)
+if [ -n "$NEW_USER_TOKEN" ]; then
+    echo "    PASS: register returned a token for $NEW_USER"
+    pass=$((pass + 1))
+    # Verify the token works
+    WHOAMI=$(curl -sS -H "Authorization: Bearer $NEW_USER_TOKEN" "$API_BASE/api/auth/whoami")
+    WHOAMI_USER=$(echo "$WHOAMI" | python3 -c "import json,sys;print(json.load(sys.stdin).get('username',''))" 2>/dev/null)
+    if [ "$WHOAMI_USER" = "$NEW_USER" ]; then
+        echo "    PASS: token from /register validates against /whoami"
+        pass=$((pass + 1))
+    else
+        echo "    FAIL: token from /register did not validate: $WHOAMI"
+        fail=$((fail + 1))
+    fi
+else
+    echo "    FAIL: register did not return a token: $RESP"
+    fail=$((fail + 1))
+fi
+
+echo "==> Test 19: rate limit kicks in on POST /api/auth/login"
 # Limiter is 10 attempts per 60s per IP. Earlier tests already used a few;
 # send 15 more to definitively cross the threshold.
 HIT_429=0
