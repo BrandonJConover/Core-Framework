@@ -2184,6 +2184,8 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemDrop.rawValue))
             buf.putShort(slot)
+            let amount = worldState.inventory.first(where: { $0.id == slot })?.amount ?? 1
+            buf.putInt(max(1, amount))
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
