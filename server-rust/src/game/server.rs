@@ -2,10 +2,12 @@
 
 use crate::database::player_repository::PlayerRepository;
 use crate::game::{GameState, Player, World, Entity, EntityId, Position};
+use crate::game::state_updater::{GameStateUpdater, KnownEntityList, PlayerSnapshot};
 use crate::protocol::{Packet, PacketBuilder, PacketReader};
 use crate::protocol::opcodes::{OpcodeIn, OpcodeOut};
 use crate::protocol::packets::{LoginRequest, LoginResponse};
 use crate::session::{Session, SessionManager, SessionState};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
@@ -34,6 +36,12 @@ pub struct ServerState {
     /// (handy for the connection-storm bench). Some(repo) routes login through
     /// bcrypt verification and persists position/skills on logout + auto-save.
     pub players: Option<Arc<PlayerRepository>>,
+    /// Per-session entity tracking lists for the full GameStateUpdater pipeline.
+    ///
+    /// Keyed by session id. Lazily created on first tick and removed on logout.
+    /// Each value is (known_players, known_npcs) so the updater can diff what
+    /// the client already knows about vs what's now in view.
+    pub known_lists: HashMap<u64, (KnownEntityList, KnownEntityList)>,
 }
 
 impl ServerState {
@@ -46,6 +54,7 @@ impl ServerState {
             start_time: Instant::now(),
             shutting_down: false,
             players: None,
+            known_lists: HashMap::new(),
         }
     }
 
@@ -335,6 +344,10 @@ impl ServerState {
             self.game.unregister_player(pid).await;
         }
 
+        // Purge per-session entity tracking lists so they don't leak memory for
+        // players who never log back in.
+        self.known_lists.remove(&session_id);
+
         info!("Session {} logged out", session_id);
         HandleResult::Disconnect
     }
@@ -522,25 +535,109 @@ impl ServerState {
 
     /// Send entity updates to all logged-in sessions.
     ///
-    /// Sends a bit-packed SEND_PLAYER_COORDS packet to each session containing
-    /// only the local player's own position + sprite (no nearby-player
-    /// updates). Layout mirrors GameStateUpdater.updatePlayers in the Java
-    /// server (Payload177+ branch) for the modern non-retro protocol:
-    ///   (x, 11) (y, 13) (sprite, 4) (local_count=0, 8)
-    /// View-area / nearby-player tracking is not yet implemented; once
-    /// `Player::local_players` and a view grid land, append per-other-player
-    /// entries here. NPC coords + appearance updates are also future work.
-    async fn send_entity_updates(&self) {
-        for session in self.sessions.all_sessions() {
+    /// Uses [`GameStateUpdater::generate_updates`] to produce the full RSC
+    /// binary update stream per session — player positions/appearances, NPC
+    /// positions/appearances, game-objects, and ground-items — exactly as the
+    /// Java server's `GameStateUpdater.updatePlayers` does.
+    ///
+    /// Pipeline:
+    ///   1. Collect a [`PlayerSnapshot`] for every online player (one read pass).
+    ///   2. For each session, retrieve (or lazily create) its per-session
+    ///      [`KnownEntityList`] pair, call `generate_updates`, convert the
+    ///      returned `game::protocol::Packet` values to wire `Packet` values,
+    ///      and ship them over the session channel.
+    ///
+    /// NPC, object, and ground-item snapshots are passed as empty slices until
+    /// the world-state snapshot API lands; at that point only this function
+    /// needs to be updated.
+    async fn send_entity_updates(&mut self) {
+        let sessions = self.sessions.all_sessions();
+
+        // --- Pass 1: build a snapshot of every online player ---
+        let mut all_players: Vec<PlayerSnapshot> = Vec::with_capacity(sessions.len());
+        for session in &sessions {
             let s = session.read().await;
             if s.state != SessionState::LoggedIn {
                 continue;
             }
-            if let Some(ref player) = s.player {
-                let p = player.read().await;
-                let packet = build_player_coords_packet(&p);
-                drop(p);
-                let _ = s.send(packet).await;
+            if let Some(ref pa) = s.player {
+                let p = pa.read().await;
+                all_players.push(PlayerSnapshot {
+                    entity_id: EntityId(p.id),
+                    player_index: p.player_index,
+                    position: p.position,
+                    direction: p.direction,
+                    // A non-empty walking queue means the player moved this tick.
+                    moved_this_tick: !p.walking_queue.is_empty(),
+                    appearance_changed: p.appearance_changed,
+                    // Full appearance encoding (equipment, skull, etc.) is
+                    // wired in appearance.rs; empty slice triggers no
+                    // appearance packet until the encoder is hooked up.
+                    appearance_data: Vec::new(),
+                });
+            }
+        }
+
+        // --- Pass 2: per-session update generation + send ---
+        for session in &sessions {
+            // Capture what we need before releasing the lock so that the
+            // mutable borrow of self.known_lists can proceed.
+            let captured = {
+                let s = session.read().await;
+                if s.state != SessionState::LoggedIn {
+                    continue;
+                }
+                match s.player {
+                    Some(ref pa) => {
+                        let p = pa.read().await;
+                        Some((s.id, EntityId(p.id), p.position))
+                    }
+                    None => None,
+                }
+            };
+
+            let (session_id, player_id, player_pos) = match captured {
+                Some(x) => x,
+                None => continue,
+            };
+
+            // Lazily create the known-entity lists for this session.
+            let (kp, kn) = self
+                .known_lists
+                .entry(session_id)
+                .or_insert_with(|| {
+                    (KnownEntityList::for_players(), KnownEntityList::for_npcs())
+                });
+
+            // Generate all outbound update packets for this player's view.
+            let game_packets = GameStateUpdater::generate_updates(
+                player_id,
+                player_pos,
+                kp,
+                kn,
+                &all_players,
+                &[], // NPC snapshots — wired when world NPC spawning lands
+                &[], // game-object snapshots
+                &[], // ground-item snapshots
+            );
+
+            // Re-acquire session lock to send; this is a second short-lived
+            // read lock taken after the known_lists borrow ends.
+            let s = session.read().await;
+            for gp in game_packets {
+                // Convert game::protocol::Packet → crate::protocol::Packet.
+                // Both carry (opcode: u8, payload: bytes); the game-layer
+                // type uses Vec<u8> while the wire type uses Bytes.
+                let wire = Packet::new(gp.opcode, gp.payload);
+                let _ = s.send(wire).await;
+            }
+
+            // After sending, clear appearance_changed so the client isn't
+            // re-sent the same appearance blob next tick.
+            if let Some(ref pa) = s.player {
+                if let Ok(mut p) = pa.try_write() {
+                    p.appearance_changed = false;
+                }
             }
         }
     }
