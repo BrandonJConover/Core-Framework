@@ -52,6 +52,7 @@ import { LinkedList } from "./util/LinkedList";
 import { PacketConstants } from "./util/PacketConstants";
 import { SoundPlayer } from "./sound/SoundPlayer";
 import { SoundBank } from "./sound/SoundBank";
+import { MusicPlayer } from "./sound/MusicPlayer";
 import { Item } from "./media/renderable/Item";
 import { Renderable } from "./media/renderable/Renderable";
 import { SpawnObjectNode } from "./scene/SpawnObjectNode";
@@ -7548,6 +7549,7 @@ export class Game extends GameShell {
     }
 
     public method152() {
+        MusicPlayer.tick();
         const localPlayer = (Game as any).localPlayer;
         if (localPlayer && localPlayer.pathX && localPlayer.pathY) {
             SoundPlayer.tick(localPlayer.pathX[0] | 0, localPlayer.pathY[0] | 0);
@@ -12232,6 +12234,7 @@ export class Game extends GameShell {
                 (this as any).js5Cache = js5Cache;
                 (globalThis as any).js5Cache = js5Cache;
                 SoundBank.attach(js5Cache);
+                MusicPlayer.load();
                 console.log("Js5Cache initialized");
                 await this.preloadSprites530(js5Cache);
                 // Try font preload — each fetch in preloadFonts530 is wrapped in

@@ -13,6 +13,7 @@ import { TextUtils } from "./util/TextUtils";
 import { ChatFilterSettings } from "./util/ChatFilterSettings";
 import { ClanState, PrivateMessage } from "./util/PrivateMessageQueue";
 import { SoundPlayer } from "./sound/SoundPlayer";
+import { MusicPlayer } from "./sound/MusicPlayer";
 import Long from "long";
 
 export class PacketHandler530 {
@@ -140,8 +141,8 @@ export class PacketHandler530 {
             case 62:  return this.consumeKnown(buf, size);              // Contact ignore (var-byte)
             case 84:  return this.handleVarbit(buf, game);              // 6 bytes
             case 37:  return this.consumeKnown(buf, size);              // Varbit (3 bytes)
-            case 208: return this.consumeKnown(buf, size);              // Varbit (5 bytes)
-            case 4:   return this.consumeKnown(buf, size);              // Music (2 bytes)
+            case 4:   return this.handleMidiSong(buf, game);            // MIDI_SONG (2 bytes)
+            case 208: return this.handleMidiJingle(buf, game);          // MIDI_JINGLE (5 bytes)
             case 211: return this.consumeKnown(buf, size);              // UpdateRandomFile (never sent)
             case 10:  return this.consumeKnown(buf, size);              // SetWalkOption (TODO on server)
 
@@ -196,6 +197,12 @@ export class PacketHandler530 {
         return ((buf.buffer[buf.currentPosition - 3] & 0xFF) << 16) +
                ((buf.buffer[buf.currentPosition - 2] & 0xFF) << 8) +
                 (buf.buffer[buf.currentPosition - 1] & 0xFF);
+    }
+    static ig3(buf: Buffer): number {
+        buf.currentPosition += 3;
+        return (buf.buffer[buf.currentPosition - 3] & 0xFF) +
+               ((buf.buffer[buf.currentPosition - 2] & 0xFF) << 8) +
+               ((buf.buffer[buf.currentPosition - 1] & 0xFF) << 16);
     }
     static ig2(buf: Buffer): number {
         buf.currentPosition += 2;
@@ -627,6 +634,26 @@ export class PacketHandler530 {
         if (chunkX >= 0 && chunkZ >= 0 && chunkX < 104 && chunkZ < 104 && trackId >= 0) {
             SoundPlayer.playArea(trackId, chunkX, chunkZ, range, loops, delay);
         }
+        return true;
+    }
+
+    static handleMidiSong(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:2320 — MIDI_SONG reads ig2add, 65535 means stop.
+        let trackId = this.ig2add(buf);
+        if (trackId === 65535) trackId = -1;
+        game.currentSong = trackId;
+        game.nextSong = trackId;
+        MusicPlayer.playSong(trackId);
+        return true;
+    }
+
+    static handleMidiJingle(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:2328 — MIDI_JINGLE reads ig3 volume then ig2 id.
+        const volume = this.ig3(buf);
+        let trackId = this.ig2(buf);
+        if (trackId === 65535) trackId = -1;
+        game.previousSong = volume;
+        MusicPlayer.playJingle(trackId, volume & 0xFF);
         return true;
     }
 
