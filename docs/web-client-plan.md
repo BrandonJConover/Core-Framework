@@ -37,15 +37,15 @@ These opcodes drive the zone-update bus that keeps locs (game objects), ground i
 
 ### Tier 5b — Player + chat-side state (medium impact, blocks UX features)
 
-- [ ] **TELEPORT_LOCAL_PLAYER (13)** — server-issued teleport; without it teleports trigger only on the next `PLAYER_INFO` tick and the `REBUILD_NORMAL` race shows a frame of the old region.
-- [ ] **RESET_ANIMS (131)** — clears all in-flight character animations on logout/teleport.
-- [ ] **DELETE_INVENTORY (191)** — wipes a whole inventory slot range; today the renderer can show stale items after a death until the next full inventory snapshot.
-- [ ] **MESSAGE_PRIVATE (0) / MESSAGE_PRIVATE_ECHO (71) / MESSAGE_QUICKCHAT_PRIVATE (247) / MESSAGE_QUICKCHAT_PRIVATE_ECHO (141)** — private + quick-chat IO.
-- [ ] **MESSAGE_CLANCHANNEL (54) / UPDATE_CLAN (196) / CLAN_QUICK_CHAT (81)** — clan-channel chat + member/membership updates.
-- [ ] **CHAT_FILTER_SETTINGS (232)** — server pushes the player's chat filter (public/private/trade tabs) so the UI can mirror it.
-- [ ] **LAST_LOGIN_INFO (164)** — last-login banner data (matches the iOS welcome dialog the player already sees).
-- [ ] **SET_WALK_TEXT (160) / SET_SETTINGS_STRING (142)** — minimap walking-text override and per-settings string.
-- [ ] **UPDATE_RUNWEIGHT (159) / UPDATE_UID192 (169) / RESET_CLIENT_VARCACHE (89) / FORCE_VARP_REFRESH (128)** — varp/varbit cache management.
+- [x] **TELEPORT_LOCAL_PLAYER (13)** — server-issued teleport; without it teleports trigger only on the next `PLAYER_INFO` tick and the `REBUILD_NORMAL` race shows a frame of the old region. _(1e302e4c0)_
+- [x] **RESET_ANIMS (131)** — clears all in-flight character animations on logout/teleport. _(1e302e4c0)_
+- [x] **DELETE_INVENTORY (191)** — wipes a whole inventory slot range; today the renderer can show stale items after a death until the next full inventory snapshot. _(1e302e4c0)_
+- [x] **MESSAGE_PRIVATE (0) / MESSAGE_PRIVATE_ECHO (71) / MESSAGE_QUICKCHAT_PRIVATE (247) / MESSAGE_QUICKCHAT_PRIVATE_ECHO (141)** — private + quick-chat IO. _(1e302e4c0)_
+- [x] **MESSAGE_CLANCHANNEL (54) / UPDATE_CLAN (196) / CLAN_QUICK_CHAT (81)** — clan-channel chat + member/membership updates. _(1e302e4c0)_
+- [x] **CHAT_FILTER_SETTINGS (232)** — server pushes the player's chat filter (public/private/trade tabs) so the UI can mirror it. _(1e302e4c0)_
+- [x] **LAST_LOGIN_INFO (164)** — last-login banner data (matches the iOS welcome dialog the player already sees). _(1e302e4c0)_
+- [x] **SET_WALK_TEXT (160) / SET_SETTINGS_STRING (142)** — minimap walking-text override and per-settings string. _(1e302e4c0)_
+- [x] **UPDATE_RUNWEIGHT (159) / UPDATE_UID192 (169) / RESET_CLIENT_VARCACHE (89) / FORCE_VARP_REFRESH (128)** — varp/varbit cache management. _(1e302e4c0)_
 
 ### Tier 5c — Interface/widget plumbing (blocks bank, options, quest UI)
 
