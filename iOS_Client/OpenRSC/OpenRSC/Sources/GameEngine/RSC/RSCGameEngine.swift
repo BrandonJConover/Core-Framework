@@ -2676,7 +2676,7 @@ final class RSCGameEngine: ObservableObject {
 
     /// Sends the entire current trade offer list to the server (TRADE_OFFER, opcode 46).
     /// Java client mudclient.java:17215 — replaces server-side offer with the full list.
-    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount.
+    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount, SHORT noted.
     func tradeOffer(_ items: [(id: Int, amount: Int)]) {
         // Optimistic local update — packet handler will overwrite from server later.
         worldState.tradeMyOffer = items
@@ -2689,6 +2689,7 @@ final class RSCGameEngine: ObservableObject {
             for it in items {
                 buf.putShort(it.id)
                 buf.putInt(it.amount)
+                buf.putShort(0)
             }
             try? await connection.send(buf.finishPacket())
         }
@@ -2707,7 +2708,7 @@ final class RSCGameEngine: ObservableObject {
 
     /// Sends the entire current duel stake list (DUEL_OFFER_ITEM, opcode 33).
     /// Java client mudclient.java:11102 — same format as trade offer.
-    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount.
+    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount, SHORT noted.
     func duelOffer(_ items: [(id: Int, amount: Int)]) {
         worldState.duelMyStake = items
         worldState.duelAccepted = false
@@ -2719,6 +2720,7 @@ final class RSCGameEngine: ObservableObject {
             for it in items {
                 buf.putShort(it.id)
                 buf.putInt(it.amount)
+                buf.putShort(0)
             }
             try? await connection.send(buf.finishPacket())
         }
