@@ -41,6 +41,7 @@ import { Font } from "./graphics/Font";
 import { TextUtils } from "./util/TextUtils";
 import { SignLink } from "./util/SignLink";
 import { PacketHandler530 } from "./PacketHandler530";
+import { ObjStack, ProjAnim, SpotAnim } from "./cache/def/ObjStackNode";
 import { BufferedConnection } from "./net/BufferedConnection";
 import { Configuration } from "./Configuration";
 import { Js5Cache } from "./Js5Cache";
@@ -345,6 +346,10 @@ export class Game extends GameShell {
     aClass6_1282: LinkedList = new LinkedList();
     aClass6_1210: LinkedList = new LinkedList();
     groundItems: LinkedList[][][] = array3d(4, 104, 104, null);
+    groundObjects: ObjStack[][][][] = array3d<ObjStack[]>(4, 104, 104, null);
+    locAnims: { plane: number; x: number; z: number; anim: number; layer: number; type?: number; rotation?: number; locId?: number; op?: string; raw?: any }[] = [];
+    projAnims: ProjAnim[] = [];
+    spotAnims: SpotAnim[] = [];
     aClass6_1261: LinkedList = new LinkedList();
     friendListStatus: number = 0;
     friendsCount: number = 0;

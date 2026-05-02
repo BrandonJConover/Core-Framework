@@ -8,9 +8,11 @@
  * to `size` before returning true.
  */
 import { Buffer } from "./net/Buffer";
+import { ObjStack, ProjAnim, SpotAnim } from "./cache/def/ObjStackNode";
 
 export class PacketHandler530 {
     private static equipmentObjIds530: number[] | null = null;
+    private static readonly LOC_LAYERS = [0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3];
 
     static handle(opcode530: number, buf: Buffer, size: number, game: any): boolean {
         const startPos = buf.currentPosition;
@@ -36,6 +38,23 @@ export class PacketHandler530 {
             // Entity synchronization
             case 225: return this.handlePlayerInfo(buf, size, game);
             case 32:  return this.handleNpcInfo(buf, size, game);
+
+            // Zone-update bus (rt4 Protocol.readZonePacket)
+            case 14:  return this.handleObjCount(buf, game);          // OBJ_COUNT
+            case 16:  return this.handleMapProjAnim2(buf, game);      // MAP_PROJANIM_2
+            case 17:  return this.handleSpotAnimSpecific(buf, game);  // SPOTANIM_SPECIFIC
+            case 20:  return this.handleLocAnim(buf, game);           // LOC_ANIM
+            case 33:  return this.handleObjReveal(buf, game);         // OBJ_REVEAL
+            case 56:  return this.handleSpotAnimEntity(buf, game);    // SPOTANIM_ENTITY
+            case 102: return this.handleNpcAnimSpecific(buf, game);   // NPC_ANIM_SPECIFIC
+            case 104: return this.handleMapProjAnim(buf, game);       // MAP_PROJANIM
+            case 121: return this.handleMapProjAnim3(buf, game);      // MAP_PROJANIM_3
+            case 135: return this.handleObjAdd(buf, game);            // OBJ_ADD
+            case 179: return this.handleLocAdd(buf, game);            // LOC_ADD
+            case 195: return this.handleLocDel(buf, game);            // LOC_DEL
+            case 202: return this.handleLocAddChange(buf, game);      // LOC_ADD_CHANGE
+            case 235: return this.handleLocAnimSpecific(buf, game);   // LOC_ANIM_SPECIFIC
+            case 240: return this.handleObjDel(buf, game);            // OBJ_DEL
 
             // Camera packets
             case 154: return this.handleCamPosition(buf, game);        // CamPosition (8)
@@ -132,6 +151,10 @@ export class PacketHandler530 {
         buf.currentPosition += 2;
         return ((buf.buffer[buf.currentPosition - 2] & 0xFF) << 8) + ((buf.buffer[buf.currentPosition - 1] - 128) & 0xFF);
     }
+    static g2b(buf: Buffer): number {
+        const value = this.g2(buf);
+        return value > 32767 ? value - 0x10000 : value;
+    }
     static ig2(buf: Buffer): number {
         buf.currentPosition += 2;
         return (buf.buffer[buf.currentPosition - 2] & 0xFF) + ((buf.buffer[buf.currentPosition - 1] & 0xFF) << 8);
@@ -139,6 +162,23 @@ export class PacketHandler530 {
     static ig2add(buf: Buffer): number {
         buf.currentPosition += 2;
         return ((buf.buffer[buf.currentPosition - 2] - 128) & 0xFF) + ((buf.buffer[buf.currentPosition - 1] & 0xFF) << 8);
+    }
+    // rt4 Buffer.g1badd: signed byte after subtracting 128.
+    static g1badd(buf: Buffer): number {
+        const value = (buf.buffer[buf.currentPosition++] - 128) & 0xFF;
+        return value > 127 ? value - 256 : value;
+    }
+    // rt4 Buffer.g1bsub: signed byte after 128 - value.
+    static g1bsub(buf: Buffer): number {
+        const value = (128 - buf.buffer[buf.currentPosition++]) & 0xFF;
+        return value > 127 ? value - 256 : value;
+    }
+    // rt4 Buffer.ig2badd: little-endian signed short with first byte add-128.
+    static ig2badd(buf: Buffer): number {
+        const value = (((buf.buffer[buf.currentPosition + 1] & 0xFF) << 8) +
+                       ((buf.buffer[buf.currentPosition] - 128) & 0xFF)) & 0xFFFF;
+        buf.currentPosition += 2;
+        return value > 32767 ? value - 0x10000 : value;
     }
     static g4(buf: Buffer): number {
         buf.currentPosition += 4;
@@ -189,6 +229,363 @@ export class PacketHandler530 {
     // Generic consumer for opcodes where we only need to keep the stream aligned
     static consumeKnown(buf: Buffer, size: number): boolean {
         if (size > 0) buf.currentPosition += size;
+        return true;
+    }
+
+    // ── Zone update state (rt4 Protocol.readZonePacket) ──
+
+    static currentPlane(game: any): number {
+        const plane = game && typeof game.plane === "number" ? game.plane : 0;
+        return Math.max(0, Math.min(3, plane | 0));
+    }
+
+    static inBounds(x: number, z: number, limit: number = 104): boolean {
+        return x >= 0 && z >= 0 && x < limit && z < limit;
+    }
+
+    static ensureZoneState(game: any): void {
+        if (!game.groundObjects) game.groundObjects = [];
+        for (let p = 0; p < 4; p++) {
+            if (!game.groundObjects[p]) game.groundObjects[p] = [];
+            for (let x = 0; x < 104; x++) {
+                if (!game.groundObjects[p][x]) game.groundObjects[p][x] = [];
+            }
+        }
+        if (!game.locAnims) game.locAnims = [];
+        if (!game.projAnims) game.projAnims = [];
+        if (!game.spotAnims) game.spotAnims = [];
+    }
+
+    static ensureGroundStack(game: any, plane: number, x: number, z: number): ObjStack[] {
+        this.ensureZoneState(game);
+        if (!game.groundObjects[plane][x][z]) game.groundObjects[plane][x][z] = [];
+        return game.groundObjects[plane][x][z];
+    }
+
+    static getGroundStack(game: any, plane: number, x: number, z: number): ObjStack[] | null {
+        this.ensureZoneState(game);
+        return game.groundObjects?.[plane]?.[x]?.[z] || null;
+    }
+
+    static tileHeight(game: any, plane: number, x: number, z: number): number {
+        if (game && typeof game.getTileHeight === "function") {
+            return game.getTileHeight(z, x, 9, plane) || 0;
+        }
+        return 0;
+    }
+
+    static loop(game: any): number {
+        return (game && game.constructor && typeof game.constructor.pulseCycle === "number")
+            ? game.constructor.pulseCycle
+            : 0;
+    }
+
+    static originX(game: any): number {
+        return typeof game?.nextTopLeftTileX === "number" ? game.nextTopLeftTileX : ((game?.chunkX || 0) - 6) * 8;
+    }
+
+    static originZ(game: any): number {
+        return typeof game?.nextTopRightTileY === "number" ? game.nextTopRightTileY : ((game?.chunkY || 0) - 6) * 8;
+    }
+
+    static pushLocState(game: any, entry: any): void {
+        this.ensureZoneState(game);
+        game.locAnims.push(entry);
+    }
+
+    static handleLocDel(buf: Buffer, game: any): boolean {
+        const local15 = this.g1neg(buf);
+        const local19 = local15 & 0x3;
+        const local23 = local15 >> 2;
+        const local27 = this.LOC_LAYERS[local23] || 0;
+        const local31 = this.g1(buf);
+        const local39 = (local31 >> 4 & 0x7) + game.chunkX;
+        const local45 = (local31 & 0x7) + game.chunkY;
+        if (this.inBounds(local39, local45)) {
+            this.pushLocState(game, { op: "del", plane: this.currentPlane(game), x: local39, z: local45, anim: -1, layer: local27, type: local23, rotation: local19, locId: -1 });
+        }
+        return true;
+    }
+
+    static handleObjReveal(buf: Buffer, game: any): boolean {
+        const local15 = this.ig2(buf);
+        const local23 = this.g1(buf);
+        const local27 = (local23 & 0x7) + game.chunkY;
+        const local19 = (local23 >> 4 & 0x7) + game.chunkX;
+        const local31 = this.g2add(buf);
+        if (this.inBounds(local19, local27)) {
+            this.ensureGroundStack(game, this.currentPlane(game), local19, local27).push(new ObjStack(local15, local31));
+        }
+        return true;
+    }
+
+    static handleMapProjAnim3(buf: Buffer, game: any): boolean {
+        const local15 = this.g1(buf);
+        let local23 = game.chunkX * 2 + (local15 >> 4 & 0xF);
+        let local19 = (local15 & 0xF) + game.chunkY * 2;
+        let local27 = local23 + this.g1b(buf);
+        let local31 = this.g1b(buf) + local19;
+        const local39 = this.g2b(buf);
+        const local45 = this.g2(buf);
+        const local218 = this.g1(buf) * 4;
+        const local224 = this.g1(buf) * 4;
+        const local228 = this.g2(buf);
+        const local232 = this.g2(buf);
+        let local236 = this.g1(buf);
+        if (local236 === 255) local236 = -1;
+        const local247 = this.g1(buf);
+        if (this.inBounds(local23, local19, 208) && this.inBounds(local27, local31, 208) && local45 !== 65535) {
+            local31 *= 64;
+            local27 *= 64;
+            local19 *= 64;
+            local23 *= 64;
+            const loop = this.loop(game);
+            const local317 = new ProjAnim(local45, this.currentPlane(game), local23, local19, this.tileHeight(game, this.currentPlane(game), local23, local19) - local218, loop + local228, loop + local232, local236, local247, local39, local224);
+            local317.setTarget(local31, loop + local228, -local224 + this.tileHeight(game, this.currentPlane(game), local27, local31), local27);
+            this.ensureZoneState(game);
+            game.projAnims.push(local317);
+        }
+        return true;
+    }
+
+    static handleSpotAnimSpecific(buf: Buffer, game: any): boolean {
+        const local15 = this.g1(buf);
+        let local23 = game.chunkX + (local15 >> 4 & 0x7);
+        let local19 = game.chunkY + (local15 & 0x7);
+        const local27 = this.g2(buf);
+        const local31 = this.g1(buf);
+        const local39 = this.g2(buf);
+        if (this.inBounds(local23, local19)) {
+            local23 = local23 * 128 + 64;
+            local19 = local19 * 128 + 64;
+            this.ensureZoneState(game);
+            game.spotAnims.push(new SpotAnim(local27, this.currentPlane(game), local23, local19, this.tileHeight(game, this.currentPlane(game), local23, local19) - local31, local39, this.loop(game)));
+        }
+        return true;
+    }
+
+    static handleLocAdd(buf: Buffer, game: any): boolean {
+        const local15 = this.g1add(buf);
+        const local23 = local15 >> 2;
+        const local19 = local15 & 0x3;
+        const local27 = this.LOC_LAYERS[local23] || 0;
+        const local31 = this.g1(buf);
+        const local39 = game.chunkX + (local31 >> 4 & 0x7);
+        const local45 = (local31 & 0x7) + game.chunkY;
+        const local218 = this.g2add(buf);
+        if (this.inBounds(local39, local45)) {
+            this.pushLocState(game, { op: "add", plane: this.currentPlane(game), x: local39, z: local45, anim: -1, layer: local27, type: local23, rotation: local19, locId: local218 });
+        }
+        return true;
+    }
+
+    static handleLocAnim(buf: Buffer, game: any): boolean {
+        const local15 = this.g1sub(buf);
+        const local23 = (local15 >> 4 & 0x7) + game.chunkX;
+        const local19 = game.chunkY + (local15 & 0x7);
+        const local27 = this.g1sub(buf);
+        const local31 = local27 >> 2;
+        const local39 = local27 & 0x3;
+        const local45 = this.LOC_LAYERS[local31] || 0;
+        let local218 = this.ig2(buf);
+        if (local218 === 65535) local218 = -1;
+        if (this.inBounds(local23, local19)) {
+            this.pushLocState(game, { op: "anim", plane: this.currentPlane(game), x: local23, z: local19, anim: local218, layer: local45, type: local31, rotation: local39 });
+        }
+        return true;
+    }
+
+    static handleLocAddChange(buf: Buffer, game: any): boolean {
+        const local15 = this.g1(buf);
+        const local23 = local15 >> 2;
+        const local19 = local15 & 0x3;
+        const local27 = this.g1(buf);
+        const local31 = (local27 >> 4 & 0x7) + game.chunkX;
+        const local39 = (local27 & 0x7) + game.chunkY;
+        const local605 = this.g1badd(buf);
+        const local609 = this.g1badd(buf);
+        const local613 = this.g1bsub(buf);
+        const local228 = this.g2add(buf);
+        const local232 = this.ig2(buf);
+        const local625 = this.g1b(buf);
+        const local247 = this.g2(buf);
+        const local633 = this.ig2badd(buf);
+        if (this.inBounds(local31, local39)) {
+            this.pushLocState(game, { op: "change", plane: this.currentPlane(game), x: local31, z: local39, anim: -1, layer: this.LOC_LAYERS[local23] || 0, type: local23, rotation: local19, locId: local228, raw: { local605, local609, local613, local232, local625, local247, local633 } });
+        }
+        return true;
+    }
+
+    static handleObjCount(buf: Buffer, game: any): boolean {
+        const local15 = this.g1(buf);
+        const local19 = game.chunkY + (local15 & 0x7);
+        const local23 = (local15 >> 4 & 0x7) + game.chunkX;
+        const local27 = this.g2(buf);
+        const local31 = this.g2(buf);
+        const local39 = this.g2(buf);
+        if (this.inBounds(local23, local19)) {
+            const stack = this.getGroundStack(game, this.currentPlane(game), local23, local19);
+            if (stack) {
+                const obj = stack.find((o) => (local27 & 0x7FFF) === o.type && local31 === o.amount);
+                if (obj) obj.amount = local39;
+            }
+        }
+        return true;
+    }
+
+    static handleObjAdd(buf: Buffer, game: any): boolean {
+        const local15 = this.ig2add(buf);
+        const local23 = this.g1neg(buf);
+        const local27 = game.chunkY + (local23 & 0x7);
+        const local19 = (local23 >> 4 & 0x7) + game.chunkX;
+        const local31 = this.ig2(buf);
+        const local39 = this.ig2(buf);
+        if (this.inBounds(local19, local27) && game.thisPlayerServerId !== local15) {
+            this.ensureGroundStack(game, this.currentPlane(game), local19, local27).push(new ObjStack(local39, local31));
+        }
+        return true;
+    }
+
+    static handleMapProjAnim2(buf: Buffer, game: any): boolean {
+        const local15 = this.g1(buf);
+        let local23 = game.chunkX + (local15 >> 4 & 0x7);
+        let local19 = (local15 & 0x7) + game.chunkY;
+        let local27 = local23 + this.g1b(buf);
+        let local31 = this.g1b(buf) + local19;
+        const local39 = this.g2b(buf);
+        const local45 = this.g2(buf);
+        const local218 = this.g1(buf) * 4;
+        const local224 = this.g1(buf) * 4;
+        const local228 = this.g2(buf);
+        const local232 = this.g2(buf);
+        let local236 = this.g1(buf);
+        const local247 = this.g1(buf);
+        if (local236 === 255) local236 = -1;
+        if (this.inBounds(local23, local19) && this.inBounds(local27, local31) && local45 !== 65535) {
+            local31 = local31 * 128 + 64;
+            local19 = local19 * 128 + 64;
+            local23 = local23 * 128 + 64;
+            local27 = local27 * 128 + 64;
+            const loop = this.loop(game);
+            const local317 = new ProjAnim(local45, this.currentPlane(game), local23, local19, this.tileHeight(game, this.currentPlane(game), local23, local19) - local218, loop + local228, loop + local232, local236, local247, local39, local224);
+            local317.setTarget(local31, loop + local228, this.tileHeight(game, this.currentPlane(game), local27, local31) - local224, local27);
+            this.ensureZoneState(game);
+            game.projAnims.push(local317);
+        }
+        return true;
+    }
+
+    static handleMapProjAnim(buf: Buffer, game: any): boolean {
+        const local15 = this.g1(buf);
+        let local19 = game.chunkY * 2 + (local15 & 0xF);
+        let local23 = game.chunkX * 2 + (local15 >> 4 & 0xF);
+        let local27 = this.g1b(buf) + local23;
+        let local31 = this.g1b(buf) + local19;
+        const local39 = this.g2b(buf);
+        const local45 = this.g2b(buf);
+        const local218 = this.g2(buf);
+        const local224 = this.g1b(buf);
+        const local228 = this.g1(buf) * 4;
+        const local232 = this.g2(buf);
+        const local236 = this.g2(buf);
+        let local247 = this.g1(buf);
+        const local633 = this.g1(buf);
+        if (local247 === 255) local247 = -1;
+        if (this.inBounds(local23, local19, 208) && this.inBounds(local27, local31, 208) && local218 !== 65535) {
+            local27 *= 64;
+            local23 *= 64;
+            local31 *= 64;
+            local19 *= 64;
+            const loop = this.loop(game);
+            const local1331 = new ProjAnim(local218, this.currentPlane(game), local23, local19, this.tileHeight(game, this.currentPlane(game), local23, local19) - local224, loop + local232, loop + local236, local247, local633, local45, local228);
+            local1331.setTarget(local31, loop + local232, -local228 + this.tileHeight(game, this.currentPlane(game), local27, local31), local27);
+            this.ensureZoneState(game);
+            game.projAnims.push(local1331);
+        }
+        return true;
+    }
+
+    static handleObjDel(buf: Buffer, game: any): boolean {
+        const local15 = this.g1sub(buf);
+        const local19 = game.chunkY + (local15 & 0x7);
+        const local23 = (local15 >> 4 & 0x7) + game.chunkX;
+        const local27 = this.g2(buf);
+        if (this.inBounds(local23, local19)) {
+            const stack = this.getGroundStack(game, this.currentPlane(game), local23, local19);
+            if (stack) {
+                const idx = stack.findIndex((obj) => obj.type === (local27 & 0x7FFF));
+                if (idx >= 0) stack.splice(idx, 1);
+                if (stack.length === 0) game.groundObjects[this.currentPlane(game)][local23][local19] = null;
+            }
+        }
+        return true;
+    }
+
+    static handleSpotAnimEntity(buf: Buffer, game: any): boolean {
+        const delay = this.g2(buf);
+        const height = this.ig2(buf);
+        const target = this.img4(buf);
+        let gfxId = this.ig2add(buf);
+        if (gfxId === 65535) gfxId = -1;
+
+        if (target >> 30 === 0) {
+            const id = target & 0xFFFF;
+            const actor = (target >> 29) !== 0
+                ? game.npcs?.[id]
+                : ((target >> 28) !== 0 ? (game.thisPlayerId === id ? game.constructor.localPlayer : game.players?.[id]) : null);
+            if (actor) {
+                actor.spotAnimId = gfxId;
+                actor.spotAnimStart = this.loop(game) + delay;
+                actor.spotAnimY = height;
+                actor.anInt3418 = 1;
+                actor.anInt3361 = 0;
+                actor.anInt3399 = actor.spotAnimStart > this.loop(game) ? -1 : 0;
+            }
+        } else {
+            const plane = target >> 28 & 0x3;
+            let posX = (target >> 14 & 0x3FFF) - this.originX(game);
+            let posZ = (target & 0x3FFF) - this.originZ(game);
+            if (this.inBounds(posX, posZ)) {
+                posZ = posZ * 128 + 64;
+                posX = posX * 128 + 64;
+                this.ensureZoneState(game);
+                game.spotAnims.push(new SpotAnim(gfxId, plane, posX, posZ, this.tileHeight(game, plane, posX, posZ) - height, delay, this.loop(game), target, height));
+            }
+        }
+        return true;
+    }
+
+    static handleNpcAnimSpecific(buf: Buffer, game: any): boolean {
+        const npcId = this.ig2(buf);
+        const value = this.g1sub(buf);
+        let seqId = this.g2(buf);
+        if (seqId === 65535) seqId = -1;
+        const npc = game.npcs?.[npcId];
+        if (npc) {
+            npc.emoteAnimation = seqId;
+            npc.animationDelay = value;
+            npc.displayedEmoteFrames = 0;
+            npc.anInt1626 = 0;
+            npc.anInt1628 = 0;
+            npc.animationOverride = seqId;
+        }
+        return true;
+    }
+
+    static handleLocAnimSpecific(buf: Buffer, game: any): boolean {
+        const slot = this.g1sub(buf);
+        const type = slot >> 2;
+        const rotation = slot & 0x3;
+        const type2 = this.LOC_LAYERS[type] || 0;
+        let seqId = this.g2(buf);
+        const pos = this.g4(buf);
+        if (seqId === 65535) seqId = -1;
+        const z = (pos & 0x3FFF) - this.originZ(game);
+        const x = (pos >> 14 & 0x3FFF) - this.originX(game);
+        const plane = pos >> 28 & 0x3;
+        if (this.inBounds(x, z)) {
+            this.pushLocState(game, { op: "animSpecific", plane, x, z, anim: seqId, layer: type2, type, rotation });
+        }
         return true;
     }
 
