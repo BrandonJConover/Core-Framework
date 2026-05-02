@@ -2604,8 +2604,7 @@ final class RSCGameEngine: ObservableObject {
     // MARK: - Character Appearance
 
     func sendAppearance(headGender: Int, headType: Int, bodyGender: Int, skinTone: Int,
-                        hairColour: Int, topColour: Int, bottomColour: Int, skinColour: Int,
-                        mode1: Int = 0, mode2: Int = 0) {
+                        hairColour: Int, topColour: Int, bottomColour: Int, skinColour: Int) {
         worldState.showAppearanceChange = false
         Task {
             let buf = ByteBuffer()
@@ -2618,8 +2617,6 @@ final class RSCGameEngine: ObservableObject {
             buf.putByte(topColour)      // 0-14
             buf.putByte(bottomColour)   // 0-14
             buf.putByte(skinColour)     // 0-4
-            buf.putByte(mode1)          // player mode (normal/ironman/etc)
-            buf.putByte(mode2)          // player mode 2
             try? await connection.send(buf.finishPacket())
             print("[Engine] Appearance sent")
         }
@@ -2687,7 +2684,7 @@ final class RSCGameEngine: ObservableObject {
 
     /// Sends the entire current trade offer list to the server (TRADE_OFFER, opcode 46).
     /// Java client mudclient.java:17215 — replaces server-side offer with the full list.
-    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount, SHORT noted(0/1).
+    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount.
     func tradeOffer(_ items: [(id: Int, amount: Int)]) {
         // Optimistic local update — packet handler will overwrite from server later.
         worldState.tradeMyOffer = items
@@ -2700,7 +2697,6 @@ final class RSCGameEngine: ObservableObject {
             for it in items {
                 buf.putShort(it.id)
                 buf.putInt(it.amount)
-                buf.putShort(0) // noted: 0 — TODO: support noted items
             }
             try? await connection.send(buf.finishPacket())
         }
@@ -2719,7 +2715,7 @@ final class RSCGameEngine: ObservableObject {
 
     /// Sends the entire current duel stake list (DUEL_OFFER_ITEM, opcode 33).
     /// Java client mudclient.java:11102 — same format as trade offer.
-    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount, SHORT noted(0/1).
+    /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount.
     func duelOffer(_ items: [(id: Int, amount: Int)]) {
         worldState.duelMyStake = items
         worldState.duelAccepted = false
@@ -2731,7 +2727,6 @@ final class RSCGameEngine: ObservableObject {
             for it in items {
                 buf.putShort(it.id)
                 buf.putInt(it.amount)
-                buf.putShort(0) // noted: 0
             }
             try? await connection.send(buf.finishPacket())
         }
