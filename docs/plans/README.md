@@ -15,7 +15,17 @@ Each plan in this folder is a self-contained ChatGPT brief for one tier of the r
 | 7 | (tier 7b — widget renderer) | **Unwritten.** Render the widget tree the skeleton built. |
 | 8 | [tier8 — textures (idx26 + TextureOps)](web-client-tier8-textures.md) | Last visible-rendering tier; depends on verified rasterizer (Tier 6). |
 | 9 | [tier9 — BAS skeletons + skin transforms](web-client-tier9-bas-skeletons.md) | Animations (walk / idle / attack). Comes after textures so debugging splits cleanly between "is the model on screen?" and "is it animating?". |
-| 5d | [tier5d — audio (SoundBank + 2 opcodes)](web-client-tier5d-audio.md) | Independent of 5a/b/c — can run in parallel with any of them. |
+| 5d | [tier5d — audio (SoundBank + 2 opcodes)](web-client-tier5d-audio.md) | Independent of every other tier — parallelisable. |
+| 10 | [tier10 — music streaming (MIDI → OGG)](web-client-tier10-music.md) | Independent of every other tier — parallelisable. Pre-converts MIDI via FluidSynth at build time. |
+
+## iOS plans
+
+The iOS port has its own tracker at [`iOS_Client/OpenRSC/REMAINING.md`](../../iOS_Client/OpenRSC/REMAINING.md). Most items there are picked up by the engine-side iteration loop. Plans below are for items that belong to **avoid-listed files** (HUDView, SoundManager, etc.) and need to be handed to those owners explicitly.
+
+| Plan | For owner of | Status |
+|---|---|---|
+| [ios-hudview-chat-color-run-energy.md](ios-hudview-chat-color-run-energy.md) | `HUDView.swift` | Pickable now |
+| [ios-userdefaults-preferences.md](ios-userdefaults-preferences.md) | engine + new `UserPreferences.swift` (no avoid-list collision) | Pickable now |
 
 ## Conventions every plan follows
 
