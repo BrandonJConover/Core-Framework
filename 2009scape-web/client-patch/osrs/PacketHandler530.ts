@@ -9,6 +9,10 @@
  */
 import { Buffer } from "./net/Buffer";
 import { ObjStack, ProjAnim, SpotAnim } from "./cache/def/ObjStackNode";
+import { TextUtils } from "./util/TextUtils";
+import { ChatFilterSettings } from "./util/ChatFilterSettings";
+import { ClanState, PrivateMessage } from "./util/PrivateMessageQueue";
+import Long from "long";
 
 export class PacketHandler530 {
     private static equipmentObjIds530: number[] | null = null;
@@ -89,6 +93,24 @@ export class PacketHandler530 {
             case 69:  return this.consumeKnown(buf, size);              // VarcUpdate
 
             // State update packets with real handlers
+            case 13:  return this.handleTeleportLocalPlayer(buf, game); // TELEPORT_LOCAL_PLAYER
+            case 89:  return this.handleResetClientVarCache(game);      // RESET_CLIENT_VARCACHE
+            case 128: return this.handleForceVarpRefresh(buf, size, game); // FORCE_VARP_REFRESH
+            case 131: return this.handleResetAnims(game);               // RESET_ANIMS
+            case 142: return this.handleSettingsString(buf, size, game); // SET_SETTINGS_STRING
+            case 159: return this.handleRunWeight530(buf, game);        // UPDATE_RUNWEIGHT
+            case 160: return this.handleSetWalkText(buf, size, game);   // SET_WALK_TEXT
+            case 164: return this.handleLastLoginInfo(buf, size, game); // LAST_LOGIN_INFO
+            case 169: return this.handleUid192(buf, size, game);        // UPDATE_UID192
+            case 191: return this.handleDeleteInventory(buf, game);     // DELETE_INVENTORY
+            case 232: return this.handleChatFilterSettings(buf, game);  // CHAT_FILTER_SETTINGS
+            case 0:   return this.handleMessagePrivate(buf, size, game);
+            case 71:  return this.handleMessagePrivateEcho(buf, size, game);
+            case 247: return this.handleMessageQuickchatPrivate(buf, size, game);
+            case 141: return this.handleMessageQuickchatPrivateEcho(buf, size, game);
+            case 54:  return this.handleMessageClanChannel(buf, size, game);
+            case 81:  return this.handleClanQuickChat(buf, size, game);
+            case 196: return this.handleUpdateClan(buf, game);
             case 60:  return this.handleVarpSmall(buf, game);           // 2 bytes
             case 226: return this.handleVarpLarge(buf, game);           // 6 bytes
             case 38:  return this.handleUpdateStat(buf, game);          // 6 bytes
@@ -155,6 +177,12 @@ export class PacketHandler530 {
         const value = this.g2(buf);
         return value > 32767 ? value - 0x10000 : value;
     }
+    static g3(buf: Buffer): number {
+        buf.currentPosition += 3;
+        return ((buf.buffer[buf.currentPosition - 3] & 0xFF) << 16) +
+               ((buf.buffer[buf.currentPosition - 2] & 0xFF) << 8) +
+                (buf.buffer[buf.currentPosition - 1] & 0xFF);
+    }
     static ig2(buf: Buffer): number {
         buf.currentPosition += 2;
         return (buf.buffer[buf.currentPosition - 2] & 0xFF) + ((buf.buffer[buf.currentPosition - 1] & 0xFF) << 8);
@@ -216,6 +244,11 @@ export class PacketHandler530 {
         const b3 = buf.buffer[buf.currentPosition - 1] & 0xFF;
         return ((b1 << 24) | (b0 << 16) | (b3 << 8) | b2) >>> 0;
     }
+    static g8(buf: Buffer): Long {
+        const high = this.g4(buf) | 0;
+        const low = this.g4(buf) | 0;
+        return new Long(low, high);
+    }
     static gjstr(buf: Buffer): string {
         let s = "";
         const end = buf.buffer ? buf.buffer.length : 0;
@@ -224,6 +257,51 @@ export class PacketHandler530 {
         }
         if (buf.currentPosition < end) buf.currentPosition++; // skip NUL
         return s;
+    }
+
+    static name37ToString(name37: Long): string {
+        try {
+            return TextUtils.formatName(TextUtils.longToName(name37));
+        } catch (e) {
+            return name37.toString();
+        }
+    }
+
+    static messageId(top: number, bot: number): string {
+        return `${top >>> 0}:${bot >>> 0}`;
+    }
+
+    static consumeMessageBody(buf: Buffer, end: number): string {
+        const bytes: number[] = [];
+        const limit = Math.min(end, buf.buffer ? buf.buffer.length : end);
+        while (buf.currentPosition < limit) {
+            const value = buf.buffer[buf.currentPosition++] & 0xFF;
+            if (value === 0 || value === 10) break;
+            bytes.push(value);
+        }
+        if (bytes.length === 0) return "";
+        const printable = bytes.every(b => b === 9 || b === 13 || (b >= 32 && b <= 126));
+        return printable ? String.fromCharCode.apply(null, bytes) : "[message]";
+    }
+
+    static consumeQuickChatPayload(buf: Buffer, end: number): string {
+        // TODO Huffman decode (Tier 8). QuickChat phrase params are variable bytes.
+        const limit = Math.min(end, buf.buffer ? buf.buffer.length : end);
+        if (buf.currentPosition >= limit) return "[quickchat]";
+        const remaining = limit - buf.currentPosition;
+        const declared = buf.buffer[buf.currentPosition] & 0xFF;
+        if (declared <= remaining - 1) {
+            buf.currentPosition += 1 + declared;
+        } else {
+            buf.currentPosition = limit;
+        }
+        return "[quickchat]";
+    }
+
+    static pushChat(game: any, name: string, message: string, type: number) {
+        if (game && game.addChatMessage) {
+            game.addChatMessage(name, message, type);
+        }
     }
 
     // Generic consumer for opcodes where we only need to keep the stream aligned
@@ -764,6 +842,294 @@ export class PacketHandler530 {
     }
 
     // ── State update packets ──
+
+    static handleTeleportLocalPlayer(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:1543 — g1sub(pos1), g1add(flags), g1(pos2).
+        const pos1 = this.g1sub(buf);
+        const flags = this.g1add(buf);
+        const pos2 = this.g1(buf);
+        game.plane = flags >> 1;
+        if (game.players && game.thisPlayerId != null && game.players[game.thisPlayerId]) {
+            game.players[game.thisPlayerId].setPosition(pos1, pos2, (flags & 1) === 1);
+        } else if ((game.constructor as any).localPlayer) {
+            (game.constructor as any).localPlayer.setPosition(pos1, pos2, (flags & 1) === 1);
+        }
+        return true;
+    }
+
+    static handleResetClientVarCache(game: any): boolean {
+        // rt4 Protocol.java:1294 — no payload, reset client-side varp cache.
+        game.clientVarCacheResetAt = (game.loopCycle || game.pulseCycle || Date.now()) | 0;
+        game.redrawTabArea = true;
+        return true;
+    }
+
+    static handleForceVarpRefresh(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1634 — current reference reads no bytes and refreshes active varps.
+        // Some handoff notes describe an older g2 varpId variant, so preserve it if present.
+        if (size >= 2) {
+            game.forceVarpRefreshId = this.g2(buf);
+        }
+        if (buf.currentPosition < size) buf.currentPosition = size;
+        game.forceVarpRefreshCount = (game.forceVarpRefreshCount || 0) + 1;
+        return true;
+    }
+
+    static handleResetAnims(game: any): boolean {
+        // rt4 Protocol.java:1847 — clear in-flight seqId on all players and NPCs.
+        const clear = (actor: any) => {
+            if (!actor) return;
+            actor.seqId = -1;
+            actor.emoteAnimation = -1;
+            actor.currentAnimation = -1;
+            actor.animationDelay = 0;
+        };
+        if (game.players) for (const player of game.players) clear(player);
+        if (game.npcs) for (const npc of game.npcs) clear(npc);
+        return true;
+    }
+
+    static handleSettingsString(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:2309 currently calls method3954(gjstr()). Some 530 notes
+        // describe a slot-prefixed shape; parse that adaptively without risking drift.
+        if (size <= 0) return true;
+        const start = buf.currentPosition;
+        if (size >= 2) {
+            const slot = this.g1(buf);
+            const text = this.gjstr(buf);
+            if (buf.currentPosition === start + size && slot >= 0 && slot < 256) {
+                game.settingsStrings[slot] = text;
+                return true;
+            }
+            buf.currentPosition = start;
+        }
+        const text = this.gjstr(buf);
+        game.settingsStrings[0] = text;
+        return true;
+    }
+
+    static handleRunWeight530(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:1790 — UPDATE_RUNWEIGHT reads g2b.
+        game.runWeight = this.g2b(buf);
+        game.anInt1319 = game.runWeight;
+        return true;
+    }
+
+    static handleSetWalkText(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1626 — empty payload restores default "Walk here".
+        game.walkText = size === 0 ? "Walk here" : this.gjstr(buf);
+        return true;
+    }
+
+    static handleLastLoginInfo(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1203 reads img4; keep optional legacy fields if present.
+        const ip = size >= 4 ? this.img4(buf) : 0;
+        const remaining = size - 4;
+        const daysAgo = remaining >= 2 ? this.g2(buf) : 0;
+        const recoveryDays = remaining >= 4 ? this.g2(buf) : 0;
+        game.lastLogin = { ip, daysAgo, recoveryDays };
+        return true;
+    }
+
+    static handleUid192(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1290 writeRandom(inboundBuffer). Store the 32-bit seed chunk.
+        game.uid192 = size >= 4 ? this.g4(buf) : 0;
+        if (buf.currentPosition < size) buf.currentPosition = size;
+        return true;
+    }
+
+    static handleDeleteInventory(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:1774 — DELETE_INVENTORY reads only ig2 container id.
+        const id = this.ig2(buf);
+        if (!game.deletedInventories) game.deletedInventories = [];
+        game.deletedInventories.push(id & 0x7FFF);
+        return true;
+    }
+
+    static handleChatFilterSettings(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:1220 — public/private/trade, one byte each.
+        game.chatFilter = ChatFilterSettings.fromServer(buf);
+        game.publicChatMode = game.chatFilter.publicFilter;
+        game.privateChatMode = game.chatFilter.privateFilter;
+        game.tradeMode = game.chatFilter.tradeFilter;
+        return true;
+    }
+
+    static handleMessagePrivate(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1944 — g8 sender, g2 top, g3 bot, g1 rights, encoded body.
+        const sender37 = this.g8(buf);
+        const top = this.g2(buf);
+        const bot = this.g3(buf);
+        const rights = this.g1(buf);
+        const body = this.consumeMessageBody(buf, size);
+        const senderName = this.name37ToString(sender37);
+        const msg: PrivateMessage = {
+            senderName,
+            senderName37: sender37.toString(),
+            rights,
+            body,
+            receivedAt: Date.now(),
+            direction: "in",
+            messageId: this.messageId(top, bot)
+        };
+        game.privateMessages.push(msg);
+        this.pushChat(game, rights !== 0 ? `@cr${Math.min(rights, 2)}@${senderName}` : senderName, body, rights !== 0 ? 7 : 3);
+        return true;
+    }
+
+    static handleMessagePrivateEcho(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1796 — g8 recipient, encoded outgoing body.
+        const target37 = this.g8(buf);
+        const body = this.consumeMessageBody(buf, size);
+        const targetName = this.name37ToString(target37);
+        game.privateMessages.push({
+            senderName: targetName,
+            senderName37: target37.toString(),
+            rights: 0,
+            body,
+            receivedAt: Date.now(),
+            direction: "out"
+        });
+        this.pushChat(game, targetName, body, 6);
+        return true;
+    }
+
+    static handleMessageQuickchatPrivate(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1655 — g8 sender, g2/g3 id pair, g1 rights, g2 quickchat id.
+        const sender37 = this.g8(buf);
+        const top = this.g2(buf);
+        const bot = this.g3(buf);
+        const rights = this.g1(buf);
+        const quickchatId = this.g2(buf);
+        const body = this.consumeQuickChatPayload(buf, size);
+        const senderName = this.name37ToString(sender37);
+        game.privateMessages.push({
+            senderName,
+            senderName37: sender37.toString(),
+            rights,
+            body,
+            receivedAt: Date.now(),
+            direction: "in",
+            messageId: this.messageId(top, bot),
+            quickchatId
+        });
+        this.pushChat(game, rights !== 0 ? `@cr${Math.min(rights, 2)}@${senderName}` : senderName, body, 7);
+        return true;
+    }
+
+    static handleMessageQuickchatPrivateEcho(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1283 — g8 recipient, g2 quickchat id, variable quickchat params.
+        const target37 = this.g8(buf);
+        const quickchatId = this.g2(buf);
+        const body = this.consumeQuickChatPayload(buf, size);
+        const targetName = this.name37ToString(target37);
+        game.privateMessages.push({
+            senderName: targetName,
+            senderName37: target37.toString(),
+            rights: 0,
+            body,
+            receivedAt: Date.now(),
+            direction: "out",
+            quickchatId
+        });
+        this.pushChat(game, targetName, body, 6);
+        return true;
+    }
+
+    static ensureClanState(game: any): ClanState {
+        if (!game.clanState) {
+            game.clanState = { name: "", owner: "", world: 0, rank: 0, minKick: 0, members: [], messages: [] };
+        }
+        if (!game.clanState.messages) game.clanState.messages = [];
+        if (!game.clanState.members) game.clanState.members = [];
+        return game.clanState;
+    }
+
+    static handleMessageClanChannel(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1987 — g8 sender, g1b world/rank byte, g8 clan, g2/g3 id, g1 rights, body.
+        const sender37 = this.g8(buf);
+        this.g1b(buf);
+        const clan37 = this.g8(buf);
+        const top = this.g2(buf);
+        const bot = this.g3(buf);
+        const rights = this.g1(buf);
+        const body = this.consumeMessageBody(buf, size);
+        const senderName = this.name37ToString(sender37);
+        const clanName = this.name37ToString(clan37);
+        const msg: PrivateMessage = {
+            senderName,
+            senderName37: sender37.toString(),
+            rights,
+            body,
+            receivedAt: Date.now(),
+            direction: "clan",
+            messageId: this.messageId(top, bot),
+            clanName
+        };
+        const clan = this.ensureClanState(game);
+        clan.name = clan.name || clanName;
+        clan.messages.push(msg);
+        this.pushChat(game, `[${clanName}] ${rights !== 0 ? `@cr${Math.min(rights, 2)}@` : ""}${senderName}`, body, 16);
+        return true;
+    }
+
+    static handleClanQuickChat(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java:1107 — clan-channel quickchat; payload after quickchatId is Huffman-backed params.
+        const sender37 = this.g8(buf);
+        this.g1b(buf);
+        const clan37 = this.g8(buf);
+        const top = this.g2(buf);
+        const bot = this.g3(buf);
+        const rights = this.g1(buf);
+        const quickchatId = this.g2(buf);
+        const body = this.consumeQuickChatPayload(buf, size);
+        const senderName = this.name37ToString(sender37);
+        const clanName = this.name37ToString(clan37);
+        const msg: PrivateMessage = {
+            senderName,
+            senderName37: sender37.toString(),
+            rights,
+            body,
+            receivedAt: Date.now(),
+            direction: "clan",
+            messageId: this.messageId(top, bot),
+            quickchatId,
+            clanName
+        };
+        const clan = this.ensureClanState(game);
+        clan.name = clan.name || clanName;
+        clan.messages.push(msg);
+        this.pushChat(game, `[${clanName}] ${senderName}`, body, 20);
+        return true;
+    }
+
+    static handleUpdateClan(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java:2172 — member add/update or high-bit remove.
+        let name37 = this.g8(buf);
+        const world = this.g2(buf);
+        const rank = this.g1b(buf);
+        const clan = this.ensureClanState(game);
+        const removed = name37.isNegative();
+        if (removed) {
+            name37 = new Long(name37.low, name37.high & 0x7FFFFFFF);
+            const key = name37.toString();
+            clan.members = clan.members.filter(member => !(member.name37 === key && member.world === world));
+            return true;
+        }
+        const worldName = this.gjstr(buf);
+        const name = this.name37ToString(name37);
+        const key = name37.toString();
+        const existing = clan.members.find(member => member.name37 === key);
+        if (existing) {
+            existing.world = world;
+            existing.rank = rank;
+            existing.worldName = worldName;
+        } else {
+            clan.members.push({ name, name37: key, world, worldName, rank });
+            clan.members.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return true;
+    }
 
     static handleVarpSmall(buf: Buffer, game: any): boolean {
         // Opcode 60: VARP_SMALL (3 bytes)
