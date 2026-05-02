@@ -3,10 +3,8 @@
 //! Implements NPC spawning, combat AI, pathfinding, and drop tables.
 
 use super::entity::{Direction, EntityId, Position};
-use super::combat::CombatStyle;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::Instant;
 use tracing::debug;
 
 /// NPC definition containing stats and behavior.

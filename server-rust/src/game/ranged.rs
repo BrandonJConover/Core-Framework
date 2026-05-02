@@ -2,7 +2,7 @@
 //! Handles bows, crossbows, throwing weapons, and projectile calculations.
 
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::info;
 
 use super::entity::{EntityId, Position};
 

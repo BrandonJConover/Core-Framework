@@ -1,7 +1,6 @@
 //! Packet structures for RSC protocol.
 
 use super::{PacketBuilder, PacketReader, Packet};
-use crate::game::entity::Position;
 use std::io;
 
 /// Login request packet.

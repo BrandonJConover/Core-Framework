@@ -2,7 +2,6 @@
 //! Handles ore rocks, mining mechanics, and gem drops.
 
 use std::collections::HashMap;
-use tracing::{debug, info};
 
 use super::entity::Position;
 

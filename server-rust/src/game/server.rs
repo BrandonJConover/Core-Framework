@@ -1,8 +1,15 @@
 //! Server state module — central hub connecting game state, sessions, and tick loop.
 
 use crate::database::player_repository::PlayerRepository;
-use crate::game::{GameState, Player, World, Entity, EntityId, Position};
-use crate::game::state_updater::{GameStateUpdater, KnownEntityList, PlayerSnapshot};
+use crate::game::{GameState, Player, Entity, EntityId, Position};
+use crate::game::appearance::build_appearance_data;
+use crate::game::equipment::Equipment as CanonicalEquipment;
+use crate::game::game_object::ObjectType;
+use crate::game::item::ItemId;
+use crate::game::state_updater::{
+    GameObjectSnapshot, GameStateUpdater, GroundItemSnapshot, KnownEntityList, NpcSnapshot,
+    PlayerSnapshot,
+};
 use crate::protocol::{Packet, PacketBuilder, PacketReader};
 use crate::protocol::opcodes::{OpcodeIn, OpcodeOut};
 use crate::protocol::packets::{LoginRequest, LoginResponse};
@@ -10,8 +17,8 @@ use crate::session::{Session, SessionManager, SessionState};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, error, info, warn};
+use tokio::sync::RwLock;
+use tracing::{debug, info, warn};
 
 /// Tick duration in milliseconds (640ms = RSC game tick).
 pub const TICK_DURATION_MS: u64 = 640;
@@ -46,7 +53,7 @@ pub struct ServerState {
 
 impl ServerState {
     pub fn new() -> Self {
-        let mut game = GameState::new(1); // 1 tick per cycle
+        let game = GameState::new(1); // 1 tick per cycle
         Self {
             sessions: SessionManager::new(),
             game,
@@ -541,19 +548,79 @@ impl ServerState {
     /// Java server's `GameStateUpdater.updatePlayers` does.
     ///
     /// Pipeline:
-    ///   1. Collect a [`PlayerSnapshot`] for every online player (one read pass).
+    ///   0. Acquire a single read lock on the world, snapshot all NPCs,
+    ///      game-objects, and ground-items, then release the lock.
+    ///   1. Collect a [`PlayerSnapshot`] (with full appearance data) for every
+    ///      online player (one read pass).
     ///   2. For each session, retrieve (or lazily create) its per-session
-    ///      [`KnownEntityList`] pair, call `generate_updates`, convert the
-    ///      returned `game::protocol::Packet` values to wire `Packet` values,
-    ///      and ship them over the session channel.
-    ///
-    /// NPC, object, and ground-item snapshots are passed as empty slices until
-    /// the world-state snapshot API lands; at that point only this function
-    /// needs to be updated.
+    ///      [`KnownEntityList`] pair, filter objects/items by view distance,
+    ///      call `generate_updates`, convert the returned packets, and send.
     async fn send_entity_updates(&mut self) {
-        let sessions = self.sessions.all_sessions();
+        // ------------------------------------------------------------------
+        // Pass 0: collect world-level snapshots under a single read lock.
+        // ------------------------------------------------------------------
+        let (all_npcs, all_objects, all_ground_items) =
+            if let Some(world_arc) = self.game.get_world("Main World") {
+                let world = world_arc.read().await;
 
-        // --- Pass 1: build a snapshot of every online player ---
+                // NPC snapshots — indexed sequentially for client npc_index.
+                let npcs: Vec<NpcSnapshot> = world
+                    .npcs
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, (entity_id, npc))| NpcSnapshot {
+                        entity_id: *entity_id,
+                        npc_index: idx as u16,
+                        def_id: npc.definition_id,
+                        position: npc.position,
+                        // world::Npc has no direction; default South.
+                        direction: npc.direction,
+                        moved_this_tick: npc.moved_this_tick,
+                        removed: npc.is_dead(),
+                    })
+                    .collect();
+
+                // Game-object snapshots (all objects in world).
+                let objects: Vec<GameObjectSnapshot> = world
+                    .game_objects
+                    .values()
+                    .filter(|obj| obj.active)
+                    .map(|obj| GameObjectSnapshot {
+                        // world::GameObject uses `id` where state_updater
+                        // expects `def_id`; they carry the same definition id.
+                        def_id: obj.id,
+                        position: obj.position,
+                        // world::GameObject has no ObjectDirection; default 0.
+                        direction: 0,
+                        // world::GameObject has no ObjectType; default Scenery.
+                        object_type: ObjectType::Scenery,
+                    })
+                    .collect();
+
+                // Ground-item snapshots — position comes from the map key.
+                let ground_items: Vec<GroundItemSnapshot> = world
+                    .ground_items
+                    .iter()
+                    .flat_map(|(pos, items)| {
+                        items.iter().map(move |item| GroundItemSnapshot {
+                            // world::GroundItem.item_id is u32; ItemId is a
+                            // newtype wrapper around u32.
+                            item_id: ItemId(item.item_id),
+                            amount: item.amount,
+                            position: *pos,
+                        })
+                    })
+                    .collect();
+
+                (npcs, objects, ground_items)
+            } else {
+                (Vec::new(), Vec::new(), Vec::new())
+            };
+
+        // ------------------------------------------------------------------
+        // Pass 1: build a snapshot of every online player (with appearance).
+        // ------------------------------------------------------------------
+        let sessions = self.sessions.all_sessions();
         let mut all_players: Vec<PlayerSnapshot> = Vec::with_capacity(sessions.len());
         for session in &sessions {
             let s = session.read().await;
@@ -562,26 +629,36 @@ impl ServerState {
             }
             if let Some(ref pa) = s.player {
                 let p = pa.read().await;
+                // Build the full appearance blob (username, equipment,
+                // colours, skull, clan tag) — sent once per new observer.
+                let appearance_data = if p.appearance_changed {
+                    // Player uses its own local Equipment type; the canonical
+                    // Equipment (expected by build_appearance_data) is separate.
+                    // Stub with an empty canonical Equipment until the two types
+                    // are unified — all colours/gender/skull still encode correctly.
+                    let stub_equip = CanonicalEquipment::new();
+                    build_appearance_data(&p.username, &p.appearance, &stub_equip, 0, 0)
+                } else {
+                    Vec::new()
+                };
                 all_players.push(PlayerSnapshot {
                     entity_id: EntityId(p.id),
                     player_index: p.player_index,
                     position: p.position,
                     direction: p.direction,
-                    // A non-empty walking queue means the player moved this tick.
                     moved_this_tick: !p.walking_queue.is_empty(),
                     appearance_changed: p.appearance_changed,
-                    // Full appearance encoding (equipment, skull, etc.) is
-                    // wired in appearance.rs; empty slice triggers no
-                    // appearance packet until the encoder is hooked up.
-                    appearance_data: Vec::new(),
+                    appearance_data,
                 });
             }
         }
 
-        // --- Pass 2: per-session update generation + send ---
+        // ------------------------------------------------------------------
+        // Pass 2: per-session update generation + send.
+        // ------------------------------------------------------------------
+        const VIEW_RADIUS: i32 = 16;
         for session in &sessions {
-            // Capture what we need before releasing the lock so that the
-            // mutable borrow of self.known_lists can proceed.
+            // Capture session metadata under a short read lock.
             let captured = {
                 let s = session.read().await;
                 if s.state != SessionState::LoggedIn {
@@ -601,7 +678,26 @@ impl ServerState {
                 None => continue,
             };
 
-            // Lazily create the known-entity lists for this session.
+            // Filter objects and ground items to this player's view area.
+            let nearby_objects: Vec<GameObjectSnapshot> = all_objects
+                .iter()
+                .filter(|o| {
+                    (o.position.x - player_pos.x).abs() <= VIEW_RADIUS
+                        && (o.position.y - player_pos.y).abs() <= VIEW_RADIUS
+                })
+                .cloned()
+                .collect();
+
+            let nearby_ground_items: Vec<GroundItemSnapshot> = all_ground_items
+                .iter()
+                .filter(|g| {
+                    (g.position.x - player_pos.x).abs() <= VIEW_RADIUS
+                        && (g.position.y - player_pos.y).abs() <= VIEW_RADIUS
+                })
+                .cloned()
+                .collect();
+
+            // Lazily create known-entity lists for this session.
             let (kp, kn) = self
                 .known_lists
                 .entry(session_id)
@@ -609,31 +705,27 @@ impl ServerState {
                     (KnownEntityList::for_players(), KnownEntityList::for_npcs())
                 });
 
-            // Generate all outbound update packets for this player's view.
+            // Generate the full outbound update packet set for this player.
             let game_packets = GameStateUpdater::generate_updates(
                 player_id,
                 player_pos,
                 kp,
                 kn,
                 &all_players,
-                &[], // NPC snapshots — wired when world NPC spawning lands
-                &[], // game-object snapshots
-                &[], // ground-item snapshots
+                &all_npcs,
+                &nearby_objects,
+                &nearby_ground_items,
             );
 
-            // Re-acquire session lock to send; this is a second short-lived
-            // read lock taken after the known_lists borrow ends.
+            // Re-acquire session lock to send (short-lived, after known_lists
+            // borrow ends so the borrow checker is satisfied).
             let s = session.read().await;
             for gp in game_packets {
-                // Convert game::protocol::Packet → crate::protocol::Packet.
-                // Both carry (opcode: u8, payload: bytes); the game-layer
-                // type uses Vec<u8> while the wire type uses Bytes.
                 let wire = Packet::new(gp.opcode, gp.payload);
                 let _ = s.send(wire).await;
             }
 
-            // After sending, clear appearance_changed so the client isn't
-            // re-sent the same appearance blob next tick.
+            // Clear appearance_changed so we don't re-send the blob next tick.
             if let Some(ref pa) = s.player {
                 if let Ok(mut p) = pa.try_write() {
                     p.appearance_changed = false;

@@ -4,7 +4,7 @@
 //! for NPC vendor buy/sell operations.
 
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::protocol::opcodes::OpcodeOut;
 use crate::protocol::{Packet, PacketBuilder};

@@ -2,9 +2,9 @@
 //! Handles fishing spots, catch mechanics, and fish definitions.
 
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::info;
 
-use super::entity::{EntityId, Position};
+use super::entity::Position;
 
 /// Fishing equipment types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

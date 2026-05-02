@@ -1,8 +1,8 @@
 //! Packet handler module for processing incoming packets.
 
 use crate::game::GameState;
-use crate::protocol::{Packet, PacketBuilder, PacketReader};
-use crate::protocol::opcodes::{OpcodeIn, OpcodeOut};
+use crate::protocol::{Packet, PacketReader};
+use crate::protocol::opcodes::OpcodeIn;
 use crate::protocol::packets::{LoginRequest, LoginResponse, ChatMessage, WalkToPoint};
 use crate::session::{Session, SessionState};
 use std::sync::Arc;

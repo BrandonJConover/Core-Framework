@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn, debug};
+use tracing::{info, debug};
 
 /// Item in a trade offer.
 #[derive(Debug, Clone, Serialize, Deserialize)]

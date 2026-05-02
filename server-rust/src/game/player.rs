@@ -1,10 +1,9 @@
 //! Player module for player entity management.
 
+use super::appearance::PlayerAppearance;
 use super::entity::{Direction, Entity, EntityId, Position};
 use super::skills::Skills;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::debug;
 
 /// Player entity representing a connected player.
 #[derive(Debug)]
@@ -25,10 +24,14 @@ pub struct Player {
     pub walking_queue: Vec<Position>,
     pub appearance_changed: bool,
     pub player_index: u16,
+    /// Visual appearance (colours, gender, skull, clan tag, etc.).
+    pub appearance: PlayerAppearance,
 }
 
 impl Player {
     pub fn new(id: u64, username: String) -> Self {
+        let mut appearance = PlayerAppearance::default();
+        appearance.combat_level = 3;
         Self {
             id,
             username,
@@ -46,6 +49,7 @@ impl Player {
             walking_queue: Vec::new(),
             appearance_changed: true,
             player_index: 0,
+            appearance,
         }
     }
 

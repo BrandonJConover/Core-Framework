@@ -2,7 +2,6 @@
 //! Handles lighting logs on fire.
 
 use std::collections::HashMap;
-use tracing::{debug, info};
 
 use super::entity::Position;
 

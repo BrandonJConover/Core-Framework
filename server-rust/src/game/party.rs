@@ -1,9 +1,9 @@
 //! Party system.
 //! Handles temporary player groups for activities like combat and quests.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Maximum party size.
 pub const MAX_PARTY_SIZE: usize = 5;

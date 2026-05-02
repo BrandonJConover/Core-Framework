@@ -103,7 +103,7 @@ impl RscCodec {
     ///   `return (opcode + outCipher.getNextValue()) & 0xFF;`
     pub fn encode_opcode(&mut self, opcode: u8) -> u8 {
         match self.out_cipher.as_mut() {
-            Some(c) => (opcode.wrapping_add((c.next_value() & 0xFF) as u8)),
+            Some(c) => opcode.wrapping_add((c.next_value() & 0xFF) as u8),
             None => opcode,
         }
     }

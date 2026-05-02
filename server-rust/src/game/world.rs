@@ -1,6 +1,6 @@
 //! World module for game world management.
 
-use super::entity::{EntityId, Position};
+use super::entity::{Direction, EntityId, Position};
 use std::collections::HashMap;
 use tracing::{debug, info};
 
@@ -123,6 +123,11 @@ impl World {
         }
     }
 
+    /// Current world tick counter.
+    pub fn tick_count(&self) -> u64 {
+        self.tick_count
+    }
+
     /// Check if position is walkable.
     pub fn is_walkable(&self, pos: Position) -> bool {
         // Check for blocking game objects
@@ -166,11 +171,14 @@ pub struct Npc {
     pub definition_id: u32,
     pub position: Position,
     pub spawn_position: Position,
+    pub direction: Direction,
     pub current_hits: u32,
     pub max_hits: u32,
     pub in_combat: bool,
     pub respawn_ticks: u32,
     pub wander_radius: u32,
+    /// Set `true` by the walk logic for the duration of one tick then cleared.
+    pub moved_this_tick: bool,
 }
 
 impl Npc {
@@ -179,15 +187,21 @@ impl Npc {
             definition_id,
             position,
             spawn_position: position,
+            direction: Direction::South,
             current_hits: 10,
             max_hits: 10,
             in_combat: false,
             respawn_ticks: 100,
             wander_radius: 5,
+            moved_this_tick: false,
         }
     }
 
     pub fn tick(&mut self) {
+        // Clear the per-tick movement flag at the start of each tick so
+        // that any walk logic executed below can set it accurately.
+        self.moved_this_tick = false;
+
         if self.in_combat {
             return;
         }

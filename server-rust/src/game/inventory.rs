@@ -1,10 +1,9 @@
 //! Player inventory management system.
 //! Handles item storage, stacking, and slot management for player inventories.
 
-use std::collections::HashMap;
 use tracing::{debug, warn};
 
-use super::item::{ItemDef, ItemId, ItemRepository};
+use super::item::{ItemId, ItemRepository};
 
 /// Maximum inventory size for a player.
 pub const MAX_INVENTORY_SIZE: usize = 30;

@@ -2,9 +2,9 @@
 //! Handles shop inventories, buy/sell logic, and pricing.
 
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::info;
 
-use super::item::{ItemDef, ItemId, ItemRepository};
+use super::item::{ItemId, ItemRepository};
 
 /// Represents an item slot in a shop.
 #[derive(Debug, Clone)]
