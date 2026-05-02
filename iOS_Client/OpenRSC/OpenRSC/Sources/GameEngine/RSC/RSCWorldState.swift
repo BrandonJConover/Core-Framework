@@ -208,6 +208,18 @@ struct RSCPartyMember: Identifiable {
     var shareExp: Bool
 }
 
+enum ChatChannel: Int, Codable, CaseIterable {
+    case chat = 0
+    case privateMsg
+    case quest
+    case trade
+    case system
+    case kill
+    case magic
+    case clan
+    case party
+}
+
 struct RSCChatMessage: Identifiable {
     let id: UUID = UUID()
     let sender: String
@@ -215,15 +227,34 @@ struct RSCChatMessage: Identifiable {
     let isLocal: Bool
     let isPrivate: Bool
     let isKill: Bool
+    let channel: ChatChannel
     let timestamp: Date
 
-    init(sender: String, text: String, isLocal: Bool = false, isPrivate: Bool = false, isKill: Bool = false) {
+    init(sender: String, text: String, isLocal: Bool = false, isPrivate: Bool = false, isKill: Bool = false, channel: ChatChannel? = nil) {
         self.sender = sender
         self.text = text
         self.isLocal = isLocal
         self.isPrivate = isPrivate
         self.isKill = isKill
+        self.channel = channel ?? Self.deriveChannel(sender: sender, isLocal: isLocal, isPrivate: isPrivate, isKill: isKill)
         self.timestamp = Date()
+    }
+
+    private static func deriveChannel(sender: String, isLocal: Bool, isPrivate: Bool, isKill: Bool) -> ChatChannel {
+        if isKill { return .kill }
+        if isPrivate { return .privateMsg }
+        if isLocal { return .chat }
+
+        switch sender {
+        case "[Quest]": return .quest
+        case "[Trade]", "[Shop]": return .trade
+        case "[System]", "[Server]", "[Friend]", "[Use]", "[Examine]": return .system
+        case "[Magic]": return .magic
+        case "[Clan]": return .clan
+        case "[Party]": return .party
+        case "[Kill]": return .kill
+        default: return sender.hasPrefix("[Option ") ? .quest : .chat
+        }
     }
 }
 
@@ -306,6 +337,12 @@ final class RSCWorldState: ObservableObject {
     @Published var isMembersWorld: Bool = false
     @Published var fatigue: Int = 0
     @Published var fatigueAuthentic: Int = 0
+    /// Native HUD run/walk preference. The current protocol branch does not
+    /// expose a confirmed run-toggle opcode, so this is persisted locally and
+    /// rendered as client UI state until server wiring is audited.
+    @Published var runEnabled: Bool = false
+    /// 0...100 energy display derived from the server's fatigue packet.
+    @Published var runEnergy: Int = 100
     @Published var petFatigue: Int = 0
     @Published var expShared: Int = 0
     @Published var openPKPoints: Int64 = 0
@@ -561,8 +598,8 @@ final class RSCWorldState: ObservableObject {
         return (atk + def + str + hp) / 4
     }
 
-    func addChat(sender: String, text: String, isLocal: Bool = false, isPrivate: Bool = false, isKill: Bool = false) {
-        let msg = RSCChatMessage(sender: sender, text: text, isLocal: isLocal, isPrivate: isPrivate, isKill: isKill)
+    func addChat(sender: String, text: String, isLocal: Bool = false, isPrivate: Bool = false, isKill: Bool = false, channel: ChatChannel? = nil) {
+        let msg = RSCChatMessage(sender: sender, text: text, isLocal: isLocal, isPrivate: isPrivate, isKill: isKill, channel: channel)
         chatMessages.append(msg)
         if chatMessages.count > 100 { chatMessages.removeFirst() }
     }
