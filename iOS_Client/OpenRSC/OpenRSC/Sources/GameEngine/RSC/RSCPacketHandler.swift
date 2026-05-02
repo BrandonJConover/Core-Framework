@@ -424,16 +424,27 @@ final class RSCPacketHandler {
             ws.duelMyStake = []
             ws.duelTheirStake = []
 
+        case 6: // updateDuelDialog — opponent stake items
+            let duelTheirCount = buf.getUnsignedByte()
+            var duelTheirItems: [(id: Int, amount: Int)] = []
+            for _ in 0..<duelTheirCount {
+                let did = buf.getShort()
+                let damt = buf.get32()
+                duelTheirItems.append((id: did, amount: damt))
+            }
+            ws.duelTheirStake = duelTheirItems
+            ws.duelAccepted = false
+            ws.duelOpponentAccepted = false
+
         case 172: // showDuelConfirmDialog — confirmation screen
             ws.duelOpen = false
             ws.duelConfirmOpen = true
-            ws.duelOpponentName = buf.getString()
+            ws.duelOpponentName = buf.getZeroPaddedString()
             // Their stake
             let duelTheirCount = buf.getUnsignedByte()
             var duelTheirItems: [(id: Int, amount: Int)] = []
             for _ in 0..<duelTheirCount {
                 let did = buf.getShort()
-                let _ = buf.getByte() // noted
                 let damt = buf.get32()
                 duelTheirItems.append((id: did, amount: damt))
             }
@@ -443,7 +454,6 @@ final class RSCPacketHandler {
             var duelMyItems: [(id: Int, amount: Int)] = []
             for _ in 0..<duelMyCount {
                 let did = buf.getShort()
-                let _ = buf.getByte() // noted
                 let damt = buf.get32()
                 duelMyItems.append((id: did, amount: damt))
             }
@@ -1254,40 +1264,29 @@ final class RSCPacketHandler {
 
     // MARK: - Trade Updates
 
-    // opcode 97 — updateTradeDialog: their items then our items
+    // opcode 97 — updateTradeDialog: opponent items only
     private func handleUpdateTradeDialog(buf: ByteBuffer, ws: RSCWorldState) {
         let theirCount = buf.getUnsignedByte()
         var theirItems: [(id: Int, amount: Int)] = []
         for _ in 0..<theirCount {
             let itemId = buf.getShort()
-            let _ = buf.getByte() // noted flag
             let amount = buf.get32()
             theirItems.append((id: itemId, amount: amount))
         }
-        let myCount = buf.getUnsignedByte()
-        var myItems: [(id: Int, amount: Int)] = []
-        for _ in 0..<myCount {
-            let itemId = buf.getShort()
-            let _ = buf.getByte() // noted flag
-            let amount = buf.get32()
-            myItems.append((id: itemId, amount: amount))
-        }
         ws.tradeTheirOffer = theirItems
-        ws.tradeMyOffer = myItems
         ws.tradeAccepted = false
         ws.tradePartnerAccepted = false
-        print("[Packet] Trade update: my=\(myCount) items, their=\(theirCount) items")
+        print("[Packet] Trade update: their=\(theirCount) items")
     }
 
     // opcode 20 — confirmTrade: show confirmation screen
     private func handleTradeConfirm(buf: ByteBuffer, ws: RSCWorldState) {
-        let partnerName = buf.getString()
+        let partnerName = buf.getZeroPaddedString()
         ws.tradePartnerName = partnerName
         let theirCount = buf.getUnsignedByte()
         var theirItems: [(id: Int, amount: Int)] = []
         for _ in 0..<theirCount {
             let itemId = buf.getShort()
-            let _ = buf.getByte() // noted
             let amount = buf.get32()
             theirItems.append((id: itemId, amount: amount))
         }
@@ -1295,7 +1294,6 @@ final class RSCPacketHandler {
         var myItems: [(id: Int, amount: Int)] = []
         for _ in 0..<myCount {
             let itemId = buf.getShort()
-            let _ = buf.getByte() // noted
             let amount = buf.get32()
             myItems.append((id: itemId, amount: amount))
         }
