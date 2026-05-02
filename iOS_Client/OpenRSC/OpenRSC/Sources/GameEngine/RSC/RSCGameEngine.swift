@@ -282,6 +282,7 @@ final class RSCGameEngine: ObservableObject {
         if worldState.systemUpdateTicks > 0 {
             worldState.systemUpdateTicks = max(0, worldState.systemUpdateTicks - 50)
         }
+        worldState.pruneExpiredXPDrops()
 
         // Real 3D Scene renderer (matches Java client mudclient.java render path):
         // - World generates a terrain mesh for the current region

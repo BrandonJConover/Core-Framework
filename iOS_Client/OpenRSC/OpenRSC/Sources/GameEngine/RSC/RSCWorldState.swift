@@ -388,7 +388,10 @@ final class RSCWorldState: ObservableObject {
                      "Herblaw","Agility","Thieving"]
         let name = skillId < names.count ? names[skillId] : "Skill"
         xpDrops.append(XPDrop(skill: name, amount: amount, timestamp: Date()))
-        // Remove old drops (older than 3 seconds)
+        pruneExpiredXPDrops()
+    }
+
+    func pruneExpiredXPDrops() {
         let cutoff = Date().addingTimeInterval(-3)
         xpDrops.removeAll { $0.timestamp < cutoff }
     }

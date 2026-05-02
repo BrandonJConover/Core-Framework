@@ -148,6 +148,8 @@ struct GameView: View {
                 }
                 .allowsHitTesting(false)
 
+                XPDropFloatOverlay(worldState: engine.worldState, gameSize: geo.size)
+
                 // Modal overlays
                 modalOverlays
             }
@@ -271,22 +273,6 @@ struct GameView: View {
         if engine.worldState.isSleeping {
             SleepPanel(worldState: engine.worldState, engine: engine)
         }
-        // XP drop notifications (top-right, floating up)
-        if !engine.worldState.xpDrops.isEmpty {
-            VStack(alignment: .trailing, spacing: 2) {
-                ForEach(engine.worldState.xpDrops) { drop in
-                    Text("+\(drop.amount) \(drop.skill) XP")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.green)
-                        .shadow(color: .black, radius: 2)
-                }
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.trailing, 12)
-            .padding(.top, 40)
-            .allowsHitTesting(false)
-        }
         if engine.worldState.isSleeping {
             SleepOverlayView(worldState: engine.worldState, engine: engine)
         }
@@ -297,6 +283,34 @@ struct GameView: View {
                 Text("You will respawn shortly").font(.system(size: 14)).foregroundColor(Color(hex: "#888888"))
             }
         }
+    }
+}
+
+private struct XPDropFloatOverlay: View {
+    @ObservedObject var worldState: RSCWorldState
+    let gameSize: CGSize
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            ZStack {
+                ForEach(Array(worldState.xpDrops.enumerated()), id: \.element.id) { index, drop in
+                    let age = timeline.date.timeIntervalSince(drop.timestamp)
+                    if age >= 0, age < 3 {
+                        Text("+\(drop.amount) \(drop.skill)")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(hex: "#7CFF6B"))
+                            .shadow(color: .black, radius: 2, x: 0, y: 1)
+                            .opacity(max(0, 1.0 - age / 3.0))
+                            .position(
+                                x: gameSize.width / 2,
+                                y: gameSize.height / 2 - 46 - CGFloat(age * 36) - CGFloat(index * 16)
+                            )
+                    }
+                }
+            }
+        }
+        .frame(width: gameSize.width, height: gameSize.height)
+        .allowsHitTesting(false)
     }
 }
 
