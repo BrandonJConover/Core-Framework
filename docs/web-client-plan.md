@@ -51,13 +51,13 @@ These opcodes drive the zone-update bus that keeps locs (game objects), ground i
 
 These all require the `Component`/`InterfaceList` stack from rt4-client (Tier 7 below). Wiring them now — without the widget layer — would just mean parsing-and-discarding to keep the stream aligned, which is still worthwhile so we stop drifting on every modal interaction.
 
-- [ ] **IF_SETCOLOUR (2)** — sets a component's text colour.
-- [ ] **WIDGETSTRUCT_SETTING (9)** — varc-style struct field write to a component.
-- [ ] **IF_SETTEXT2 (48) / IF_SETTEXT3 (123)** — pushes server-side string into a text component.
-- [ ] **IF_SETSCROLLPOS (220)** — scroll-position seek (used by quest journal, bank tabs).
-- [ ] **SWITCH_WIDGET (176)** — replaces a tab/page within a parent interface.
-- [ ] **INTERFACE_ANIMATE_ROTATE (207)** — interface model rotate-on-axis animation.
-- [ ] **GAME_FRAME_UNK (209)** — game-frame-level interface update (unknown payload; mirror Java's parse to stay aligned).
+- [x] **IF_SETCOLOUR (2)** — sets a component's text colour. _(b7d532c04)_
+- [x] **WIDGETSTRUCT_SETTING (9)** — varc-style struct field write to a component. _(b7d532c04)_
+- [x] **IF_SETTEXT2 (48) / IF_SETTEXT3 (123)** — pushes server-side string into a text component. _(b7d532c04)_
+- [x] **IF_SETSCROLLPOS (220)** — scroll-position seek (used by quest journal, bank tabs). _(b7d532c04)_
+- [x] **SWITCH_WIDGET (176)** — replaces a tab/page within a parent interface. _(b7d532c04)_
+- [x] **INTERFACE_ANIMATE_ROTATE (207)** — interface model rotate-on-axis animation. _(b7d532c04)_
+- [x] **GAME_FRAME_UNK (209)** — game-frame-level interface update (unknown payload; mirror Java's parse to stay aligned). _(b7d532c04)_
 
 ### Tier 5d — Audio + misc (low impact for now, wire when audio comes online)
 
