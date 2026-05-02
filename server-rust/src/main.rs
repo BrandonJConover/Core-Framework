@@ -10,9 +10,11 @@ use anyhow::Result;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use database::player_repository::PlayerRepository;
+use database::{schema, DatabaseConfig, DatabasePool, DatabaseType};
 use game::server::{ServerState, TICK_DURATION_MS};
 use infrastructure::InfrastructureManager;
 
@@ -38,8 +40,49 @@ async fn main() -> Result<()> {
     infrastructure.initialize().await?;
     info!("Infrastructure initialized");
 
-    // Create shared server state
-    let server_state = Arc::new(RwLock::new(ServerState::new()));
+    // Optionally bring up the DB pool + ensure schema exists.
+    // When config.database.enabled = false (default), the server runs in
+    // accept-all auth mode with no persistence — see ServerState::players.
+    let player_repo: Option<Arc<PlayerRepository>> = if config.database.enabled {
+        let db_cfg = DatabaseConfig {
+            db_type: DatabaseType::from(config.database.kind.as_str()),
+            host: config.database.host.clone(),
+            port: config.database.port,
+            database: if matches!(DatabaseType::from(config.database.kind.as_str()), DatabaseType::Sqlite) {
+                config.database.sqlite_path.clone()
+            } else {
+                config.database.database.clone()
+            },
+            username: config.database.username.clone(),
+            password: config.database.password.clone(),
+            ..DatabaseConfig::default()
+        };
+        match DatabasePool::new(&db_cfg).await {
+            Ok(pool) => {
+                if let Err(e) = schema::init_schema(&pool).await {
+                    warn!("Schema init failed: {} — server will run without persistence", e);
+                    None
+                } else {
+                    Some(Arc::new(PlayerRepository::new(pool)))
+                }
+            }
+            Err(e) => {
+                warn!("DB connect failed: {} — server will run without persistence", e);
+                None
+            }
+        }
+    } else {
+        info!("DB persistence disabled (config.database.enabled = false)");
+        None
+    };
+
+    // Create shared server state, optionally with DB-backed auth + persistence.
+    let mut initial_state = ServerState::new();
+    if let Some(repo) = player_repo.clone() {
+        initial_state = initial_state.with_players(repo);
+        info!("ServerState wired with DB-backed PlayerRepository");
+    }
+    let server_state = Arc::new(RwLock::new(initial_state));
     {
         let mut state = server_state.write().await;
         state.initialize().await?;

@@ -391,6 +391,8 @@ struct WebGameView: UIViewRepresentable {
                     queue: .main
                 ) { [weak self] _ in
                     self?.recordLog(level: "lifecycle", message: "UIApplication didEnterBackground")
+                    UIApplication.shared.isIdleTimerDisabled = false
+                    self?.notifyWebClientOfAppVisibility(isVisible: false)
                 }
             )
             observers.append(
@@ -400,6 +402,8 @@ struct WebGameView: UIViewRepresentable {
                     queue: .main
                 ) { [weak self] _ in
                     self?.recordLog(level: "lifecycle", message: "UIApplication willEnterForeground")
+                    UIApplication.shared.isIdleTimerDisabled = true
+                    self?.notifyWebClientOfAppVisibility(isVisible: true)
                 }
             )
         }
@@ -436,6 +440,17 @@ struct WebGameView: UIViewRepresentable {
             ) { [weak self] _, error in
                 if let error {
                     self?.recordLog(level: "memory", message: "Unable to notify web client of memory warning: \(error)")
+                }
+            }
+        }
+
+        private func notifyWebClientOfAppVisibility(isVisible: Bool) {
+            let script = """
+            window._mudclientHandleNativeVisibility && window._mudclientHandleNativeVisibility(\(isVisible ? "true" : "false"))
+            """
+            webView?.evaluateJavaScript(script) { [weak self] _, error in
+                if let error {
+                    self?.recordLog(level: "lifecycle", message: "Unable to notify web client visibility=\(isVisible): \(error)")
                 }
             }
         }

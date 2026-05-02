@@ -1,218 +1,419 @@
 //! RSC protocol opcodes for client and server communication.
+//!
+//! These enum names mirror the authoritative Java enums in
+//! `server-java-modern/src/com/openrsc/server/net/rsc/enums/OpcodeIn.java`
+//! and `OpcodeOut.java` character-for-character (SCREAMING_SNAKE_CASE).
+//!
+//! On-the-wire byte values for incoming packets vary across protocol
+//! revisions (38, 69, 115, 201, 203, 235, ...). Translation from a wire
+//! byte to an `OpcodeIn` variant lives in `protocol::legacy` and uses
+//! per-version dispatch tables that mirror the Java `Payload<rev>Parser`
+//! `static { opcodes<rev>.put(...) }` blocks.
+//!
+//! Outgoing opcodes are assigned indices (mirroring Java enum ordinals,
+//! which is how the Java codec encodes them via the formatter pipeline).
+//! `OpcodeOut` uses `#[repr(u16)]` because some retro/custom outgoing
+//! opcodes ordinal-index past 255 in some payload formatters.
+
+#![allow(non_camel_case_types, dead_code)]
 
 /// Incoming opcodes (client -> server).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
+///
+/// Names mirror `com.openrsc.server.net.rsc.enums.OpcodeIn` exactly.
+/// Wire-byte mapping is performed in `protocol::legacy::decode_opcode`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OpcodeIn {
-    // Session opcodes
-    Login = 0,
-    Logout = 1,
-    Ping = 5,
+    HEARTBEAT,
+    WALK_TO_ENTITY,
+    WALK_TO_POINT,
+    CONFIRM_LOGOUT,
+    LOGOUT,
+    BLINK,
+    COMBAT_STYLE_CHANGED,
+    QUESTION_DIALOG_ANSWER,
 
-    // Movement opcodes
-    WalkToPoint = 16,
-    WalkToEntity = 17,
+    PLAYER_APPEARANCE_CHANGE,
+    SOCIAL_ADD_IGNORE,
+    SOCIAL_ADD_DELAYED_IGNORE, // custom
+    SOCIAL_ADD_FRIEND,
+    SOCIAL_SEND_PRIVATE_MESSAGE,
+    SOCIAL_REMOVE_FRIEND,
+    SOCIAL_REMOVE_IGNORE,
 
-    // Chat opcodes
-    PublicChat = 30,
-    PrivateMessage = 31,
-    AddFriend = 32,
-    RemoveFriend = 33,
-    AddIgnore = 34,
-    RemoveIgnore = 35,
+    DUEL_FIRST_SETTINGS_CHANGED,
+    DUEL_FIRST_ACCEPTED,
+    DUEL_DECLINED,
+    DUEL_OFFER_ITEM,
+    DUEL_SECOND_ACCEPTED,
 
-    // Player interaction
-    AttackPlayer = 40,
-    FollowPlayer = 41,
-    TradeRequest = 42,
-    DuelRequest = 43,
+    INTERACT_WITH_BOUNDARY,
+    INTERACT_WITH_BOUNDARY2,
+    CAST_ON_BOUNDARY,
+    USE_WITH_BOUNDARY,
 
-    // NPC interaction
-    AttackNpc = 50,
-    TalkToNpc = 51,
-    UseItemOnNpc = 52,
-    CastSpellOnNpc = 53,
+    NPC_TALK_TO,
+    NPC_COMMAND,
+    NPC_COMMAND2, // custom
+    NPC_ATTACK,
+    CAST_ON_NPC,
+    NPC_USE_ITEM,
 
-    // Object interaction
-    UseObject = 60,
-    UseItemOnObject = 61,
+    PLAYER_CAST_PVP,
+    PLAYER_USE_ITEM,
+    PLAYER_ATTACK,
+    PLAYER_DUEL,
+    PLAYER_INIT_TRADE_REQUEST,
+    PLAYER_FOLLOW,
 
-    // Ground item interaction
-    PickupItem = 70,
-    DropItem = 71,
-    UseItemOnGroundItem = 72,
+    CAST_ON_GROUND_ITEM,
+    GROUND_ITEM_USE_ITEM,
+    GROUND_ITEM_TAKE,
 
-    // Inventory
-    WieldItem = 80,
-    UnwieldItem = 81,
-    UseItem = 82,
-    UseItemOnItem = 83,
+    CAST_ON_INVENTORY_ITEM,
+    ITEM_USE_ITEM,
+    ITEM_UNEQUIP_FROM_INVENTORY,
+    ITEM_EQUIP_FROM_INVENTORY,
+    ITEM_UNEQUIP_FROM_EQUIPMENT, // custom
+    ITEM_EQUIP_FROM_BANK,        // custom
+    ITEM_REMOVE_TO_BANK,         // custom
+    ITEM_COMMAND,
+    ITEM_DROP,
 
-    // Skills
-    PrayerActivated = 90,
-    PrayerDeactivated = 91,
-    CastSpell = 92,
-    CastSpellOnSelf = 93,
+    CAST_ON_SELF,
+    CAST_ON_LAND,
 
-    // Trading
-    TradeAccept = 100,
-    TradeDecline = 101,
-    TradeUpdate = 102,
-    TradeConfirm = 103,
+    OBJECT_COMMAND,
+    OBJECT_COMMAND2,
+    CAST_ON_SCENERY,
+    USE_ITEM_ON_SCENERY,
 
-    // Dueling
-    DuelAccept = 110,
-    DuelDecline = 111,
-    DuelUpdate = 112,
-    DuelConfirm = 113,
+    SHOP_CLOSE,
+    SHOP_BUY,
+    SHOP_SELL,
 
-    // Banking
-    BankOpen = 120,
-    BankClose = 121,
-    BankDeposit = 122,
-    BankWithdraw = 123,
+    PLAYER_ACCEPTED_INIT_TRADE_REQUEST,
+    PLAYER_DECLINED_TRADE,
+    PLAYER_ADDED_ITEMS_TO_TRADE_OFFER,
+    PLAYER_ACCEPTED_TRADE,
 
-    // Shop
-    ShopOpen = 130,
-    ShopClose = 131,
-    ShopBuy = 132,
-    ShopSell = 133,
+    PRAYER_ACTIVATED,
+    PRAYER_DEACTIVATED,
 
-    // Settings
-    SettingsUpdate = 140,
-    PrivacySettings = 141,
+    GAME_SETTINGS_CHANGED,
+    CHAT_MESSAGE,
+    COMMAND,
+    PRIVACY_SETTINGS_CHANGED,
+    REPORT_ABUSE,
+    BANK_CLOSE,
+    BANK_WITHDRAW,
+    BANK_DEPOSIT,
 
-    // Commands
-    Command = 200,
+    BANK_DEPOSIT_ALL_FROM_INVENTORY, // custom
+    BANK_DEPOSIT_ALL_FROM_EQUIPMENT, // custom
+    BANK_SAVE_PRESET,                // custom
+    BANK_LOAD_PRESET,                // custom
+    INTERFACE_OPTIONS,               // custom
 
-    // Unknown/invalid
-    Unknown = 255,
-}
+    SLEEPWORD_ENTERED,
 
-impl From<u8> for OpcodeIn {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => OpcodeIn::Login,
-            1 => OpcodeIn::Logout,
-            5 => OpcodeIn::Ping,
-            16 => OpcodeIn::WalkToPoint,
-            17 => OpcodeIn::WalkToEntity,
-            30 => OpcodeIn::PublicChat,
-            31 => OpcodeIn::PrivateMessage,
-            32 => OpcodeIn::AddFriend,
-            33 => OpcodeIn::RemoveFriend,
-            34 => OpcodeIn::AddIgnore,
-            35 => OpcodeIn::RemoveIgnore,
-            40 => OpcodeIn::AttackPlayer,
-            41 => OpcodeIn::FollowPlayer,
-            42 => OpcodeIn::TradeRequest,
-            43 => OpcodeIn::DuelRequest,
-            50 => OpcodeIn::AttackNpc,
-            51 => OpcodeIn::TalkToNpc,
-            52 => OpcodeIn::UseItemOnNpc,
-            53 => OpcodeIn::CastSpellOnNpc,
-            60 => OpcodeIn::UseObject,
-            61 => OpcodeIn::UseItemOnObject,
-            70 => OpcodeIn::PickupItem,
-            71 => OpcodeIn::DropItem,
-            72 => OpcodeIn::UseItemOnGroundItem,
-            80 => OpcodeIn::WieldItem,
-            81 => OpcodeIn::UnwieldItem,
-            82 => OpcodeIn::UseItem,
-            83 => OpcodeIn::UseItemOnItem,
-            90 => OpcodeIn::PrayerActivated,
-            91 => OpcodeIn::PrayerDeactivated,
-            92 => OpcodeIn::CastSpell,
-            93 => OpcodeIn::CastSpellOnSelf,
-            100 => OpcodeIn::TradeAccept,
-            101 => OpcodeIn::TradeDecline,
-            102 => OpcodeIn::TradeUpdate,
-            103 => OpcodeIn::TradeConfirm,
-            110 => OpcodeIn::DuelAccept,
-            111 => OpcodeIn::DuelDecline,
-            112 => OpcodeIn::DuelUpdate,
-            113 => OpcodeIn::DuelConfirm,
-            120 => OpcodeIn::BankOpen,
-            121 => OpcodeIn::BankClose,
-            122 => OpcodeIn::BankDeposit,
-            123 => OpcodeIn::BankWithdraw,
-            130 => OpcodeIn::ShopOpen,
-            131 => OpcodeIn::ShopClose,
-            132 => OpcodeIn::ShopBuy,
-            133 => OpcodeIn::ShopSell,
-            140 => OpcodeIn::SettingsUpdate,
-            141 => OpcodeIn::PrivacySettings,
-            200 => OpcodeIn::Command,
-            _ => OpcodeIn::Unknown,
-        }
-    }
+    SKIP_TUTORIAL,
+    ON_BLACK_HOLE,           // custom
+    NPC_DEFINITION_REQUEST,  // custom
+
+    LOGIN,
+    RELOGIN,           // retro rsc
+    REGISTER_ACCOUNT,  // part of rsc era protocol
+    FORGOT_PASSWORD,   // part of rsc era protocol
+    RECOVERY_ATTEMPT,  // part of rsc era protocol
+
+    CHANGE_RECOVERY_REQUEST, // part of rsc era protocol
+    CHANGE_DETAILS_REQUEST,  // part of rsc era protocol
+
+    CHANGE_PASS,  // part of rsc era protocol
+    SET_RECOVERY, // part of rsc era protocol
+    SET_DETAILS,  // part of rsc era protocol
+
+    CANCEL_RECOVERY_REQUEST, // part of rsc era protocol
+
+    SEND_DEBUG_INFO, // part of rsc era protocol
+    KNOWN_PLAYERS,   // part of rsc era protocol
 }
 
 /// Outgoing opcodes (server -> client).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
+///
+/// Names mirror `com.openrsc.server.net.rsc.enums.OpcodeOut` exactly.
+/// `#[repr(u16)]` because some retro/custom payload formatters use
+/// values that exceed 255 on the wire; the variants themselves are
+/// just identifiers and the on-wire byte is chosen by the formatter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u16)]
 pub enum OpcodeOut {
-    // Session opcodes
-    LoginResponse = 0,
-    Logout = 1,
-
-    // World updates
-    PlayerPositionUpdate = 10,
-    NpcPositionUpdate = 11,
-    GroundItemUpdate = 12,
-    GameObjectUpdate = 13,
-    WallObjectUpdate = 14,
-
-    // Player updates
-    PlayerAppearance = 20,
-    PlayerStats = 21,
-    PlayerInventory = 22,
-    PlayerEquipment = 23,
-    PlayerSettings = 24,
-
-    // Chat
-    ChatMessage = 30,
-    PrivateMessage = 31,
-    ServerMessage = 32,
-    QuestMessage = 33,
-
-    // Combat
-    DamageUpdate = 40,
-    DeathScreen = 41,
-
-    // Interface
-    OpenBank = 50,
-    OpenShop = 51,
-    OpenTrade = 52,
-    OpenDuel = 53,
-    CloseInterface = 54,
-
-    // Dialogue
-    NpcDialogue = 60,
-    OptionDialogue = 61,
-
-    // Sound/Effects
-    PlaySound = 70,
-    Teleport = 71,
-    Bubble = 72,
-
-    // Friends/Ignore
-    FriendList = 80,
-    FriendUpdate = 81,
-    IgnoreList = 82,
-
-    // Skills
-    StatUpdate = 90,
-    ExperienceUpdate = 91,
-    FatigueUpdate = 92,
-
-    // Misc
-    WorldInfo = 100,
-    SystemUpdate = 101,
+    SEND_LOGOUT_REQUEST_CONFIRM,
+    SEND_QUESTS,
+    SEND_DUEL_OPPONENTS_ITEMS,
+    SEND_TRADE_ACCEPTED,
+    SEND_SERVER_CONFIGS, // custom
+    SEND_TRADE_OPEN_CONFIRM,
+    SEND_WORLD_INFO,
+    SEND_DUEL_SETTINGS,
+    SEND_EXPERIENCE,
+    SEND_EXPERIENCE_TOGGLE, // custom
+    SEND_BUBBLE,            // used for teleport, telegrab, and iban's magic
+    SEND_BANK_OPEN,
+    SEND_SCENERY_HANDLER,
+    SEND_PRIVACY_SETTINGS,
+    SEND_SYSTEM_UPDATE,
+    SEND_INVENTORY,
+    SEND_ELIXIR, // custom
+    SEND_APPEARANCE_SCREEN,
+    SEND_NPC_COORDS,
+    SEND_DEATH,
+    SEND_STOPSLEEP,
+    SEND_PRIVATE_MESSAGE_SENT,
+    SEND_BOX,
+    SEND_INVENTORY_UPDATEITEM,
+    SEND_BOUNDARY_HANDLER,
+    SEND_TRADE_WINDOW,
+    SEND_TRADE_OTHER_ITEMS,
+    SEND_EXPSHARED, // custom
+    SEND_GROUND_ITEM_HANDLER,
+    SEND_SHOP_OPEN,
+    SEND_UPDATE_NPC,
+    SEND_FRIEND_LIST, // retro rsc
+    SEND_IGNORE_LIST,
+    SEND_INPUT_BOX, // custom
+    SEND_ON_TUTORIAL,
+    SEND_CLAN,           // custom
+    SEND_CLAN_LIST,      // custom
+    SEND_CLAN_SETTINGS,  // custom
+    SEND_IRONMAN,        // custom
+    SEND_PARTY,          // custom
+    SEND_PARTY_LIST,     // custom
+    SEND_PARTY_SETTINGS, // custom
+    SEND_FATIGUE,
+    SEND_ON_BLACK_HOLE, // custom
+    SEND_SLEEPSCREEN,
+    SEND_KILL_ANNOUNCEMENT, // custom
+    SEND_PRIVATE_MESSAGE,
+    SEND_INVENTORY_REMOVE_ITEM,
+    SEND_TRADE_CLOSE,
+    SEND_COMBAT_STYLE, // custom
+    SEND_SERVER_MESSAGE,
+    SEND_AUCTION_PROGRESS,     // custom
+    SEND_FISHING_TRAWLER,      // custom
+    SEND_STATUS_PROGRESS_BAR,  // custom
+    SEND_BANK_PIN_INTERFACE,   // custom
+    SEND_ONLINE_LIST,          // custom
+    SEND_SHOP_CLOSE,
+    SEND_OPENPK_POINTS_TO_GP_RATIO, // custom
+    SEND_NPC_KILLS,                 // custom
+    SEND_OPENPK_POINTS,             // custom
+    SEND_FRIEND_UPDATE,
+    SEND_BANK_PRESET, // custom
+    SEND_EQUIPMENT_STATS,
+    SEND_STATS,
+    SEND_STAT,
+    SEND_UPDATE_STAT,
+    SEND_TRADE_OTHER_ACCEPTED,
+    SEND_LOGOUT,
+    SEND_DUEL_CONFIRMWINDOW,
+    SEND_DUEL_WINDOW,
+    SEND_WELCOME_INFO,
+    SEND_CANT_LOGOUT,
+    SEND_28_BYTES_UNUSED,
+    SEND_PLAYER_COORDS,
+    SEND_SLEEPWORD_INCORRECT,
+    SEND_BANK_CLOSE,
+    SEND_PLAY_SOUND,
+    SEND_PRAYERS_ACTIVE,
+    SEND_DUEL_ACCEPTED,
+    SEND_REMOVE_WORLD_ENTITY,
+    SEND_APPEARANCE_KEEPALIVE,
+    SEND_BOX2,
+    SEND_OPEN_RECOVERY, // part of rsc era protocol
+    SEND_DUEL_CLOSE,
+    SEND_OPEN_DETAILS, // part of rsc era protocol
+    SEND_UPDATE_PLAYERS,
+    SEND_UPDATE_PLAYERS_RETRO, // retro rsc protocol what later became SEND_UPDATE_PLAYERS type 5
+    SEND_UPDATE_IGNORE_LIST_BECAUSE_NAME_CHANGE,
+    SEND_GAME_SETTINGS,
+    SEND_SLEEP_FATIGUE,
+    SEND_OPTIONS_MENU_OPEN,
+    SEND_BANK_UPDATE,
+    SEND_OPTIONS_MENU_CLOSE,
+    SEND_DUEL_OTHER_ACCEPTED,
+    SEND_EQUIPMENT,        // custom
+    SEND_EQUIPMENT_UPDATE, // custom
+    SEND_REMOVE_WORLD_NPC,    // retro rsc protocol
+    SEND_REMOVE_WORLD_PLAYER, // retro rsc protocol
+    RUNESCAPE_UPDATED,        // rsc era protocol
+    SEND_YOPTIN, // added by mudclient 61 (or earlier, but post 40) and missing by 93 (present in mudclient 75)
+    SEND_INVENTORY_SIZE, // known to be in mudclient69 to 75
+    SEND_UNLOCKED_APPEARANCES, // custom
 }
 
+// ---------------------------------------------------------------------------
+// CamelCase aliases + numeric conversions.
+//
+// Several handler files (game/server.rs, session/handler.rs, bank_handler.rs,
+// shop_handler.rs, social.rs, quest_engine.rs, etc.) were written against an
+// earlier draft of these enums that used CamelCase semantic names like
+// `Login`, `OpenBank`, `ChatMessage`. The enums were later rewritten to mirror
+// the Java SCREAMING_SNAKE_CASE names exactly. Rather than re-edit every
+// handler, we expose the old names as `pub const` aliases pointing at the
+// closest Java-named variant. New code should use the SCREAMING_SNAKE_CASE
+// names directly.
+// ---------------------------------------------------------------------------
+
+#[allow(non_upper_case_globals)]
+impl OpcodeIn {
+    pub const Login: Self = Self::LOGIN;
+    pub const Logout: Self = Self::LOGOUT;
+    pub const Ping: Self = Self::HEARTBEAT;
+    pub const WalkToPoint: Self = Self::WALK_TO_POINT;
+    pub const WalkToEntity: Self = Self::WALK_TO_ENTITY;
+    pub const PublicChat: Self = Self::CHAT_MESSAGE;
+    pub const Command: Self = Self::COMMAND;
+    pub const PrivateMessage: Self = Self::SOCIAL_SEND_PRIVATE_MESSAGE;
+    pub const AttackNpc: Self = Self::NPC_ATTACK;
+    pub const AttackPlayer: Self = Self::PLAYER_ATTACK;
+}
+
+#[allow(non_upper_case_globals)]
+impl OpcodeOut {
+    pub const WorldInfo: Self = Self::SEND_WORLD_INFO;
+    pub const ChatMessage: Self = Self::SEND_SERVER_MESSAGE;
+    pub const PrivateMessage: Self = Self::SEND_PRIVATE_MESSAGE;
+    pub const ServerMessage: Self = Self::SEND_SERVER_MESSAGE;
+    pub const OpenBank: Self = Self::SEND_BANK_OPEN;
+    pub const CloseInterface: Self = Self::SEND_BANK_CLOSE;
+    pub const QuestMessage: Self = Self::SEND_SERVER_MESSAGE;
+    pub const OpenShop: Self = Self::SEND_SHOP_OPEN;
+    pub const FriendList: Self = Self::SEND_FRIEND_LIST;
+    pub const FriendUpdate: Self = Self::SEND_FRIEND_UPDATE;
+    pub const IgnoreList: Self = Self::SEND_IGNORE_LIST;
+    pub const PlayerStats: Self = Self::SEND_STATS;
+    pub const PlayerInventory: Self = Self::SEND_INVENTORY;
+}
+
+/// `OpcodeIn::from(packet.opcode)` — wire byte to enum.
+///
+/// This is the simplified dispatch used in the inauthentic / web-client path,
+/// where opcodes carry semantic meaning directly. Authentic mudclient framing
+/// goes through `protocol::legacy::decode_opcode` for per-revision dispatch.
+/// Unknown bytes map to `HEARTBEAT` so an unrecognised packet doesn't crash
+/// the server; the handler's `_ => {}` arm logs and drops it.
+impl From<u8> for OpcodeIn {
+    fn from(byte: u8) -> Self {
+        // Variant order matches enum declaration above. Keeping the table
+        // explicit (rather than transmuting on ordinal) makes adding a new
+        // variant a compile-time obligation here too.
+        const TABLE: &[OpcodeIn] = &[
+            OpcodeIn::HEARTBEAT,
+            OpcodeIn::WALK_TO_ENTITY,
+            OpcodeIn::WALK_TO_POINT,
+            OpcodeIn::CONFIRM_LOGOUT,
+            OpcodeIn::LOGOUT,
+            OpcodeIn::BLINK,
+            OpcodeIn::COMBAT_STYLE_CHANGED,
+            OpcodeIn::QUESTION_DIALOG_ANSWER,
+            OpcodeIn::PLAYER_APPEARANCE_CHANGE,
+            OpcodeIn::SOCIAL_ADD_IGNORE,
+            OpcodeIn::SOCIAL_ADD_DELAYED_IGNORE,
+            OpcodeIn::SOCIAL_ADD_FRIEND,
+            OpcodeIn::SOCIAL_SEND_PRIVATE_MESSAGE,
+            OpcodeIn::SOCIAL_REMOVE_FRIEND,
+            OpcodeIn::SOCIAL_REMOVE_IGNORE,
+            OpcodeIn::DUEL_FIRST_SETTINGS_CHANGED,
+            OpcodeIn::DUEL_FIRST_ACCEPTED,
+            OpcodeIn::DUEL_DECLINED,
+            OpcodeIn::DUEL_OFFER_ITEM,
+            OpcodeIn::DUEL_SECOND_ACCEPTED,
+            OpcodeIn::INTERACT_WITH_BOUNDARY,
+            OpcodeIn::INTERACT_WITH_BOUNDARY2,
+            OpcodeIn::CAST_ON_BOUNDARY,
+            OpcodeIn::USE_WITH_BOUNDARY,
+            OpcodeIn::NPC_TALK_TO,
+            OpcodeIn::NPC_COMMAND,
+            OpcodeIn::NPC_COMMAND2,
+            OpcodeIn::NPC_ATTACK,
+            OpcodeIn::CAST_ON_NPC,
+            OpcodeIn::NPC_USE_ITEM,
+            OpcodeIn::PLAYER_CAST_PVP,
+            OpcodeIn::PLAYER_USE_ITEM,
+            OpcodeIn::PLAYER_ATTACK,
+            OpcodeIn::PLAYER_DUEL,
+            OpcodeIn::PLAYER_INIT_TRADE_REQUEST,
+            OpcodeIn::PLAYER_FOLLOW,
+            OpcodeIn::CAST_ON_GROUND_ITEM,
+            OpcodeIn::GROUND_ITEM_USE_ITEM,
+            OpcodeIn::GROUND_ITEM_TAKE,
+            OpcodeIn::CAST_ON_INVENTORY_ITEM,
+            OpcodeIn::ITEM_USE_ITEM,
+            OpcodeIn::ITEM_UNEQUIP_FROM_INVENTORY,
+            OpcodeIn::ITEM_EQUIP_FROM_INVENTORY,
+            OpcodeIn::ITEM_UNEQUIP_FROM_EQUIPMENT,
+            OpcodeIn::ITEM_EQUIP_FROM_BANK,
+            OpcodeIn::ITEM_REMOVE_TO_BANK,
+            OpcodeIn::ITEM_COMMAND,
+            OpcodeIn::ITEM_DROP,
+            OpcodeIn::CAST_ON_SELF,
+            OpcodeIn::CAST_ON_LAND,
+            OpcodeIn::OBJECT_COMMAND,
+            OpcodeIn::OBJECT_COMMAND2,
+            OpcodeIn::CAST_ON_SCENERY,
+            OpcodeIn::USE_ITEM_ON_SCENERY,
+            OpcodeIn::SHOP_CLOSE,
+            OpcodeIn::SHOP_BUY,
+            OpcodeIn::SHOP_SELL,
+            OpcodeIn::PLAYER_ACCEPTED_INIT_TRADE_REQUEST,
+            OpcodeIn::PLAYER_DECLINED_TRADE,
+            OpcodeIn::PLAYER_ADDED_ITEMS_TO_TRADE_OFFER,
+            OpcodeIn::PLAYER_ACCEPTED_TRADE,
+            OpcodeIn::PRAYER_ACTIVATED,
+            OpcodeIn::PRAYER_DEACTIVATED,
+            OpcodeIn::GAME_SETTINGS_CHANGED,
+            OpcodeIn::CHAT_MESSAGE,
+            OpcodeIn::COMMAND,
+            OpcodeIn::PRIVACY_SETTINGS_CHANGED,
+            OpcodeIn::REPORT_ABUSE,
+            OpcodeIn::BANK_CLOSE,
+            OpcodeIn::BANK_WITHDRAW,
+            OpcodeIn::BANK_DEPOSIT,
+            OpcodeIn::BANK_DEPOSIT_ALL_FROM_INVENTORY,
+            OpcodeIn::BANK_DEPOSIT_ALL_FROM_EQUIPMENT,
+            OpcodeIn::BANK_SAVE_PRESET,
+            OpcodeIn::BANK_LOAD_PRESET,
+            OpcodeIn::INTERFACE_OPTIONS,
+            OpcodeIn::SLEEPWORD_ENTERED,
+            OpcodeIn::SKIP_TUTORIAL,
+            OpcodeIn::ON_BLACK_HOLE,
+            OpcodeIn::NPC_DEFINITION_REQUEST,
+            OpcodeIn::LOGIN,
+            OpcodeIn::RELOGIN,
+            OpcodeIn::REGISTER_ACCOUNT,
+            OpcodeIn::FORGOT_PASSWORD,
+            OpcodeIn::RECOVERY_ATTEMPT,
+            OpcodeIn::CHANGE_RECOVERY_REQUEST,
+            OpcodeIn::CHANGE_DETAILS_REQUEST,
+            OpcodeIn::CHANGE_PASS,
+            OpcodeIn::SET_RECOVERY,
+            OpcodeIn::SET_DETAILS,
+            OpcodeIn::CANCEL_RECOVERY_REQUEST,
+            OpcodeIn::SEND_DEBUG_INFO,
+            OpcodeIn::KNOWN_PLAYERS,
+        ];
+        TABLE.get(byte as usize).copied().unwrap_or(OpcodeIn::HEARTBEAT)
+    }
+}
+
+/// Truncate `OpcodeOut` to a wire byte. All current variants fit in `u8`; the
+/// `#[repr(u16)]` is a forward-compat hedge for retro/custom formatters that
+/// may add variants past 255 in future. If/when that happens, the codec will
+/// need to widen to two bytes and this impl should be removed in favour of an
+/// explicit wire-byte table.
 impl From<OpcodeOut> for u8 {
-    fn from(opcode: OpcodeOut) -> Self {
-        opcode as u8
+    fn from(op: OpcodeOut) -> Self {
+        op as u16 as u8
     }
 }

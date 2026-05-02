@@ -1,0 +1,9 @@
+# Captured by .terrain-mesh-test.mjs at 2026-05-02T10:36:43.893Z
+# All assertions passed: tile count, vertex count, triangle count, index range, distinct colors,
+# edge clamp (tiny mesh), overlay-priority routing, plane filter (excluded plane=1 tile)
+# Source: 4×4 tile zone, 3 floor types (grass/path/sand), one plane-1 tile excluded
+
+[TerrainMesh530] built mesh tiles=11 verts=44 tris=22 distinctColors=3
+[TerrainMesh530] edge-clamp tiny-mesh verts=4 (heights -10,-20,-30,-40 confirmed)
+[TerrainMesh530] overlay route OK: pathColor=ccaa55 emitted in 2 triangles
+[TerrainMesh530] index rebase OK: maxIdx=43 verts=44

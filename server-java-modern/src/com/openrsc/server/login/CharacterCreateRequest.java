@@ -61,7 +61,7 @@ public class CharacterCreateRequest extends LoginExecutorProcess{
 		this.server = server;
 		this.setEmail("");
 		this.setUsername(DataConversions.sanitizeUsername(username));
-		this.setAuthenticClient(clientVersion <= 235);
+		this.setAuthenticClient(clientVersion <= 5235);
 		this.setChannel(null);
 		this.setIpAddress(ip);
 		this.setClientVersion(clientVersion);

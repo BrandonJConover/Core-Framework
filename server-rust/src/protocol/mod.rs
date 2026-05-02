@@ -2,6 +2,8 @@
 //! Defines packet structures, opcodes, and encoding/decoding.
 
 pub mod codec;
+pub mod isaac;
+pub mod legacy;
 pub mod opcodes;
 pub mod packets;
 

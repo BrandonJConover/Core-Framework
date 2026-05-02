@@ -1,7 +1,10 @@
 //! Database schema definitions and models.
 
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+
+use super::DatabasePool;
 
 /// Player database record.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
@@ -377,4 +380,33 @@ pub mod sql {
             FOREIGN KEY (player_id) REFERENCES players(id)
         )
     "#;
+}
+
+/// Run idempotent CREATE TABLE IF NOT EXISTS for every table the Rust port
+/// uses. Safe to call on every boot — a no-op once the schema is in place.
+///
+/// MySQL note: the SQL is written in SQLite-leaning dialect (e.g.
+/// `INTEGER PRIMARY KEY AUTOINCREMENT`). MySQL accepts most of it but real
+/// MySQL deployments should run a migration tool (sqlx migrate, refinery)
+/// against a hand-tuned schema instead. This initializer is intended for the
+/// SQLite path used in dev/bench.
+pub async fn init_schema(pool: &DatabasePool) -> Result<()> {
+    let stmts = [
+        sql::CREATE_PLAYERS_TABLE,
+        sql::CREATE_SKILLS_TABLE,
+        sql::CREATE_INVENTORY_TABLE,
+        sql::CREATE_BANK_TABLE,
+        sql::CREATE_FRIENDS_TABLE,
+        sql::CREATE_QUESTS_TABLE,
+        sql::CREATE_SETTINGS_TABLE,
+    ];
+    for stmt in stmts {
+        match pool {
+            DatabasePool::MySql(p) => sqlx::query(stmt).execute(p).await
+                .context("schema init (mysql)")?,
+            DatabasePool::Sqlite(p) => sqlx::query(stmt).execute(p).await
+                .context("schema init (sqlite)")?,
+        };
+    }
+    Ok(())
 }

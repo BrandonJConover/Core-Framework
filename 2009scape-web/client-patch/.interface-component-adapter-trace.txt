@@ -1,0 +1,2 @@
+[InterfaceComponent530Adapter] component id=786432 type=2 slots=28
+[InterfaceComponent530Adapter] component id=786433 type=4 text=Hello 530

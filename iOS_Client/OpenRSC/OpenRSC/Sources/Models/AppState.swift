@@ -48,6 +48,13 @@ final class AppState: ObservableObject {
         saveServers()
     }
 
+    func updateLastUsername(_ username: String, for server: ServerProfile) {
+        guard let index = servers.firstIndex(where: { $0.id == server.id }) else { return }
+        guard servers[index].lastUsername != username else { return }
+        servers[index].lastUsername = username
+        saveServers()
+    }
+
     func removeServer(at offsets: IndexSet) {
         servers.remove(atOffsets: offsets)
         saveServers()

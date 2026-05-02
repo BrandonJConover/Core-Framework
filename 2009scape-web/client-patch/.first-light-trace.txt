@@ -1,0 +1,6 @@
+# Captured by .first-light-test.mjs at 2026-05-02T10:04:44.356Z
+# All assertions passed: createBones, createPose, applyAnimFrame, Model530Bridge.draw
+# Arm vertex Y translated 100 -> 110 (delta=10) via applyAnimFrame
+
+[Model530] drawing npc=1 verts=4 tris=4 animFrame=0
+[Model530] drawing npc=1 verts=4 tris=4 animFrame=0

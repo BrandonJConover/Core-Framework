@@ -1,0 +1,8 @@
+# Captured by .npc-appearance-test.mjs at 2026-05-02T10:56:42.791Z
+# All assertions passed: composeNpcModel, mergeRawModels, applyRecolor, applyRetex, attachNpcAppearance530
+# Fixture A: 1 modelIndex (id=100). Fixture B: 2 modelIndices (100+200) + recolor + retex.
+
+[NpcAppearance530] composed verts=8 tris=4
+[NpcAppearance530] recolor-replaced=1 retex-replaced=2
+[NpcAttacher530] attach+replace ok (resetCalls=1)
+[NpcAppearance530] index rebase OK: maxIdx=7 verts=8

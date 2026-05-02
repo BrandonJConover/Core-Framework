@@ -1586,6 +1586,10 @@ export class Game extends GameShell {
         Model.anInt1708 = 0;
         Model.anInt1706 = this.mouseX - 4;
         Model.anInt1707 = this.mouseY - 4;
+        if ((globalThis as any).__rendererAuditDebug || (this as any).__rendererProbePending) {
+            (globalThis as any).__rendererProbeDebug = true;
+            Model.resetRendererAudit();
+        }
         Rasterizer.resetPixels();
         this.currentScene.method280(this.cameraX, k, 0, this.cameraZ, this.cameraY, this.cameraYaw, this.cameraPitch);
         this.currentScene.method255();
@@ -1593,6 +1597,8 @@ export class Game extends GameShell {
             (this as any).__rendererProbePending = false;
             (this as any).__rendererProbeDone = true;
             (this.currentScene as any).runRendererProbe(this);
+            console.table([Model.rendererAudit]);
+            (globalThis as any).__rendererProbeDebug = false;
         }
         this.method121(false);
         this.method127(true);

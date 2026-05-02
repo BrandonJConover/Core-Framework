@@ -1,0 +1,11 @@
+# Captured by .player-appearance-test.mjs at 2026-05-02T10:21:29.927Z
+# All assertions passed: parseAppearanceMask, resolveSlot, mergeRawModels, applyAppearanceMask, equip-swap delta
+# Composite1 (bronze sword 1042): 32 verts / 16 tris
+# Composite2 (mithril sword 1044): 36 verts / 18 tris
+# Equip-swap delta: 4 verts
+
+[PlayerAppearance530] composite1 verts=32 tris=16
+[PlayerAppearance530] composite2 verts=36 tris=18
+[PlayerAppearance530] equip swap delta verts=4
+[PlayerAppearance530] index rebase OK: maxIdx=35 verts=36
+[PlayerAppearance530] decode OK: gender=0 basId=42 idk=7 obj=1 empty=4

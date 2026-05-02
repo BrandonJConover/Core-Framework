@@ -154,6 +154,26 @@ impl PlayerRepository {
         Ok(())
     }
 
+    /// Update player position by username.
+    ///
+    /// The in-memory Player carries username but not the DB primary key, so
+    /// the logout path uses this convenience that does a WHERE username = ?.
+    /// Costs an indexed lookup; fine for logout/auto-save (not per-tick).
+    pub async fn update_position_by_username(&self, username: &str, x: i32, y: i32) -> Result<()> {
+        let query = "UPDATE players SET x = ?, y = ? WHERE username = ?";
+        match &self.pool {
+            DatabasePool::MySql(pool) => {
+                sqlx::query(query).bind(x).bind(y).bind(username).execute(pool).await
+                    .context("update_position_by_username (mysql)")?;
+            }
+            DatabasePool::Sqlite(pool) => {
+                sqlx::query(query).bind(x).bind(y).bind(username).execute(pool).await
+                    .context("update_position_by_username (sqlite)")?;
+            }
+        }
+        Ok(())
+    }
+
     /// Update player online status.
     pub async fn set_online(&self, player_id: i64, online: bool) -> Result<()> {
         let query = "UPDATE players SET online = ?, last_login = ? WHERE id = ?";

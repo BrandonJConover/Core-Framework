@@ -94,7 +94,7 @@ public final class GameSettingHandler implements PayloadProcessor<GameSettingStr
 			return;
 		}
 
-		if (player.getClientVersion() <= 235) {
+		if (player.getClientVersion() <= 5235) {
 			if (idx == 0) { // Camera Mode Auto
 				player.getSettings().setGameSetting(PlayerSettings.GAME_SETTING_AUTO_CAMERA, payload.cameraModeAuto == 1);
 			} else if (idx == 1) { // 1: Change in PkMode

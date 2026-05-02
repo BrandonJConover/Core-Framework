@@ -58,7 +58,7 @@ public abstract class LoginRequest extends LoginExecutorProcess{
 		this.server = server;
 		this.channel = null;
 		this.setUsername(DataConversions.sanitizeUsername(username));
-		this.setAuthenticClient(clientVersion <= 235);
+		this.setAuthenticClient(clientVersion <= 5235);
 		this.setIpAddress(ip);
 		this.setClientVersion(clientVersion);
 		this.setUsernameHash(DataConversions.usernameToHash(username));
@@ -158,6 +158,7 @@ public abstract class LoginRequest extends LoginExecutorProcess{
 		PlayerLoginData playerData;
 		int groupId = Group.USER;
 		try {
+			boolean usingGameTicket = false;
 			if (getServer().isRestarting() || getServer().isShuttingDown() || !getServer().getLoginExecutor().isRunning()) {
 				return new ValidatedLogin(LoginResponse.WORLD_DOES_NOT_ACCEPT_NEW_PLAYERS);
 			}
@@ -176,7 +177,14 @@ public abstract class LoginRequest extends LoginExecutorProcess{
 					playerData = getServer().getDatabase().getPlayerLoginData(username);
 					usernameChangeType = oldUsername.changeType;
 				}
-			} else {
+			}
+
+			if (!isSimLogin && playerData != null) {
+				usingGameTicket = getServer().getGameLoginTicketService()
+					.isValidPasswordToken(username, getPassword());
+			}
+
+			if (playerData != null && !usingGameTicket) {
 				// check for released name that has been reassigned
 				// (password will almost always mismatch, else they've logged into the new account)
 				if (!DataConversions.checkPassword(getPassword(), playerData.salt, playerData.password)) {
@@ -255,13 +263,18 @@ public abstract class LoginRequest extends LoginExecutorProcess{
 				return new ValidatedLogin(LoginResponse.ACCOUNT_TEMP_DISABLED);
 			}
 
-			if (!isSimLogin && !DataConversions.checkPassword(getPassword(), playerData.salt, playerData.password)) {
+			if (!isSimLogin && !usingGameTicket && !DataConversions.checkPassword(getPassword(), playerData.salt, playerData.password)) {
 				server.getPacketFilter().addPasswordAttempt(getIpAddress());
 				return new ValidatedLogin(LoginResponse.INVALID_CREDENTIALS);
 			}
 
 			// all other checks passed, check cryptographic nonces have not been used before by inserting into a UNIQUE column
 			if (!isSimLogin && !getServer().getDatabase().queryInsertLoginAttempt(new LoginLog(playerData.id, getIpAddress(), clientVersion, nonces))) {
+				return new ValidatedLogin(LoginResponse.INVALID_CREDENTIALS);
+			}
+
+			if (usingGameTicket && !getServer().getGameLoginTicketService()
+				.consumePasswordToken(username, getPassword())) {
 				return new ValidatedLogin(LoginResponse.INVALID_CREDENTIALS);
 			}
 

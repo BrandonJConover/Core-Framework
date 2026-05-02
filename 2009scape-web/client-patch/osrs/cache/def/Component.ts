@@ -1,3 +1,5 @@
+import { InterfaceComponent530Data } from "./InterfaceComponent530";
+
 class ComponentReader {
     pos: number = 0;
     constructor(readonly data: Uint8Array) {}
@@ -43,6 +45,7 @@ class ComponentReader {
 export class Component {
     id: number = 0;
     if3: boolean = false;
+    ifVersion: number = 1;
     type: number = 0;
     buttonType: number = 0;
     contentType: number = 0;
@@ -50,19 +53,44 @@ export class Component {
     y: number = 0;
     width: number = 0;
     height: number = 0;
+    alpha: number = 0;
     parentId: number = -1;
     childIds: number[] = [];
 
     text: string | null = null;
     activeText: string | null = null;
     colour: number = 0;
+    activeColour: number = 0;
+    font: number = -1;
+    horizontalAlignment: number = 0;
+    verticalAlignment: number = 0;
+    textShadowed: boolean = false;
     sprite: number = -1;
     activeSprite: number = -1;
+    spriteAngle: number = 0;
+    spriteHasAlpha: boolean = false;
+    spriteTiling: boolean = false;
+    spriteOutline: number = 0;
+    spriteShadow: number = 0;
+    spriteHFlip: boolean = false;
+    spriteVFlip: boolean = false;
     modelId: number = -1;
+    activeModelId: number = -1;
     modelSeqId: number = -1;
+    activeModelSeqId: number = -1;
+    modelType: number = 0;
     modelZoom: number = 0;
     modelXAngle: number = 0;
     modelYAngle: number = 0;
+    inventorySlotCount: number = 0;
+    inventoryItems: number[] = [];
+    inventoryItemAmounts: number[] = [];
+    inventoryOptions: string[] = [];
+    invMarginX: number = 0;
+    invMarginY: number = 0;
+    invSprite: number[] = [];
+    invOffsetX: number[] = [];
+    invOffsetY: number[] = [];
     scrollPos: number = 0;
     scrollMaxH: number = 0;
     scrollMaxV: number = 0;
@@ -90,6 +118,75 @@ export class Component {
             else c.decodeIf1(r);
         } catch (e) {
             (c as any).decodeError = (e as any)?.message || String(e);
+        }
+        return c;
+    }
+
+    static fromInterfaceComponent(data: InterfaceComponent530Data): Component {
+        const c = new Component();
+        c.id = data.id;
+        c.if3 = data.ifVersion === 3;
+        c.ifVersion = data.ifVersion;
+        c.type = data.type;
+        c.buttonType = data.buttonType;
+        c.x = data.x;
+        c.y = data.y;
+        c.width = data.width;
+        c.height = data.height;
+        c.alpha = data.alpha;
+        c.parentId = data.parentId;
+        c.hidden = data.hidden;
+        c.colour = data.color;
+        c.optionBase = data.optionBase || null;
+        c.ops = data.ops ? data.ops.slice() : [];
+
+        if (data.container) {
+            c.scrollMaxH = data.container.scrollMaxH;
+            c.scrollMaxV = data.container.scrollMaxV;
+            c.childIds = data.container.childIds.slice();
+        }
+        if (data.text) {
+            c.text = data.text.text;
+            c.activeText = data.text.activeText;
+            c.colour = data.text.color;
+            c.activeColour = data.text.activeColor;
+            c.font = data.text.font;
+            c.horizontalAlignment = data.text.halign;
+            c.verticalAlignment = data.text.valign;
+            c.textShadowed = data.text.shadowed;
+        }
+        if (data.sprite) {
+            c.sprite = data.sprite.spriteId;
+            c.activeSprite = data.sprite.activeSpriteId;
+            c.spriteAngle = data.sprite.angle2d;
+            c.spriteHasAlpha = data.sprite.hasAlpha;
+            c.spriteTiling = data.sprite.spriteTiling;
+            c.spriteOutline = data.sprite.outlineThickness;
+            c.spriteShadow = data.sprite.shadowColor;
+            c.spriteHFlip = data.sprite.hFlip;
+            c.spriteVFlip = data.sprite.vFlip;
+        }
+        if (data.model) {
+            c.modelId = data.model.modelId;
+            c.activeModelId = data.model.activeModelId;
+            c.modelSeqId = data.model.modelSeqId;
+            c.activeModelSeqId = data.model.activeModelSeqId;
+            c.modelType = data.model.modelType;
+            c.modelZoom = data.model.modelZoom;
+            c.modelXAngle = data.model.modelXAngle;
+            c.modelYAngle = data.model.modelYAngle;
+        }
+        if (data.inventory) {
+            c.inventorySlotCount = data.inventory.slotCount;
+            c.inventoryItems = data.inventory.items.slice();
+            c.inventoryItemAmounts = data.inventory.itemAmounts.slice();
+            c.inventoryOptions = data.inventory.options.slice();
+            if (c.ops.length === 0) c.ops = data.inventory.options.slice();
+            c.invMarginX = data.inventory.invMarginX;
+            c.invMarginY = data.inventory.invMarginY;
+            c.invSprite = data.inventory.invSprite.slice();
+            c.invOffsetX = data.inventory.invOffsetX.slice();
+            c.invOffsetY = data.inventory.invOffsetY.slice();
         }
         return c;
     }

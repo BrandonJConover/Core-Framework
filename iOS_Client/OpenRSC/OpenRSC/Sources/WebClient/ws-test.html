@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>OpenRSC WebSocket Test</title>
+  <style>
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #111;
+      color: #eee;
+      font: 16px/1.45 -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 14px;
+      border: 1px solid #d4af37;
+      border-radius: 8px;
+      background: #222;
+      color: #f3d36b;
+      font: inherit;
+      font-weight: 700;
+    }
+
+    pre {
+      min-height: 220px;
+      overflow: auto;
+      padding: 12px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #050505;
+      color: #b8f5c8;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <h1>OpenRSC WebSocket Test</h1>
+  <button type="button" data-url="/rsc-ws">Same-origin /rsc-ws</button>
+  <button type="button" data-url="/rsc-ws" data-protocol="binary">Same-origin /rsc-ws + binary protocol</button>
+  <button type="button" data-url="ws://10.8.0.1:43494/">Direct 43494</button>
+  <button type="button" data-url="ws://10.8.0.1:43494/" data-protocol="binary">Direct 43494 + binary protocol</button>
+  <pre id="log"></pre>
+
+  <script>
+    (function() {
+      var logEl = document.getElementById('log');
+      var activeSocket = null;
+
+      function log(message) {
+        var line = new Date().toISOString() + ' ' + message;
+        console.log(line);
+        logEl.textContent += line + '\n';
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function socketUrl(url) {
+        if (/^wss?:\/\//.test(url)) {
+          return url;
+        }
+        return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + url;
+      }
+
+      function closeActive() {
+        if (activeSocket && activeSocket.readyState < WebSocket.CLOSING) {
+          try {
+            activeSocket.close(1000, 'next test');
+          } catch (err) {
+            log('closeActive error: ' + err);
+          }
+        }
+        activeSocket = null;
+      }
+
+    function runTest(url, protocol) {
+        closeActive();
+        logEl.textContent = '';
+        var finalUrl = socketUrl(url);
+        var startedAt = Date.now();
+        var timer = 0;
+        var didOpen = false;
+
+        log('userAgent=' + navigator.userAgent);
+        log('opening url=' + finalUrl + ' protocol=' + (protocol || '<none>'));
+
+        try {
+          activeSocket = protocol
+            ? new WebSocket(finalUrl, protocol)
+            : new WebSocket(finalUrl);
+          activeSocket.binaryType = 'arraybuffer';
+
+          timer = setTimeout(function() {
+            log('timeout readyState=' + activeSocket.readyState);
+            try {
+              activeSocket.close(4001, 'timeout');
+            } catch (err) {
+              log('timeout close error: ' + err);
+            }
+          }, 8000);
+
+          activeSocket.onopen = function() {
+            clearTimeout(timer);
+            didOpen = true;
+            log('TRANSPORT PASS: open afterMs=' + (Date.now() - startedAt) + ' protocol=' + activeSocket.protocol);
+            setTimeout(function() {
+              try {
+                activeSocket.close(1000, 'test complete');
+              } catch (err) {
+                log('close error: ' + err);
+              }
+            }, 500);
+          };
+
+          activeSocket.onerror = function(event) {
+            clearTimeout(timer);
+            log((didOpen ? 'post-open ' : 'TRANSPORT FAIL: ') + 'error readyState=' + activeSocket.readyState + ' eventType=' + event.type);
+          };
+
+          activeSocket.onclose = function(event) {
+            clearTimeout(timer);
+            log(
+              (didOpen ? 'post-open close ' : 'TRANSPORT FAIL: close ') +
+              'code=' + event.code +
+              ' wasClean=' + event.wasClean +
+              (event.reason ? ' reason=' + event.reason : '') +
+              ' afterMs=' + (Date.now() - startedAt)
+            );
+          };
+
+          activeSocket.onmessage = function(event) {
+            var length = typeof event.data === 'string'
+              ? event.data.length
+              : event.data && event.data.byteLength || 0;
+            log('message type=' + typeof event.data + ' length=' + length);
+          };
+        } catch (err) {
+          clearTimeout(timer);
+          log('constructor failed: ' + (err && err.stack || err));
+        }
+      }
+
+      document.querySelectorAll('button[data-url]').forEach(function(button) {
+        button.addEventListener('click', function() {
+          runTest(button.getAttribute('data-url'), button.getAttribute('data-protocol'));
+        });
+      });
+
+      log('Ready. Tap a test button.');
+    })();
+  </script>
+</body>
+</html>

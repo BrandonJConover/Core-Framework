@@ -1,0 +1,7 @@
+# Captured by .bas-animation-test.mjs at 2026-05-02T10:54:09.713Z
+# Gates: 4-bone fixture, 3-frame translate-only frameset, framesPerTick=1
+
+[Animator530] frames advanced, vert delta=30 expected=30
+[Animator530] vert deltas: v0=+10 (frame 0), v1=+20 (frame 1), v2=+30 (frame 2)
+[Animator530] frameIdx after 3 calls=0, after 6 calls=0 (loop confirmed)
+[Animator530] seq-switch reset OK: seqId=99, frameIdx=0 after switching from 42

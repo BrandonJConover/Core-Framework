@@ -1,0 +1,8 @@
+# Captured by .terrain-textures-test.mjs at 2026-05-02T10:59:00.087Z
+# Gates: runOpGraph against ColorFill + VerticalGradient fixtures
+# Texture size: 64×64 = 4096 pixels
+
+[TerrainTextureProvider] colorFill+vGradient ok pixels=4096+4096
+[TerrainTextureProvider] colorFill: every pixel = 0xFFFF0000 (solid red, 4096 verified)
+[TerrainTextureProvider] vGradient: top=0xff0000ff bot=0xff00ff00 distinct-rows=64
+[TerrainTextureProvider] vGradient mid-row interp ok: G=129 B=125 (expected ~127)

@@ -3934,7 +3934,7 @@ public final class Player extends Mob {
 	}
 
 	public boolean isUsing233CompatibleClient() {
-		return this.clientVersion >= 233 && this.clientVersion <= 235;
+		return this.clientVersion > 204 && this.clientVersion <= 5235;
 	}
 
 	public boolean isUsingCustomClient() {

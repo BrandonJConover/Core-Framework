@@ -127,6 +127,7 @@ public final class ApiServer {
         AuthEndpoint auth = new AuthEndpoint(server, jwt, loginLimiter);
         WhoamiEndpoint whoami = new WhoamiEndpoint(jwt);
         RefreshEndpoint refresh = new RefreshEndpoint(jwt);
+        GameTicketEndpoint gameTicket = new GameTicketEndpoint(jwt, server.getGameLoginTicketService());
         RegisterEndpoint register = new RegisterEndpoint(server, jwt, registerLimiter);
         OnlinePlayersEndpoint online = new OnlinePlayersEndpoint(server);
         CharacterEndpoint character = new CharacterEndpoint(server);
@@ -137,6 +138,7 @@ public final class ApiServer {
             .route(HttpMethod.POST, "/api/auth/login",           auth::handle)
             .route(HttpMethod.POST, "/api/auth/register",        register::handle)
             .route(HttpMethod.POST, "/api/auth/refresh",         refresh::handle)
+            .route(HttpMethod.POST, "/api/auth/game-ticket",     gameTicket::handle)
             .route(HttpMethod.GET,  "/api/auth/whoami",          whoami::handle)
             .route(HttpMethod.GET,  "/api/players/online",       req -> online.handle())
             .route(HttpMethod.GET,  "/api/character/{username}", character::handle);

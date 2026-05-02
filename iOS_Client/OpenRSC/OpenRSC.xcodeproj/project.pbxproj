@@ -33,6 +33,7 @@
 		49BE2E9E20608DF7F8491734 /* landscape.dat in Resources */ = {isa = PBXBuildFile; fileRef = EB1994B23C1113BEF842C514 /* landscape.dat */; };
 		4B6D93F4FBEAD30A6A116F46 /* GameObjectDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4EDAB057950782165E6034E /* GameObjectDefinitions.swift */; };
 		4EDFD6C354CB77D0C3011728 /* RSCWorldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CBD0EBDD0DAD78E31727091 /* RSCWorldState.swift */; };
+		552BAD94C1418B5032196D70 /* BiometricLoginStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368DEB5A277F7F3412F785E4 /* BiometricLoginStore.swift */; };
 		5D992464CE94A9E8AD9FE4FE /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA34960346994775CDF265C /* LoginView.swift */; };
 		64AB02B55EB3EBA6BE73D300 /* Scanline.swift in Sources */ = {isa = PBXBuildFile; fileRef = D37E5A4EBD7022529B04B92A /* Scanline.swift */; };
 		6648F15278343C12D182D549 /* NPCNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5576569325B6C2223C6DEE7E /* NPCNames.swift */; };
@@ -88,6 +89,7 @@
 		2A2C8E3EE280E9D4EC285120 /* MinimapPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinimapPanel.swift; sourceTree = "<group>"; };
 		2A965968A944DB773A974098 /* SoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
 		2BDDB02A754C67CF7D8CEC0D /* LocalHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHTTPServer.swift; sourceTree = "<group>"; };
+		368DEB5A277F7F3412F785E4 /* BiometricLoginStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricLoginStore.swift; sourceTree = "<group>"; };
 		38223850597085ADCA3EE8A3 /* TouchTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchTranslator.swift; sourceTree = "<group>"; };
 		3E5FBB918C12B58C6F35F9CA /* AppearancePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePanel.swift; sourceTree = "<group>"; };
 		3ED06FB5405C413FFB721D92 /* ObjectNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectNames.swift; sourceTree = "<group>"; };
@@ -309,6 +311,14 @@
 			path = Rendering;
 			sourceTree = "<group>";
 		};
+		D03276F437196CB6F6376451 /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				368DEB5A277F7F3412F785E4 /* BiometricLoginStore.swift */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
 		D209D9539355735E75BDCB65 /* RSC */ = {
 			isa = PBXGroup;
 			children = (
@@ -349,6 +359,7 @@
 				699C5C185BD323A5162E5836 /* Models */,
 				BA24992C9D30600FD094A500 /* Network */,
 				CC20FD5EAF8C4477E6070BEC /* Rendering */,
+				D03276F437196CB6F6376451 /* Security */,
 				5138393423EBA38325AF3D1C /* Views */,
 			);
 			path = Sources;
@@ -439,6 +450,7 @@
 				CC7E01957E9CC492C4A17597 /* AppState.swift in Sources */,
 				DEFC358256760CE8C2766569 /* AppearancePanel.swift in Sources */,
 				E964A6AC245FC0015DFBC76F /* BankPanel.swift in Sources */,
+				552BAD94C1418B5032196D70 /* BiometricLoginStore.swift in Sources */,
 				3AA1A652B3144AB124C777AA /* ByteBuffer.swift in Sources */,
 				000976800475318BA8C73DE6 /* CharacterBillboards.swift in Sources */,
 				843CD2F78B555661353B2FBA /* DuelPanel.swift in Sources */,

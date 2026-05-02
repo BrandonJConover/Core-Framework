@@ -11,6 +11,20 @@ import { array2d } from "../../Arrays";
 
 export class Model extends Renderable {
     public static __static_initialized: boolean = false;
+    public static rendererAudit = {
+        renderCalls: 0,
+        rejectedNearFar: 0,
+        rejectedRight: 0,
+        rejectedLeft: 0,
+        rejectedBottom: 0,
+        rejectedTop: 0,
+        verticesProjected: 0,
+        verticesBehindNear: 0,
+        trianglesVisited: 0,
+        trianglesNearClipped: 0,
+        trianglesBackfaceCulled: 0,
+        trianglesBucketed: 0
+    };
 
     public static anInt1642: number = 0;
     public static EMPTY_MODEL: Model = new Model();
@@ -50,6 +64,15 @@ export class Model extends Renderable {
     public static COSINE: number[] = Rasterizer3D.COSINE;
     public static anIntArray1712: number[] = Rasterizer3D.getRgbLookupTableId;
     public static anIntArray1713: number[] = Rasterizer3D.anIntArray1535;
+
+    public static resetRendererAudit() {
+        const audit: any = Model.rendererAudit;
+        for (const key of Object.keys(audit)) audit[key] = 0;
+    }
+
+    private static auditEnabled(): boolean {
+        return !!(globalThis as any).__rendererAuditDebug || !!(globalThis as any).__rendererProbeDebug;
+    }
 
     public static reset() {
         Model.modelHeaders = null;
@@ -3363,31 +3386,38 @@ export class Model extends Renderable {
      * @param {number} i2
      */
     public renderAtPoint(i: number, j: number, k: number, l: number, i1: number, j1: number, k1: number, l1: number, i2: number) {
+        const audit = Model.auditEnabled() ? Model.rendererAudit : null;
+        if (audit) audit.renderCalls++;
         const j2: number = (l1 * i1 - j1 * l) >> 16;
         const k2: number = (k1 * j + j2 * k) >> 16;
         const l2: number = (this.shadowIntensity * k) >> 16;
         const i3: number = k2 + l2;
         if (i3 <= 50 || k2 >= 3500) {
+            if (audit) audit.rejectedNearFar++;
             return;
         }
         const j3: number = (l1 * l + j1 * i1) >> 16;
         let k3: number = (j3 - this.shadowIntensity) << 9;
         if (((k3 / i3) | 0) >= Rasterizer.centerX) {
+            if (audit) audit.rejectedRight++;
             return;
         }
         let l3: number = (j3 + this.shadowIntensity) << 9;
         if (((l3 / i3) | 0) <= -Rasterizer.centerX) {
+            if (audit) audit.rejectedLeft++;
             return;
         }
         const i4: number = (k1 * k - j2 * j) >> 16;
         const j4: number = (this.shadowIntensity * j) >> 16;
         let k4: number = (i4 + j4) << 9;
         if (((k4 / i3) | 0) <= -Rasterizer.centerY) {
+            if (audit) audit.rejectedBottom++;
             return;
         }
         const l4: number = j4 + ((this.modelHeight * k) >> 16);
         let i5: number = (i4 - l4) << 9;
         if (((i5 / i3) | 0) >= Rasterizer.centerY) {
+            if (audit) audit.rejectedTop++;
             return;
         }
         const j5: number = l2 + ((this.modelHeight * j) >> 16);
@@ -3457,9 +3487,11 @@ export class Model extends Renderable {
                 if (i8 >= 50) {
                     Model.anIntArray1686[j7] = l5 + (((k7 << 9) / i8) | 0);
                     Model.anIntArray1687[j7] = j6 + (((l7 << 9) / i8) | 0);
+                    if (audit) audit.verticesProjected++;
                 } else {
                     Model.anIntArray1686[j7] = -5000;
                     flag = true;
+                    if (audit) audit.verticesBehindNear++;
                 }
                 if (flag || this.texturedTriangleCount > 0) {
                     Model.anIntArray1689[j7] = k7;
@@ -3477,11 +3509,13 @@ export class Model extends Renderable {
     }
 
     public method599(flag: boolean, flag1: boolean, i: number) {
+        const audit = Model.auditEnabled() ? Model.rendererAudit : null;
         for (let j: number = 0; j < this.anInt1673; j++) {
             Model.anIntArray1692[j] = 0;
         }
         for (let k: number = 0; k < this.triangleCount; k++) {
             if (this.texturePoints == null || this.texturePoints[k] !== -1) {
+                if (audit) audit.trianglesVisited++;
                 const l: number = this.trianglePointsX[k];
                 const k1: number = this.trianglePointsY[k];
                 const j2: number = this.trianglePointsZ[k];
@@ -3494,6 +3528,7 @@ export class Model extends Renderable {
                         (((Model.anIntArray1688[l] + Model.anIntArray1688[k1] + Model.anIntArray1688[j2]) / 3) | 0) +
                         this.anInt1674;
                     Model.anIntArrayArray1693[j5][Model.anIntArray1692[j5]++] = k;
+                    if (audit) audit.trianglesNearClipped++;
                 } else {
                     if (
                         flag1 &&
@@ -3535,6 +3570,9 @@ export class Model extends Renderable {
                                 0) +
                             this.anInt1674;
                         Model.anIntArrayArray1693[k5][Model.anIntArray1692[k5]++] = k;
+                        if (audit) audit.trianglesBucketed++;
+                    } else if (audit) {
+                        audit.trianglesBackfaceCulled++;
                     }
                 }
             }

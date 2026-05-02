@@ -15,30 +15,53 @@ pub struct ServerConfig {
     pub tracing: TracingConfig,
     pub discovery: DiscoveryConfig,
     pub security: SecurityConfig,
+    pub database: DatabaseSection,
+}
+
+/// Database section for ServerConfig.
+///
+/// `enabled = false` means the server runs in accept-all auth mode with no
+/// persistence — handy for benchmarking the protocol/tick path. When true,
+/// the SQLite/MySQL pool is wired into the ServerState and login goes
+/// through bcrypt verification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseSection {
+    pub enabled: bool,
+    pub kind: String,        // "sqlite" or "mysql"
+    pub sqlite_path: String, // e.g. "openrsc.db"
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub username: String,
+    pub password: String,
+}
+
+impl Default for DatabaseSection {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            kind: "sqlite".to_string(),
+            sqlite_path: "openrsc.db".to_string(),
+            host: "localhost".to_string(),
+            port: 3306,
+            database: "openrsc".to_string(),
+            username: "root".to_string(),
+            password: String::new(),
+        }
+    }
 }
 
 impl ServerConfig {
     /// Load configuration from file or environment.
+    ///
+    /// Starts from `ServerConfig::default()` so any field added to a sub-struct
+    /// is automatically defaulted; file/env sources overlay on top.
     pub fn load() -> Result<Self> {
+        let defaults = config::Config::try_from(&Self::default())?;
         let config = config::Config::builder()
+            .add_source(defaults)
             .add_source(config::File::with_name("config/server").required(false))
             .add_source(config::Environment::with_prefix("OPENRSC").separator("__"))
-            .set_default("world_name", "world-1")?
-            .set_default("server_port", 43594)?
-            .set_default("quic_port", 43595)?
-            .set_default("max_players", 2000)?
-            .set_default("redis.enabled", false)?
-            .set_default("redis.url", "redis://localhost:6379")?
-            .set_default("redis.pool_size", 10)?
-            .set_default("redis.key_prefix", "openrsc:")?
-            .set_default("metrics.enabled", true)?
-            .set_default("metrics.prometheus_port", 9090)?
-            .set_default("tracing.enabled", false)?
-            .set_default("tracing.otlp_endpoint", "http://localhost:4317")?
-            .set_default("discovery.enabled", false)?
-            .set_default("discovery.provider", "consul")?
-            .set_default("discovery.consul_url", "http://localhost:8500")?
-            .set_default("security.password_iterations", 100000)?
             .build()?;
 
         Ok(config.try_deserialize()?)
@@ -67,6 +90,7 @@ impl Default for ServerConfig {
             tracing: TracingConfig::default(),
             discovery: DiscoveryConfig::default(),
             security: SecurityConfig::default(),
+            database: DatabaseSection::default(),
         }
     }
 }

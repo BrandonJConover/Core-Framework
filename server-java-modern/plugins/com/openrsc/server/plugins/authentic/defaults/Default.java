@@ -16,6 +16,7 @@ import com.openrsc.server.model.struct.EquipRequest;
 import com.openrsc.server.model.struct.UnequipRequest;
 import com.openrsc.server.net.rsc.ActionSender;
 import com.openrsc.server.plugins.DefaultHandler;
+import com.openrsc.server.plugins.shared.DropObject;
 import com.openrsc.server.plugins.triggers.*;
 import com.openrsc.server.util.rsc.DataConversions;
 
@@ -153,7 +154,7 @@ public class Default implements DefaultHandler,
 
 	@Override
 	public void onDropObj(Player player, Integer invIndex, Item item, Boolean fromInventory) {
-		// No default actions
+		DropObject.batchDrop(player, item, fromInventory, item.getAmount(), item.getAmount(), invIndex);
 	}
 
 	@Override

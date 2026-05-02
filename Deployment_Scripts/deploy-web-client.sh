@@ -166,6 +166,8 @@ server {
 	    }
 	
 	    # Keep hosted browsers on the same TLS origin for Safari/iOS.
+	    # Preserve the trailing slash on proxy_pass: the Java websocket endpoint
+	    # expects / after the /rsc-ws prefix is stripped.
 	    location /rsc-ws {
 	        proxy_pass http://127.0.0.1:$OPENRSC_WS_PORT/;
 	        proxy_http_version 1.1;

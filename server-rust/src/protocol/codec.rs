@@ -1,46 +1,111 @@
-//! Tokio codec for RSC packet framing.
+//! Tokio codec for RSC packet framing, with optional ISAAC opcode shuffling.
+//!
+//! The framing produced by this codec is the *simplified* 3-byte-header form
+//! (opcode + u16 BE length) used by inauthentic / OpenRSC web clients — see
+//! `RSCProtocolDecoder.java` and `RSCProtocolEncoderMain.java` in the Java
+//! server (`authenticClient == -1` branch). The authentic mudclient framing
+//! (variable 1/2-byte length, last-byte-of-payload-shuffled-into-header,
+//! >= mudclient 183 with ISAAC) is handled at a higher layer; this codec
+//! exposes the ISAAC bookkeeping so that layer can call `next_in()` /
+//! `next_out()` for opcode shuffling on its own framing.
+//!
+//! ISAAC integration:
+//! - `set_encryption(seed)` initialises *two* `IsaacCipher` instances, one
+//!   for incoming packet opcodes, one for outgoing — exactly mirroring
+//!   `ISAACContainer(in, out)` in `com.openrsc.server.net.rsc.ISAACContainer`.
+//!   Both ciphers are seeded with the same 4-word key (the keys recovered
+//!   from the RSA login block), as Java does at
+//!   `LoginPacketHandler.java:231-235`.
+//! - When encryption is enabled, `encode()` applies
+//!   `(opcode + out.next_value()) & 0xFF` to the outgoing opcode byte and
+//!   `decode()` applies `(byte - in.next_value()) & 0xFF` to the incoming
+//!   opcode byte (matches `ISAACContainer.encodeOpcode` / `decodeOpcode`).
 
 use super::{Packet, HEADER_SIZE, MAX_PACKET_SIZE};
+use crate::protocol::isaac::IsaacCipher;
 use bytes::{Buf, BytesMut};
 use std::io::{self, Error, ErrorKind};
 use tokio_util::codec::{Decoder, Encoder};
 
 /// RSC packet codec for tokio-util.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RscCodec {
-    /// Whether encryption is enabled.
-    encrypted: bool,
-    /// ISAAC cipher for encryption (if enabled).
-    cipher_key: Option<[u32; 4]>,
+    /// ISAAC cipher for decoding inbound opcodes (None when encryption is off).
+    in_cipher: Option<IsaacCipher>,
+    /// ISAAC cipher for encoding outbound opcodes (None when encryption is off).
+    out_cipher: Option<IsaacCipher>,
+}
+
+impl Default for RscCodec {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RscCodec {
     /// Create a new codec without encryption.
     pub fn new() -> Self {
         Self {
-            encrypted: false,
-            cipher_key: None,
+            in_cipher: None,
+            out_cipher: None,
         }
     }
 
     /// Create a new codec with ISAAC encryption.
-    pub fn with_encryption(key: [u32; 4]) -> Self {
+    ///
+    /// `seed` is the 4-word ISAAC key recovered from the RSA login block
+    /// (see `LoginPacketHandler.processLogin`, `loginInfo.keys`). Both the
+    /// incoming and outgoing ciphers are initialised with the same key —
+    /// matching Java's `ISAACContainer(in, out)` setup.
+    pub fn with_encryption(seed: [u32; 4]) -> Self {
         Self {
-            encrypted: true,
-            cipher_key: Some(key),
+            in_cipher: Some(IsaacCipher::new(seed)),
+            out_cipher: Some(IsaacCipher::new(seed)),
         }
     }
 
     /// Enable encryption with the given key.
-    pub fn set_encryption(&mut self, key: [u32; 4]) {
-        self.encrypted = true;
-        self.cipher_key = Some(key);
+    pub fn set_encryption(&mut self, seed: [u32; 4]) {
+        self.in_cipher = Some(IsaacCipher::new(seed));
+        self.out_cipher = Some(IsaacCipher::new(seed));
     }
 
     /// Disable encryption.
     pub fn disable_encryption(&mut self) {
-        self.encrypted = false;
-        self.cipher_key = None;
+        self.in_cipher = None;
+        self.out_cipher = None;
+    }
+
+    /// Whether encryption is currently enabled on this codec.
+    pub fn is_encrypted(&self) -> bool {
+        self.in_cipher.is_some()
+    }
+
+    /// Pull the next ISAAC stream word from the *incoming* cipher and apply
+    /// it to a raw encoded opcode byte. Returns the decoded opcode.
+    ///
+    /// Mirrors Java `ISAACContainer.decodeOpcode(int)`:
+    ///   `return (opcode - inCipher.getNextValue()) & 0xFF;`
+    ///
+    /// Exposed for higher-level framers that handle the authentic mudclient
+    /// length encoding themselves; `decode()` calls this internally.
+    pub fn decode_opcode(&mut self, encoded: u8) -> u8 {
+        match self.in_cipher.as_mut() {
+            Some(c) => ((encoded as i32 - c.next_value() as i32) & 0xFF) as u8,
+            None => encoded,
+        }
+    }
+
+    /// Pull the next ISAAC stream word from the *outgoing* cipher and apply
+    /// it to a raw opcode. Returns the encoded opcode byte.
+    ///
+    /// Mirrors Java `ISAACContainer.encodeOpcode(int)`:
+    ///   `return (opcode + outCipher.getNextValue()) & 0xFF;`
+    pub fn encode_opcode(&mut self, opcode: u8) -> u8 {
+        match self.out_cipher.as_mut() {
+            Some(c) => (opcode.wrapping_add((c.next_value() & 0xFF) as u8)),
+            None => opcode,
+        }
     }
 }
 
@@ -54,8 +119,8 @@ impl Decoder for RscCodec {
             return Ok(None);
         }
 
-        // Read opcode and length
-        let opcode = src[0];
+        // Peek opcode and length without consuming.
+        let raw_opcode = src[0];
         let length = u16::from_be_bytes([src[1], src[2]]) as usize;
 
         // Validate length
@@ -73,6 +138,11 @@ impl Decoder for RscCodec {
             src.reserve(total_len - src.len());
             return Ok(None);
         }
+
+        // Decode the opcode through ISAAC if encryption is on. Note: we only
+        // advance the ISAAC stream after we've confirmed the full packet is
+        // available, so partial reads don't desync the cipher.
+        let opcode = self.decode_opcode(raw_opcode);
 
         // Extract the packet
         src.advance(HEADER_SIZE);
@@ -95,11 +165,14 @@ impl Encoder<Packet> for RscCodec {
             ));
         }
 
+        // Apply ISAAC to the outgoing opcode if encryption is enabled.
+        let opcode_byte = self.encode_opcode(item.opcode);
+
         // Reserve space
         dst.reserve(HEADER_SIZE + payload_len);
 
         // Write header
-        dst.extend_from_slice(&[item.opcode]);
+        dst.extend_from_slice(&[opcode_byte]);
         dst.extend_from_slice(&(payload_len as u16).to_be_bytes());
 
         // Write payload
@@ -109,169 +182,12 @@ impl Encoder<Packet> for RscCodec {
     }
 }
 
-/// ISAAC cipher for RSC packet encryption.
-/// This is a simplified implementation for demonstration.
-#[derive(Debug, Clone)]
-pub struct IsaacCipher {
-    mm: [u32; 256],
-    randrsl: [u32; 256],
-    aa: u32,
-    bb: u32,
-    cc: u32,
-    randcnt: usize,
-}
-
-impl IsaacCipher {
-    /// Create a new ISAAC cipher with the given seed.
-    pub fn new(seed: &[u32]) -> Self {
-        let mut cipher = Self {
-            mm: [0; 256],
-            randrsl: [0; 256],
-            aa: 0,
-            bb: 0,
-            cc: 0,
-            randcnt: 0,
-        };
-
-        // Copy seed to randrsl
-        for (i, &s) in seed.iter().enumerate() {
-            if i >= 256 {
-                break;
-            }
-            cipher.randrsl[i] = s;
-        }
-
-        cipher.randinit(true);
-        cipher
-    }
-
-    /// Get the next random value.
-    pub fn next(&mut self) -> u32 {
-        if self.randcnt == 0 {
-            self.isaac();
-            self.randcnt = 256;
-        }
-        self.randcnt -= 1;
-        self.randrsl[self.randcnt]
-    }
-
-    fn randinit(&mut self, flag: bool) {
-        let mut a = 0x9e3779b9u32;
-        let mut b = a;
-        let mut c = a;
-        let mut d = a;
-        let mut e = a;
-        let mut f = a;
-        let mut g = a;
-        let mut h = a;
-
-        // Mix
-        for _ in 0..4 {
-            a ^= b << 11; d = d.wrapping_add(a); b = b.wrapping_add(c);
-            b ^= c >> 2;  e = e.wrapping_add(b); c = c.wrapping_add(d);
-            c ^= d << 8;  f = f.wrapping_add(c); d = d.wrapping_add(e);
-            d ^= e >> 16; g = g.wrapping_add(d); e = e.wrapping_add(f);
-            e ^= f << 10; h = h.wrapping_add(e); f = f.wrapping_add(g);
-            f ^= g >> 4;  a = a.wrapping_add(f); g = g.wrapping_add(h);
-            g ^= h << 8;  b = b.wrapping_add(g); h = h.wrapping_add(a);
-            h ^= a >> 9;  c = c.wrapping_add(h); a = a.wrapping_add(b);
-        }
-
-        for i in (0..256).step_by(8) {
-            if flag {
-                a = a.wrapping_add(self.randrsl[i]);
-                b = b.wrapping_add(self.randrsl[i + 1]);
-                c = c.wrapping_add(self.randrsl[i + 2]);
-                d = d.wrapping_add(self.randrsl[i + 3]);
-                e = e.wrapping_add(self.randrsl[i + 4]);
-                f = f.wrapping_add(self.randrsl[i + 5]);
-                g = g.wrapping_add(self.randrsl[i + 6]);
-                h = h.wrapping_add(self.randrsl[i + 7]);
-            }
-
-            a ^= b << 11; d = d.wrapping_add(a); b = b.wrapping_add(c);
-            b ^= c >> 2;  e = e.wrapping_add(b); c = c.wrapping_add(d);
-            c ^= d << 8;  f = f.wrapping_add(c); d = d.wrapping_add(e);
-            d ^= e >> 16; g = g.wrapping_add(d); e = e.wrapping_add(f);
-            e ^= f << 10; h = h.wrapping_add(e); f = f.wrapping_add(g);
-            f ^= g >> 4;  a = a.wrapping_add(f); g = g.wrapping_add(h);
-            g ^= h << 8;  b = b.wrapping_add(g); h = h.wrapping_add(a);
-            h ^= a >> 9;  c = c.wrapping_add(h); a = a.wrapping_add(b);
-
-            self.mm[i] = a;
-            self.mm[i + 1] = b;
-            self.mm[i + 2] = c;
-            self.mm[i + 3] = d;
-            self.mm[i + 4] = e;
-            self.mm[i + 5] = f;
-            self.mm[i + 6] = g;
-            self.mm[i + 7] = h;
-        }
-
-        if flag {
-            for i in (0..256).step_by(8) {
-                a = a.wrapping_add(self.mm[i]);
-                b = b.wrapping_add(self.mm[i + 1]);
-                c = c.wrapping_add(self.mm[i + 2]);
-                d = d.wrapping_add(self.mm[i + 3]);
-                e = e.wrapping_add(self.mm[i + 4]);
-                f = f.wrapping_add(self.mm[i + 5]);
-                g = g.wrapping_add(self.mm[i + 6]);
-                h = h.wrapping_add(self.mm[i + 7]);
-
-                a ^= b << 11; d = d.wrapping_add(a); b = b.wrapping_add(c);
-                b ^= c >> 2;  e = e.wrapping_add(b); c = c.wrapping_add(d);
-                c ^= d << 8;  f = f.wrapping_add(c); d = d.wrapping_add(e);
-                d ^= e >> 16; g = g.wrapping_add(d); e = e.wrapping_add(f);
-                e ^= f << 10; h = h.wrapping_add(e); f = f.wrapping_add(g);
-                f ^= g >> 4;  a = a.wrapping_add(f); g = g.wrapping_add(h);
-                g ^= h << 8;  b = b.wrapping_add(g); h = h.wrapping_add(a);
-                h ^= a >> 9;  c = c.wrapping_add(h); a = a.wrapping_add(b);
-
-                self.mm[i] = a;
-                self.mm[i + 1] = b;
-                self.mm[i + 2] = c;
-                self.mm[i + 3] = d;
-                self.mm[i + 4] = e;
-                self.mm[i + 5] = f;
-                self.mm[i + 6] = g;
-                self.mm[i + 7] = h;
-            }
-        }
-
-        self.isaac();
-        self.randcnt = 256;
-    }
-
-    fn isaac(&mut self) {
-        self.cc = self.cc.wrapping_add(1);
-        self.bb = self.bb.wrapping_add(self.cc);
-
-        for i in 0..256 {
-            let x = self.mm[i];
-            self.aa = match i % 4 {
-                0 => self.aa ^ (self.aa << 13),
-                1 => self.aa ^ (self.aa >> 6),
-                2 => self.aa ^ (self.aa << 2),
-                _ => self.aa ^ (self.aa >> 16),
-            };
-            self.aa = self.mm[(i + 128) % 256].wrapping_add(self.aa);
-            let y = self.mm[((x >> 2) as usize) % 256]
-                .wrapping_add(self.aa)
-                .wrapping_add(self.bb);
-            self.mm[i] = y;
-            self.bb = self.mm[((y >> 10) as usize) % 256].wrapping_add(x);
-            self.randrsl[i] = self.bb;
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_codec_roundtrip() {
+    fn test_codec_roundtrip_plain() {
         let mut codec = RscCodec::new();
         let mut buf = BytesMut::new();
 
@@ -283,12 +199,57 @@ mod tests {
         assert_eq!(decoded.payload.as_ref(), &[1, 2, 3, 4, 5]);
     }
 
+    /// With ISAAC enabled, encoding+decoding through a *paired* codec setup
+    /// (server out -> client in, client out -> server in) must recover the
+    /// original opcode. We simulate by using two codecs seeded identically:
+    /// `server.encode_opcode` produces what the wire sees, then we feed it
+    /// to `client.decode_opcode` and expect the original.
     #[test]
-    fn test_isaac_cipher() {
-        let mut cipher = IsaacCipher::new(&[1, 2, 3, 4]);
-        let first = cipher.next();
-        let second = cipher.next();
-        // Values should be different
-        assert_ne!(first, second);
+    fn test_isaac_opcode_shuffle_roundtrip() {
+        let seed = [0x1234_5678, 0x9abc_def0, 0xfedc_ba98, 0x7654_3210];
+
+        // Server's outgoing cipher pairs with client's incoming cipher
+        // (both seeded the same — mirrors Java's ISAACContainer where in & out
+        // are both fed the same login keys).
+        let mut server = RscCodec::with_encryption(seed);
+        let mut client = RscCodec::with_encryption(seed);
+
+        for opcode in 0u8..=255 {
+            let on_wire = server.encode_opcode(opcode);
+            let recovered = client.decode_opcode(on_wire);
+            assert_eq!(recovered, opcode, "ISAAC roundtrip failed at opcode {opcode}");
+        }
+    }
+
+    /// Full encode/decode roundtrip with ISAAC: server encodes, "client"
+    /// (a separately-seeded codec) decodes, and the opcode + payload are
+    /// preserved.
+    #[test]
+    fn test_codec_full_roundtrip_with_encryption() {
+        let seed = [11, 22, 33, 44];
+        let mut server = RscCodec::with_encryption(seed);
+        let mut client = RscCodec::with_encryption(seed);
+
+        let mut buf = BytesMut::new();
+        let packet = Packet::new(99, vec![0xAA, 0xBB, 0xCC]);
+        server.encode(packet, &mut buf).unwrap();
+
+        // The opcode byte on the wire should NOT be 99 (extremely unlikely).
+        assert_ne!(buf[0], 99, "ISAAC didn't shuffle the opcode (or got unlucky)");
+
+        let decoded = client.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(decoded.opcode, 99);
+        assert_eq!(decoded.payload.as_ref(), &[0xAA, 0xBB, 0xCC]);
+    }
+
+    /// Disabling encryption mid-stream should make subsequent opcodes pass
+    /// through unmodified.
+    #[test]
+    fn test_disable_encryption_makes_opcodes_passthrough() {
+        let mut codec = RscCodec::with_encryption([1, 2, 3, 4]);
+        codec.disable_encryption();
+        assert!(!codec.is_encrypted());
+        assert_eq!(codec.encode_opcode(77), 77);
+        assert_eq!(codec.decode_opcode(77), 77);
     }
 }

@@ -480,7 +480,7 @@ impl TradeHandler {
 
 /// Build a "trade request received" notification for the target player.
 fn build_trade_request_packet(requester_id: u64) -> Packet {
-    PacketBuilder::new(OpcodeOut::ServerMessage.into())
+    PacketBuilder::new(OpcodeOut::SEND_SERVER_MESSAGE.into())
         .write_string(&format!(
             "@que@Player {} wishes to trade with you.",
             requester_id
@@ -490,7 +490,7 @@ fn build_trade_request_packet(requester_id: u64) -> Packet {
 
 /// Build the packet that opens the trade window for a player.
 fn build_open_trade_packet(partner_id: u64) -> Packet {
-    PacketBuilder::new(OpcodeOut::OpenTrade.into())
+    PacketBuilder::new(OpcodeOut::SEND_TRADE_WINDOW.into())
         .write_long(partner_id)
         .build()
 }
@@ -500,7 +500,7 @@ fn build_trade_update_packet(
     _for_player: u64,
     items: &[(ItemId, u32)],
 ) -> Packet {
-    let mut builder = PacketBuilder::new(OpcodeOut::OpenTrade.into())
+    let mut builder = PacketBuilder::new(OpcodeOut::SEND_TRADE_WINDOW.into())
         .write_byte(items.len() as u8);
 
     for (item_id, amount) in items {
@@ -515,7 +515,7 @@ fn build_trade_other_items_packet(
     _for_player: u64,
     items: &[(ItemId, u32)],
 ) -> Packet {
-    let mut builder = PacketBuilder::new(OpcodeOut::CloseInterface.into())
+    let mut builder = PacketBuilder::new(OpcodeOut::SEND_TRADE_OTHER_ITEMS.into())
         .write_byte(items.len() as u8);
 
     for (item_id, amount) in items {
@@ -531,7 +531,7 @@ fn build_trade_confirm_packet(
     my_items: &[(ItemId, u32)],
     their_items: &[(ItemId, u32)],
 ) -> Packet {
-    let mut builder = PacketBuilder::new(OpcodeOut::OpenTrade.into())
+    let mut builder = PacketBuilder::new(OpcodeOut::SEND_TRADE_OPEN_CONFIRM.into())
         .write_byte(my_items.len() as u8);
 
     for (item_id, amount) in my_items {
@@ -548,12 +548,12 @@ fn build_trade_confirm_packet(
 
 /// Build a trade-close packet telling the client to close the window.
 fn build_trade_close_packet(_for_player: u64) -> Packet {
-    PacketBuilder::new(OpcodeOut::CloseInterface.into()).build()
+    PacketBuilder::new(OpcodeOut::SEND_TRADE_CLOSE.into()).build()
 }
 
 /// Build a simple server message.
 fn build_server_message(msg: &str) -> Packet {
-    PacketBuilder::new(OpcodeOut::ServerMessage.into())
+    PacketBuilder::new(OpcodeOut::SEND_SERVER_MESSAGE.into())
         .write_string(msg)
         .build()
 }

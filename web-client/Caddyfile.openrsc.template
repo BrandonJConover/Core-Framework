@@ -1,0 +1,44 @@
+# Caddy template for hosting the OpenRSC web client over HTTPS/WSS.
+#
+# Replace:
+#   ${DOMAIN}           public hostname, e.g. earlybird.novelgames.dev
+#   ${RSC_C_DIR}        built rsc-c directory, e.g. /opt/rsc-c
+#   ${OPENRSC_WS_PORT}  websocket port from server-java-modern/local.conf
+#   ${APP_UPSTREAM}     optional existing site upstream, e.g. 127.0.0.1:5000
+#
+# The /rsc-ws route intentionally uses handle_path so the Java websocket
+# endpoint receives "/" after the prefix is stripped. This matches the working
+# VPN-only http://10.8.0.1:8080/rsc-ws proxy behavior.
+
+${DOMAIN} {
+	handle_path /rsc-ws* {
+		request_header -Sec-WebSocket-Extensions
+		request_header -Sec-Websocket-Extensions
+		reverse_proxy 127.0.0.1:${OPENRSC_WS_PORT} {
+			header_up -Sec-WebSocket-Extensions
+			header_up -Sec-Websocket-Extensions
+			header_down -Sec-WebSocket-Extensions
+			header_down -Sec-Websocket-Extensions
+		}
+	}
+
+	handle_path /rsc/* {
+		root * ${RSC_C_DIR}
+
+		@runtime path /mudclient.html /mudclient.js /mudclient.wasm /mudclient.wasm.js /ws-test.html
+		header @runtime Cache-Control "no-store"
+
+		@wasm path *.wasm
+		header @wasm Content-Type application/wasm
+
+		@data path *.data
+		header @data Cache-Control "public, max-age=604800, immutable"
+
+		file_server
+	}
+
+	handle {
+		reverse_proxy ${APP_UPSTREAM}
+	}
+}
+

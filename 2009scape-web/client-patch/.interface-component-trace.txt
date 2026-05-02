@@ -1,0 +1,3 @@
+[InterfaceComponent530] parsed format=IF3 type=2 id=786432 width=7 height=4
+[InterfaceComponent530] parsed format=IF3 type=4 id=786433 width=120 height=20
+[InterfaceComponent530] parsed format=IF1 type=3 id=786434 width=64 height=32

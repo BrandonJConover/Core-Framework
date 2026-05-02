@@ -1,0 +1,15 @@
+# Captured by .loc-mesh-test.mjs at 2026-05-02T10:49:51.432Z
+# All assertions passed: resolveLocModels (shapes!=null and shapes==null routes),
+# composeLocMesh (shape variant + flat-multi merge), applyLocOrientation (0..3),
+# resize+translate, out-of-range fallback.
+# Variant routing delta verts: 4
+
+[LocMesh530] composed shape=5 verts=4 tris=2 orientation=0
+[LocMesh530] composed shape=7 verts=4 tris=2 orientation=0
+[LocMesh530] composed shape=10 verts=8 tris=4 orientation=0
+[LocMesh530] variant routing delta verts=4
+[LocMesh530] composed shape=5 verts=4 tris=2 orientation=1
+[LocMesh530] composed shape=5 verts=4 tris=2 orientation=2
+[LocMesh530] composed shape=5 verts=4 tris=2 orientation=3
+[LocMesh530] resize+translate OK: vertex[0] (10,0,-50) → (70,-25,-25)
+[LocMesh530] out-of-range shape returns null OK

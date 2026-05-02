@@ -90,6 +90,7 @@ public class Server implements Runnable {
 	private final RSCPacketFilter packetFilter;
 	private final IPlayerService playerService;
 	private final I18NService i18nService;
+	private final com.openrsc.server.net.api.GameLoginTicketService gameLoginTicketService;
 
 	private final World world;
 	private final String name;
@@ -251,6 +252,7 @@ public class Server implements Runnable {
 		name = getConfig().SERVER_NAME;
 
 		packetFilter = new RSCPacketFilter(this);
+		gameLoginTicketService = new com.openrsc.server.net.api.GameLoginTicketService();
 
 		pluginHandler = new PluginHandler(this);
 		combatScriptLoader = new CombatScriptLoader(this);
@@ -1102,6 +1104,10 @@ public class Server implements Runnable {
 
 	public GameDatabase getDatabase() {
 		return database;
+	}
+
+	public com.openrsc.server.net.api.GameLoginTicketService getGameLoginTicketService() {
+		return gameLoginTicketService;
 	}
 
 	public IPlayerService getPlayerService() { return playerService; }

@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>OpenRSC Sign In</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #111111;
+            --panel: #1b1b1b;
+            --panel-2: #232323;
+            --border: #343434;
+            --text: #f1f1f1;
+            --muted: #9a9a9a;
+            --accent: #c8a951;
+            --accent-strong: #dfbf62;
+            --danger: #ff7a7a;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top, rgba(200, 169, 81, 0.14), transparent 28%),
+                linear-gradient(180deg, #121212 0%, #0d0d0d 100%);
+            color: var(--text);
+            font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+
+        .shell {
+            width: min(100%, 420px);
+        }
+
+        .panel {
+            background: rgba(27, 27, 27, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 28px 24px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+        }
+
+        .eyebrow {
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 10px 0 6px;
+            font-size: 30px;
+            line-height: 1.1;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        form {
+            padding: 22px 24px 24px;
+        }
+
+        .field {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        input {
+            width: 100%;
+            height: 50px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel-2);
+            color: var(--text);
+            padding: 0 14px;
+            font: inherit;
+            outline: none;
+            transition: border-color 120ms ease, box-shadow 120ms ease;
+        }
+
+        input:focus {
+            border-color: rgba(200, 169, 81, 0.9);
+            box-shadow: 0 0 0 3px rgba(200, 169, 81, 0.16);
+        }
+
+        .actions {
+            display: grid;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        button {
+            appearance: none;
+            border: 0;
+            border-radius: 10px;
+            height: 52px;
+            padding: 0 16px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .primary {
+            background: var(--accent);
+            color: #111111;
+        }
+
+        .primary:disabled {
+            cursor: default;
+            opacity: 0.65;
+        }
+
+        .secondary {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .status {
+            min-height: 22px;
+            margin-top: 6px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .status.error {
+            color: var(--danger);
+        }
+
+        .status.success {
+            color: var(--accent-strong);
+        }
+
+        .footer {
+            padding: 0 24px 24px;
+            color: #7f7f7f;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <div class="panel">
+            <div class="header">
+                <div class="eyebrow">OpenRSC</div>
+                <h1>Sign In</h1>
+                <p class="subtitle">Use browser autofill, then jump straight into the client.</p>
+            </div>
+
+            <form id="login-form">
+                <div class="field">
+                    <label for="username">Username</label>
+                    <input
+                        id="username"
+                        name="username"
+                        type="text"
+                        autocapitalize="none"
+                        autocorrect="off"
+                        spellcheck="false"
+                        autocomplete="username"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        autocomplete="current-password"
+                        required
+                    >
+                </div>
+
+                <div id="status" class="status" aria-live="polite"></div>
+
+                <div class="actions">
+                    <button id="submit-button" class="primary" type="submit">Continue to Game</button>
+                    <button id="open-classic" class="secondary" type="button">Open Classic Login Instead</button>
+                </div>
+            </form>
+
+            <div class="footer">
+                This page signs in over HTTPS, requests a short-lived game ticket, and hands it to mudclient.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            var SESSION_KEY = 'rsc-launch-config';
+            var USERNAME_KEY = 'rsc-launch-last-username';
+            var loginForm = document.getElementById('login-form');
+            var usernameInput = document.getElementById('username');
+            var passwordInput = document.getElementById('password');
+            var statusNode = document.getElementById('status');
+            var submitButton = document.getElementById('submit-button');
+            var openClassicButton = document.getElementById('open-classic');
+
+            var isJava21Path = window.location.pathname.indexOf('/rsc21/') !== -1;
+            var clientPage = isJava21Path ? 'mudclient21.html' : 'mudclient.html';
+            var targetHref = clientPage + '#members';
+            var apiBase = window.location.origin +
+                (isJava21Path ? '/rsc21-api/api' : '/rsc-api/api');
+
+            try {
+                var lastUsername = localStorage.getItem(USERNAME_KEY);
+                if (lastUsername) {
+                    usernameInput.value = lastUsername;
+                    passwordInput.focus();
+                } else {
+                    usernameInput.focus();
+                }
+            } catch (err) {}
+
+            openClassicButton.addEventListener('click', function() {
+                sessionStorage.removeItem(SESSION_KEY);
+                window.location.href = targetHref;
+            });
+
+            loginForm.addEventListener('submit', async function(event) {
+                event.preventDefault();
+
+                var username = usernameInput.value.trim();
+                var password = passwordInput.value;
+                if (!username || !password) {
+                    setStatus('Username and password are required.', 'error');
+                    return;
+                }
+
+                setBusy(true);
+                setStatus('Signing in...', '');
+
+                try {
+                    var loginResponse = await fetch(apiBase + '/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username: username,
+                            password: password
+                        })
+                    });
+
+                    var loginBody = await readJson(loginResponse);
+                    if (!loginResponse.ok) {
+                        throw new Error(loginBody.error || 'Login failed.');
+                    }
+
+                    setStatus('Starting game...', 'success');
+
+                    var ticketResponse = await fetch(apiBase + '/auth/game-ticket', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + loginBody.token
+                        }
+                    });
+
+                    var ticketBody = await readJson(ticketResponse);
+                    if (!ticketResponse.ok) {
+                        throw new Error(ticketBody.error || 'Could not start the game.');
+                    }
+
+                    var launchConfig = {
+                        platform: 'web-launcher',
+                        launchArgs: ['members'],
+                        autoLogin: {
+                            username: ticketBody.username,
+                            password: ticketBody.ticket
+                        },
+                        issuedAt: Date.now()
+                    };
+
+                    sessionStorage.setItem(SESSION_KEY, JSON.stringify(launchConfig));
+                    try {
+                        localStorage.setItem(USERNAME_KEY, ticketBody.username);
+                    } catch (err) {}
+                    window.location.href = targetHref;
+                } catch (error) {
+                    setStatus(error.message || 'Login failed.', 'error');
+                    setBusy(false);
+                }
+            });
+
+            async function readJson(response) {
+                try {
+                    return await response.json();
+                } catch (err) {
+                    return {};
+                }
+            }
+
+            function setBusy(isBusy) {
+                submitButton.disabled = isBusy;
+                usernameInput.disabled = isBusy;
+                passwordInput.disabled = isBusy;
+                openClassicButton.disabled = isBusy;
+                submitButton.textContent = isBusy ? 'Connecting...' : 'Continue to Game';
+            }
+
+            function setStatus(message, kind) {
+                statusNode.textContent = message || '';
+                statusNode.className = 'status' + (kind ? ' ' + kind : '');
+            }
+        })();
+    </script>
+</body>
+</html>

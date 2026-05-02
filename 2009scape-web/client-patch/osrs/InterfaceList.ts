@@ -1,6 +1,5 @@
-import { Js5Cache } from "./Js5Cache";
 import { Component } from "./cache/def/Component";
-import { ComponentLoader } from "./cache/def/ComponentLoader";
+import { ComponentLoader, ComponentLoaderCache } from "./cache/def/ComponentLoader";
 
 export class InterfaceList {
     static byKey: Map<string, Component> = new Map<string, Component>();
@@ -24,7 +23,7 @@ export class InterfaceList {
         this.loadedInterfaces.add(interfaceId);
     }
 
-    static loadInterface(js5: Js5Cache | null, interfaceId: number): Promise<void> {
+    static loadInterface(js5: ComponentLoaderCache | null, interfaceId: number): Promise<void> {
         if (!js5 || interfaceId < 0) return Promise.resolve();
         if (this.loadedInterfaces.has(interfaceId)) return Promise.resolve();
         const active = this.loadingInterfaces.get(interfaceId);

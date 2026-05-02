@@ -1,0 +1,9 @@
+# Captured by .terrain-render-wire-test.mjs at 2026-05-02T11:02:51.440Z
+# Gates: tileSourceForPlane reshape, buildLandscape530 plane filter, attachLandscape530 idempotent
+# Plane 0 fixture: 6×6 painted region (36 tiles) yielding 144 verts / 72 tris
+# Plane 1 fixture: single tile yielding 4 verts / 2 tris
+
+[TerrainAdapter530] attached plane=0 verts=144 tris=72
+[TerrainAdapter530] plane filter ok: plane=1 emitted 4 verts (1 tile)
+[TerrainAdapter530] reset() count after re-attach=1 (expected 1)
+[TerrainAdapter530] empty-mesh + out-of-range plane attach returned null

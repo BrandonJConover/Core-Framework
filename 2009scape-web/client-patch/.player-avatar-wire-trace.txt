@@ -1,0 +1,9 @@
+# Captured by .player-avatar-wire-test.mjs at 2026-05-02T11:00:26.503Z
+# Gates: idempotent bridge attach, prior-reset, empty-mesh no-op, vert delta
+# Mesh A: 32 verts (starter kit)
+# Mesh B: 36 verts (+bronze-sword equip)
+
+[PlayerAvatar530] attached + replaced ok
+[PlayerAvatar530] reset() called exactly once on the prior bridged model (resetCalls=1)
+[PlayerAvatar530] empty-mesh attach returned null and did not touch the slot
+[PlayerAvatar530] vert-buffer delta=4 (verts 32 → 36)

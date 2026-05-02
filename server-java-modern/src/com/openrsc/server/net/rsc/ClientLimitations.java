@@ -110,7 +110,7 @@ public class ClientLimitations {
 			maxServerId = 1500;
 		}
 
-		else if (clientVersion >= 177 && clientVersion <= 235) {
+		else if (clientVersion >= 177 && clientVersion <= 5235) {
 			// not sure which client in 2009 added this feature
 			// 224 is the only 2009 RSC client I have.
 			if (clientVersion >= 224) {

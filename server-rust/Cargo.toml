@@ -70,11 +70,13 @@ once_cell = "1.19"
 pin-project-lite = "0.2"
 
 # Security
-argon2 = "0.5"                          # Password hashing
+argon2 = "0.5"                          # Password hashing (new accounts)
+bcrypt = "0.15"                         # Password verification (legacy/Java-side accounts use bcrypt)
 rand = "0.8"
 sha2 = "0.10"
 hmac = "0.12"
 constant_time_eq = "0.3"
+rsa = "0.9"                             # RSA login-block decryption (raw modPow, matches Java BigInteger semantics)
 
 # Encoding
 base64 = "0.22"

@@ -14,9 +14,7 @@ public final class RSCProtocolWebEncoder extends MessageToMessageEncoder<Packet>
 
 	@Override
 	protected void encode(ChannelHandlerContext ctx, Packet message, List<Object> out) throws Exception {
-		BinaryWebSocketFrame result = new BinaryWebSocketFrame();
-		result.content().writeBytes(encoder.encode(ctx, message));
-		out.add(result);
+		out.add(new BinaryWebSocketFrame(encoder.encode(ctx, message)));
 	}
 
 	@Override

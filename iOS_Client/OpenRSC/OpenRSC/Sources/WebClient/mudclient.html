@@ -158,6 +158,83 @@
                 color: #ffb4a8;
             }
 
+            #launch-screen {
+                position: fixed;
+                inset: 0;
+                z-index: 999996;
+                display: grid;
+                place-items: center;
+                padding:
+                    max(24px, env(safe-area-inset-top))
+                    max(24px, env(safe-area-inset-right))
+                    max(24px, env(safe-area-inset-bottom))
+                    max(24px, env(safe-area-inset-left));
+                background:
+                    radial-gradient(circle at 50% 38%, rgba(58, 46, 20, 0.42), transparent 34%),
+                    #050505;
+                color: #f4d36a;
+                font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+                opacity: 1;
+                transition: opacity 220ms ease;
+                pointer-events: none;
+            }
+
+            body.mudclient-ready #launch-screen {
+                opacity: 0;
+            }
+
+            #launch-panel {
+                width: min(360px, 100%);
+                text-align: center;
+            }
+
+            #launch-title {
+                color: #ffe08a;
+                font-size: 20px;
+                font-weight: 700;
+                line-height: 1.2;
+                margin: 0 0 8px;
+            }
+
+            #launch-status {
+                min-height: 18px;
+                color: rgba(255, 232, 166, 0.86);
+                font-size: 13px;
+                font-weight: 600;
+                line-height: 1.35;
+                margin: 0 0 16px;
+            }
+
+            #launch-progress {
+                position: relative;
+                height: 4px;
+                overflow: hidden;
+                border-radius: 999px;
+                background: rgba(255, 215, 0, 0.18);
+            }
+
+            #launch-progress-bar {
+                position: absolute;
+                inset: 0 auto 0 0;
+                width: var(--mudclient-load-progress, 14%);
+                border-radius: inherit;
+                background: linear-gradient(90deg, #c99b2e, #ffe08a);
+                transition: width 180ms ease;
+            }
+
+            body.mudclient-standalone #launch-screen {
+                padding-top: max(32px, env(safe-area-inset-top));
+                padding-bottom: max(32px, env(safe-area-inset-bottom));
+            }
+
+            body.mudclient-launch-error #launch-title {
+                color: #ffb4a8;
+            }
+
+            body.mudclient-launch-error #launch-progress-bar {
+                background: linear-gradient(90deg, #a93a2e, #ffb4a8);
+            }
+
             #mobile-controls {
                 display: none;
                 pointer-events: none;
@@ -437,6 +514,8 @@
                 autocapitalize="none"
                 autocorrect="off"
                 spellcheck="false"
+                data-lpignore="false"
+                data-1p-ignore="false"
                 inputmode="text"
                 enterkeyhint="next"
                 aria-label="Username"
@@ -451,6 +530,8 @@
                 autocapitalize="none"
                 autocorrect="off"
                 spellcheck="false"
+                data-lpignore="false"
+                data-1p-ignore="false"
                 inputmode="text"
                 enterkeyhint="done"
                 aria-label="Password"
@@ -459,6 +540,15 @@
 
         <button id="ios-keyboard-btn">Tap to type</button>
         <div id="connection-banner" role="status" aria-live="polite"></div>
+        <div id="launch-screen" aria-live="polite">
+            <div id="launch-panel">
+                <p id="launch-title">OpenRSC</p>
+                <p id="launch-status">Starting web client...</p>
+                <div id="launch-progress" aria-hidden="true">
+                    <div id="launch-progress-bar"></div>
+                </div>
+            </div>
+        </div>
 
         <div id="mobile-controls">
             <div class="mobile-toggle">
@@ -482,7 +572,40 @@
 
         <script>
             (function() {
+                function loadLauncherConfig() {
+                    var storageKey = 'rsc-launch-config';
+                    try {
+                        var raw = window.sessionStorage.getItem(storageKey);
+                        if (!raw) {
+                            return null;
+                        }
+                        window.sessionStorage.removeItem(storageKey);
+                        return JSON.parse(raw);
+                    } catch (err) {
+                        console.warn('[mudclient] Failed to load launcher config', err);
+                        return null;
+                    }
+                }
+
+                var launcherConfig = loadLauncherConfig();
+                var existingNativeConfig = window.rscNativeConfig || {};
+                if (launcherConfig && typeof launcherConfig === 'object') {
+                    var mergedConfig = Object.assign({}, launcherConfig, existingNativeConfig);
+                    if (launcherConfig.autoLogin || existingNativeConfig.autoLogin) {
+                        mergedConfig.autoLogin = Object.assign(
+                            {},
+                            launcherConfig.autoLogin || {},
+                            existingNativeConfig.autoLogin || {}
+                        );
+                    }
+                    window.rscNativeConfig = mergedConfig;
+                    window.rscLauncherConfig = launcherConfig;
+                }
+
                 var connectionBanner = document.getElementById('connection-banner');
+                var launchScreen = document.getElementById('launch-screen');
+                var launchStatus = document.getElementById('launch-status');
+                var launchReadyTimer = 0;
                 var nativeConfig = window.rscNativeConfig || {};
                 var isNativeIOSWebClient = nativeConfig.platform === 'ios';
                 var isAppleMobile =
@@ -518,6 +641,38 @@
                 document.body.classList.toggle('mudclient-native-ios', isNativeIOSWebClient);
                 document.body.classList.toggle('mudclient-browser-mobile', isBrowserMobile);
                 document.body.classList.toggle('mudclient-standalone', isStandalone);
+
+                function setLaunchProgress(percent) {
+                    document.documentElement.style.setProperty(
+                        '--mudclient-load-progress',
+                        Math.max(8, Math.min(100, percent)) + '%'
+                    );
+                }
+
+                function setLaunchStatus(message, isError) {
+                    if (launchStatus && message) {
+                        launchStatus.textContent = message;
+                    }
+                    document.body.classList.toggle('mudclient-launch-error', !!isError);
+                }
+
+                function markLaunchReady(delay) {
+                    if (!launchScreen || document.body.classList.contains('mudclient-ready')) {
+                        return;
+                    }
+                    if (launchReadyTimer) {
+                        clearTimeout(launchReadyTimer);
+                    }
+                    launchReadyTimer = setTimeout(function() {
+                        document.body.classList.add('mudclient-ready');
+                        setLaunchProgress(100);
+                        setTimeout(function() {
+                            if (launchScreen && document.body.classList.contains('mudclient-ready')) {
+                                launchScreen.style.display = 'none';
+                            }
+                        }, 260);
+                    }, delay || 0);
+                }
 
                 function showConnectionBanner(message, isError) {
                     if (!connectionBanner) {
@@ -573,7 +728,12 @@
                     isNativeIOSWebClient ||
                     isBrowserMobile
                 ) {
-                    setInterval(function() {
+                    var heartbeatIntervalMs = isAppleMobile ? 30000 : 15000;
+                    var heartbeatTimer = 0;
+                    function sendHeartbeat() {
+                        if (document.visibilityState === 'hidden') {
+                            return;
+                        }
                         var canvas = document.getElementById('canvas');
                         var heapBytes = 0;
                         var memory = null;
@@ -613,7 +773,14 @@
                                 memory: memory
                             })
                         });
-                    }, 5000);
+                    }
+                    heartbeatTimer = setInterval(sendHeartbeat, heartbeatIntervalMs);
+                    window.addEventListener('pagehide', function() {
+                        if (heartbeatTimer) {
+                            clearInterval(heartbeatTimer);
+                            heartbeatTimer = 0;
+                        }
+                    });
                 }
 
                 ['log', 'warn', 'error'].forEach(function(level) {
@@ -623,6 +790,16 @@
                         var text = args.map(stringify).join(' ');
                         if (/\bLogin response:\s*0\b/.test(text)) {
                             window._mudclientWelcomeCloseAssistUntil = Date.now() + 90000;
+                        }
+                        if (/\bINFO:\s*Started application\b/.test(text)) {
+                            setLaunchStatus('Game ready');
+                            markLaunchReady(550);
+                        } else if (/\bWebSocket connected\b/.test(text)) {
+                            setLaunchStatus('Connected');
+                            setLaunchProgress(88);
+                        } else if (/\bINFO:\s*Loading\b/.test(text)) {
+                            setLaunchStatus(text.replace(/^INFO:\s*/, ''));
+                            setLaunchProgress(76);
                         }
                         sendNative(level === 'error' ? 'error' : 'log', {
                             level: level,
@@ -635,6 +812,9 @@
                 window._mudclientNativeMessage = sendNative;
                 window._mudclientShowConnectionBanner = showConnectionBanner;
                 window._mudclientHideConnectionBanner = hideConnectionBanner;
+                window._mudclientSetLaunchStatus = setLaunchStatus;
+                window._mudclientSetLaunchProgress = setLaunchProgress;
+                window._mudclientMarkLaunchReady = markLaunchReady;
 
 	                if (typeof window.WebSocket === 'function') {
 	                    var NativeWebSocket = window.WebSocket;
@@ -654,6 +834,20 @@
 	                        return null;
 	                    }
 
+	                    function byteLengthFromWebSocketPayload(payload) {
+	                        var bytes = bytesFromWebSocketPayload(payload);
+	                        if (bytes) {
+	                            return bytes.byteLength;
+	                        }
+	                        if (typeof payload === 'string') {
+	                            return payload.length;
+	                        }
+	                        if (payload && typeof payload.size === 'number') {
+	                            return payload.size;
+	                        }
+	                        return 0;
+	                    }
+
 	                    function describeOutgoingPacket(payload) {
 	                        var bytes = bytesFromWebSocketPayload(payload);
 	                        if (!bytes || bytes.length < 3) {
@@ -661,26 +855,47 @@
 	                        }
 	                        var packetLength = (bytes[0] << 8) | bytes[1];
 	                        var opcode = bytes[2];
-	                        return {
+	                        var description = {
 	                            opcode: opcode,
 	                            packetLength: packetLength,
 	                            byteLength: bytes.length
 	                        };
+	                        if (opcode === 246 && bytes.length >= 5) {
+	                            description.slot = (bytes[3] << 8) | bytes[4];
+	                            if (description.slot & 0x8000) {
+	                                description.slot -= 0x10000;
+	                            }
+	                            if (bytes.length >= 9) {
+	                                description.amount = (
+	                                    (bytes[5] << 24) |
+	                                    (bytes[6] << 16) |
+	                                    (bytes[7] << 8) |
+	                                    bytes[8]
+	                                );
+	                            }
+	                        }
+	                        return description;
 	                    }
 
 	                    function MonitoredWebSocket(url, protocols) {
+	                        var hasProtocols = protocols !== undefined && protocols !== null;
                             console.log(
                                 '[mudclient] Opening WebSocket: ' +
                                 url +
                                 ' protocols=' +
-                                (protocols === undefined ? '<none>' : JSON.stringify(protocols)) +
+                                (!hasProtocols ? '<none>' : JSON.stringify(protocols)) +
                                 ' location=' +
                                 location.href
                             );
-	                        var socket = protocols === undefined
-	                            ? new NativeWebSocket(url)
-	                            : new NativeWebSocket(url, protocols);
+	                        var socket = hasProtocols
+	                            ? new NativeWebSocket(url, protocols)
+	                            : new NativeWebSocket(url);
+	                        try {
+	                            socket.binaryType = 'arraybuffer';
+	                        } catch (err) {}
                         var didOpen = false;
+                        var sendLogCount = 0;
+                        var receiveLogCount = 0;
                         var timer = setTimeout(function() {
                             if (didOpen || socket.readyState !== NativeWebSocket.CONNECTING) {
                                 return;
@@ -706,6 +921,17 @@
                                 level: 'websocket-open',
                                 message: 'Connected to ' + url
                             });
+	                        });
+
+	                        socket.addEventListener('message', function(event) {
+	                            if (receiveLogCount >= 8) {
+	                                return;
+	                            }
+	                            receiveLogCount += 1;
+	                            console.log(
+	                                '[mudclient] Incoming WebSocket frame: bytes=' +
+	                                byteLengthFromWebSocketPayload(event.data)
+	                            );
 	                        });
 
 	                        socket.addEventListener('error', function(event) {
@@ -747,22 +973,117 @@
 	                        var nativeSend = socket.send;
 	                        socket.send = function(payload) {
 	                            var packet = describeOutgoingPacket(payload);
+	                            if (packet && sendLogCount < 12) {
+	                                sendLogCount += 1;
+	                                console.log(
+	                                    '[mudclient] Outgoing packet: opcode=' +
+	                                    packet.opcode +
+	                                    ' length=' +
+	                                    packet.packetLength +
+	                                    ' bytes=' +
+	                                    packet.byteLength
+	                                );
+	                            }
 	                            if (packet && packet.opcode === 246) {
 	                                var message = 'Outgoing item drop packet: length='
 	                                    + packet.packetLength
 	                                    + ' bytes='
-	                                    + packet.byteLength;
+	                                    + packet.byteLength
+	                                    + ' slot='
+	                                    + (packet.slot === undefined ? '<unknown>' : packet.slot);
+	                                if (packet.amount !== undefined) {
+	                                    message += ' amount=' + packet.amount;
+	                                }
 	                                console.log('[mudclient] ' + message);
 	                                sendNative('status', {
 	                                    level: 'item-drop-packet',
 	                                    message: message
 	                                });
 	                            }
-	                            return nativeSend.call(socket, payload);
+	                            try {
+	                                return nativeSend.call(socket, payload);
+	                            } catch (err) {
+	                                var sendMessage = 'WebSocket send failed: ' +
+	                                    url +
+	                                    ' readyState=' +
+	                                    socket.readyState +
+	                                    ' bytes=' +
+	                                    byteLengthFromWebSocketPayload(payload) +
+	                                    ' error=' +
+	                                    (err && err.message ? err.message : err);
+	                                console.error('[mudclient] ' + sendMessage);
+	                                sendNative('error', {
+	                                    level: 'websocket-send',
+	                                    message: sendMessage
+	                                });
+	                                throw err;
+	                            }
 	                        };
 
 	                        return socket;
 	                    }
+
+                    function runWebSocketDiagnostic() {
+                        if (!/[?&]wsdiag(?:=1)?(?:&|$)/.test(location.search)) {
+                            return;
+                        }
+
+                        var diagnosticUrl =
+                            (location.protocol === 'https:' ? 'wss://' : 'ws://') +
+                            location.host +
+                            '/rsc-ws';
+                        var startedAt = Date.now();
+
+                        console.log('[mudclient] WebSocket diagnostic opening: ' + diagnosticUrl);
+                        showConnectionBanner('Testing WebSocket...', false);
+
+                        try {
+                            var diagnosticSocket = new NativeWebSocket(diagnosticUrl);
+                            var diagnosticTimer = setTimeout(function() {
+                                console.error('[mudclient] WebSocket diagnostic timeout readyState=' + diagnosticSocket.readyState);
+                                showConnectionBanner('WebSocket diagnostic timed out', true);
+                                try {
+                                    diagnosticSocket.close(4001, 'diagnostic timeout');
+                                } catch (err) {}
+                            }, 8000);
+
+                            diagnosticSocket.binaryType = 'arraybuffer';
+                            diagnosticSocket.onopen = function() {
+                                clearTimeout(diagnosticTimer);
+                                console.log('[mudclient] WebSocket diagnostic open in ' + (Date.now() - startedAt) + 'ms');
+                                showConnectionBanner('WebSocket diagnostic connected', false);
+                                setTimeout(function() {
+                                    try {
+                                        diagnosticSocket.close(1000, 'diagnostic complete');
+                                    } catch (err) {}
+                                }, 250);
+                            };
+                            diagnosticSocket.onerror = function(event) {
+                                clearTimeout(diagnosticTimer);
+                                console.error(
+                                    '[mudclient] WebSocket diagnostic error readyState=' +
+                                    diagnosticSocket.readyState,
+                                    event
+                                );
+                                showConnectionBanner('WebSocket diagnostic error', true);
+                            };
+                            diagnosticSocket.onclose = function(event) {
+                                clearTimeout(diagnosticTimer);
+                                console.warn(
+                                    '[mudclient] WebSocket diagnostic close code=' +
+                                    event.code +
+                                    ' wasClean=' +
+                                    event.wasClean +
+                                    (event.reason ? ' reason=' + event.reason : '')
+                                );
+                            };
+                        } catch (err) {
+                            console.error('[mudclient] WebSocket diagnostic constructor failed', err);
+                            showConnectionBanner('WebSocket diagnostic failed to start', true);
+                        }
+                    }
+
+                    runWebSocketDiagnostic();
 
                     MonitoredWebSocket.prototype = NativeWebSocket.prototype;
                     MonitoredWebSocket.CONNECTING = NativeWebSocket.CONNECTING;
@@ -942,6 +1263,12 @@
 	            var nativeConfig = window.rscNativeConfig || {};
 	            var isNativeIOSWebClient =
 	                nativeConfig.platform === 'ios';
+	            var isWebKitMobile =
+	                /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+	                (
+	                    navigator.platform === 'MacIntel' &&
+	                    navigator.maxTouchPoints > 1
+	                );
 	            var isHostedBrowserWebClient = !isNativeIOSWebClient;
 	            var isHetznerNativeWebClient =
 	                isNativeIOSWebClient &&
@@ -949,13 +1276,73 @@
 	            var webSocketPort = window.location.port ||
 	                (window.location.protocol === 'https:' ? '443' : '80');
 	            var webSocketHost = window.location.hostname + ':' + webSocketPort;
+	            var nativeWebSocketHost = nativeConfig.host
+	                ? nativeConfig.host + ':' + (nativeConfig.wsPort || nativeConfig.port || '43494')
+	                : webSocketHost;
 	            var webSocketUrl = isHostedBrowserWebClient
 	                ? webSocketScheme + webSocketHost + '/rsc-ws'
 	                : isHetznerNativeWebClient
 	                    ? 'ws://' + nativeConfig.host + ':8080/rsc-ws'
-	                : webSocketScheme;
+	                : 'ws://' + nativeWebSocketHost + '/';
 
-            if (isNativeIOSWebClient && window.HTMLCanvasElement) {
+            if (isWebKitMobile) {
+                (function() {
+                    var nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+                    var nativeCancelAnimationFrame = window.cancelAnimationFrame.bind(window);
+                    var targetFrameMs = 1000 / 30;
+                    var lastFrameAt = 0;
+                    var nextHandle = 1;
+                    var pendingFrames = new Map();
+
+                    window.requestAnimationFrame = function(callback) {
+                        var handle = nextHandle++;
+                        var now = performance.now ? performance.now() : Date.now();
+                        var wait = Math.max(0, targetFrameMs - (now - lastFrameAt));
+                        var timeoutId = setTimeout(function() {
+                            var rafId = nativeRequestAnimationFrame(function(timestamp) {
+                                pendingFrames.delete(handle);
+                                lastFrameAt = timestamp || (performance.now ? performance.now() : Date.now());
+                                callback(lastFrameAt);
+                            });
+                            pendingFrames.set(handle, { rafId: rafId, timeoutId: 0 });
+                        }, wait);
+                        pendingFrames.set(handle, { rafId: 0, timeoutId: timeoutId });
+                        return handle;
+                    };
+
+                    window.cancelAnimationFrame = function(handle) {
+                        var pending = pendingFrames.get(handle);
+                        if (!pending) {
+                            return;
+                        }
+                        if (pending.timeoutId) {
+                            clearTimeout(pending.timeoutId);
+                        }
+                        if (pending.rafId) {
+                            nativeCancelAnimationFrame(pending.rafId);
+                        }
+                        pendingFrames.delete(handle);
+                    };
+
+                    document.addEventListener('visibilitychange', function() {
+                        if (document.visibilityState === 'hidden') {
+                            pendingFrames.forEach(function(pending) {
+                                if (pending.timeoutId) {
+                                    clearTimeout(pending.timeoutId);
+                                }
+                                if (pending.rafId) {
+                                    nativeCancelAnimationFrame(pending.rafId);
+                                }
+                            });
+                            pendingFrames.clear();
+                        }
+                    });
+
+                    console.log('[mudclient] WebKit mobile frame pacing enabled at 30 fps');
+                })();
+            }
+
+            if ((isNativeIOSWebClient || isWebKitMobile) && window.HTMLCanvasElement) {
                 (function() {
                     var originalGetContext = HTMLCanvasElement.prototype.getContext;
                     var stableWebGLAttributes = {
@@ -963,7 +1350,7 @@
                         antialias: false,
                         preserveDrawingBuffer: false,
                         failIfMajorPerformanceCaveat: false,
-                        powerPreference: 'high-performance'
+                        powerPreference: 'low-power'
                     };
 
                     HTMLCanvasElement.prototype.getContext = function(type, attributes) {
@@ -976,7 +1363,7 @@
                             if (window._mudclientNativeMessage) {
                                 window._mudclientNativeMessage('status', {
                                     level: 'webgl',
-                                    message: 'Requesting stable iOS WebGL context: ' + type
+                                    message: 'Requesting low-power WebKit WebGL context: ' + type
                                 });
                             }
                             return originalGetContext.call(this, type, mergedAttributes);
@@ -1012,13 +1399,29 @@
                 }
             };
 
+            window._mudclientHandleNativeVisibility = function(isVisible) {
+                try {
+                    if (!isVisible && window._mudclientReleaseActiveTouchState) {
+                        window._mudclientReleaseActiveTouchState();
+                    }
+                    if (window._mudclientNativeMessage) {
+                        window._mudclientNativeMessage('status', {
+                            level: 'visibility',
+                            message: 'native-visible=' + !!isVisible
+                        });
+                    }
+                } catch (err) {
+                    console.warn('[mudclient] Native visibility handler failed', err);
+                }
+            };
+
             var Module = {
                 // Hosted Safari is happiest when the WebSocket upgrade stays on
                 // the same origin as the page. Native iOS keeps using the direct
                 // game server endpoint from the patched world list.
                 websocket: {
                     url: webSocketUrl,
-                    subprotocol: isHostedBrowserWebClient ? null : 'binary'
+                    subprotocol: isHostedBrowserWebClient ? undefined : 'binary'
                 },
                 preInit: [
                     function () {
@@ -1088,6 +1491,9 @@
                 })(),
                 onAbort: function(reason) {
                     console.error('[mudclient] Runtime aborted:', reason);
+                    if (window._mudclientSetLaunchStatus) {
+                        window._mudclientSetLaunchStatus('Web client stopped', true);
+                    }
                     if (window._mudclientNativeMessage) {
                         window._mudclientNativeMessage('error', {
                             level: 'abort',
@@ -1096,6 +1502,12 @@
                     }
                 },
                 onRuntimeInitialized: function() {
+                    if (window._mudclientSetLaunchStatus) {
+                        window._mudclientSetLaunchStatus('Starting game...');
+                    }
+                    if (window._mudclientSetLaunchProgress) {
+                        window._mudclientSetLaunchProgress(82);
+                    }
                     if (window._mudclientNativeMessage) {
                         window._mudclientNativeMessage('status', {
                             level: 'ready',
@@ -1216,6 +1628,9 @@
                     return canvas;
                 })(),
                 setStatus: function (text) {
+                    if (text && window._mudclientSetLaunchStatus) {
+                        window._mudclientSetLaunchStatus(text);
+                    }
                     if (window._mudclientNativeMessage && text) {
                         window._mudclientNativeMessage('status', {
                             level: 'status',
@@ -1239,13 +1654,26 @@
                                   ')'
                             : 'All downloads complete.'
                     );
+                    if (window._mudclientSetLaunchProgress) {
+                        var completed = this.totalDependencies - left;
+                        var progress = this.totalDependencies > 0
+                            ? 24 + (completed / this.totalDependencies) * 52
+                            : 76;
+                        window._mudclientSetLaunchProgress(left ? progress : 78);
+                    }
                 }
             };
 
             Module.setStatus('Downloading...');
+            if (window._mudclientSetLaunchProgress) {
+                window._mudclientSetLaunchProgress(18);
+            }
 
             window.onerror = function (msg, url, line, col, error) {
                 console.error('[mudclient] Error:', msg, url, line, col, error);
+                if (window._mudclientSetLaunchStatus) {
+                    window._mudclientSetLaunchStatus('Something went wrong while starting', true);
+                }
                 Module.setStatus('Exception thrown, see JavaScript console');
 
                 Module.setStatus = function (text) {
@@ -1538,6 +1966,7 @@
                 input.dataset.promptKind = input === passwordInput ? 'password' : 'text';
                 if (!isRefresh) {
                     input.dataset.promptNonce = String((Number(input.dataset.promptNonce) || 0) + 1);
+                    input.dataset.selectAllOnFocus = input.value ? 'true' : 'false';
                 }
 
                 input.style.left = left + 'px';
@@ -1640,6 +2069,58 @@
                 }
             }
 
+            function clearGameInputLine() {
+                for (var i = 0; i < 255; i++) {
+                    emscriptenKeyPress(BACKSPACE_KEY_CODE, BACKSPACE_KEY_CODE);
+                }
+            }
+
+            function typeGameInputValue(value) {
+                for (const character of value.split('')) {
+                    emscriptenKeyPress(-1, character.charCodeAt(0));
+                }
+            }
+
+            function syncGameInputValue(previousValue, nextValue, event) {
+                previousValue = previousValue || '';
+                nextValue = nextValue || '';
+
+                if (previousValue === nextValue) {
+                    return;
+                }
+
+                var inputType = event && typeof event.inputType === 'string'
+                    ? event.inputType
+                    : '';
+                var appendedText = nextValue.startsWith(previousValue)
+                    ? nextValue.slice(previousValue.length)
+                    : '';
+                var removedCount = previousValue.startsWith(nextValue)
+                    ? previousValue.length - nextValue.length
+                    : 0;
+                var looksLikeAutofillOrPaste = (
+                    appendedText.length > 3 ||
+                    inputType.indexOf('FromPaste') !== -1 ||
+                    inputType.indexOf('Replacement') !== -1 ||
+                    inputType.indexOf('Auto') !== -1
+                );
+
+                if (appendedText && !looksLikeAutofillOrPaste) {
+                    typeGameInputValue(appendedText);
+                    return;
+                }
+
+                if (removedCount > 0 && removedCount <= 8) {
+                    for (var i = 0; i < removedCount; i++) {
+                        emscriptenKeyPress(BACKSPACE_KEY_CODE, BACKSPACE_KEY_CODE);
+                    }
+                    return;
+                }
+
+                clearGameInputLine();
+                typeGameInputValue(nextValue);
+            }
+
             function hasNativeAutoLoginCredentials() {
                 return !!(
                     nativeAutoLogin &&
@@ -1713,20 +2194,14 @@
                     return;
                 }
 
-                for (let i = 0; i < 255; i++) {
-                    emscriptenKeyPress(BACKSPACE_KEY_CODE, BACKSPACE_KEY_CODE);
-                }
-
-                for (const character of event.target.value.split('')) {
-                    emscriptenKeyPress(-1, character.charCodeAt(0));
-                }
-
                 if (event.target === keyboardInput) {
+                    syncGameInputValue(lastKeyboardValue, keyboardInput.value, event);
                     lastKeyboardValue = keyboardInput.value;
                     if (passwordInput.value && passwordInput.value !== lastPasswordValue) {
                         pendingAutofillPassword = passwordInput.value;
                     }
                 } else if (event.target === passwordInput) {
+                    syncGameInputValue(lastPasswordValue, passwordInput.value, event);
                     lastPasswordValue = passwordInput.value;
                     pendingAutofillPassword = '';
                 }
@@ -1734,6 +2209,8 @@
 
             keyboardInput.addEventListener('input', keyboardInputEvent);
             passwordInput.addEventListener('input', keyboardInputEvent);
+            keyboardInput.addEventListener('change', keyboardInputEvent);
+            passwordInput.addEventListener('change', keyboardInputEvent);
 
             function keyboardDownEvent(event) {
                 if (event.key === 'Enter') {
@@ -1769,8 +2246,14 @@
                     _activeKeyboardInput = event.target;
                     applyPendingAutofillFor(event.target);
                 }
-                event.target.selectionStart = event.target.selectionEnd =
-                    event.target.value.length;
+                if (event.target.dataset.selectAllOnFocus === 'true') {
+                    event.target.selectionStart = 0;
+                    event.target.selectionEnd = event.target.value.length;
+                    event.target.dataset.selectAllOnFocus = 'false';
+                } else {
+                    event.target.selectionStart = event.target.selectionEnd =
+                        event.target.value.length;
+                }
             }
 
             keyboardInput.addEventListener('focus', keyboardFocusEvent);
@@ -1801,9 +2284,10 @@
                 }
 
                 var LONG_PRESS_MS = 430;
-                var SWIPE_THRESHOLD = 28;
-                var TAP_MOVE_THRESHOLD = 10;
+                var SWIPE_THRESHOLD = 22;
+                var TAP_MOVE_THRESHOLD = 12;
                 var PINCH_WHEEL_SCALE = 0.85;
+                var MIN_SWIPE_KEY_HOLD_MS = 90;
                 var BUTTON_WHEEL_DELTA = 84;
                 var CONTROLS_COLLAPSED_KEY = 'mudclient.mobileControlsCollapsed';
                 var CONTROL_POSITIONS_KEY = 'mudclient.mobileControlPositions';
@@ -1812,6 +2296,9 @@
                 var dragState = null;
                 var lastWheelAt = 0;
                 var wheelRemainder = 0;
+                var wheelFrame = 0;
+                var canvasRectCache = null;
+                var canvasRectCacheAt = 0;
                 var touchState = {
                     mode: null,
                     startX: 0,
@@ -1820,12 +2307,17 @@
                     lastY: 0,
                     lastClientX: 0,
                     lastClientY: 0,
+                    startClientX: 0,
+                    startClientY: 0,
                     pinchDistance: 0,
                     pinchStartDistance: 0,
                     pinchCenterX: 0,
                     pinchCenterY: 0,
+                    pinchCenterClientX: 0,
+                    pinchCenterClientY: 0,
                     pinchMoved: false,
                     activeKey: null,
+                    activeKeyStartedAt: 0,
                     longPressTimer: null,
                     longPressed: false
                 };
@@ -1986,8 +2478,24 @@
                     event.preventDefault();
                 });
 
+                function getCanvasRect() {
+                    var now = performance.now ? performance.now() : Date.now();
+                    if (canvasRectCache && now - canvasRectCacheAt < 16) {
+                        return canvasRectCache;
+                    }
+
+                    canvasRectCache = canvas.getBoundingClientRect();
+                    canvasRectCacheAt = now;
+                    return canvasRectCache;
+                }
+
+                function clearCanvasRectCache() {
+                    canvasRectCache = null;
+                    canvasRectCacheAt = 0;
+                }
+
                 function canvasPoint(clientX, clientY) {
-                    var rect = canvas.getBoundingClientRect();
+                    var rect = getCanvasRect();
                     var backingWidth = canvas.width || rect.width;
                     var backingHeight = canvas.height || rect.height;
                     var scaleX = rect.width > 0 ? backingWidth / rect.width : 1;
@@ -1997,6 +2505,18 @@
                         y: (clientY - rect.top) * scaleY,
                         clientX: clientX,
                         clientY: clientY
+                    };
+                }
+
+                function clientPointFromGamePoint(x, y) {
+                    var rect = getCanvasRect();
+                    var backingWidth = canvas.width || rect.width;
+                    var backingHeight = canvas.height || rect.height;
+                    var scaleX = backingWidth > 0 ? rect.width / backingWidth : 1;
+                    var scaleY = backingHeight > 0 ? rect.height / backingHeight : 1;
+                    return {
+                        clientX: rect.left + x * scaleX,
+                        clientY: rect.top + y * scaleY
                     };
                 }
 
@@ -2020,7 +2540,7 @@
                     }
                 }
 
-                function dispatchMouse(type, x, y, button) {
+                function dispatchMouse(type, x, y, button, clientX, clientY) {
                     if (
                         !Number.isFinite(x) ||
                         !Number.isFinite(y) ||
@@ -2030,21 +2550,18 @@
                         return;
                     }
 
-                    var rect = canvas.getBoundingClientRect();
-                    var backingWidth = canvas.width || rect.width;
-                    var backingHeight = canvas.height || rect.height;
-                    var scaleX = backingWidth > 0 ? rect.width / backingWidth : 1;
-                    var scaleY = backingHeight > 0 ? rect.height / backingHeight : 1;
-                    var clientX = rect.left + x * scaleX;
-                    var clientY = rect.top + y * scaleY;
+                    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+                        var clientPoint = clientPointFromGamePoint(x, y);
+                        clientX = clientPoint.clientX;
+                        clientY = clientPoint.clientY;
+                    }
+
                     var event = new MouseEvent(type, {
                         bubbles: true,
                         cancelable: true,
                         view: window,
                         clientX: clientX,
                         clientY: clientY,
-                        offsetX: x,
-                        offsetY: y,
                         screenX: clientX,
                         screenY: clientY,
                         button: button,
@@ -2080,6 +2597,7 @@
                     if (!touchState.activeKey) {
                         dispatchKey('keydown', nextKey.key, nextKey.code, nextKey.keyCode);
                         touchState.activeKey = nextKey;
+                        touchState.activeKeyStartedAt = Date.now();
                         inputBreadcrumb('keydown ' + nextKey.code, true);
                     }
                 }
@@ -2096,6 +2614,26 @@
                     );
                     inputBreadcrumb('keyup ' + touchState.activeKey.code, true);
                     touchState.activeKey = null;
+                    touchState.activeKeyStartedAt = 0;
+                }
+
+                function releaseActiveKeyAfterMinimumHold(minimumMs) {
+                    if (!touchState.activeKey) {
+                        return;
+                    }
+
+                    var elapsed = Date.now() - touchState.activeKeyStartedAt;
+                    if (elapsed >= minimumMs) {
+                        releaseActiveKey();
+                        return;
+                    }
+
+                    var keyCode = touchState.activeKey.keyCode;
+                    setTimeout(function() {
+                        if (touchState.activeKey && touchState.activeKey.keyCode === keyCode) {
+                            releaseActiveKey();
+                        }
+                    }, minimumMs - elapsed);
                 }
 
                 function keyForDirection(direction) {
@@ -2125,20 +2663,28 @@
                 }
 
                 function wheel(deltaY) {
-                    var now = Date.now();
                     wheelRemainder += deltaY;
-                    if (now - lastWheelAt < 48 && Math.abs(wheelRemainder) < 36) {
+                    if (wheelFrame) {
                         return;
                     }
-                    deltaY = wheelRemainder;
-                    wheelRemainder = 0;
-                    lastWheelAt = now;
-                    canvas.dispatchEvent(new WheelEvent('wheel', {
-                        bubbles: true,
-                        cancelable: true,
-                        deltaY: deltaY
-                    }));
-                    inputBreadcrumb('wheel deltaY=' + Math.round(deltaY));
+                    wheelFrame = requestAnimationFrame(function() {
+                        var now = Date.now();
+                        var nextDelta = wheelRemainder;
+                        wheelFrame = 0;
+
+                        if (now - lastWheelAt < 24 && Math.abs(nextDelta) < 12) {
+                            return;
+                        }
+
+                        wheelRemainder = 0;
+                        lastWheelAt = now;
+                        canvas.dispatchEvent(new WheelEvent('wheel', {
+                            bubbles: true,
+                            cancelable: true,
+                            deltaY: nextDelta
+                        }));
+                        inputBreadcrumb('wheel deltaY=' + Math.round(nextDelta));
+                    });
                 }
 
                 function clearLongPress() {
@@ -2207,38 +2753,38 @@
                     );
                 }
 
-                function fireRightClick(x, y) {
+                function fireRightClick(x, y, clientX, clientY) {
                     haptic('medium');
                     inputBreadcrumb('right-click x=' + Math.round(x) + ' y=' + Math.round(y), true);
-                    dispatchMouse('mousemove', x, y, 2);
-                    dispatchMouse('mousedown', x, y, 2);
-                    dispatchMouse('mouseup', x, y, 2);
-                    var rect = canvas.getBoundingClientRect();
-                    var backingWidth = canvas.width || rect.width;
-                    var backingHeight = canvas.height || rect.height;
+                    dispatchMouse('mousemove', x, y, 2, clientX, clientY);
+                    dispatchMouse('mousedown', x, y, 2, clientX, clientY);
+                    dispatchMouse('mouseup', x, y, 2, clientX, clientY);
+                    var clientPoint = (!Number.isFinite(clientX) || !Number.isFinite(clientY))
+                        ? clientPointFromGamePoint(x, y)
+                        : { clientX: clientX, clientY: clientY };
                     canvas.dispatchEvent(new MouseEvent('contextmenu', {
                         bubbles: true,
                         cancelable: true,
-                        clientX: rect.left + x * (backingWidth > 0 ? rect.width / backingWidth : 1),
-                        clientY: rect.top + y * (backingHeight > 0 ? rect.height / backingHeight : 1),
+                        clientX: clientPoint.clientX,
+                        clientY: clientPoint.clientY,
                         button: 2
                     }));
                 }
 
-                function fireLeftClick(x, y) {
+                function fireLeftClick(x, y, clientX, clientY) {
                     haptic('selection');
                     inputBreadcrumb('left-click x=' + Math.round(x) + ' y=' + Math.round(y), true);
-                    dispatchMouse('mousemove', x, y, 0);
-                    dispatchMouse('mousedown', x, y, 0);
-                    dispatchMouse('mouseup', x, y, 0);
-                    var rect = canvas.getBoundingClientRect();
-                    var backingWidth = canvas.width || rect.width;
-                    var backingHeight = canvas.height || rect.height;
+                    dispatchMouse('mousemove', x, y, 0, clientX, clientY);
+                    dispatchMouse('mousedown', x, y, 0, clientX, clientY);
+                    dispatchMouse('mouseup', x, y, 0, clientX, clientY);
+                    var clientPoint = (!Number.isFinite(clientX) || !Number.isFinite(clientY))
+                        ? clientPointFromGamePoint(x, y)
+                        : { clientX: clientX, clientY: clientY };
                     canvas.dispatchEvent(new MouseEvent('click', {
                         bubbles: true,
                         cancelable: true,
-                        clientX: rect.left + x * (backingWidth > 0 ? rect.width / backingWidth : 1),
-                        clientY: rect.top + y * (backingHeight > 0 ? rect.height / backingHeight : 1),
+                        clientX: clientPoint.clientX,
+                        clientY: clientPoint.clientY,
                         button: 0
                     }));
                 }
@@ -2480,10 +3026,16 @@
                     touchState.pinchStartDistance = 0;
                     touchState.pinchMoved = false;
                     touchState.longPressed = false;
+                    if (wheelFrame) {
+                        cancelAnimationFrame(wheelFrame);
+                        wheelFrame = 0;
+                    }
+                    wheelRemainder = 0;
                 }
                 window._mudclientReleaseActiveTouchState = resetTouchState;
 
                 canvas.addEventListener('touchstart', function(event) {
+                    clearCanvasRectCache();
                     focusCanvas();
                     wakeControls();
 
@@ -2497,6 +3049,8 @@
                         var center = midpoint(event.touches[0], event.touches[1]);
                         touchState.pinchCenterX = center.x;
                         touchState.pinchCenterY = center.y;
+                        touchState.pinchCenterClientX = center.clientX;
+                        touchState.pinchCenterClientY = center.clientY;
                         touchState.pinchMoved = false;
                         event.preventDefault();
                         return;
@@ -2514,18 +3068,26 @@
                     touchState.lastY = point.y;
                     touchState.lastClientX = point.clientX;
                     touchState.lastClientY = point.clientY;
+                    touchState.startClientX = point.clientX;
+                    touchState.startClientY = point.clientY;
                     touchState.longPressed = false;
                     clearLongPress();
 
                     touchState.longPressTimer = setTimeout(function() {
                         touchState.longPressed = true;
                         inputBreadcrumb('long-press', true);
-                        fireRightClick(touchState.startX, touchState.startY);
+                        fireRightClick(
+                            touchState.startX,
+                            touchState.startY,
+                            touchState.startClientX,
+                            touchState.startClientY
+                        );
                     }, LONG_PRESS_MS);
                     event.preventDefault();
                 }, { passive: false });
 
                 canvas.addEventListener('touchmove', function(event) {
+                    clearCanvasRectCache();
                     if (event.touches.length === 2) {
                         var nextDistance = distance(event.touches[0], event.touches[1]);
                         if (touchState.mode !== 'pinch') {
@@ -2541,6 +3103,11 @@
                         if (Math.abs(nextDistance - touchState.pinchStartDistance) > 12) {
                             touchState.pinchMoved = true;
                         }
+                        var center = midpoint(event.touches[0], event.touches[1]);
+                        touchState.pinchCenterX = center.x;
+                        touchState.pinchCenterY = center.y;
+                        touchState.pinchCenterClientX = center.clientX;
+                        touchState.pinchCenterClientY = center.clientY;
                         touchState.pinchDistance = nextDistance;
                         wheel(delta * PINCH_WHEEL_SCALE);
                         event.preventDefault();
@@ -2567,13 +3134,22 @@
                         inputBreadcrumb('swipe dx=' + Math.round(dx) + ' dy=' + Math.round(dy), true);
                         setActiveKey(keyForSwipe(dx, dy));
                         event.preventDefault();
+                    } else if (touchState.mode === 'swipe') {
+                        setActiveKey(keyForSwipe(dx, dy));
+                        event.preventDefault();
                     }
                 }, { passive: false });
 
                 canvas.addEventListener('touchend', function(event) {
+                    clearCanvasRectCache();
                     if (touchState.mode === 'pinch') {
                         if (!touchState.pinchMoved) {
-                            fireRightClick(touchState.pinchCenterX, touchState.pinchCenterY);
+                            fireRightClick(
+                                touchState.pinchCenterX,
+                                touchState.pinchCenterY,
+                                touchState.pinchCenterClientX,
+                                touchState.pinchCenterClientY
+                            );
                         }
                         resetTouchState();
                         event.preventDefault();
@@ -2581,7 +3157,10 @@
                     }
 
                     if (touchState.mode === 'swipe') {
-                        resetTouchState();
+                        clearLongPress();
+                        releaseActiveKeyAfterMinimumHold(MIN_SWIPE_KEY_HOLD_MS);
+                        touchState.mode = null;
+                        touchState.longPressed = false;
                         event.preventDefault();
                         return;
                     }
@@ -2598,7 +3177,12 @@
                         var dy = touchState.lastY - touchState.startY;
                         var movement = Math.sqrt(dx * dx + dy * dy);
                         if (movement <= TAP_MOVE_THRESHOLD) {
-                            fireLeftClick(touchState.lastX, touchState.lastY);
+                            fireLeftClick(
+                                touchState.lastX,
+                                touchState.lastY,
+                                touchState.lastClientX,
+                                touchState.lastClientY
+                            );
                         }
                         resetTouchState();
                         event.preventDefault();
