@@ -112,6 +112,9 @@ private struct QuickStatsBar: View {
                 }
             }
 
+            runWalkChip
+            runEnergyBar
+
             Spacer()
 
             // Combat indicator
@@ -151,6 +154,45 @@ private struct QuickStatsBar: View {
         if pct > 0.25 { return .yellow }
         return .red
     }
+
+    private var runWalkChip: some View {
+        Button(action: { engine.toggleRun() }) {
+            HStack(spacing: 3) {
+                Image(systemName: worldState.runEnabled ? "figure.run" : "figure.walk")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(worldState.runEnabled ? "Run" : "Walk")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.black.opacity(0.6))
+            .overlay(Capsule().stroke(Color(hex: "#c8a951"), lineWidth: 1))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .foregroundColor(.white)
+    }
+
+    private var runEnergyBar: some View {
+        let energy = max(0.0, min(1.0, Double(worldState.runEnergy) / 100.0))
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.black.opacity(0.5))
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(runEnergyColor)
+                    .frame(width: geo.size.width * energy)
+            }
+        }
+        .frame(width: 58, height: 6)
+        .accessibilityLabel("Run energy \(worldState.runEnergy) percent")
+    }
+
+    private var runEnergyColor: Color {
+        if worldState.runEnergy > 50 { return .green }
+        if worldState.runEnergy > 25 { return .yellow }
+        return .orange
+    }
 }
 
 // MARK: - Chat Panel
@@ -172,7 +214,7 @@ private struct ChatPanelView: View {
                                     .foregroundColor(chatColor(msg))
                                 Text(msg.text)
                                     .font(.system(size: 12))
-                                    .foregroundColor(msg.isKill ? .red : .white)
+                                    .foregroundColor(chatColor(msg))
                             }
                             .id(msg.id)
                         }
@@ -221,11 +263,26 @@ private struct ChatPanelView: View {
     }
 
     private func chatColor(_ msg: RSCChatMessage) -> Color {
-        if msg.isKill { return .red }
-        if msg.isPrivate { return .cyan }
-        if msg.isLocal { return Color(hex: "#c8a951") }
-        if msg.sender.hasPrefix("[") { return .yellow }
-        return .white
+        switch msg.channel {
+        case .chat:
+            return msg.isLocal ? Color(hex: "#c8a951") : .white
+        case .privateMsg:
+            return Color(hex: "#c8ffff")
+        case .quest:
+            return Color(hex: "#ffb347")
+        case .trade:
+            return Color(hex: "#c8a951")
+        case .system:
+            return Color(hex: "#ffff00")
+        case .kill:
+            return .red
+        case .magic:
+            return Color(hex: "#c8c8ff")
+        case .clan:
+            return Color(hex: "#88ff88")
+        case .party:
+            return Color(hex: "#ffff88")
+        }
     }
 }
 
