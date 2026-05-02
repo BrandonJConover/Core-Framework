@@ -2474,19 +2474,23 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func enablePrayer(prayerId: Int) {
+        guard prayerId >= 0 && prayerId < worldState.activePrayers.count else { return }
+        worldState.activePrayers[prayerId] = true
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.prayerOn.rawValue))
-            buf.putShort(prayerId)
+            buf.putByte(prayerId)
             try? await connection.send(buf.finishPacket())
         }
     }
 
     func disablePrayer(prayerId: Int) {
+        guard prayerId >= 0 && prayerId < worldState.activePrayers.count else { return }
+        worldState.activePrayers[prayerId] = false
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.prayerOff.rawValue))
-            buf.putShort(prayerId)
+            buf.putByte(prayerId)
             try? await connection.send(buf.finishPacket())
         }
     }
