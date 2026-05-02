@@ -70,7 +70,7 @@ These all require the `Component`/`InterfaceList` stack from rt4-client (Tier 7 
 
 Once Tier 5a lands, the scene actually contains the right entities and the rasterizer becomes the bottleneck for "screen still black/flat". Order:
 
-1. **Camera-frustum verification.** `Game.calculateCameraPosition()` was last touched on the chunkX/chunkY fix (`fceb862e7`); add a one-shot debug probe to log the projected min/max screen-space X/Y of `models[0]` after `REBUILD_NORMAL` and confirm the same shape we audited in the iOS port (where polygons were silently collapsing to 25×25 off-screen because `Polygon` was a class shared across N slots — see iOS commit `38d169327`). The TS `Polygon` equivalent is value-typed today but the symptom matrix is identical, so the same probe is the fastest triage. _(probe landed in `1a113b1b3`; first runtime capture still pending because Parcel 1/Node 25 idled during local build before writing `dist`)_
+1. **Camera-frustum verification.** `Game.calculateCameraPosition()` was last touched on the chunkX/chunkY fix (`fceb862e7`); add a one-shot debug probe to log the projected min/max screen-space X/Y of `models[0]` after `REBUILD_NORMAL` and confirm the same shape we audited in the iOS port (where polygons were silently collapsing to 25×25 off-screen because `Polygon` was a class shared across N slots — see iOS commit `38d169327`). The TS `Polygon` equivalent is value-typed today but the symptom matrix is identical, so the same probe is the fastest triage. _(probe landed in `1a113b1b3`; model-level rejection counters now cover near/far clip, side/top/bottom clip, near-plane vertices, backface culls, and bucketed triangles; first runtime capture still pending because Parcel 1/Node 25 idled during local build before writing `dist`)_
 2. **`applyLighting()` against 530 face flags.** rt4 packs texture/colour-shift bits we don't replicate yet; the bridge in `Model530` zeros most flags, which produces flat-shaded geometry.
 3. **`Rasterizer3D` instrumentation** — count triangles entering vs leaving each cull stage so we can attribute "no pixels" to a specific gate.
 4. **Texture streaming** (defers to Tier 8). Until textures are wired, expect flat-shaded coloured terrain that matches Java when run with `-DDISABLE_TEXTURES`.
@@ -79,8 +79,9 @@ Once Tier 5a lands, the scene actually contains the right entities and the raste
 
 Required to surface bank/options/quest UI properly, and to make Tier 5c handlers do something visible. Concrete checklist:
 
-- [ ] Port `Component.java` (rt4) to TS — there are ~50 fields per component but most are passive containers. The first three pages (Component, ComponentPointer, InterfaceList) cover ~80% of in-game widgets.
-- [ ] Wire `Js5Cache.getRegionBytes` style decompression into idx3 (interface defs) and idx13 (interface graphics).
+- [x] Port `Component.java` (rt4) to TS — there are ~50 fields per component but most are passive containers. The first three pages (Component, ComponentPointer, InterfaceList) cover ~80% of in-game widgets. _(8355aff4)_
+- [x] Wire `Js5Cache.getRegionBytes` style decompression into idx3 (interface defs) and idx13 (interface graphics). _(8355aff4 for idx3 component defs; idx13 graphics remain renderer-side)_
+- [x] Feed Tier 5c IF_* flight-recorder packets into the decoded component tree while keeping the recorder as a debug trail. _(56dff937)_
 - [ ] Hook `ScriptRunner` (CS2) — many interfaces dispatch logic through CS2 scripts; can ship a stub that no-ops unknown opcodes and selectively port the ones bank/options need.
 - [ ] Wire the modal stack: server says "open IF X", client opens the right component tree.
 
