@@ -10,7 +10,7 @@ Each plan in this folder is a self-contained ChatGPT brief for one tier of the r
 | 2 | [tier5b — player + chat state](web-client-tier5b-player-chat-state.md) | Teleports stop racing. PMs/clan chat appear. |
 | 3 | [tier5c — interface drain](web-client-tier5c-interface-drain.md) | Defensive — keep the byte stream aligned even before widgets exist. |
 | 4 | [tier6a — renderer probe](web-client-tier6a-renderer-probe.md) | Diagnostic-only. Gives us the data Tier 6b will use. |
-| 5 | (tier 6b — renderer fix) | **Unwritten.** Conditioned on tier 6a output. Don't write ahead of the data. |
+| 5 | [tier6b — renderer fix (template)](web-client-tier6b-renderer-fix.md) | **Template state** — written with five candidate root causes; gets filled in once 6a's probe captures real diagnostic output. |
 | 6 | [tier7 — widget skeleton](web-client-tier7-widget-skeleton.md) | Hooks the Tier 5c flight recorder onto a real component tree. |
 | 7 | (tier 7b — widget renderer) | **Unwritten.** Render the widget tree the skeleton built. |
 | 8 | [tier8 — textures (idx26 + TextureOps)](web-client-tier8-textures.md) | Last visible-rendering tier; depends on verified rasterizer (Tier 6). |
@@ -33,6 +33,7 @@ The iOS port has its own tracker at [`iOS_Client/OpenRSC/REMAINING.md`](../../iO
 | Plan | What it gates |
 |---|---|
 | [ci-smoke-test.md](ci-smoke-test.md) | Adds GitHub Actions matrix that builds iOS + Java desktop + modern server + 2009scape-web on every push to `develop`. The first guard rail this repo gets. |
+| [web-client-playwright-integration.md](web-client-playwright-integration.md) | Pairs with the smoke matrix. Promotes the ad-hoc `Deployment_Scripts/playwright/{login-flow,probe}.mjs` scripts into a structured scenario set that runs after smoke goes green and uploads screenshots/event logs on red. |
 | [server-java-modern-parity-audit.md](server-java-modern-parity-audit.md) | **Audit-only** plan that produces a single `PARITY.md` tracker for `server-java-modern/` so future work has a clear "what's left" entry point instead of three drifting changelogs. |
 
 ## Conventions every plan follows
