@@ -2260,8 +2260,8 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnGround.rawValue))
             buf.putShort(x)
             buf.putShort(z)
-            buf.putShort(itemId)
             buf.putShort(slot)
+            buf.putShort(itemId)
             try? await connection.send(buf.finishPacket())
             clearPendingItemUse()
         }
