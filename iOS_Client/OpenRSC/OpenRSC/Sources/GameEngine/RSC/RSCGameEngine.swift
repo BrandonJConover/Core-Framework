@@ -47,6 +47,7 @@ final class RSCGameEngine: ObservableObject {
     private var cameraRotation: Int32 = 0
     private var cameraPitch: Int32 = 64
     private var cameraZoom: Int32 = 1200  // Java default: 750; native starts wider on phone screens
+    private var cameraOcclusionZoom: Int32 = 1200
 
     /// Camera rotation in degrees (0..360). Read by gesture handlers in GameView.
     var cameraRotationDegrees: Double { Double(cameraRotation) * 360.0 / 256.0 }
@@ -358,7 +359,8 @@ final class RSCGameEngine: ObservableObject {
             // (World.generateLandscapeModel places verts at tileX*128, tileX in [-half,+half]).
             // So camera center = (0, -cameraY, 0) puts the camera directly above the player
             // origin. Absolute world position doesn't enter the projection math.
-            cameraZoom = Int32(1200.0 / max(0.5, min(3.0, Double(zoomLevel))))
+            let desiredZoom = Int32(1200.0 / max(0.5, min(3.0, Double(zoomLevel))))
+            cameraZoom = cameraZoomWithOcclusion(desiredZoom)
             let cameraY: Int32 = 180  // height above ground
             scene.fogLandscapeDistance = cameraZoom * 6
             scene.setCamera(
@@ -1197,6 +1199,75 @@ final class RSCGameEngine: ObservableObject {
                 y += sy
             }
         }
+    }
+
+    /// Pull the camera inward when static world geometry sits between the
+    /// player and the camera. The Java client keeps the player visible by
+    /// adjusting camera distance around occluders; this native approximation
+    /// samples the tile ray behind the player using the current yaw and shortens
+    /// the camera when a wall/object occupies that path.
+    private func cameraZoomWithOcclusion(_ desiredZoom: Int32) -> Int32 {
+        let yaw = Int((cameraRotation * 4) & 1023)
+        let pitch = Int((cameraPitch * 4) & 1023)
+        let offset = desiredZoom * 2
+
+        var offX: Int32 = 0
+        var offY: Int32 = 0
+        var offZ: Int32 = offset
+
+        if pitch != 0 {
+            let sin = FastMath.trigTable1024[pitch]
+            let cos = FastMath.trigTable1024[pitch + 1024]
+            let tmp = (cos &* offY &- sin &* offset) >> 15
+            offZ = (sin &* offY &+ offset &* cos) >> 15
+            offY = tmp
+        }
+
+        if yaw != 0 {
+            let sin = FastMath.trigTable1024[yaw]
+            let cos = FastMath.trigTable1024[yaw + 1024]
+            let tmp = (offX &* cos &+ offZ &* sin) >> 15
+            offZ = (cos &* offZ &- sin &* offX) >> 15
+            offX = tmp
+        }
+
+        let cameraTileX = -Double(offX) / 128.0
+        let cameraTileZ = -Double(offZ) / 128.0
+        let distanceTiles = max(1.0, sqrt(cameraTileX * cameraTileX + cameraTileZ * cameraTileZ))
+        let stepX = cameraTileX / distanceTiles
+        let stepZ = cameraTileZ / distanceTiles
+
+        let objectTiles = Set(worldState.gameObjects.map { "\($0.x),\($0.y)" })
+        let wallTiles = Set(worldState.wallObjects.map { "\($0.x),\($0.y)" })
+        var occludedAt: Double?
+
+        let maxSample = min(18, max(2, Int(distanceTiles.rounded(.down))))
+        for step in 1...maxSample {
+            let tx = worldState.localPlayerX + Int((stepX * Double(step)).rounded())
+            let tz = worldState.localPlayerY + Int((stepZ * Double(step)).rounded())
+            let key = "\(tx),\(tz)"
+            if objectTiles.contains(key) || wallTiles.contains(key) {
+                occludedAt = Double(step)
+                break
+            }
+        }
+
+        let targetZoom: Int32
+        if let occludedAt {
+            // Keep the camera just in front of the nearest blocking tile. Scene
+            // receives `offset = zoom * 2`, so one tile is roughly 64 zoom units.
+            targetZoom = min(desiredZoom, max(520, Int32((occludedAt - 0.35) * 64.0)))
+        } else {
+            targetZoom = desiredZoom
+        }
+
+        if cameraOcclusionZoom == 0 { cameraOcclusionZoom = targetZoom }
+        if cameraOcclusionZoom > targetZoom {
+            cameraOcclusionZoom = max(targetZoom, cameraOcclusionZoom - 90)
+        } else if cameraOcclusionZoom < targetZoom {
+            cameraOcclusionZoom = min(targetZoom, cameraOcclusionZoom + 35)
+        }
+        return cameraOcclusionZoom
     }
 
     // Simple 3x5 pixel font for rendering text on the map
