@@ -29,11 +29,11 @@ Current symptom: if the viewport still renders black, the likely causes are now 
 
 These opcodes drive the zone-update bus that keeps locs (game objects), ground items, and short-lived effects in sync after `REBUILD_NORMAL`. Without them the scene quietly desynchronises the moment anything spawns, despawns, or animates.
 
-- [ ] **OBJ_ADD (135) / OBJ_DEL (240) / OBJ_REVEAL (33) / OBJ_COUNT (14)** — ground item lifecycle. Today only the initial sweep on REBUILD_NORMAL gets ground items; drops/picks-up are silently dropped.
-- [ ] **LOC_ADD (179) / LOC_DEL (195) / LOC_ADD_CHANGE (202) / LOC_ANIM (20) / LOC_ANIM_SPECIFIC (235)** — game object mutations and animations (doors opening, fires lit, banks toggling).
-- [ ] **MAP_PROJANIM (104) / MAP_PROJANIM_2 (16) / MAP_PROJANIM_3 (121)** — server-driven projectile animations (arrows, spells in flight, telegrabs).
-- [ ] **SPOTANIM_SPECIFIC (17) / SPOTANIM_ENTITY (56)** — graphic-only animations (cast effects, eat ticks).
-- [ ] **NPC_ANIM_SPECIFIC (102)** — one-shot NPC animation override.
+- [x] **OBJ_ADD (135) / OBJ_DEL (240) / OBJ_REVEAL (33) / OBJ_COUNT (14)** — ground item lifecycle. Today only the initial sweep on REBUILD_NORMAL gets ground items; drops/picks-up are silently dropped. _(512c798cd)_
+- [x] **LOC_ADD (179) / LOC_DEL (195) / LOC_ADD_CHANGE (202) / LOC_ANIM (20) / LOC_ANIM_SPECIFIC (235)** — game object mutations and animations (doors opening, fires lit, banks toggling). _(512c798cd)_
+- [x] **MAP_PROJANIM (104) / MAP_PROJANIM_2 (16) / MAP_PROJANIM_3 (121)** — server-driven projectile animations (arrows, spells in flight, telegrabs). _(512c798cd)_
+- [x] **SPOTANIM_SPECIFIC (17) / SPOTANIM_ENTITY (56)** — graphic-only animations (cast effects, eat ticks). _(512c798cd)_
+- [x] **NPC_ANIM_SPECIFIC (102)** — one-shot NPC animation override. _(512c798cd)_
 
 ### Tier 5b — Player + chat-side state (medium impact, blocks UX features)
 
