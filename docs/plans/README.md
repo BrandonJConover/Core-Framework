@@ -18,6 +18,17 @@ Each plan in this folder is a self-contained ChatGPT brief for one tier of the r
 | 5d | [tier5d — audio (SoundBank + 2 opcodes)](web-client-tier5d-audio.md) | Independent of every other tier — parallelisable. |
 | 10 | [tier10 — music streaming (MIDI → OGG)](web-client-tier10-music.md) | Independent of every other tier — parallelisable. Pre-converts MIDI via FluidSynth at build time. |
 
+## Renderer-wire phases (P3+, follow data-side ports)
+
+These plans wire data-side ports (already shipped + offline-verified) into the live Scene render path. They share a structural template — bridge `RawModel530Data` through `Model530Bridge` → attach to a Scene slot.
+
+| Phase | Plan | Status |
+|---|---|---|
+| P3a | TerrainMesh530 builder | **Shipped** offline-verified — see `2009scape-web/client-patch/.terrain-mesh-trace.txt` |
+| P3b | [TerrainMesh530 → Scene wire](web-client-p3b-terrain-render-wire.md) | Pickable now |
+| P4 (data) | PlayerAppearance530 compositor | **Shipped** offline-verified — see `2009scape-web/client-patch/.player-appearance-trace.txt` |
+| P4 (wire) | [PlayerAppearance530 → Scene wire](web-client-p4-player-avatar-wire.md) | Pickable now (parallel-safe with P3b — different files) |
+
 ## iOS plans
 
 The iOS port has its own tracker at [`iOS_Client/OpenRSC/REMAINING.md`](../../iOS_Client/OpenRSC/REMAINING.md). Most items there are picked up by the engine-side iteration loop. Plans below are for items that belong to **avoid-listed files** (HUDView, SoundManager, etc.) or for multi-iteration efforts that need a roadmap.
