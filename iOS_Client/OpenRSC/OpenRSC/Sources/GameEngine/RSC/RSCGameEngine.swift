@@ -1470,18 +1470,11 @@ final class RSCGameEngine: ObservableObject {
             let npcSY = centerY + (npc.y - pz) * tp
             guard npcSX > -tp*3 && npcSX < w + tp*3 && npcSY > -tp*3 && npcSY < h + tp*3 else { continue }
 
-            // Try to draw NPC sprite, fall back to colored dot
-            let npcSpriteId = npc.npcId  // Simplified: use npcId as sprite index hint
-            // Entity sprites: each animation has 15 frames, frame 3 = facing south
-            // Animation number for NPC comes from NPCDef.sprites1
-            // For simplicity, try sprite IDs near the NPC type
-            var drewSprite = false
             if spriteLoader.isLoaded {
                 // Try a few sprite IDs based on NPC type (rough mapping)
                 let baseSpriteId = npc.npcId * 3  // rough estimate
                 spriteLoader.drawSprite(baseSpriteId, onto: &pixelData, bufferWidth: w, bufferHeight: h,
                                         atX: npcSX - tp, atY: npcSY - tp * 2, scale: 1)
-                drewSprite = true  // We attempted it — even if no sprite found, we still draw the dot
             }
 
             // NPC dot as fallback/indicator

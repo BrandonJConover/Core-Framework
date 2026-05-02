@@ -27,7 +27,7 @@ struct GameSprite {
 }
 
 class SpriteLoader: @unchecked Sendable {
-    internal(set) var sprites: [Int: GameSprite] = [:]
+    private(set) var sprites: [Int: GameSprite] = [:]
     var isLoaded: Bool { !sprites.isEmpty }
 
     func loadArchive() {
