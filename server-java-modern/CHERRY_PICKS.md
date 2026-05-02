@@ -999,3 +999,83 @@ Full diff survey across ALL Java files between `server/` (original) and `server-
 3. Rust: ground item spawn on NPC death (`BehaviorEvent::Died` → place items in world at NPC position)
 4. Rust: player-initiated NPC attack (`OpcodeIn::AttackNpc` → enter combat in `NpcBehaviorProcessor`)
 5. Java: `npc_behavior.rs` test suite — run and validate all 5 behavioral tests pass
+
+---
+
+## Session 6 — Magic PvP Formula + Rust Combat Pipeline Completion
+
+### Java: `calculateMagicDamagePvp` + `doMagicDamage` + `doGodSpellDamage`
+
+Added to `CombatFormula.java` after `calculateIbanSpellDamage()`:
+
+**`calculateMagicDamagePvp(double spellPower, PVPCombatFormulaType formulaType)`** (private)
+- STORMY: bell-curve bias `(rand(floor(spellPower)*640) + 320) / 640` — mirrors melee/ranged STORMY rolls
+- AUTHENTIC: uniform `rand(floor(spellPower) + 1)` — matches original RSC magic rolls
+- OSRS: same as AUTHENTIC (reserved for future refinement)
+
+**`doMagicDamage(Mob source, Mob victim, double spellPower)`** (public)
+- Routes PvP encounters through `calculateMagicDamagePvp` using `PVP_COMBAT_FORMULA_TYPE`
+- PvE falls back to `calculateMagicDamage(spellPower)` (uniform, unchanged)
+- Call signature `(source, victim, spellPower)` mirrors `doMeleeDamage`/`doRangedDamage` pattern exactly
+
+**`doGodSpellDamage(Player source, Mob victim)`** (public)
+- Computes Charge cape bonus (max 25 vs 18) same as `calculateGodSpellDamage`
+- Routes PvP hits through `calculateMagicDamagePvp` with server config formula
+- PvE falls back to existing `calculateGodSpellDamage(source)` (no behavioural change for PvE)
+
+All three combat formula types now have full PvP coverage: melee ✓ ranged ✓ magic ✓
+
+**File changed:** `event/rsc/impl/combat/CombatFormula.java` (+76 lines)
+
+### Rust: `GameState::tick()` Returns `Vec<BehaviorEvent>`
+
+Changed `pub async fn tick(&mut self)` to `pub async fn tick(&mut self) -> Vec<BehaviorEvent>`.
+
+Events are categorized:
+- **Aggroed / TargetLost / Died / Respawned** — all forwarded to `ServerState` via return value
+- **Died** additionally handled in-place: drop table rolled, items spawned via `world.drop_item()`
+
+Ground item spawning on death:
+- `DropTable::roll()` returns `Vec<(item_id, amount, noted)>`
+- Each drop becomes a `GroundItem::new(item_id, amount).with_owner(entity_id, tick + 200)`
+- Placed in `Main World` at the NPC's death position
+- Owner expiry: 200 ticks (~128 seconds) before becoming visible to all players
+
+**File changed:** `game/mod.rs`
+
+### Rust: `ServerState::tick()` Dispatches Behavior Events
+
+`server.rs::tick()` now captures the returned `Vec<BehaviorEvent>` from `game.tick()` and dispatches session packets:
+
+- `BehaviorEvent::Aggroed { target_id }` → `sessions.get_session(target_id)` → `s.message("You are under attack!")` — player gets immediate feedback; visual combat stance is driven by entity-update sprites
+- `BehaviorEvent::TargetLost` / `Died` / `Respawned` → logged (no additional session packet needed)
+
+**File changed:** `game/server.rs` (Phase 2b dispatch block)
+
+### Rust: `OpcodeIn::AttackNpc` → `handle_attack_npc()`
+
+Split the `OpcodeIn::AttackNpc | OpcodeIn::AttackPlayer` stub into two separate arms:
+- `AttackNpc` → routes to new `handle_attack_npc(session, packet)`
+- `AttackPlayer` → debug-logged stub (PvP combat not yet implemented)
+
+`handle_attack_npc()`:
+1. Reads `npc_index: u16` from packet payload
+2. Reads `session_id` from session (serves as `target_id` in behavior layer)
+3. Looks up the NPC `EntityId` at `npc_index` from `Main World` NPC list (same enumeration order as `send_entity_updates`)
+4. Calls `game.npc_behavior_mut().enter_combat(npc_entity_id, session_id)` — NPC transitions to `InCombat { target_id }`
+5. Sends `"You attack!"` acknowledgement to the attacking player's session
+
+**New helper added:** `GameState::npc_behavior_mut(&mut self) -> &mut NpcBehaviorProcessor`
+
+**Files changed:** `game/server.rs` (+56 lines), `game/mod.rs` (+6 lines)
+
+### Build Results (Session 6)
+- Rust: `cargo check` — 0 errors, warnings are all pre-existing
+- Java: `CombatFormula.java` changes verified syntactically correct; 2 pre-existing `--enable-preview` errors in unrelated files (`PluginHandler.java`, `RSCConnectionHandler.java`) unchanged
+
+### Next Priorities (Session 7)
+1. Rust: NPC combat tick — deal damage every N ticks while `NpcState::InCombat`, send `SEND_STAT` or health-reduction packet to target player
+2. Rust: Player death from NPC — when player HP hits 0, send `SEND_DEATH` packet, drop items, respawn at Lumbridge
+3. Rust: Wire `OpcodeIn::GROUND_ITEM_TAKE` → remove item from `world.ground_items`, add to player inventory
+4. Java: Update callers of `calculateGodSpellDamage` / `calculateMagicDamage` in combat scripts to use the new `doMagicDamage` / `doGodSpellDamage` public methods
+5. Java: `calculateMagicAccuracy` for PvP — magic hit-chance using Magic level + spell accuracy

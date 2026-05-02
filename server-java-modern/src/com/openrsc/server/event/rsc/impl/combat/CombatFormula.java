@@ -152,6 +152,83 @@ public class CombatFormula {
 		// Source for max damage: http://web.archive.org/web/20041226185618/http://www.rsinn.com/forum/showthread.php?t=2469
 		return calculateMagicDamage(15);
 	}
+	/**
+	 * Gets a dice roll for magic damage in a PvP encounter using the formula
+	 * selected by {@link PVPCombatFormulaType} in the server configuration.
+	 *
+	 * <ul>
+	 *   <li><b>STORMY</b>    — bell-curve bias: {@code (rand(floor(spellPower)*640) + 320) / 640}</li>
+	 *   <li><b>AUTHENTIC</b> — uniform random in {@code [0, floor(spellPower)]}, matching the
+	 *       original RSC damage roll.</li>
+	 *   <li><b>OSRS</b>      — uniform random in {@code [0, floor(spellPower)]} (reserved for
+	 *       future OSRS-formula refinements).</li>
+	 * </ul>
+	 *
+	 * @param spellPower  The max hit of the spell.
+	 * @param formulaType The PvP formula type from server config.
+	 * @return The randomized damage value.
+	 */
+	private static int calculateMagicDamagePvp(final double spellPower, final PVPCombatFormulaType formulaType) {
+		int maxHit = (int) Math.floor(spellPower);
+		if (maxHit <= 0) return 0;
+		int stormyRoll = maxHit * 640;
+		return switch (formulaType) {
+			case STORMY    -> stormyRoll <= 0 ? 0 : (DataConversions.getRandom().nextInt(stormyRoll) + 320) / 640;
+			case AUTHENTIC -> DataConversions.getRandom().nextInt(maxHit + 1);
+			case OSRS      -> DataConversions.getRandom().nextInt(maxHit + 1);
+		};
+	}
+
+	/**
+	 * Gets the damage dealt for a magic spell in PvP or PvE.
+	 *
+	 * <p>In player-vs-player encounters the formula selected by
+	 * {@link PVPCombatFormulaType} in the server configuration is used;
+	 * all other encounters (PvE) fall back to the uniform
+	 * {@link #calculateMagicDamage(double)} roll.</p>
+	 *
+	 * @param source     The attacking mob.
+	 * @param victim     The mob being attacked.
+	 * @param spellPower The max hit of the spell being cast.
+	 * @return The damage to apply (may be 0 for a zero-roll).
+	 */
+	public static int doMagicDamage(final Mob source, final Mob victim, final double spellPower) {
+		return (source.isPlayer() && victim.isPlayer())
+			? calculateMagicDamagePvp(spellPower, source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE)
+			: calculateMagicDamage(spellPower);
+	}
+
+	/**
+	 * Gets the damage dealt for a god spell in PvP or PvE.
+	 *
+	 * <p>Mirrors {@link #calculateGodSpellDamage(Player)} for PvE encounters but
+	 * routes PvP hits through the configured {@link PVPCombatFormulaType} so that
+	 * Charge-boosted god spells (max 25) respect the server's formula choice.</p>
+	 *
+	 * @param source The player casting the god spell.
+	 * @param victim The mob being attacked.
+	 * @return The damage to apply.
+	 */
+	public static int doGodSpellDamage(final Player source, final Mob victim) {
+		int[] godCapes = new int[] {
+			ZAMORAK_CAPE.id(),
+			SARADOMIN_CAPE.id(),
+			GUTHIX_CAPE.id()
+		};
+		boolean hasCapeEquipped = false;
+		for (int capeId : godCapes) {
+			if (source.getCarriedItems().getEquipment().hasEquipped(capeId)) {
+				hasCapeEquipped = true;
+				break;
+			}
+		}
+		boolean hasChargeBenefit = source.isCharged() && hasCapeEquipped;
+		int godSpellMax = hasChargeBenefit ? 25 : 18;
+		return victim.isPlayer()
+			? calculateMagicDamagePvp(godSpellMax, source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE)
+			: calculateGodSpellDamage(source);
+	}
+
 
 	/**
 	 * Calculates an accuracy check (base method)
