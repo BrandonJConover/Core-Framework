@@ -1,0 +1,106 @@
+[package]
+name = "openrsc-server"
+version = "1.0.0"
+edition = "2021"
+authors = ["OpenRSC Team"]
+description = "High-performance OpenRSC game server in Rust"
+license = "GPL-3.0"
+rust-version = "1.75"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full", "tracing"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+
+# Networking
+quinn = "0.10"                          # QUIC implementation
+rustls = { version = "0.22", features = ["ring"] }
+rcgen = "0.12"                          # Certificate generation
+bytes = "1.5"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rmp-serde = "1.1"                       # MessagePack
+rkyv = { version = "0.7", features = ["validation", "strict"] }  # Zero-copy
+flatbuffers = "23.5"
+bincode = "1.3"
+
+# Database & Caching
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "mysql", "sqlite"] }
+deadpool-redis = "0.14"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-opentelemetry = "0.22"
+opentelemetry = { version = "0.21", features = ["metrics", "trace"] }
+opentelemetry-otlp = { version = "0.14", features = ["metrics", "trace", "grpc-tonic"] }
+opentelemetry_sdk = { version = "0.21", features = ["rt-tokio"] }
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+# Service Discovery
+etcd-client = "0.12"
+
+# HTTP Client
+reqwest = { version = "0.11", features = ["json"] }
+async-trait = "0.1"
+hostname = "0.3"
+
+# HTTP Server (for health endpoints)
+axum = { version = "0.7", features = ["tokio", "json"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Configuration
+config = "0.14"
+dotenvy = "0.15"
+
+# Utilities
+thiserror = "1.0"
+anyhow = "1.0"
+dashmap = "5.5"                         # Concurrent hashmap
+parking_lot = "0.12"                    # Fast synchronization
+crossbeam = "0.8"                       # Concurrent data structures
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+once_cell = "1.19"
+pin-project-lite = "0.2"
+
+# Security
+argon2 = "0.5"                          # Password hashing
+rand = "0.8"
+sha2 = "0.10"
+hmac = "0.12"
+constant_time_eq = "0.3"
+
+# Encoding
+base64 = "0.22"
+hex = "0.4"
+
+# Futures
+futures = "0.3"
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 1
+
+[[bin]]
+name = "openrsc-server"
+path = "src/main.rs"
+
+[[bench]]
+name = "serialization"
+harness = false

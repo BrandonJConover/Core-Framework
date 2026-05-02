@@ -20,12 +20,20 @@ Each plan in this folder is a self-contained ChatGPT brief for one tier of the r
 
 ## iOS plans
 
-The iOS port has its own tracker at [`iOS_Client/OpenRSC/REMAINING.md`](../../iOS_Client/OpenRSC/REMAINING.md). Most items there are picked up by the engine-side iteration loop. Plans below are for items that belong to **avoid-listed files** (HUDView, SoundManager, etc.) and need to be handed to those owners explicitly.
+The iOS port has its own tracker at [`iOS_Client/OpenRSC/REMAINING.md`](../../iOS_Client/OpenRSC/REMAINING.md). Most items there are picked up by the engine-side iteration loop. Plans below are for items that belong to **avoid-listed files** (HUDView, SoundManager, etc.) or for multi-iteration efforts that need a roadmap.
 
 | Plan | For owner of | Status |
 |---|---|---|
 | [ios-hudview-chat-color-run-energy.md](ios-hudview-chat-color-run-energy.md) | `HUDView.swift` | Pickable now |
 | [ios-userdefaults-preferences.md](ios-userdefaults-preferences.md) | engine + new `UserPreferences.swift` (no avoid-list collision) | Pickable now |
+| [ios-terrain-textures-phase5.md](ios-terrain-textures-phase5.md) | rendering pipeline (`Scene`, `World`, `SpriteLoader`) | 4-step roadmap; no avoid-list collision |
+
+## Cross-cutting / infrastructure
+
+| Plan | What it gates |
+|---|---|
+| [ci-smoke-test.md](ci-smoke-test.md) | Adds GitHub Actions matrix that builds iOS + Java desktop + modern server + 2009scape-web on every push to `develop`. The first guard rail this repo gets. |
+| [server-java-modern-parity-audit.md](server-java-modern-parity-audit.md) | **Audit-only** plan that produces a single `PARITY.md` tracker for `server-java-modern/` so future work has a clear "what's left" entry point instead of three drifting changelogs. |
 
 ## Conventions every plan follows
 
