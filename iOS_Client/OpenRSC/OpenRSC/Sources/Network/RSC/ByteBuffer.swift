@@ -151,6 +151,15 @@ final class ByteBuffer {
         return (hi << 8) | lo
     }
 
+    func getUnsignedShortInt() -> Int {
+        guard readPos < writePos else { return 0 }
+        let first = data[readPos]
+        if (first & 0x80) == 0 {
+            return getUnsignedShort()
+        }
+        return Int(UInt32(bitPattern: Int32(get32())) & 0x7FFFFFFF)
+    }
+
     func get32() -> Int {
         let b0 = getUnsignedByte()
         let b1 = getUnsignedByte()
@@ -169,6 +178,36 @@ final class ByteBuffer {
             bytes.append(b)
         }
         return String(bytes: bytes, encoding: .utf8) ?? ""
+    }
+
+    func getZeroPaddedString() -> String {
+        guard readPos < writePos, data[readPos] == 0 else { return "" }
+        readPos += 1
+        var bytes = [UInt8]()
+        while readPos < writePos {
+            let b = data[readPos]
+            readPos += 1
+            if b == 0 { break }
+            bytes.append(b)
+        }
+        return String(bytes: bytes, encoding: .utf8) ?? ""
+    }
+
+    func getSmart08_16() -> Int {
+        guard readPos < writePos else { return 0 }
+        return data[readPos] < 128 ? getUnsignedByte() : getUnsignedShort() - 32768
+    }
+
+    func getBytes(_ count: Int) -> [UInt8] {
+        let safeCount = max(0, min(count, bytesRemaining))
+        let bytes = Array(data[readPos..<(readPos + safeCount)])
+        readPos += safeCount
+        return bytes
+    }
+
+    func getEncryptedString() -> String {
+        let plainLength = getSmart08_16()
+        return RSCStringCipher.decode(getBytes(bytesRemaining), plainLength: plainLength)
     }
 
     var bytesRemaining: Int { max(0, writePos - readPos) }

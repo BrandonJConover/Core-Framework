@@ -20,9 +20,11 @@ enum RSCStringCipher {
         22, 22, 22, 22, 22, 22, 21, 22, 21, 22, 22, 22, 21, 22, 22
     ]
 
-    private static let cipherBlocks: [UInt32] = {
+    private static let tables: (blocks: [UInt32], dictionary: [Int]) = {
         var blocks = [UInt32](repeating: 0, count: bitLengths.count)
         var builder = [UInt32](repeating: 0, count: 33)
+        var dictionary = [Int](repeating: 0, count: 8)
+        var dictionaryLimit = 0
 
         for index in 0..<bitLengths.count {
             let bitLength = bitLengths[index]
@@ -56,10 +58,35 @@ enum RSCStringCipher {
                     builder[length] = nextValue
                 }
             }
+
+            var dictionaryIndex = 0
+            for bit in 0..<bitLength {
+                let bitSelector = UInt32(0x80000000) >> UInt32(bit)
+                if (value & bitSelector) == 0 {
+                    dictionaryIndex += 1
+                } else {
+                    if dictionary[dictionaryIndex] == 0 {
+                        dictionary[dictionaryIndex] = dictionaryLimit
+                    }
+                    dictionaryIndex = dictionary[dictionaryIndex]
+                }
+
+                if dictionary.count <= dictionaryIndex {
+                    dictionary += [Int](repeating: 0, count: dictionary.count)
+                }
+            }
+
+            dictionary[dictionaryIndex] = ~index
+            if dictionaryIndex >= dictionaryLimit {
+                dictionaryLimit = dictionaryIndex + 1
+            }
         }
 
-        return blocks
+        return (blocks, dictionary)
     }()
+
+    private static var cipherBlocks: [UInt32] { tables.blocks }
+    private static var cipherDictionary: [Int] { tables.dictionary }
 
     static func encode(_ message: String) -> (plainLength: Int, cipherBytes: [UInt8]) {
         let plain = stringBytes(message)
@@ -115,6 +142,29 @@ enum RSCStringCipher {
         return (plain.count, Array(output.prefix(encodedLength)))
     }
 
+    static func decode(_ bytes: [UInt8], plainLength: Int) -> String {
+        guard plainLength > 0 else { return "" }
+        var output = [UInt8]()
+        output.reserveCapacity(plainLength)
+        var node = 0
+
+        for byte in bytes {
+            for mask in [0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01] {
+                node = (Int(byte) & mask) == 0 ? node + 1 : cipherDictionary[node]
+                let value = cipherDictionary[node]
+                if value < 0 {
+                    output.append(UInt8(truncatingIfNeeded: ~value))
+                    if output.count >= plainLength {
+                        return decodeStringBytes(output)
+                    }
+                    node = 0
+                }
+            }
+        }
+
+        return decodeStringBytes(output)
+    }
+
     private static func stringBytes(_ message: String) -> [UInt8] {
         message.map { char in
             switch char {
@@ -153,4 +203,22 @@ enum RSCStringCipher {
             }
         }
     }
+
+    private static func decodeStringBytes(_ bytes: [UInt8]) -> String {
+        let scalars = bytes.compactMap { byte -> UnicodeScalar? in
+            if byte == 0 { return nil }
+            if byte >= 128 && byte < 160 {
+                return UnicodeScalar(specialCharacters[Int(byte) - 128].unicodeScalars.first!.value)
+            }
+            return UnicodeScalar(Int(byte))
+        }
+        return String(String.UnicodeScalarView(scalars))
+    }
+
+    private static let specialCharacters: [Character] = [
+        "\u{20AC}", "?", "\u{201A}", "\u{0192}", "\u{201E}", "\u{2026}", "\u{2020}", "\u{2021}",
+        "\u{02C6}", "\u{2030}", "\u{0160}", "\u{2039}", "\u{0152}", "?", "\u{017D}", "?",
+        "?", "\u{2018}", "\u{2019}", "\u{201C}", "\u{201D}", "\u{2022}", "\u{2013}", "\u{2014}",
+        "\u{02DC}", "\u{2122}", "\u{0161}", "\u{203A}", "\u{0153}", "?", "\u{017E}", "\u{0178}"
+    ]
 }

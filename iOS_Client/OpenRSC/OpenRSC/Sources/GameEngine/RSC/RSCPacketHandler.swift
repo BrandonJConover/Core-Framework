@@ -14,21 +14,20 @@ final class RSCPacketHandler {
 
         switch opcode {
         case 131: // SEND_MESSAGE — Java showMessage()
-            // Format: INT crown, BYTE msgType (enum), BYTE formatFlags, STRING message
-            // If formatFlags & 1: STRING sender, STRING clan
-            // If formatFlags & 2: STRING colour
-            _ = buf.get32() // crown
+            // Format: BYTE msgType, BYTE formatFlags, ZERO_STRING message
+            // If formatFlags & 1: ZERO_STRING sender, ZERO_STRING clan
+            // If formatFlags & 2: ZERO_STRING colour
             let msgTypeRaw = buf.getUnsignedByte()
             let formatFlags = buf.getUnsignedByte()
-            let message131 = buf.getString()
+            let message131 = buf.getZeroPaddedString()
             var sender131 = ""
             var clan131 = ""
             if (formatFlags & 1) != 0 {
-                sender131 = buf.getString()
-                clan131 = buf.getString()
+                sender131 = buf.getZeroPaddedString()
+                clan131 = buf.getZeroPaddedString()
             }
             if (formatFlags & 2) != 0 {
-                let _ = buf.getString() // colour code
+                let _ = buf.getZeroPaddedString() // colour code
             }
             // Message types: 1=chat, 2=private, 3=quest/NPC, 4=trade, 5=system, 6=global
             let prefix: String
@@ -45,16 +44,17 @@ final class RSCPacketHandler {
             let displayName = clan131.isEmpty ? prefix : "[\(clan131)] \(prefix)"
             ws.addChat(sender: displayName, text: message131, isPrivate: isPriv, channel: channel)
 
-        case 120: // receivePrivateMsg — Java: STRING sender, STRING formerName, INT icon, STRING message
-            let pmSender = buf.getString()
-            let _ = buf.getString() // formerName
-            let _ = buf.get32() // icon
-            let pmMessage = buf.getString()
+        case 120: // receivePrivateMsg — ZERO_STRING sender/former, BYTE icon, 8-byte id, RSC string
+            let pmSender = buf.getZeroPaddedString()
+            let _ = buf.getZeroPaddedString() // formerName
+            let _ = buf.getUnsignedByte() // icon
+            if buf.bytesRemaining >= 8 { _ = buf.getBytes(8) } // message id
+            let pmMessage = buf.getEncryptedString()
             ws.addChat(sender: pmSender, text: pmMessage, isPrivate: true)
 
-        case 87:  // sendPrivateMessage confirmation — Java: STRING recipient, STRING message
-            let pmRecipient = buf.getString()
-            let pmSent = buf.getString()
+        case 87:  // sendPrivateMessage confirmation — ZERO_STRING recipient, RSC string message
+            let pmRecipient = buf.getZeroPaddedString()
+            let pmSent = buf.getEncryptedString()
             ws.addChat(sender: "To \(pmRecipient)", text: pmSent, isPrivate: true)
 
         case 19:  // serverConfig — setServerConfiguration()
@@ -184,12 +184,12 @@ final class RSCPacketHandler {
             ws.tradeAccepted = buf.getByte() == 1
 
         case 149: // sendConnectionMessage — friend login/logout
-            let friendName = buf.getString()
-            let _ = buf.getString() // formerName
+            let friendName = buf.getZeroPaddedString()
+            let _ = buf.getZeroPaddedString() // formerName
             let onlineStatus = buf.getUnsignedByte()
             let isOnline = (onlineStatus & 4) != 0
             var world149: String? = nil
-            if isOnline { world149 = buf.getString() }
+            if isOnline { world149 = buf.getZeroPaddedString() }
             // Update friend in list
             if let idx = ws.friendsList.firstIndex(where: { $0.name == friendName }) {
                 ws.friendsList[idx] = (name: friendName, online: isOnline)
@@ -223,7 +223,7 @@ final class RSCPacketHandler {
             handleShowOptionsMenu(buf: buf, ws: ws)
 
         case 204: // playSound — Java PacketHandler.playSound() / soundPlayer.playSoundFile()
-            let soundName = buf.getString()
+            let soundName = buf.getZeroPaddedString()
             SoundManager.shared.play(name: soundName)
 
         case 118: // killAnnouncement — Java PacketHandler.announceKill():
@@ -309,14 +309,19 @@ final class RSCPacketHandler {
             print("[Packet] Character creation screen requested")
 
         case 90:  // SET_INVENTORY_SLOT — Java updateInventoryItem()
-            // Format: BYTE slot, SHORT itemID-with-equipped-bit, BYTE noted, [INT amount if stackable/noted]
-            if buf.bytesRemaining >= 4 {
+            // Format: BYTE slot, SHORT itemID-with-equipped-bit, [ushort/int amount if stackable]
+            if buf.bytesRemaining >= 3 {
                 let slot90 = buf.getUnsignedByte()
                 let rawItemID90 = buf.getUnsignedShort()
-                let noted90 = buf.getUnsignedByte() == 1
-                let equipped90 = (rawItemID90 / 32768) != 0
+                let equipped90 = (rawItemID90 & 32768) != 0
                 let itemID90 = rawItemID90 & 32767
-                let amount90 = ItemDefinitions.isStackable(itemID90, noted: noted90) && buf.bytesRemaining >= 4 ? buf.get32() : 1
+                let amount90: Int
+                if itemID90 == 0 {
+                    amount90 = 0
+                    _ = buf.getBytes(buf.bytesRemaining)
+                } else {
+                    amount90 = ItemDefinitions.isStackable(itemID90) && buf.bytesRemaining >= 2 ? buf.getUnsignedShortInt() : 1
+                }
 
                 while ws.inventory.count <= slot90 {
                     ws.inventory.append(RSCInventoryItem(id: ws.inventory.count, itemId: 0, amount: 0, equipped: false))
@@ -324,30 +329,35 @@ final class RSCPacketHandler {
                 ws.inventory[slot90].itemId = itemID90
                 ws.inventory[slot90].equipped = equipped90
                 ws.inventory[slot90].amount = amount90
+                print("[Packet] Inventory slot update: slot=\(slot90) itemId=\(itemID90) amount=\(amount90) equipped=\(equipped90)")
             }
 
         case 123: // REMOVE_INVENTORY_SLOT — Java removeItem()
             if buf.bytesRemaining >= 1 {
                 let slot123 = buf.getUnsignedByte()
                 if slot123 < ws.inventory.count {
+                    let removed = ws.inventory[slot123]
                     ws.inventory.remove(at: slot123)
                     // Re-index remaining items
                     for i in 0..<ws.inventory.count {
                         ws.inventory[i] = RSCInventoryItem(id: i, itemId: ws.inventory[i].itemId,
                                                             amount: ws.inventory[i].amount, equipped: ws.inventory[i].equipped)
                     }
+                    print("[Packet] Inventory slot removed: slot=\(slot123) itemId=\(removed.itemId) amount=\(removed.amount)")
+                } else {
+                    print("[Packet] Inventory remove ignored: slot=\(slot123) count=\(ws.inventory.count)")
                 }
             }
 
         case 109: // SET_IGNORE — Java updateIgnoreList()
-            // Format: BYTE count, then per entry: 4x STRING (name, formerName, arg0, arg1)
+            // Format: BYTE count, then per entry: 4x zero-quoted strings (duplicated current/former names)
             let ignoreCount = buf.getUnsignedByte()
             var ignores: [String] = []
             for _ in 0..<ignoreCount {
-                let name = buf.getString()
-                let _ = buf.getString() // formerName
-                let _ = buf.getString() // arg0
-                let _ = buf.getString() // arg1
+                let name = buf.getZeroPaddedString()
+                let _ = buf.getZeroPaddedString() // duplicate current name
+                let _ = buf.getZeroPaddedString() // formerName
+                let _ = buf.getZeroPaddedString() // duplicate formerName
                 ignores.append(name)
             }
             ws.ignoreList = ignores
@@ -377,10 +387,10 @@ final class RSCPacketHandler {
             handleUpdateEquipmentSlot(buf: buf, ws: ws)
 
         case 249: // updateBank — individual bank slot update
-            if buf.bytesRemaining >= 7 {
+            if buf.bytesRemaining >= 5 {
                 let slot249 = buf.getUnsignedByte()
                 let itemId249 = buf.getUnsignedShort()
-                let amount249 = buf.get32()
+                let amount249 = buf.getUnsignedShortInt()
                 if slot249 < ws.bankItems.count {
                     ws.bankItems[slot249] = (id: itemId249, amount: amount249)
                 }
@@ -796,15 +806,15 @@ final class RSCPacketHandler {
     }
 
     // Port of PacketHandler.java updateInventory() — opcode 53
-    // Format: BYTE count, then per item: SHORT itemID, BYTE equipped, BYTE noted, [INT amount if stackable/noted]
+    // Format: BYTE count, then per item: SHORT itemID-with-equipped-bit, [ushort/int amount if stackable]
     private func handleUpdateInventory(buf: ByteBuffer, ws: RSCWorldState) {
         let count = buf.getUnsignedByte()
         var items: [RSCInventoryItem] = []
         for i in 0..<count {
-            let itemId = buf.getUnsignedShort()
-            let equipped = buf.getByte() != 0
-            let noted = buf.getByte() == 1
-            let amount = ItemDefinitions.isStackable(itemId, noted: noted) && buf.bytesRemaining >= 4 ? buf.get32() : 1
+            let rawItemId = buf.getUnsignedShort()
+            let equipped = (rawItemId & 32768) != 0
+            let itemId = rawItemId & 32767
+            let amount = ItemDefinitions.isStackable(itemId) && buf.bytesRemaining >= 2 ? buf.getUnsignedShortInt() : 1
             items.append(RSCInventoryItem(id: i, itemId: itemId, amount: amount, equipped: equipped))
         }
         ws.inventory = items
@@ -901,14 +911,14 @@ final class RSCPacketHandler {
     }
 
     // Port of PacketHandler.java showBank() — opcode 42
-    // Format: SHORT itemCount, SHORT maxItems, then per item: SHORT id, INT amount
+    // Format: BYTE itemCount, BYTE maxItems, then per item: SHORT id, ushort/int amount
     private func handleShowBank(buf: ByteBuffer, ws: RSCWorldState) {
-        let itemCount = buf.getShort()
-        let maxItems = buf.getShort()
+        let itemCount = buf.getUnsignedByte()
+        let maxItems = buf.getUnsignedByte()
         var items: [(id: Int, amount: Int)] = []
         for _ in 0..<itemCount {
-            let id = buf.getShort()
-            let amount = buf.get32()
+            let id = buf.getUnsignedShort()
+            let amount = buf.getUnsignedShortInt()
             items.append((id: id, amount: amount))
         }
         ws.bankItems = items
