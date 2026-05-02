@@ -2180,10 +2180,18 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func dropItem(slot: Int) {
+        // Java mudclient.java:13074-13077 always sends [SHORT slot][INT amount]
+        // for opcode 246; the modern server's PayloadCustomParser validates
+        // ITEM_DROP body >= 4 bytes (>= 6 when WANT_DROP_X is on) and silently
+        // drops anything shorter. We default to dropping the entire stack —
+        // the Java client does the same when not in DROP_X prompt mode
+        // (mudclient.java case ITEM_DROP_ALL).
+        let amount = worldState.inventory.first(where: { $0.id == slot })?.amount ?? 1
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemDrop.rawValue))
             buf.putShort(slot)
+            buf.putInt(amount)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
