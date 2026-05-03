@@ -45,7 +45,7 @@ The "Start application" workflow runs `bash start.sh` which:
 - `server/inc/sqlite/preservation.db` — SQLite game database
 
 ### Configuration
-- `server/local.conf` — Main config (copied from default.conf, modified for SQLite)
+- `server/local.conf` — Main config (copied from default.conf, modified for the JDBC database in use)
 - World: Preservation (authentic RSC)
 - DB type: SQLite
 
