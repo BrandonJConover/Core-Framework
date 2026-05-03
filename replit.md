@@ -66,7 +66,7 @@ cd server-rust && cargo build
 ```
 
 ## Note on Java 21 (server-java-modern)
-The `server-java-modern/` directory requires Java 21. The current Replit environment provides Java 19 (GraalVM CE 22.3.1). To use it, upgrade to a Java 21 runtime when available.
+The `server-java-modern/` directory requires Java 21. The current Replit environment provides Java 19 (GraalVM CE 22.3.1), so `server-java-modern/` is note 21 rather than runnable here without a newer runtime.
 
 ## Rust Server (server-rust/)
 
