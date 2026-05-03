@@ -1,4 +1,4 @@
-package com.openrsc.server.database.impl.mysql;
+package com.openrsc.server.database.impl.postgres;
 
 import com.openrsc.server.Server;
 import com.openrsc.server.database.DatabaseType;
@@ -7,39 +7,36 @@ import com.openrsc.server.util.SystemUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 
-public class MySQLDatabaseConnection extends JDBCDatabaseConnection {
-        /**
-         * The asynchronous logger.
-         */
+public class PostgresDatabaseConnection extends JDBCDatabaseConnection {
         private static final Logger LOGGER = LogManager.getLogger();
-
         private final Server server;
         private Connection connection;
         private Statement statement;
         private boolean connected;
 
-        public MySQLDatabaseConnection(final Server server) {
+        public PostgresDatabaseConnection(final Server server) {
                 this.server = server;
-                connected = false;
         }
 
         public synchronized boolean open() {
-                // Close the old connection before attempting to open a new connection.
                 close();
-
                 try {
-                        Class.forName("com.mysql.cj.jdbc.Driver");
+                        Class.forName("org.postgresql.Driver");
                 } catch (final ClassNotFoundException e) {
                         LOGGER.catching(e);
                         System.exit(1);
                 }
-
                 try {
-                        connection = DriverManager.getConnection(getJdbcUrl(),
+                        connection = DriverManager.getConnection(
+                                "jdbc:postgresql://" + getServer().getConfig().DB_HOST + "/" + getServer().getConfig().DB_NAME,
                                 getServer().getConfig().DB_USER,
-                                getServer().getConfig().DB_PASS);
+                                getServer().getConfig().DB_PASS
+                        );
                         statement = getConnection().createStatement();
                         statement.setEscapeProcessing(true);
                         connected = checkConnection();
@@ -47,34 +44,26 @@ public class MySQLDatabaseConnection extends JDBCDatabaseConnection {
                         LOGGER.catching(e);
                         connected = false;
                 }
-
-                if(isConnected()) {
-                        LOGGER.info(getServer().getName() + " : " + getServer().getName() + " - Connected to MySQL!");
+                if (isConnected()) {
+                        LOGGER.info(getServer().getName() + " - Connected to PostgreSQL!");
                 } else {
-                        LOGGER.error("Unable to connect to MySQL");
+                        LOGGER.error("Unable to connect to PostgreSQL");
                         SystemUtil.exit(1);
                 }
-
                 return isConnected();
         }
-
-    protected String getJdbcUrl() {
-                return "jdbc:mysql://"
-                        + getServer().getConfig().DB_HOST + "/" + getServer().getConfig().DB_NAME
-                        + "?autoReconnect=true&useSSL=false&rewriteBatchedStatements=true&serverTimezone=UTC";
-    }
 
         @Override
         public synchronized void close() {
                 try {
-                        if(statement != null) {
+                        if (statement != null) {
                                 statement.close();
                         }
                 } catch (final SQLException e) {
                         LOGGER.catching(e);
                 }
                 try {
-                        if(getConnection() != null) {
+                        if (getConnection() != null) {
                                 getConnection().close();
                         }
                 } catch (final SQLException e) {
@@ -87,7 +76,7 @@ public class MySQLDatabaseConnection extends JDBCDatabaseConnection {
 
         @Override
         public DatabaseType getDatabaseType() {
-                return DatabaseType.MYSQL;
+                return DatabaseType.POSTGRES;
         }
 
         @Override
@@ -109,10 +98,12 @@ public class MySQLDatabaseConnection extends JDBCDatabaseConnection {
                 return statement;
         }
 
+        @Override
         public synchronized Connection getConnection() {
                 return connection;
         }
 
+        @Override
         public boolean isConnected() {
                 return connected;
         }
