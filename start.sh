@@ -21,7 +21,7 @@ else
 fi
 
 echo ""
-echo "Starting OpenRSC game server with SQLite (preservation world)..."
+echo "Starting OpenRSC game server with PostgreSQL-compatible JDBC config (preservation world)..."
 echo "TCP port: 43594 | WebSocket port: 43494"
 echo ""
 
