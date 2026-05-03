@@ -18,6 +18,7 @@
                 margin: 0;
                 box-sizing: border-box;
                 -webkit-text-size-adjust: 100%;
+                -webkit-tap-highlight-color: transparent;
                 -webkit-touch-callout: none;
                 -webkit-user-select: none;
                 user-select: none;
@@ -41,6 +42,10 @@
                 width: var(--mudclient-vw, 100vw);
                 height: var(--mudclient-vh, 100%);
                 padding: 0;
+            }
+
+            body.mudclient-browser-mobile {
+                touch-action: none;
             }
 
             /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
@@ -302,6 +307,22 @@
                 cursor: grab;
             }
 
+            @media (pointer: coarse) {
+                .mobile-control {
+                    width: 52px;
+                    height: 52px;
+                }
+
+                .mobile-dpad {
+                    grid-template-columns: repeat(3, 52px);
+                    grid-template-rows: repeat(3, 52px);
+                }
+
+                .mobile-actions {
+                    grid-template-columns: repeat(2, 52px);
+                }
+            }
+
             .mobile-drag-handle {
                 pointer-events: auto;
                 width: 36px;
@@ -491,6 +512,18 @@
                     height: 42px;
                     border-radius: 10px;
                     font-size: 21px;
+                }
+            }
+
+            @media (orientation: landscape) and (max-height: 480px) {
+                .mobile-dpad {
+                    transform: scale(0.92);
+                    transform-origin: left bottom;
+                }
+
+                .mobile-actions {
+                    transform: scale(0.92);
+                    transform-origin: right bottom;
                 }
             }
         </style>
@@ -816,69 +849,69 @@
                 window._mudclientSetLaunchProgress = setLaunchProgress;
                 window._mudclientMarkLaunchReady = markLaunchReady;
 
-	                if (typeof window.WebSocket === 'function') {
-	                    var NativeWebSocket = window.WebSocket;
-	                    var CONNECT_TIMEOUT_MS = 12000;
+                        if (typeof window.WebSocket === 'function') {
+                            var NativeWebSocket = window.WebSocket;
+                            var CONNECT_TIMEOUT_MS = 12000;
 
-	                    function bytesFromWebSocketPayload(payload) {
-	                        if (payload instanceof ArrayBuffer) {
-	                            return new Uint8Array(payload);
-	                        }
-	                        if (ArrayBuffer.isView(payload)) {
-	                            return new Uint8Array(
-	                                payload.buffer,
-	                                payload.byteOffset,
-	                                payload.byteLength
-	                            );
-	                        }
-	                        return null;
-	                    }
+                            function bytesFromWebSocketPayload(payload) {
+                                if (payload instanceof ArrayBuffer) {
+                                    return new Uint8Array(payload);
+                                }
+                                if (ArrayBuffer.isView(payload)) {
+                                    return new Uint8Array(
+                                        payload.buffer,
+                                        payload.byteOffset,
+                                        payload.byteLength
+                                    );
+                                }
+                                return null;
+                            }
 
-	                    function byteLengthFromWebSocketPayload(payload) {
-	                        var bytes = bytesFromWebSocketPayload(payload);
-	                        if (bytes) {
-	                            return bytes.byteLength;
-	                        }
-	                        if (typeof payload === 'string') {
-	                            return payload.length;
-	                        }
-	                        if (payload && typeof payload.size === 'number') {
-	                            return payload.size;
-	                        }
-	                        return 0;
-	                    }
+                            function byteLengthFromWebSocketPayload(payload) {
+                                var bytes = bytesFromWebSocketPayload(payload);
+                                if (bytes) {
+                                    return bytes.byteLength;
+                                }
+                                if (typeof payload === 'string') {
+                                    return payload.length;
+                                }
+                                if (payload && typeof payload.size === 'number') {
+                                    return payload.size;
+                                }
+                                return 0;
+                            }
 
-	                    function describeOutgoingPacket(payload) {
-	                        var bytes = bytesFromWebSocketPayload(payload);
-	                        if (!bytes || bytes.length < 3) {
-	                            return null;
-	                        }
-	                        var packetLength = (bytes[0] << 8) | bytes[1];
-	                        var opcode = bytes[2];
-	                        var description = {
-	                            opcode: opcode,
-	                            packetLength: packetLength,
-	                            byteLength: bytes.length
-	                        };
-	                        if (opcode === 246 && bytes.length >= 5) {
-	                            description.slot = (bytes[3] << 8) | bytes[4];
-	                            if (description.slot & 0x8000) {
-	                                description.slot -= 0x10000;
-	                            }
-	                            if (bytes.length >= 9) {
-	                                description.amount = (
-	                                    (bytes[5] << 24) |
-	                                    (bytes[6] << 16) |
-	                                    (bytes[7] << 8) |
-	                                    bytes[8]
-	                                );
-	                            }
-	                        }
-	                        return description;
-	                    }
+                            function describeOutgoingPacket(payload) {
+                                var bytes = bytesFromWebSocketPayload(payload);
+                                if (!bytes || bytes.length < 3) {
+                                    return null;
+                                }
+                                var packetLength = (bytes[0] << 8) | bytes[1];
+                                var opcode = bytes[2];
+                                var description = {
+                                    opcode: opcode,
+                                    packetLength: packetLength,
+                                    byteLength: bytes.length
+                                };
+                                if (opcode === 246 && bytes.length >= 5) {
+                                    description.slot = (bytes[3] << 8) | bytes[4];
+                                    if (description.slot & 0x8000) {
+                                        description.slot -= 0x10000;
+                                    }
+                                    if (bytes.length >= 9) {
+                                        description.amount = (
+                                            (bytes[5] << 24) |
+                                            (bytes[6] << 16) |
+                                            (bytes[7] << 8) |
+                                            bytes[8]
+                                        );
+                                    }
+                                }
+                                return description;
+                            }
 
-	                    function MonitoredWebSocket(url, protocols) {
-	                        var hasProtocols = protocols !== undefined && protocols !== null;
+                            function MonitoredWebSocket(url, protocols) {
+                                var hasProtocols = protocols !== undefined && protocols !== null;
                             console.log(
                                 '[mudclient] Opening WebSocket: ' +
                                 url +
@@ -887,12 +920,12 @@
                                 ' location=' +
                                 location.href
                             );
-	                        var socket = hasProtocols
-	                            ? new NativeWebSocket(url, protocols)
-	                            : new NativeWebSocket(url);
-	                        try {
-	                            socket.binaryType = 'arraybuffer';
-	                        } catch (err) {}
+                                var socket = hasProtocols
+                                    ? new NativeWebSocket(url, protocols)
+                                    : new NativeWebSocket(url);
+                                try {
+                                    socket.binaryType = 'arraybuffer';
+                                } catch (err) {}
                         var didOpen = false;
                         var sendLogCount = 0;
                         var receiveLogCount = 0;
@@ -912,116 +945,116 @@
                             } catch (err) {}
                         }, CONNECT_TIMEOUT_MS);
 
-	                        socket.addEventListener('open', function() {
-	                            didOpen = true;
-	                            clearTimeout(timer);
-	                            hideConnectionBanner();
-	                            console.log('[mudclient] WebSocket connected: ' + url);
+                                socket.addEventListener('open', function() {
+                                    didOpen = true;
+                                    clearTimeout(timer);
+                                    hideConnectionBanner();
+                                    console.log('[mudclient] WebSocket connected: ' + url);
                             sendNative('status', {
                                 level: 'websocket-open',
                                 message: 'Connected to ' + url
                             });
-	                        });
+                                });
 
-	                        socket.addEventListener('message', function(event) {
-	                            if (receiveLogCount >= 8) {
-	                                return;
-	                            }
-	                            receiveLogCount += 1;
-	                            console.log(
-	                                '[mudclient] Incoming WebSocket frame: bytes=' +
-	                                byteLengthFromWebSocketPayload(event.data)
-	                            );
-	                        });
+                                socket.addEventListener('message', function(event) {
+                                    if (receiveLogCount >= 8) {
+                                        return;
+                                    }
+                                    receiveLogCount += 1;
+                                    console.log(
+                                        '[mudclient] Incoming WebSocket frame: bytes=' +
+                                        byteLengthFromWebSocketPayload(event.data)
+                                    );
+                                });
 
-	                        socket.addEventListener('error', function(event) {
-	                            clearTimeout(timer);
-	                            showConnectionBanner('WebSocket error: ' + url, true);
-	                            console.error(
-	                                '[mudclient] WebSocket error: ' +
-	                                url +
-	                                ' readyState=' +
-	                                socket.readyState,
-	                                event
-	                            );
-	                            sendNative('error', {
-	                                level: 'websocket-error',
-	                                message: 'WebSocket error: ' +
-	                                    url +
-	                                    ' readyState=' +
-	                                    socket.readyState
-	                            });
-	                        });
+                                socket.addEventListener('error', function(event) {
+                                    clearTimeout(timer);
+                                    showConnectionBanner('WebSocket error: ' + url, true);
+                                    console.error(
+                                        '[mudclient] WebSocket error: ' +
+                                        url +
+                                        ' readyState=' +
+                                        socket.readyState,
+                                        event
+                                    );
+                                    sendNative('error', {
+                                        level: 'websocket-error',
+                                        message: 'WebSocket error: ' +
+                                            url +
+                                            ' readyState=' +
+                                            socket.readyState
+                                    });
+                                });
 
-	                        socket.addEventListener('close', function(event) {
-	                            clearTimeout(timer);
-	                            var message = 'WebSocket closed: ' + url + ' code=' + event.code;
-	                            if (event.reason) {
-	                                message += ' reason=' + event.reason;
-	                            }
-	                            message += ' wasClean=' + event.wasClean;
-	                            if (!didOpen) {
-	                                showConnectionBanner(message, true);
-	                            }
+                                socket.addEventListener('close', function(event) {
+                                    clearTimeout(timer);
+                                    var message = 'WebSocket closed: ' + url + ' code=' + event.code;
+                                    if (event.reason) {
+                                        message += ' reason=' + event.reason;
+                                    }
+                                    message += ' wasClean=' + event.wasClean;
+                                    if (!didOpen) {
+                                        showConnectionBanner(message, true);
+                                    }
                             console.warn('[mudclient] ' + message);
                             sendNative(didOpen ? 'status' : 'error', {
                                 level: didOpen ? 'websocket-close' : 'websocket-failed',
-	                                message: message
-	                            });
-	                        });
+                                        message: message
+                                    });
+                                });
 
-	                        var nativeSend = socket.send;
-	                        socket.send = function(payload) {
-	                            var packet = describeOutgoingPacket(payload);
-	                            if (packet && sendLogCount < 12) {
-	                                sendLogCount += 1;
-	                                console.log(
-	                                    '[mudclient] Outgoing packet: opcode=' +
-	                                    packet.opcode +
-	                                    ' length=' +
-	                                    packet.packetLength +
-	                                    ' bytes=' +
-	                                    packet.byteLength
-	                                );
-	                            }
-	                            if (packet && packet.opcode === 246) {
-	                                var message = 'Outgoing item drop packet: length='
-	                                    + packet.packetLength
-	                                    + ' bytes='
-	                                    + packet.byteLength
-	                                    + ' slot='
-	                                    + (packet.slot === undefined ? '<unknown>' : packet.slot);
-	                                if (packet.amount !== undefined) {
-	                                    message += ' amount=' + packet.amount;
-	                                }
-	                                console.log('[mudclient] ' + message);
-	                                sendNative('status', {
-	                                    level: 'item-drop-packet',
-	                                    message: message
-	                                });
-	                            }
-	                            try {
-	                                return nativeSend.call(socket, payload);
-	                            } catch (err) {
-	                                var sendMessage = 'WebSocket send failed: ' +
-	                                    url +
-	                                    ' readyState=' +
-	                                    socket.readyState +
-	                                    ' bytes=' +
-	                                    byteLengthFromWebSocketPayload(payload) +
-	                                    ' error=' +
-	                                    (err && err.message ? err.message : err);
-	                                console.error('[mudclient] ' + sendMessage);
-	                                sendNative('error', {
-	                                    level: 'websocket-send',
-	                                    message: sendMessage
-	                                });
-	                                throw err;
-	                            }
-	                        };
+                                var nativeSend = socket.send;
+                                socket.send = function(payload) {
+                                    var packet = describeOutgoingPacket(payload);
+                                    if (packet && sendLogCount < 12) {
+                                        sendLogCount += 1;
+                                        console.log(
+                                            '[mudclient] Outgoing packet: opcode=' +
+                                            packet.opcode +
+                                            ' length=' +
+                                            packet.packetLength +
+                                            ' bytes=' +
+                                            packet.byteLength
+                                        );
+                                    }
+                                    if (packet && packet.opcode === 246) {
+                                        var message = 'Outgoing item drop packet: length='
+                                            + packet.packetLength
+                                            + ' bytes='
+                                            + packet.byteLength
+                                            + ' slot='
+                                            + (packet.slot === undefined ? '<unknown>' : packet.slot);
+                                        if (packet.amount !== undefined) {
+                                            message += ' amount=' + packet.amount;
+                                        }
+                                        console.log('[mudclient] ' + message);
+                                        sendNative('status', {
+                                            level: 'item-drop-packet',
+                                            message: message
+                                        });
+                                    }
+                                    try {
+                                        return nativeSend.call(socket, payload);
+                                    } catch (err) {
+                                        var sendMessage = 'WebSocket send failed: ' +
+                                            url +
+                                            ' readyState=' +
+                                            socket.readyState +
+                                            ' bytes=' +
+                                            byteLengthFromWebSocketPayload(payload) +
+                                            ' error=' +
+                                            (err && err.message ? err.message : err);
+                                        console.error('[mudclient] ' + sendMessage);
+                                        sendNative('error', {
+                                            level: 'websocket-send',
+                                            message: sendMessage
+                                        });
+                                        throw err;
+                                    }
+                                };
 
-	                        return socket;
-	                    }
+                                return socket;
+                            }
 
                     function runWebSocketDiagnostic() {
                         if (!/[?&]wsdiag(?:=1)?(?:&|$)/.test(location.search)) {
@@ -1259,31 +1292,31 @@
                 }
             }
 
-	            var webSocketScheme = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-	            var nativeConfig = window.rscNativeConfig || {};
-	            var isNativeIOSWebClient =
-	                nativeConfig.platform === 'ios';
-	            var isWebKitMobile =
-	                /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-	                (
-	                    navigator.platform === 'MacIntel' &&
-	                    navigator.maxTouchPoints > 1
-	                );
-	            var isHostedBrowserWebClient = !isNativeIOSWebClient;
-	            var isHetznerNativeWebClient =
-	                isNativeIOSWebClient &&
-	                nativeConfig.host === '10.8.0.1';
-	            var webSocketPort = window.location.port ||
-	                (window.location.protocol === 'https:' ? '443' : '80');
-	            var webSocketHost = window.location.hostname + ':' + webSocketPort;
-	            var nativeWebSocketHost = nativeConfig.host
-	                ? nativeConfig.host + ':' + (nativeConfig.wsPort || nativeConfig.port || '43494')
-	                : webSocketHost;
-	            var webSocketUrl = isHostedBrowserWebClient
-	                ? webSocketScheme + webSocketHost + '/rsc-ws'
-	                : isHetznerNativeWebClient
-	                    ? 'ws://' + nativeConfig.host + ':8080/rsc-ws'
-	                : 'ws://' + nativeWebSocketHost + '/';
+                    var webSocketScheme = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+                    var nativeConfig = window.rscNativeConfig || {};
+                    var isNativeIOSWebClient =
+                        nativeConfig.platform === 'ios';
+                    var isWebKitMobile =
+                        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                        (
+                            navigator.platform === 'MacIntel' &&
+                            navigator.maxTouchPoints > 1
+                        );
+                    var isHostedBrowserWebClient = !isNativeIOSWebClient;
+                    var isHetznerNativeWebClient =
+                        isNativeIOSWebClient &&
+                        nativeConfig.host === '10.8.0.1';
+                    var webSocketPort = window.location.port ||
+                        (window.location.protocol === 'https:' ? '443' : '80');
+                    var webSocketHost = window.location.hostname + ':' + webSocketPort;
+                    var nativeWebSocketHost = nativeConfig.host
+                        ? nativeConfig.host + ':' + (nativeConfig.wsPort || nativeConfig.port || '43494')
+                        : webSocketHost;
+                    var webSocketUrl = isHostedBrowserWebClient
+                        ? webSocketScheme + webSocketHost + '/rsc-ws'
+                        : isHetznerNativeWebClient
+                            ? 'ws://' + nativeConfig.host + ':8080/rsc-ws'
+                        : 'ws://' + nativeWebSocketHost + '/';
 
             if (isWebKitMobile) {
                 (function() {
