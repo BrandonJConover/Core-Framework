@@ -104,7 +104,9 @@ struct WebGameView: UIViewRepresentable {
             "launchArgs": ["members"],
             "autoLogin": [
                 "username": username ?? "",
-                "password": password ?? ""
+                "password": password ?? "",
+                "direct": true,
+                "skipTitle": true
             ]
         ]
 

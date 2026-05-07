@@ -608,6 +608,29 @@
                 var launchReadyTimer = 0;
                 var nativeConfig = window.rscNativeConfig || {};
                 var isNativeIOSWebClient = nativeConfig.platform === 'ios';
+                window._mudclientStartupReturned = false;
+                window._mudclientNativeAutoLoginPending = false;
+                (function installNativeStartupDetector() {
+                    if (!isNativeIOSWebClient || console.__mudclientNativeStartupDetector) {
+                        return;
+                    }
+
+                    var originalLog = console.log.bind(console);
+                    console.log = function() {
+                        var text = Array.prototype.slice.call(arguments).join(' ');
+                        if (text.indexOf('startUp:46 RETURN') !== -1) {
+                            window._mudclientStartupReturned = true;
+                            window._mudclientNativeAutoLoginPending = true;
+                            setTimeout(function() {
+                                if (window._mudclientTryNativeDirectAutoLogin) {
+                                    window._mudclientTryNativeDirectAutoLogin('startup-console');
+                                }
+                            }, 80);
+                        }
+                        return originalLog.apply(console, arguments);
+                    };
+                    console.__mudclientNativeStartupDetector = true;
+                })();
                 var isAppleMobile =
                     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                     (
@@ -1028,10 +1051,14 @@
                             return;
                         }
 
+                        var diagnosticWebSocketPath =
+                            window.location.pathname.indexOf('/rsc21/') !== -1
+                                ? '/rsc21-ws'
+                                : '/rsc-ws';
                         var diagnosticUrl =
                             (location.protocol === 'https:' ? 'wss://' : 'ws://') +
                             location.host +
-                            '/rsc-ws';
+                            diagnosticWebSocketPath;
                         var startedAt = Date.now();
 
                         console.log('[mudclient] WebSocket diagnostic opening: ' + diagnosticUrl);
@@ -1276,11 +1303,15 @@
 	            var webSocketPort = window.location.port ||
 	                (window.location.protocol === 'https:' ? '443' : '80');
 	            var webSocketHost = window.location.hostname + ':' + webSocketPort;
+	            var hostedWebSocketPath =
+	                window.location.pathname.indexOf('/rsc21/') !== -1
+	                    ? '/rsc21-ws'
+	                    : '/rsc-ws';
 	            var nativeWebSocketHost = nativeConfig.host
 	                ? nativeConfig.host + ':' + (nativeConfig.wsPort || nativeConfig.port || '43494')
 	                : webSocketHost;
 	            var webSocketUrl = isHostedBrowserWebClient
-	                ? webSocketScheme + webSocketHost + '/rsc-ws'
+	                ? webSocketScheme + webSocketHost + hostedWebSocketPath
 	                : isHetznerNativeWebClient
 	                    ? 'ws://' + nativeConfig.host + ':8080/rsc-ws'
 	                : 'ws://' + nativeWebSocketHost + '/';
@@ -2135,6 +2166,101 @@
                     (!nativeAutoLogin.usernameApplied || !nativeAutoLogin.passwordApplied)
                 );
             }
+
+            var nativeDirectAutoLoginStarted = false;
+
+            function nativeDirectAutoLoginEnabled() {
+                var config = window.rscNativeConfig || {};
+                var autoLogin = config.autoLogin || {};
+                return !!(
+                    config.platform === 'ios' &&
+                    autoLogin.direct !== false &&
+                    hasNativeAutoLoginCredentials()
+                );
+            }
+
+            function tapNativeGamePoint(x, y) {
+                dispatchMouse('mousedown', x, y, 0);
+                dispatchMouse('mouseup', x, y, 0);
+                dispatchMouse('click', x, y, 0);
+            }
+
+            function clearNativeGameInputLine() {
+                for (var i = 0; i < 255; i++) {
+                    emscriptenKeyPress(BACKSPACE_KEY_CODE, BACKSPACE_KEY_CODE);
+                }
+            }
+
+            function typeNativeGameText(value) {
+                value = String(value || '');
+                for (var i = 0; i < value.length; i++) {
+                    emscriptenKeyPress(-1, value.charCodeAt(i));
+                }
+            }
+
+            function runNativeDirectAutoLogin(reason) {
+                if (nativeDirectAutoLoginStarted || !nativeDirectAutoLoginEnabled()) {
+                    return false;
+                }
+
+                if (!window._mudclientStartupReturned) {
+                    window._mudclientNativeAutoLoginPending = true;
+                    return false;
+                }
+
+                nativeDirectAutoLoginStarted = true;
+                window._mudclientNativeAutoLoginPending = false;
+
+                var width = (canvas && canvas.width) || 765;
+                var height = (canvas && canvas.height) || 503;
+                var existingUserX = Math.floor(width / 2) + 80;
+                var existingUserY = Math.floor(height / 2) + 40;
+                var loginX = Math.floor(width / 2) - 80;
+                var loginY = Math.floor(height / 2) + 70;
+
+                console.log('[native-login] Starting direct iOS login flow reason=' + reason);
+                if (window._mudclientSetLaunchStatus) {
+                    window._mudclientSetLaunchStatus('Signing in...', false);
+                }
+
+                setTimeout(function() {
+                    tapNativeGamePoint(existingUserX, existingUserY);
+                }, 120);
+                setTimeout(function() {
+                    clearNativeGameInputLine();
+                    typeNativeGameText(nativeAutoLogin.username);
+                    emscriptenKeyPress(ENTER_KEY_CODE, ENTER_KEY_CODE);
+                }, 460);
+                setTimeout(function() {
+                    clearNativeGameInputLine();
+                    typeNativeGameText(nativeAutoLogin.password);
+                }, 760);
+                setTimeout(function() {
+                    tapNativeGamePoint(loginX, loginY);
+                    nativeAutoLogin.usernameApplied = true;
+                    nativeAutoLogin.passwordApplied = true;
+                    nativeAutoLogin.submitQueued = true;
+                    console.log('[native-login] Submitted direct iOS login flow');
+                }, 1080);
+
+                return true;
+            }
+
+            window._mudclientTryNativeDirectAutoLogin = function(reason) {
+                return runNativeDirectAutoLogin(reason || 'external');
+            };
+
+            var nativeDirectAutoLoginPolls = 0;
+            var nativeDirectAutoLoginTimer = setInterval(function() {
+                nativeDirectAutoLoginPolls++;
+                if (runNativeDirectAutoLogin('poll')) {
+                    clearInterval(nativeDirectAutoLoginTimer);
+                    return;
+                }
+                if (nativeDirectAutoLoginPolls > 600 || !nativeDirectAutoLoginEnabled()) {
+                    clearInterval(nativeDirectAutoLoginTimer);
+                }
+            }, 100);
 
             function queueNativeAutoLoginEnter() {
                 setTimeout(function() {
