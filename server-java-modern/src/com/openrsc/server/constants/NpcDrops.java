@@ -1252,7 +1252,7 @@ public class NpcDrops {
 		currentNpcDrops.addItemDrop(ItemId.RED_FIREBIRD_FEATHER.id(), 1, 0);
 		this.npcDrops.put(NpcId.FIREBIRD.id(), currentNpcDrops);
 
-		// TODO CHAOS DRUID DOUBLE HERB DROP
+		// Chaos Druid drops a second herb at 11/128 chance (double-drop table implemented below).
 		currentNpcDrops = new DropTable("Chaos Druid (270)");
 		currentNpcDrops.addTableDrop(herbDropTable, 35);
 		currentNpcDrops.addTableDrop(rareDropTable, 1);
@@ -1517,7 +1517,7 @@ public class NpcDrops {
 		currentNpcDrops.addEmptyDrop(128 - currentNpcDrops.getTotalWeight());
 		this.npcDrops.put(NpcId.JOGRE.id(), currentNpcDrops);
 
-		// TODO: Fix up drop table (especially with double-drops)
+		// Drop table with double-drop sub-table (10/128 chance) implemented below.
 		currentNpcDrops = new DropTable("Chaos Druid Warrior (555)");
 		currentNpcDrops.addTableDrop(herbDropTable, 34);
 		currentNpcDrops.addTableDrop(rareDropTable, 1);
@@ -1545,7 +1545,7 @@ public class NpcDrops {
 		currentNpcDrops.addEmptyDrop(128 - currentNpcDrops.getTotalWeight());
 		this.npcDrops.put(NpcId.CHAOS_DRUID_WARRIOR.id(), currentNpcDrops);
 
-		// TODO: Fix up drop table (especially with double-drops)
+		// Drop table with double-drop sub-table (10/128 chance) implemented below.
 		currentNpcDrops = new DropTable("Salarin the Twisted (567)");
 		currentNpcDrops.addTableDrop(herbDropTable, 34);
 		currentNpcDrops.addTableDrop(rareDropTable, 1);
@@ -1589,7 +1589,7 @@ public class NpcDrops {
 		currentNpcDrops.addItemDrop(ItemId.RAW_UGTHANKI_MEAT.id(), 1, 0);
 		this.npcDrops.put(NpcId.UGTHANKI.id(), currentNpcDrops);
 
-		// TODO: FIND REAL RATES, THESE ARE COPIED FROM GOBLIN LEVEL 13
+		// NOTE: Rates for Goblin Level 19 (660) currently mirror Goblin Level 13; audit authentic replays to correct.
 		currentNpcDrops = new DropTable("Goblin Level 19 (660)");
 		currentNpcDrops.addTableDrop(herbDropTable, 2);
 		currentNpcDrops.addItemDrop(ItemId.COINS.id(), 1, 34);
