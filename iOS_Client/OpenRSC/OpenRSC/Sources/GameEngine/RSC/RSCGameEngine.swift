@@ -1727,7 +1727,8 @@ final class RSCGameEngine: ObservableObject {
         guard let scene = self.scene else { return nil }
         let localX = Int32(((tileX - Double(worldState.localPlayerX)) * 128.0).rounded()) + 64
         let localZ = Int32(((tileZ - Double(worldState.localPlayerY)) * 128.0).rounded()) + 64
-        let proj = scene.projectPoint(worldX: localX, worldY: yOffset, worldZ: localZ)
+        let elevation = world?.getElevation(x: Int(localX), z: Int(localZ)) ?? 0
+        let proj = scene.projectPoint(worldX: localX, worldY: -Int32(elevation) + yOffset, worldZ: localZ)
         guard proj.depth >= scene.rot1024_zTop else { return nil }
         return (Double(proj.screenX), Double(proj.screenY), proj.depth)
     }
@@ -1881,8 +1882,8 @@ final class RSCGameEngine: ObservableObject {
         let destX = target.x
         let destZ = target.z
 
-        let targetNPC = nearestNPCOnScreen(gameX: gameX, gameY: gameY) ?? nearestNPC(toX: destX, z: destZ)
-        let targetPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY) ?? nearestPlayer(toX: destX, z: destZ)
+        let targetNPC = nearestNPCOnScreen(gameX: gameX, gameY: gameY)
+        let targetPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY)
         let targetGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY) ?? nearestGroundItem(toX: destX, z: destZ)
         let targetObject = nearestGameObject(toX: destX, z: destZ)
 
