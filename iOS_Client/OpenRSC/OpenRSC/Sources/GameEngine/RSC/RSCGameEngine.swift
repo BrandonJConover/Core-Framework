@@ -137,7 +137,7 @@ final class RSCGameEngine: ObservableObject {
             // it to the current native default; preserve deliberate wider/closer
             // user changes outside that band.
             let rawZoom = (700.0...820.0).contains(prefs.lastCameraZoom) ? 1200.0 : prefs.lastCameraZoom
-            let persistedZoom = max(400.0, min(2400.0, rawZoom))
+            let persistedZoom = max(900.0, min(2400.0, rawZoom))
             cameraZoom = Int32(persistedZoom)
             cameraOcclusionZoom = Int32(persistedZoom)
             zoomLevel = CGFloat(1200.0 / persistedZoom)
@@ -1306,9 +1306,11 @@ final class RSCGameEngine: ObservableObject {
 
         let targetZoom: Int32
         if let occludedAt {
-            // Keep the camera just in front of the nearest blocking tile. Scene
-            // receives `offset = zoom * 2`, so one tile is roughly 64 zoom units.
-            targetZoom = min(desiredZoom, max(520, Int32((occludedAt - 0.35) * 64.0)))
+            // Keep the camera just in front of the nearest blocking tile, but
+            // do not collapse into the old close-up view on mobile. Dense towns
+            // can have scenery immediately behind the player; a hard 520 floor
+            // made the world feel over-zoomed and hurt tap targeting.
+            targetZoom = min(desiredZoom, max(900, Int32((occludedAt - 0.35) * 64.0)))
         } else {
             targetZoom = desiredZoom
         }
