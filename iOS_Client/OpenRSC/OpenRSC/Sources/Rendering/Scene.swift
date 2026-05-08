@@ -485,7 +485,11 @@ final class Scene {
                             graphics.pixelData[rowBase + x] = sampled
                         }
                     } else {
-                        graphics.pixelData[rowBase + x] = color
+                        if containsScreenPoint(x: Double(x) + 0.5,
+                                               y: Double(y) + 0.5,
+                                               screenPts: screenPts) {
+                            graphics.pixelData[rowBase + x] = color
+                        }
                     }
                 }
             }
@@ -596,6 +600,11 @@ final class Scene {
         return barycentricUV(x: x, y: y,
                              p0: screenPts[0], p1: screenPts[1], p2: screenPts[2],
                              uv0: (0.0, 0.0), uv1: (1.0, 0.0), uv2: (0.5, 1.0))
+    }
+
+    private func containsScreenPoint(x: Double, y: Double,
+                                     screenPts: [(x: Int, y: Int)]) -> Bool {
+        terrainUVForScreenPoint(x: x, y: y, screenPts: screenPts) != nil
     }
 
     private func barycentricUV(x: Double, y: Double,
