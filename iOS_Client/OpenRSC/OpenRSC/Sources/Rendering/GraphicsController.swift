@@ -429,33 +429,39 @@ final class GraphicsController {
     ///   - Source pixels with R==G==B (gray) get tinted by mask1 (multiplicative).
     ///   - Source pixels with R==255 && G==B (white axis) get tinted by mask2.
     ///   - Other colors pass through unchanged.
-    /// Transparent pixels (alpha=0 or full-zero) are skipped. No scaling — the
-    /// sprite is blit at its native size; horizontal mirror is handled.
+    /// Transparent pixels (full-zero) are skipped. The destination width/height
+    /// are honoured so character layers match Java's drawSpriteClipping path.
     func drawEntityTinted(index: Int, x: Int32, y: Int32, width: Int32, height: Int32,
-                          mask1: Int32, mask2: Int32, mirrorX: Bool) {
+                          mask1: Int32, mask2: Int32, blueMask: Int32 = 0, mirrorX: Bool) {
         guard index >= 0 && index < sprites.count, let sprite = sprites[index] else { return }
+        guard sprite.width > 0 && sprite.height > 0 && width > 0 && height > 0 else { return }
         let m1 = mask1 == 0 ? Int32(0xFFFFFF) : mask1
         let m2 = mask2 == 0 ? Int32(0xFFFFFF) : mask2
+        let bm = blueMask == 0 ? Int32(0xFFFFFF) : blueMask
         let m1R = (Int(m1) >> 16) & 0xFF, m1G = (Int(m1) >> 8) & 0xFF, m1B = Int(m1) & 0xFF
         let m2R = (Int(m2) >> 16) & 0xFF, m2G = (Int(m2) >> 8) & 0xFF, m2B = Int(m2) & 0xFF
+        let bmR = (Int(bm) >> 16) & 0xFF, bmG = (Int(bm) >> 8) & 0xFF, bmB = Int(bm) & 0xFF
 
         let sw = Int(sprite.width); let sh = Int(sprite.height)
         let dw = Int(width2); let dh = Int(height2)
+        let outW = Int(width); let outH = Int(height)
 
-        for sy in 0..<sh {
-            let dy = Int(y) + sy
+        for dyLocal in 0..<outH {
+            let dy = Int(y) + dyLocal
             if dy < 0 || dy >= dh { continue }
+            let sy = min(sh - 1, (dyLocal * sh) / max(1, outH))
             let rowBase = dy * dw
-            for sx in 0..<sw {
+            for dxLocal in 0..<outW {
+                let dx = Int(x) + dxLocal
+                if dx < 0 || dx >= dw { continue }
+
+                let sx = min(sw - 1, (dxLocal * sw) / max(1, outW))
                 let srcX = mirrorX ? (sw - 1 - sx) : sx
                 let pixel = sprite.pixels[sy * sw + srcX]
                 // RSC sprites are stored as 24-bit RGB with no alpha byte:
                 // pixel == 0 (full black) signals transparency. Don't reject on
                 // alpha == 0 — every non-transparent pixel has alpha = 0 on disk.
                 if pixel == 0 { continue }
-
-                let dx = Int(x) + sx
-                if dx < 0 || dx >= dw { continue }
 
                 var r = (Int(pixel) >> 16) & 0xFF
                 var g = (Int(pixel) >> 8) & 0xFF
@@ -471,6 +477,11 @@ final class GraphicsController {
                     r = (r * m2R) >> 8
                     g = (g * m2G) >> 8
                     b = (b * m2B) >> 8
+                } else if bm != 0xFFFFFF && r == g && b != g {
+                    let shifter = r * b
+                    r = (bmR * shifter) >> 16
+                    g = (bmG * shifter) >> 16
+                    b = (bmB * shifter) >> 16
                 }
                 // else: pass through unchanged
 

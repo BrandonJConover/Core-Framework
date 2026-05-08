@@ -158,25 +158,40 @@ enum CharacterBillboards {
 
             let spriteID = anim.number + layerFrame.offset
             guard let gs = spriteLoader.getSprite(spriteID) else { continue }
+            let baseGs = spriteLoader.getSprite(anim.number)
 
             // The sprite is stored as a TRIMMED bitmap of size (gs.width, gs.height)
             // positioned inside a virtual bounding box of size (authenticWidth,
             // authenticHeight) with offset (xShift, yShift). Characters are
             // composited inside this authentic box so layers align correctly.
+            // Java drawPlayer/drawNPC passes the actor's virtual box width and
+            // height into drawSpriteClipping; the renderer then scales the
+            // trimmed bitmap according to its authentic dimensions and x/y shift.
+            // Replicate that math before registering the billboard layer.
             //
             // The character's feet anchor sits at (anchorScreenX, anchorScreenY).
             // The authentic box bottom-center coincides with the feet, so:
             //   boxTopLeft = (anchor.x - authW/2, anchor.y - authH)
             //   spriteTopLeft = boxTopLeft + (xShift, yShift)
-            let authW = Int32(gs.authenticWidth > 0 ? gs.authenticWidth : gs.width)
-            let authH = Int32(gs.authenticHeight > 0 ? gs.authenticHeight : gs.height)
-            let spriteW = Int32(gs.width)
-            let spriteH = Int32(gs.height)
+            let authW = max(1, Int32(gs.authenticWidth > 0 ? gs.authenticWidth : gs.width))
+            let authH = max(1, Int32(gs.authenticHeight > 0 ? gs.authenticHeight : gs.height))
+            let baseAuthWidthSource = baseGs?.authenticWidth ?? gs.authenticWidth
+            let baseAuthHeightSource = baseGs?.authenticHeight ?? gs.authenticHeight
+            let baseAuthW = max(1, Int32(baseAuthWidthSource > 0 ? baseAuthWidthSource : gs.width))
+            let baseAuthH = max(1, Int32(baseAuthHeightSource > 0 ? baseAuthHeightSource : gs.height))
+            let actorW = baseAuthW
+            let actorH = baseAuthH
+            let spriteVirtualW = max(1, (authW * actorW) / baseAuthW)
+            let spriteW = max(1, (Int32(gs.width) * spriteVirtualW) / authW)
+            let spriteH = max(1, (Int32(gs.height) * actorH) / authH)
+            let shiftX = (Int32(gs.xShift) * spriteVirtualW) / authW
+            let shiftY = (Int32(gs.yShift) * actorH) / authH
+            let xOffset = (Int32(layerFrame.xOffset) * actorW) / authW
+            let yOffset = (Int32(layerFrame.yOffset) * actorH) / authH
 
-            let boxLeft = anchorScreenX - authW / 2 + anchorXAdjust + Int32(layerFrame.xOffset)
-            let boxTop = anchorScreenY - authH
-            let drawX = boxLeft + Int32(gs.xShift)
-            let drawY = boxTop + Int32(gs.yShift) + Int32(layerFrame.yOffset)
+            let drawX = anchorScreenX - actorW / 2 + anchorXAdjust + xOffset
+                - (spriteVirtualW - actorW) / 2 + shiftX
+            let drawY = anchorScreenY - actorH + yOffset + shiftY
 
             // Per-layer color masks. Java mudclient.java:6637-6646 picks mask1
             // based on the AnimationDef.charColour role:
@@ -195,9 +210,9 @@ enum CharacterBillboards {
             scene.drawSpriteTinted(
                 depth: depth,
                 x: drawX, y: drawY,
-                width: spriteW, height: spriteH,  // draw at native size (no scale)
+                width: spriteW, height: spriteH,
                 spriteIdx: Int32(spriteID),
-                mask1: mask1, mask2: mask2,
+                mask1: mask1, mask2: mask2, blueMask: Int32(anim.blueMask),
                 mirrorX: flip
             )
         }
