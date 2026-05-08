@@ -26,7 +26,24 @@ struct GameSprite {
     let authenticHeight: Int
 }
 
+struct TerrainTextureBuffer {
+    let index: Int
+    let spriteID: Int
+    let width: Int
+    let height: Int
+    /// Expanded ARGB pixels remapped through the Java-style 256-colour palette.
+    let pixels: [Int32]
+    /// Java dictionary/palette. Kept for the later scanline-rasterizer pass.
+    let palette: [Int32]
+    /// One byte per source pixel, indexing into `palette`.
+    let indices: Data
+    /// Java `sprite.getSomething1() / 64 - 1`: 0 for normal, 1+ for large.
+    let type: Int
+}
+
 class SpriteLoader: @unchecked Sendable {
+    static let terrainTextureBaseID = 3225
+
     private(set) var sprites: [Int: GameSprite] = [:]
     var isLoaded: Bool { !sprites.isEmpty }
 
@@ -116,6 +133,37 @@ class SpriteLoader: @unchecked Sendable {
         print("[Sprites] Bridged \(sprites.count) sprites into GraphicsController (atlas size \(graphics.sprites.count))")
     }
 
+    /// Builds the Java mudclient terrain texture buffers from the authentic
+    /// sprite range beginning at `spriteTexture` (3225). The desktop client
+    /// quantises each sprite to a 256-entry palette plus byte indices before
+    /// handing it to Scene.loadTexture; we keep both that compact form and an
+    /// expanded ARGB copy for the current iOS placeholder rasterizer.
+    func terrainTextureBuffers(startID: Int = SpriteLoader.terrainTextureBaseID) -> [TerrainTextureBuffer] {
+        var out: [TerrainTextureBuffer] = []
+        var textureIndex = 0
+
+        while let sprite = sprites[startID + textureIndex] {
+            out.append(makeTerrainTextureBuffer(index: textureIndex, spriteID: startID + textureIndex, sprite: sprite))
+            textureIndex += 1
+        }
+
+        return out
+    }
+
+    func loadTerrainTextures(into scene: Scene, startID: Int = SpriteLoader.terrainTextureBaseID) -> Int {
+        let buffers = terrainTextureBuffers(startID: startID)
+        for texture in buffers {
+            scene.loadTexture(index: texture.index, pixels: texture.pixels, type: texture.type, data: texture.indices)
+        }
+
+        if let last = buffers.last {
+            print("[Textures] Loaded \(buffers.count) textures from spriteTexture range (\(startID)..\(last.spriteID))")
+        } else {
+            print("[Textures] No terrain textures found at spriteTexture base \(startID)")
+        }
+        return buffers.count
+    }
+
     // Fallback direct blit for overhead map rendering.
     func drawSprite(_ id: Int, onto buffer: inout [Int32], bufferWidth: Int, bufferHeight: Int,
                     atX: Int, atY: Int, scale: Int = 1) {
@@ -139,5 +187,104 @@ class SpriteLoader: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    private func makeTerrainTextureBuffer(index: Int, spriteID: Int, sprite: GameSprite) -> TerrainTextureBuffer {
+        let length = sprite.width * sprite.height
+        var histogram = [Int](repeating: 0, count: 32768)
+        var sourceRGB = [UInt32](repeating: 0, count: length)
+
+        for i in 0..<length {
+            var rgb = UInt32(bitPattern: sprite.pixels[i]) & 0x00FF_FFFF
+            if rgb == 0 { rgb = 0x00FF_00FF }
+            sourceRGB[i] = rgb
+            histogram[quantizedIndex(rgb)] += 1
+        }
+
+        var palette = [Int32](repeating: 0, count: 256)
+        var frequency = [Int](repeating: 0, count: 256)
+        palette[0] = opaque(0x00FF_00FF)
+
+        for q in 0..<histogram.count {
+            let count = histogram[q]
+            if count > frequency[255] {
+                for slot in 1..<256 where count > frequency[slot] {
+                    if slot < 255 {
+                        for move in stride(from: 255, to: slot, by: -1) {
+                            palette[move] = palette[move - 1]
+                            frequency[move] = frequency[move - 1]
+                        }
+                    }
+
+                    let red = (q & 0x7C00) << 9
+                    let green = (q & 0x03E0) << 6
+                    let blue = (q & 0x001F) << 3
+                    let rgb = UInt32(red + green + blue + 0x040404)
+                    palette[slot] = opaque(rgb & 0x00FF_FFFF)
+                    frequency[slot] = count
+                    break
+                }
+            }
+            histogram[q] = -1
+        }
+
+        var indexed = [UInt8](repeating: 0, count: length)
+        var expanded = [Int32](repeating: 0, count: length)
+
+        for i in 0..<length {
+            let rgb = sourceRGB[i]
+            let q = quantizedIndex(rgb)
+            var paletteIndex = histogram[q]
+
+            if paletteIndex == -1 {
+                var bestDistance = Int.max
+                var bestIndex = 0
+                let r = Int((rgb >> 16) & 0xFF)
+                let g = Int((rgb >> 8) & 0xFF)
+                let b = Int(rgb & 0xFF)
+
+                for candidate in 0..<256 {
+                    let pal = UInt32(bitPattern: palette[candidate]) & 0x00FF_FFFF
+                    let pr = Int((pal >> 16) & 0xFF)
+                    let pg = Int((pal >> 8) & 0xFF)
+                    let pb = Int(pal & 0xFF)
+                    let dr = r - pr
+                    let dg = g - pg
+                    let db = b - pb
+                    let distance = dr * dr + dg * dg + db * db
+                    if distance < bestDistance {
+                        bestDistance = distance
+                        bestIndex = candidate
+                    }
+                }
+
+                paletteIndex = bestIndex
+                histogram[q] = bestIndex
+            }
+
+            let safeIndex = max(0, min(255, paletteIndex))
+            indexed[i] = UInt8(safeIndex)
+            expanded[i] = palette[safeIndex]
+        }
+
+        let type = max(0, sprite.authenticWidth / 64 - 1)
+        return TerrainTextureBuffer(
+            index: index,
+            spriteID: spriteID,
+            width: sprite.width,
+            height: sprite.height,
+            pixels: expanded,
+            palette: palette,
+            indices: Data(indexed),
+            type: type
+        )
+    }
+
+    private func quantizedIndex(_ rgb: UInt32) -> Int {
+        Int(((rgb & 0x00F8_0000) >> 9) | ((rgb & 0x0000_F800) >> 6) | ((rgb & 0x0000_00F8) >> 3))
+    }
+
+    private func opaque(_ rgb: UInt32) -> Int32 {
+        Int32(bitPattern: 0xFF00_0000 | (rgb & 0x00FF_FFFF))
     }
 }

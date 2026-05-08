@@ -160,6 +160,7 @@ final class RSCGameEngine: ObservableObject {
         let loader = self.landscapeLoader
         let sprLoader = self.spriteLoader
         let sharedGraphics = graphics
+        let sharedScene = scene
         Task.detached(priority: .userInitiated) {
             loader.loadArchive()
             sprLoader.loadArchive()
@@ -169,6 +170,7 @@ final class RSCGameEngine: ObservableObject {
             await MainActor.run {
                 // Bridge decoded sprites into GraphicsController atlas so Scene.drawEntity() can draw them
                 sprLoader.bridgeInto(sharedGraphics)
+                _ = sprLoader.loadTerrainTextures(into: sharedScene)
                 print("[Engine] Archives loaded: landscape=\(loader.isLoaded) sprites=\(sprLoader.isLoaded) npcDefs=\(NPCDefinitions.defs.count) objDefs=\(GameObjectDefinitions.defs.count)")
             }
         }

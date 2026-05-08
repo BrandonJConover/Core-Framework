@@ -28,6 +28,8 @@ final class Scene {
 
     // Texture database
     var resourceDatabase: [[Int32]?]
+    var textureTypes: [Int]
+    var textureIndexData: [Data?]
     var m_L: [[Int32]]
     var m_Hb: [Int32]
 
@@ -111,9 +113,11 @@ final class Scene {
         self.m_flip = [Bool](repeating: false, count: spriteCount)
 
         // Initialize texture database
-        self.resourceDatabase = [[Int32]?](repeating: nil, count: 50)
-        self.m_L = [[Int32]](repeating: [], count: 50)
-        self.m_Hb = [Int32](repeating: 0, count: 50)
+        self.resourceDatabase = [[Int32]?](repeating: nil, count: 80)
+        self.textureTypes = [Int](repeating: 0, count: 80)
+        self.textureIndexData = [Data?](repeating: nil, count: 80)
+        self.m_L = [[Int32]](repeating: [], count: 80)
+        self.m_Hb = [Int32](repeating: 0, count: 80)
 
         // Set up screen dimensions
         self.m_A = graphics.width2 / 2
@@ -673,8 +677,22 @@ final class Scene {
     // MARK: - Texture management
 
     func loadTexture(index: Int, pixels: [Int32], type: Int, data: Data?) {
-        guard index >= 0 && index < resourceDatabase.count else { return }
+        guard index >= 0 else { return }
+        ensureTextureCapacity(index + 1)
         resourceDatabase[index] = pixels
+        textureTypes[index] = type
+        textureIndexData[index] = data
+        m_L[index] = pixels
+    }
+
+    private func ensureTextureCapacity(_ needed: Int) {
+        guard needed > resourceDatabase.count else { return }
+        let newCount = max(needed, resourceDatabase.count * 2)
+        resourceDatabase.append(contentsOf: [[Int32]?](repeating: nil, count: newCount - resourceDatabase.count))
+        textureTypes.append(contentsOf: [Int](repeating: 0, count: newCount - textureTypes.count))
+        textureIndexData.append(contentsOf: [Data?](repeating: nil, count: newCount - textureIndexData.count))
+        m_L.append(contentsOf: [[Int32]](repeating: [], count: newCount - m_L.count))
+        m_Hb.append(contentsOf: [Int32](repeating: 0, count: newCount - m_Hb.count))
     }
 
     func resourceToColor(_ resource: Int32) -> Int32 {
