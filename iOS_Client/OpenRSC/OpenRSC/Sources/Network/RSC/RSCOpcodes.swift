@@ -34,6 +34,10 @@ enum RSCOutOpcode: UInt8 {
     case itemUseOnGround    = 53
     case objectCommand1     = 136
     case objectCommand2     = 79
+    case wallCommand1       = 14
+    case wallCommand2       = 127
+    case wallUseItem        = 161
+    case castOnWall         = 180
     case shopBuy            = 236
     case shopSell           = 221
     case shopClose          = 166

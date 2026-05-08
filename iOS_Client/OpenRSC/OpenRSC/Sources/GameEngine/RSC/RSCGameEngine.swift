@@ -1839,6 +1839,21 @@ final class RSCGameEngine: ObservableObject {
         return nearest
     }
 
+    private func nearestWallObject(toX x: Int, z: Int) -> RSCWallObject? {
+        var nearest: RSCWallObject? = nil
+        var nearestDist = Int.max
+        for wall in worldState.wallObjects {
+            let dx = wall.x - x
+            let dz = wall.y - z
+            let dist = dx * dx + dz * dz
+            if dist < nearestDist && dist <= 4 {
+                nearestDist = dist
+                nearest = wall
+            }
+        }
+        return nearest
+    }
+
     @discardableResult
     private func sendWalkPath(toX destX: Int, toZ destZ: Int, walkToEntity: Bool) async -> [(x: Int, z: Int)] {
         let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
@@ -1886,6 +1901,7 @@ final class RSCGameEngine: ObservableObject {
         let targetPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY)
         let targetGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY) ?? nearestGroundItem(toX: destX, z: destZ)
         let targetObject = nearestGameObject(toX: destX, z: destZ)
+        let targetWall = nearestWallObject(toX: destX, z: destZ)
 
         // Item-use target mode — armed by inventory "Use". The next tap on a
         // world entity consumes the pending item instead of doing default walk
@@ -1904,6 +1920,9 @@ final class RSCGameEngine: ObservableObject {
             } else if let object = targetObject {
                 print("[Input] Use item slot \(itemSlot) on object \(object.objectId)")
                 useItemOnObject(slot: itemSlot, x: object.x, z: object.y)
+            } else if let wall = targetWall {
+                print("[Input] Use item slot \(itemSlot) on wall \(wall.wallId)")
+                useItemOnWall(slot: itemSlot, x: wall.x, z: wall.y, direction: wall.direction)
             } else {
                 worldState.addChat(sender: "[Use]", text: "No target selected.")
             }
@@ -1928,6 +1947,9 @@ final class RSCGameEngine: ObservableObject {
             } else if let object = targetObject {
                 print("[Input] Cast spell \(spellId) on object \(object.objectId)")
                 castSpellOnObject(spellId: spellId, x: object.x, z: object.y)
+            } else if let wall = targetWall {
+                print("[Input] Cast spell \(spellId) on wall \(wall.wallId)")
+                castSpellOnWall(spellId: spellId, x: wall.x, z: wall.y, direction: wall.direction)
             } else {
                 print("[Input] Cast spell \(spellId) on ground (\(destX),\(destZ))")
                 castSpellOnGround(spellId: spellId, x: destX, z: destZ)
@@ -2100,6 +2122,33 @@ final class RSCGameEngine: ObservableObject {
                 }
                 actions.append(("Examine \(objName)", "eye", { [weak self] in
                     self?.worldState.addChat(sender: "[Examine]", text: def?.description.isEmpty == false ? def!.description : objName)
+                }))
+                break
+            }
+        }
+
+        // Check boundary/wall objects (doors, gates, fences). Java keeps these
+        // separate from scenery and sends boundary-specific opcodes that include
+        // direction, so route them through their own actions.
+        for wall in worldState.wallObjects {
+            let wdx = wall.x - worldX
+            let wdz = wall.y - worldZ
+            if wdx * wdx + wdz * wdz <= 4 {
+                let wallName = EntityDefinitions.getDoorDef(wall.wallId)?.name ?? "Door"
+                title = wallName
+                if let pendingItemSlot {
+                    actions.append(("Use \(pendingItemName) with \(wallName)", "hand.point.up.left", { [weak self] in
+                        self?.useItemOnWall(slot: pendingItemSlot, x: wall.x, z: wall.y, direction: wall.direction)
+                    }))
+                }
+                actions.append(("Open \(wallName)", "door.left.hand.open", { [weak self] in
+                    self?.wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
+                }))
+                actions.append(("Close \(wallName)", "door.left.hand.closed", { [weak self] in
+                    self?.wallAction2(x: wall.x, z: wall.y, direction: wall.direction)
+                }))
+                actions.append(("Examine \(wallName)", "eye", { [weak self] in
+                    self?.worldState.addChat(sender: "[Examine]", text: wallName)
                 }))
                 break
             }
@@ -2362,6 +2411,20 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    func useItemOnWall(slot: Int, x: Int, z: Int, direction: Int) {
+        Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.wallUseItem.rawValue))
+            buf.putShort(x)
+            buf.putShort(z)
+            buf.putByte(direction)
+            buf.putShort(slot)
+            try? await connection.send(buf.finishPacket())
+            clearPendingItemUse()
+        }
+    }
+
     func pickupGroundItem(x: Int, y: Int, itemId: Int) {
         Task {
             let buf = ByteBuffer()
@@ -2524,6 +2587,30 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    func wallAction1(x: Int, z: Int, direction: Int) {
+        Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand1.rawValue))
+            buf.putShort(x)
+            buf.putShort(z)
+            buf.putByte(direction)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func wallAction2(x: Int, z: Int, direction: Int) {
+        Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand2.rawValue))
+            buf.putShort(x)
+            buf.putShort(z)
+            buf.putByte(direction)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
     // MARK: - Magic & Prayer
 
     func castSpellOnSelf(spellId: Int) {
@@ -2576,6 +2663,19 @@ final class RSCGameEngine: ObservableObject {
             buf.putShort(spellId)
             buf.putShort(x)
             buf.putShort(z)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func castSpellOnWall(spellId: Int, x: Int, z: Int, direction: Int) {
+        Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.castOnWall.rawValue))
+            buf.putShort(x)
+            buf.putShort(z)
+            buf.putByte(direction)
+            buf.putShort(spellId)
             try? await connection.send(buf.finishPacket())
         }
     }
