@@ -239,8 +239,11 @@ final class RSCPacketHandler {
             }
             ws.addChat(sender: "[Kill]", text: "\(attacker) defeated \(victim) \(style).", isKill: true)
 
-        case 222: // showServerMsg
+        case 222: // showServerMsg — Java showServerMessageDialog(), top box
             let text = buf.getString()
+            ws.serverMessageDialogText = text
+            ws.serverMessageDialogTop = true
+            ws.serverMessageDialogOpen = true
             ws.addChat(sender: "[Server]", text: text)
 
         case 4:   // closeConnection
@@ -494,8 +497,11 @@ final class RSCPacketHandler {
         case 253: // duelOpponentDecision
             ws.duelOpponentAccepted = buf.getUnsignedByte() == 1
 
-        case 89:  // showServerMessageDialogTwo
+        case 89:  // showServerMessageDialogTwo — Java lower/centered server modal
             let msg89 = buf.getString()
+            ws.serverMessageDialogText = msg89
+            ws.serverMessageDialogTop = false
+            ws.serverMessageDialogOpen = true
             ws.addChat(sender: "[Server]", text: msg89)
 
         case 88:  // createNPC — dynamic NPC definition from server
@@ -1083,6 +1089,8 @@ final class RSCPacketHandler {
                         ws.skills[hpIdx].current = curhp
                         ws.skills[hpIdx].base = maxhp
                     }
+                    ws.serverMessageDialogOpen = false
+                    ws.welcomeOpen = false
                     ws.lastDamageReceived = damage
                     ws.localDamageTaken = damage
                     ws.localDamageTimeout = 200
@@ -1159,6 +1167,8 @@ final class RSCPacketHandler {
                         ws.skills[hpIdx].current = curhp8
                         ws.skills[hpIdx].base = maxhp8
                     }
+                    ws.serverMessageDialogOpen = false
+                    ws.welcomeOpen = false
                 }
 
             case 9: // HP update (no damage/heal value)
@@ -1169,6 +1179,8 @@ final class RSCPacketHandler {
                         ws.skills[hpIdx].current = curhp9
                         ws.skills[hpIdx].base = maxhp9
                     }
+                    ws.serverMessageDialogOpen = false
+                    ws.welcomeOpen = false
                 }
 
             default:

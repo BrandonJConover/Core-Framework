@@ -351,6 +351,13 @@ final class RSCWorldState: ObservableObject {
     @Published var kills3: Int = 0
     @Published var isDead: Bool = false
 
+    /// Modal server-message dialog shown by Java opcodes 222 and 89. Java
+    /// keeps this separate from the scrolling chat box and requires an
+    /// explicit "Click here to close window" acknowledgement.
+    @Published var serverMessageDialogOpen: Bool = false
+    @Published var serverMessageDialogText: String = ""
+    @Published var serverMessageDialogTop: Bool = false
+
     /// Ticks remaining until the server reboots (opcode 52). Server sends
     /// ticks-of-32ms; Java code multiplies by 32 to get milliseconds. We
     /// keep that scaled value here so the banner shows seconds = ticks/1000.

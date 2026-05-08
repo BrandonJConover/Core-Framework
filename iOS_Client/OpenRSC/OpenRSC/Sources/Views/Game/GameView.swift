@@ -261,6 +261,9 @@ struct GameView: View {
         if engine.worldState.contextMenuOpen {
             ContextMenuOverlay(worldState: engine.worldState, engine: engine)
         }
+        if engine.worldState.serverMessageDialogOpen {
+            ServerMessageDialog(worldState: engine.worldState)
+        }
         if engine.worldState.showAppearanceChange {
             AppearancePanel(worldState: engine.worldState, engine: engine)
         }
@@ -283,6 +286,53 @@ struct GameView: View {
                 Text("You will respawn shortly").font(.system(size: 14)).foregroundColor(Color(hex: "#888888"))
             }
         }
+    }
+}
+
+// MARK: - Server Message Dialog
+
+private struct ServerMessageDialog: View {
+    @ObservedObject var worldState: RSCWorldState
+
+    var body: some View {
+        ZStack(alignment: worldState.serverMessageDialogTop ? .top : .center) {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .onTapGesture { close() }
+
+            VStack(spacing: 18) {
+                Text(worldState.serverMessageDialogText)
+                    .font(.system(size: 15))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .frame(maxWidth: .infinity)
+
+                Button(action: close) {
+                    Text("Click here to close window")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(hex: "#ff5a5a"))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+            .frame(maxWidth: 400)
+            .padding(.horizontal, 16)
+            .background(Color.black.opacity(0.92))
+            .overlay(
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
+            )
+            .padding(.top, worldState.serverMessageDialogTop ? 72 : 0)
+        }
+    }
+
+    private func close() {
+        worldState.serverMessageDialogOpen = false
+        worldState.serverMessageDialogText = ""
     }
 }
 
