@@ -16,7 +16,7 @@ struct GameView: View {
     @State private var dragStartCameraRotation: CGFloat = 0
     @State private var dragStartCameraPitch: CGFloat = 0
     @State private var dragMovedFar: Bool = false
-    @State private var pinchStartZoom: CGFloat = 1.6
+    @State private var pinchStartZoom: CGFloat = 1.0
 
     var body: some View {
         #if canImport(UIKit)

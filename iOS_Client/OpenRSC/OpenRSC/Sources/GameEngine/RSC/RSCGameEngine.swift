@@ -131,7 +131,13 @@ final class RSCGameEngine: ObservableObject {
             setCameraPitchDegrees(prefs.lastCameraPitchDegrees)
         }
         if prefs.lastCameraZoom > 0 {
-            let persistedZoom = max(400.0, min(2400.0, prefs.lastCameraZoom))
+            // Early native builds persisted the old Java-like 750 camera zoom,
+            // which is too tight on a phone viewport and makes targeting feel
+            // cramped. Treat that legacy default as "no preference" and widen
+            // it to the current native default; preserve deliberate wider/closer
+            // user changes outside that band.
+            let rawZoom = (700.0...820.0).contains(prefs.lastCameraZoom) ? 1200.0 : prefs.lastCameraZoom
+            let persistedZoom = max(400.0, min(2400.0, rawZoom))
             cameraZoom = Int32(persistedZoom)
             cameraOcclusionZoom = Int32(persistedZoom)
             zoomLevel = CGFloat(1200.0 / persistedZoom)
