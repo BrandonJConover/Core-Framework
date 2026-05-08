@@ -35,6 +35,17 @@ public class CombatFormula {
 		return chosenHit;
 	}
 
+	private static int calculateMeleeDamagePvp(final Mob source, final PVPCombatFormulaType formulaType) {
+		int maxRoll = getMeleeDamage(source);
+		if (maxRoll <= 0) return 0;
+		int maxHit = (maxRoll + 320) / 640;
+		return switch (formulaType) {
+			case STORMY -> (DataConversions.getRandom().nextInt(maxRoll) + 320) / 640;
+			case AUTHENTIC -> DataConversions.getRandom().nextInt(maxHit + 1);
+			case OSRS -> DataConversions.getRandom().nextInt(maxHit + 1);
+		};
+	}
+
 	/**
 	 * Gets a dice roll for ranged damage for a single attack
 	 * The result is an int sourced from randomness effectively from 0.5 - maxHit.
@@ -48,6 +59,17 @@ public class CombatFormula {
 		int maxRoll = getRangedDamage(source, bowId, arrowId);
 		int chosenHit = (DataConversions.getRandom().nextInt(maxRoll) + 320) / 640;
 		return chosenHit;
+	}
+
+	private static int calculateRangedDamagePvp(final Mob source, final int bowId, final int arrowId, final PVPCombatFormulaType formulaType) {
+		int maxRoll = getRangedDamage(source, bowId, arrowId);
+		if (maxRoll <= 0) return 0;
+		int maxHit = (maxRoll + 320) / 640;
+		return switch (formulaType) {
+			case STORMY -> (DataConversions.getRandom().nextInt(maxRoll) + 320) / 640;
+			case AUTHENTIC -> DataConversions.getRandom().nextInt(maxHit + 1);
+			case OSRS -> DataConversions.getRandom().nextInt(maxHit + 1);
+		};
 	}
 
 	/**
@@ -97,6 +119,45 @@ public class CombatFormula {
 		// TODO: Remove this code and roll it into calculateMagicDamage
 		// Source for max damage: http://web.archive.org/web/20041226185618/http://www.rsinn.com/forum/showthread.php?t=2469
 		return calculateMagicDamage(15);
+	}
+
+	private static int calculateMagicDamagePvp(final double spellPower, final PVPCombatFormulaType formulaType) {
+		int maxHit = (int)Math.floor(spellPower);
+		if (maxHit <= 0) return 0;
+		int stormyRoll = maxHit * 640;
+		return switch (formulaType) {
+			case STORMY -> (DataConversions.getRandom().nextInt(stormyRoll) + 320) / 640;
+			case AUTHENTIC -> DataConversions.getRandom().nextInt(maxHit + 1);
+			case OSRS -> DataConversions.getRandom().nextInt(maxHit + 1);
+		};
+	}
+
+	public static int doMagicDamage(final Mob source, final Mob victim, final double spellPower) {
+		return (source.isPlayer() && victim.isPlayer())
+			? calculateMagicDamagePvp(spellPower, source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE)
+			: calculateMagicDamage(spellPower);
+	}
+
+	public static int doGodSpellDamage(final Player source, final Mob victim) {
+		int[] godCapes = new int[] {
+			ZAMORAK_CAPE.id(),
+			SARADOMIN_CAPE.id(),
+			GUTHIX_CAPE.id()
+		};
+
+		boolean hasCapeEquipped = false;
+		for (int capeId : godCapes) {
+			if (source.getCarriedItems().getEquipment().hasEquipped(capeId)) {
+				hasCapeEquipped = true;
+				break;
+			}
+		}
+		boolean hasChargeBenefit = source.isCharged() && hasCapeEquipped;
+		int godSpellMax = hasChargeBenefit ? 25 : 18;
+
+		return victim.isPlayer()
+			? calculateMagicDamagePvp(godSpellMax, source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE)
+			: calculateGodSpellDamage(source);
 	}
 
 	/**
@@ -154,7 +215,9 @@ public class CombatFormula {
 	public static int doMeleeDamage(final Mob source, final Mob victim) {
 		boolean isHit = calculateMeleeAccuracy(source, victim);
 		boolean wasHit = isHit;
-		int damage = calculateMeleeDamage(source);
+		int damage = (source.isPlayer() && victim.isPlayer())
+			? calculateMeleeDamagePvp(source, source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE)
+			: calculateMeleeDamage(source);
 		if (victim instanceof Player playerVictim) {
 			// Track the damage dealt to the player
 			if (isHit) {
@@ -210,7 +273,9 @@ public class CombatFormula {
 
 		//LOGGER.info(source + " " + (isHit ? "hit" : "missed") + " " + victim + ", Damage: " + damage);
 
-		return calculateRangedDamage(source, bowId, arrowId);
+		return (source.isPlayer() && victim.isPlayer())
+			? calculateRangedDamagePvp(source, bowId, arrowId, source.getWorld().getServer().getConfig().PVP_COMBAT_FORMULA_TYPE)
+			: calculateRangedDamage(source, bowId, arrowId);
 	}
 
 	/**
