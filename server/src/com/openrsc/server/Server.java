@@ -10,6 +10,7 @@ import com.openrsc.server.database.GameDatabase;
 import com.openrsc.server.database.JDBCDatabase;
 import com.openrsc.server.database.impl.mysql.MySqlGameDatabase;
 import com.openrsc.server.database.impl.mysql.MySqlGameLogger;
+import com.openrsc.server.database.impl.postgres.PostgresGameDatabase;
 import com.openrsc.server.database.impl.sqlite.SqliteGameDatabase;
 import com.openrsc.server.database.patches.JDBCPatchApplier;
 import com.openrsc.server.database.patches.PatchApplier;
@@ -260,6 +261,9 @@ public class Server implements Runnable {
 				break;
 			case SQLITE:
 				database = new SqliteGameDatabase(this);
+				break;
+			case POSTGRES:
+				database = new PostgresGameDatabase(this);
 				break;
 			default:
 				database = null;

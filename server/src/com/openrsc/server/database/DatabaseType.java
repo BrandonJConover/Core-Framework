@@ -2,11 +2,11 @@ package com.openrsc.server.database;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 public enum DatabaseType {
 	MYSQL(0),
-	SQLITE(1);
+	SQLITE(1),
+	POSTGRES(2);
 
 	private static final Map<Integer, DatabaseType> byType = new HashMap<Integer, DatabaseType>();
 	public static final DatabaseType DEFAULT = SQLITE;
@@ -20,7 +20,7 @@ public enum DatabaseType {
 	}
 
 	public static DatabaseType getByType(Integer type) {
-		return byType.getOrDefault(type, DatabaseType.MYSQL);
+		return byType.getOrDefault(type, DatabaseType.DEFAULT);
 	}
 
 	DatabaseType(int type) {
@@ -41,7 +41,7 @@ public enum DatabaseType {
 		}
 	}
 
-    public int getType() {
+	public int getType() {
 		return this.type;
 	}
 }
