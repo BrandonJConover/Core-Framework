@@ -433,9 +433,16 @@ final class RSCGameEngine: ObservableObject {
             // Java mudclient.java drives combatRole off ORSCharacterDirection;
             // we approximate via the combatTimeout flag set when fighting.
             let combatTick = renderLogCount  // shared frame counter for combat cycle
+            func elevationForTileOffset(tileX: Double, tileZ: Double) -> Int {
+                let localX = Int((tileX * 128.0).rounded()) + 64
+                let localZ = Int((tileZ * 128.0).rounded()) + 64
+                return world.getElevation(x: localX, z: localZ)
+            }
             for npc in worldState.npcs {
                 if let def = NPCDefinitions.get(npc.npcId) {
                     let role: CharacterBillboards.CombatRole = npc.combatTimeout > 0 ? .combatA : .none
+                    let tileX = npc.interpolatedX - Double(px)
+                    let tileZ = npc.interpolatedY - Double(pz)
                     var sprites = def.sprites
                     if npc.wield > 0 {
                         if sprites.count <= 4 { sprites += Array(repeating: -1, count: 5 - sprites.count) }
@@ -447,8 +454,8 @@ final class RSCGameEngine: ObservableObject {
                     }
                     CharacterBillboards.register(
                         scene: scene, spriteLoader: spriteLoader,
-                        tileX: npc.interpolatedX - Double(px),
-                        tileZ: npc.interpolatedY - Double(pz),
+                        tileX: tileX,
+                        tileZ: tileZ,
                         rsDir: npc.direction,
                         stepFrame: role == .none ? renderLogCount : combatTick,
                         walkModel: def.walkModel,
@@ -461,7 +468,8 @@ final class RSCGameEngine: ObservableObject {
                         combatRole: role,
                         combatModel: def.combatModel,
                         combatSprite: def.combatSprite,
-                        overlayMovement: 32  // small lean while attacking
+                        overlayMovement: 32,  // small lean while attacking
+                        elevation: elevationForTileOffset(tileX: tileX, tileZ: tileZ)
                     )
                 }
             }
@@ -480,10 +488,12 @@ final class RSCGameEngine: ObservableObject {
                 let topIdx = appearance?.colourTop ?? defaultTopIdx
                 let bottomIdx = appearance?.colourBottom ?? defaultBottomIdx
                 let skinIdx = appearance?.colourSkin ?? defaultSkinIdx
+                let tileX = player.interpolatedX - Double(px)
+                let tileZ = player.interpolatedY - Double(pz)
                 CharacterBillboards.register(
                     scene: scene, spriteLoader: spriteLoader,
-                    tileX: player.interpolatedX - Double(px),
-                    tileZ: player.interpolatedY - Double(pz),
+                    tileX: tileX,
+                    tileZ: tileZ,
                     rsDir: player.direction, stepFrame: renderLogCount,
                     walkModel: 6,
                     cameraRotation: cameraRotation,
@@ -491,7 +501,8 @@ final class RSCGameEngine: ObservableObject {
                     hairColor: PlayerPalettes.hairColour(hairIdx),
                     topColor: PlayerPalettes.clothingColour(topIdx),
                     bottomColor: PlayerPalettes.clothingColour(bottomIdx),
-                    skinColor: PlayerPalettes.skinColour(skinIdx)
+                    skinColor: PlayerPalettes.skinColour(skinIdx),
+                    elevation: elevationForTileOffset(tileX: tileX, tileZ: tileZ)
                 )
             }
             // Local player sits at the origin in local coords. When the engine
@@ -516,7 +527,8 @@ final class RSCGameEngine: ObservableObject {
                 combatRole: localCombatRole,
                 combatModel: 6,
                 combatSprite: 5,
-                overlayMovement: 32
+                overlayMovement: 32,
+                elevation: elevationForTileOffset(tileX: 0, tileZ: 0)
             )
 
             scene.endScene(1)

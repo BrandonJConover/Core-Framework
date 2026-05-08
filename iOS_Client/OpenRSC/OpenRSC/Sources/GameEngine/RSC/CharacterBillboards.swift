@@ -72,12 +72,13 @@ enum CharacterBillboards {
         combatRole: CombatRole = .none,
         combatModel: Int = 6,
         combatSprite: Int = 5,
-        overlayMovement: Int = 0
+        overlayMovement: Int = 0,
+        elevation: Int = 0
     ) {
         // Convert server tile coords to Scene world units (128 units/tile, + 64 center)
         let worldX: Int32 = Int32((tileX * 128.0).rounded()) + 64
         let worldZ: Int32 = Int32((tileZ * 128.0).rounded()) + 64
-        let worldY: Int32 = 0  // ground level (Scene Y is inverted — negative up)
+        let worldY: Int32 = -Int32(elevation)  // ground level (Scene Y is inverted — negative up)
 
         let projected = scene.projectPoint(worldX: worldX, worldY: worldY, worldZ: worldZ)
         if projected.depth < scene.rot1024_zTop { return }  // behind camera
