@@ -350,6 +350,9 @@ final class RSCWorldState: ObservableObject {
     @Published var lastNpcKilledId: Int = 0
     @Published var kills3: Int = 0
     @Published var isDead: Bool = false
+    /// Java sets `deathScreenTimeout = 250` on opcode 83 and counts it down
+    /// once per game tick before returning control to the world.
+    @Published var deathScreenTimeout: Int = 0
 
     /// Modal server-message dialog shown by Java opcodes 222 and 89. Java
     /// keeps this separate from the scrolling chat box and requires an

@@ -279,13 +279,18 @@ struct GameView: View {
         if engine.worldState.isSleeping {
             SleepOverlayView(worldState: engine.worldState, engine: engine)
         }
-        if engine.worldState.isDead {
+        if engine.worldState.isDead || engine.worldState.deathScreenTimeout > 0 {
             Color.black.opacity(0.7).ignoresSafeArea()
             VStack(spacing: 16) {
                 Text("You have died").font(.system(size: 24, weight: .bold)).foregroundColor(.red)
-                Text("You will respawn shortly").font(.system(size: 14)).foregroundColor(Color(hex: "#888888"))
+                Text(deathSubtitle).font(.system(size: 14)).foregroundColor(Color(hex: "#888888"))
             }
         }
+    }
+
+    private var deathSubtitle: String {
+        let seconds = max(1, Int(ceil(Double(engine.worldState.deathScreenTimeout) * 0.05)))
+        return "You will respawn shortly" + (engine.worldState.deathScreenTimeout > 0 ? " (\(seconds)s)" : "")
     }
 }
 

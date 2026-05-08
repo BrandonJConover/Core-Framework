@@ -322,6 +322,14 @@ final class RSCGameEngine: ObservableObject {
         if worldState.systemUpdateTicks > 0 {
             worldState.systemUpdateTicks = max(0, worldState.systemUpdateTicks - 50)
         }
+        if worldState.deathScreenTimeout > 0 {
+            worldState.deathScreenTimeout -= 1
+            if worldState.deathScreenTimeout == 0 {
+                worldState.isDead = false
+                worldState.addChat(sender: "[System]", text: "You have been granted another life. Be more careful this time!")
+                worldState.addChat(sender: "[System]", text: "You retain your skills. Your objects land where you died.")
+            }
+        }
         worldState.pruneExpiredXPDrops()
         persistCameraPreferencesIfNeeded()
 

@@ -206,6 +206,7 @@ final class RSCPacketHandler {
 
         case 83:  // DISPLAY_DEATH_SCREEN
             ws.isDead = true
+            ws.deathScreenTimeout = 250
             ws.exitCombat()
 
         case 114: // SET_FATIGUE
