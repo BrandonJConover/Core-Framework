@@ -575,20 +575,56 @@
             (function() {
                 function loadLauncherConfig() {
                     var storageKey = 'rsc-launch-config';
+                    var raw = null;
                     try {
-                        var raw = window.sessionStorage.getItem(storageKey);
-                        if (!raw) {
+                        raw = window.sessionStorage.getItem(storageKey);
+                        window.sessionStorage.removeItem(storageKey);
+                    } catch (err) {
+                        console.warn('[mudclient] Failed to load session launcher config', err);
+                    }
+                    if (!raw) {
+                        try {
+                            raw = window.localStorage.getItem(storageKey);
+                            window.localStorage.removeItem(storageKey);
+                        } catch (err) {
+                            console.warn('[mudclient] Failed to load local launcher config', err);
+                        }
+                    }
+                    if (!raw) {
+                        return null;
+                    }
+
+                    try {
+                        var parsed = JSON.parse(raw);
+                        if (
+                            parsed &&
+                            parsed.issuedAt &&
+                            Date.now() - parsed.issuedAt > 10 * 60 * 1000
+                        ) {
                             return null;
                         }
-                        window.sessionStorage.removeItem(storageKey);
-                        return JSON.parse(raw);
+                        return parsed;
                     } catch (err) {
-                        console.warn('[mudclient] Failed to load launcher config', err);
+                        console.warn('[mudclient] Failed to parse launcher config', err);
                         return null;
                     }
                 }
 
                 var launcherConfig = loadLauncherConfig();
+                if (!launcherConfig) {
+                    try {
+                        var searchParams = new URLSearchParams(window.location.search);
+                        if (searchParams.get('launcher') === '1') {
+                            var loginUrl = window.location.pathname.indexOf('/rsc21/') !== -1
+                                ? 'mudclient-new-login.html'
+                                : 'mudclient-new-login.html';
+                            var url = new URL(loginUrl, window.location.href);
+                            url.searchParams.set('error', 'Login handoff expired. Please sign in again.');
+                            window.location.replace(url.toString());
+                            return;
+                        }
+                    } catch (err) {}
+                }
                 var existingNativeConfig = window.rscNativeConfig || {};
                 if (launcherConfig && typeof launcherConfig === 'object') {
                     var mergedConfig = Object.assign({}, launcherConfig, existingNativeConfig);
@@ -822,6 +858,20 @@
                             if (window._mudclientMarkNativeDirectAutoLoginComplete) {
                                 window._mudclientMarkNativeDirectAutoLoginComplete('login-response');
                             }
+                        } else if (
+                            (isWebLauncherClient || isNativeIOSWebClient) &&
+                            (
+                                /\bLogin response:\s*(?!0\b)\d+\b/.test(text) ||
+                                /Unrecognised response code|Unrecognized response code/i.test(text)
+                            )
+                        ) {
+                            setTimeout(function() {
+                                if (window._mudclientFailNativeDirectAutoLogin) {
+                                    window._mudclientFailNativeDirectAutoLogin('Login failed. Please try again.');
+                                } else if (isWebLauncherClient) {
+                                    returnToLauncherLogin('Login failed. Please try again.');
+                                }
+                            }, 0);
                         }
                         if (/\bINFO:\s*Started application\b/.test(text)) {
                             setLaunchStatus('Game ready');
@@ -2240,6 +2290,33 @@
                 );
             }
 
+            function allowNativePromptAutoLoginFallback() {
+                var config = window.rscNativeConfig || {};
+                var autoLogin = config.autoLogin || {};
+                return autoLogin.promptFallback !== false;
+            }
+
+            function returnToLauncherLogin(message) {
+                var config = window.rscNativeConfig || {};
+                var autoLogin = config.autoLogin || {};
+                var returnUrl = autoLogin.returnUrl;
+                if (typeof returnUrl !== 'string' || !returnUrl) {
+                    returnUrl = (window.location.pathname.indexOf('/rsc21/') !== -1)
+                        ? 'mudclient-new-login.html'
+                        : 'mudclient-new-login.html';
+                }
+
+                try {
+                    var url = new URL(returnUrl, window.location.href);
+                    if (message) {
+                        url.searchParams.set('error', message);
+                    }
+                    window.location.replace(url.toString());
+                } catch (err) {
+                    window.location.replace(returnUrl);
+                }
+            }
+
             function tapNativeGamePoint(x, y) {
                 if (typeof window._mudclientFireLeftClick === 'function') {
                     window._mudclientFireLeftClick(x, y);
@@ -2355,6 +2432,23 @@
                     return true;
                 }
 
+                if (!allowNativePromptAutoLoginFallback()) {
+                    var message = 'This web client build needs the direct login handoff. Please try again after the client is updated.';
+                    nativeAutoLogin.usernameApplied = true;
+                    nativeAutoLogin.passwordApplied = true;
+                    nativeAutoLogin.submitQueued = true;
+                    pendingAutofillUsername = '';
+                    pendingAutofillPassword = '';
+                    nativeDirectAutoLoginSubmitted = true;
+                    nativeDirectAutoLoginStarted = false;
+                    nativeLoginLog('Skipped legacy prompt fallback for launcher login');
+                    if (window._mudclientSetLaunchStatus) {
+                        window._mudclientSetLaunchStatus(message, true);
+                    }
+                    returnToLauncherLogin(message);
+                    return true;
+                }
+
                 nativeAutoLogin.usernameApplied = true;
                 nativeAutoLogin.passwordApplied = true;
                 nativeAutoLogin.submitQueued = true;
@@ -2394,6 +2488,27 @@
                 nativeLoginLog('Completed direct login flow reason=' + reason);
             };
 
+            window._mudclientFailNativeDirectAutoLogin = function(message) {
+                message = message || 'Login handoff failed. Please try again.';
+                nativeDirectAutoLoginCompleted = true;
+                nativeDirectAutoLoginSubmitted = true;
+                nativeDirectAutoLoginStarted = false;
+                nativeAutoLogin.submitQueued = true;
+                nativeLoginLog('Failed direct login flow: ' + message);
+                if (window._mudclientSetLaunchStatus) {
+                    window._mudclientSetLaunchStatus(message, true);
+                }
+                if (typeof sendNative === 'function') {
+                    sendNative('error', {
+                        level: 'native-login',
+                        message: message
+                    });
+                }
+                if (isWebLauncherClient) {
+                    returnToLauncherLogin(message);
+                }
+            };
+
             window._mudclientTryNativeDirectAutoLogin = function(reason) {
                 return runNativeDirectAutoLogin(reason || 'external');
             };
@@ -2406,9 +2521,23 @@
                 }
                 if (
                     nativeDirectAutoLoginCompleted ||
-                    nativeDirectAutoLoginPolls > 1200 ||
                     !nativeDirectAutoLoginEnabled()
                 ) {
+                    if (
+                        !nativeDirectAutoLoginCompleted &&
+                        hasNativeAutoLoginCredentials() &&
+                        nativeDirectAutoLoginAttempts >= nativeDirectAutoLoginMaxAttempts &&
+                        window._mudclientFailNativeDirectAutoLogin
+                    ) {
+                        window._mudclientFailNativeDirectAutoLogin('Login handoff timed out. Please try again.');
+                    }
+                    clearInterval(nativeDirectAutoLoginTimer);
+                    return;
+                }
+                if (nativeDirectAutoLoginPolls > 1200) {
+                    if (window._mudclientFailNativeDirectAutoLogin) {
+                        window._mudclientFailNativeDirectAutoLogin('Login handoff timed out. Please try again.');
+                    }
                     clearInterval(nativeDirectAutoLoginTimer);
                 }
             }, 100);
@@ -2420,7 +2549,7 @@
             }
 
             function maybeApplyNativeAutoLogin(input) {
-                if (!hasNativeAutoLoginCredentials() || !input) {
+                if (!hasNativeAutoLoginCredentials() || !input || !allowNativePromptAutoLoginFallback()) {
                     return false;
                 }
 

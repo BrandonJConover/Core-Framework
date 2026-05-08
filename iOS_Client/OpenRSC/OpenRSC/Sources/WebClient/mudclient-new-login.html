@@ -221,11 +221,14 @@
 
             var isJava21Path = window.location.pathname.indexOf('/rsc21/') !== -1;
             var clientPage = isJava21Path ? 'mudclient21.html' : 'mudclient.html';
-            var targetHref = clientPage + '#members';
+            var targetHref = clientPage + '?launcher=1#members';
+            var classicHref = clientPage + '#members';
             var apiBase = window.location.origin +
                 (isJava21Path ? '/rsc21-api/api' : '/rsc-api/api');
 
             try {
+                sessionStorage.removeItem(SESSION_KEY);
+                localStorage.removeItem(SESSION_KEY);
                 var lastUsername = localStorage.getItem(USERNAME_KEY);
                 if (lastUsername) {
                     usernameInput.value = lastUsername;
@@ -235,9 +238,25 @@
                 }
             } catch (err) {}
 
+            try {
+                var params = new URLSearchParams(window.location.search);
+                var launchError = params.get('error');
+                if (launchError) {
+                    setStatus(launchError, 'error');
+                    params.delete('error');
+                    var cleanUrl = window.location.pathname +
+                        (params.toString() ? '?' + params.toString() : '') +
+                        window.location.hash;
+                    window.history.replaceState(null, '', cleanUrl);
+                }
+            } catch (err) {}
+
             openClassicButton.addEventListener('click', function() {
                 sessionStorage.removeItem(SESSION_KEY);
-                window.location.href = targetHref;
+                try {
+                    localStorage.removeItem(SESSION_KEY);
+                } catch (err) {}
+                window.location.href = classicHref;
             });
 
             loginForm.addEventListener('submit', async function(event) {
@@ -289,13 +308,18 @@
                         launchArgs: ['members'],
                         autoLogin: {
                             username: ticketBody.username,
-                            password: ticketBody.ticket
+                            password: ticketBody.ticket,
+                            direct: true,
+                            promptFallback: false,
+                            returnUrl: window.location.href
                         },
                         issuedAt: Date.now()
                     };
 
-                    sessionStorage.setItem(SESSION_KEY, JSON.stringify(launchConfig));
+                    var launchConfigJson = JSON.stringify(launchConfig);
+                    sessionStorage.setItem(SESSION_KEY, launchConfigJson);
                     try {
+                        localStorage.setItem(SESSION_KEY, launchConfigJson);
                         localStorage.setItem(USERNAME_KEY, ticketBody.username);
                     } catch (err) {}
                     window.location.href = targetHref;
