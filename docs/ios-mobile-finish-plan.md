@@ -150,6 +150,58 @@ References:
 - Local_RSC builds and runs in browser; connects to server via WebSocket on port 43494
 - To deploy to phone: open `OpenRSC.xcodeproj`, set signing team, select device, build and run
 
+## Build plan for full 2001 + 2009 replication
+
+### 2001 client parity
+
+1. Finish protocol bootstrap
+- Keep opcode 19 bootstrap
+- Port the remaining config fields from the Java client
+- Match login capability payloads
+
+2. Fix packet decoding
+- Bit-packed player/NPC/world updates
+- Inventory, bank, shop, chat, PM, friends, ignore, sleep, sound
+- Correct outbound walk/logout/chat encodings
+
+3. Restore core game flow
+- Login, reconnect, region loading, movement, combat, trade, banking
+- Match the Java client UI state transitions
+
+4. Add parity checks
+- Packet fixtures
+- Decode snapshots against Java client captures
+- Login/world boot smoke cases
+
+### 2009 client parity
+
+1. Separate protocol module
+- Keep RSC isolated from 2009/client-rev-specific code
+- Add revision selection in the app shell
+
+2. Add 2009 handshake stack
+- ISAAC
+- RSA login block
+- JS5 cache bootstrap
+
+3. Implement 2009 world/game packets
+- Region load
+- Entity updates
+- Interface, chat, inventory, ground items, combat
+
+4. Add 2009 rendering and UI
+- Modernized panel layout
+- Touch-first controls
+- Mobile-friendly navigation
+
+### Shared app work
+
+- Persisted server profiles
+- Better LAN/physical-device connection flow
+- Haptics, audio, lifecycle, reconnect handling
+- Safe-area and orientation polish
+- Device testing on multiple screen sizes
+
 ## References
 
 - Protocol truth: [Client_Base/src/orsc/mudclient.java](../Client_Base/src/orsc/mudclient.java)
