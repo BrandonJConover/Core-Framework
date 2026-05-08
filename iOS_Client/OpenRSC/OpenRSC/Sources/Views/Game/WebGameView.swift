@@ -191,6 +191,16 @@ struct WebGameView: UIViewRepresentable {
                 let level = body["level"] as? String ?? type
                 let text = body["message"] as? String ?? "\(body)"
                 recordLog(level: level, message: text)
+                if type == "error", level == "native-login" {
+                    DispatchQueue.main.async {
+                        self.showNativeLoginFailure(message: text)
+                    }
+                }
+
+            case "reload":
+                DispatchQueue.main.async {
+                    self.reloadWebClient(reason: body["reason"] as? String ?? "bridge")
+                }
 
             default:
                 recordLog(level: "bridge", message: "Unhandled native bridge message type=\(type)")
@@ -357,6 +367,31 @@ struct WebGameView: UIViewRepresentable {
             return true
         }
 
+        private func reloadWebClient(reason: String) {
+            guard let webView,
+                  let request = currentRequest else {
+                recordLog(level: "navigation", message: "Unable to reload web client reason=\(reason); no active request")
+                return
+            }
+
+            automaticRecoveryCount = 0
+            recordLog(level: "navigation", message: "Reloading web client reason=\(reason)")
+            webView.load(request)
+        }
+
+        private func showNativeLoginFailure(message: String) {
+            guard let webView else { return }
+            let crashLogURL = writeCrashSnapshot(reason: "Native web-client login failed: \(message)")
+            webView.loadHTMLString(
+                WebGameView.webLoginFailedPage(
+                    message: message,
+                    sessionLogPath: sessionLogURL.path,
+                    diagnosticLogPath: crashLogURL.path
+                ),
+                baseURL: nil
+            )
+        }
+
         private func appendAsync(line: String, to url: URL) {
             logQueue.async { [line, url] in
                 self.append(line: line, to: url)
@@ -511,6 +546,32 @@ struct WebGameView: UIViewRepresentable {
         <p style="color:#ddd;font-size:12px;word-break:break-word;text-align:left">Session log:<br>\(sessionLogPath)</p>
         </body></html>
         """
+    }
+
+    private static func webLoginFailedPage(message: String, sessionLogPath: String, diagnosticLogPath: String) -> String {
+        """
+        <html>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+        <body style="background:#1a1a1a;color:#c8a951;font-family:-apple-system,sans-serif;padding:32px;text-align:center;line-height:1.45">
+        <h2>Login handoff failed</h2>
+        <p style="color:#ddd">\(escapeHTML(message))</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:24px 0">
+          <button onclick="window.webkit && window.webkit.messageHandlers.nativeBridge.postMessage({type:'reload',reason:'login-failed-retry'})" style="appearance:none;border:1px solid #c8a951;background:#2d2513;color:#ffe08a;border-radius:10px;padding:12px 18px;font-weight:700">Retry</button>
+          <button onclick="window.webkit && window.webkit.messageHandlers.nativeBridge.postMessage({type:'back'})" style="appearance:none;border:1px solid #555;background:#222;color:#eee;border-radius:10px;padding:12px 18px;font-weight:700">Back</button>
+        </div>
+        <p style="color:#ddd;font-size:12px;word-break:break-word;text-align:left">Diagnostic log:<br>\(diagnosticLogPath)</p>
+        <p style="color:#ddd;font-size:12px;word-break:break-word;text-align:left">Session log:<br>\(sessionLogPath)</p>
+        </body></html>
+        """
+    }
+
+    private static func escapeHTML(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
     }
 }
 #endif
