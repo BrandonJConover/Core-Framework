@@ -565,7 +565,28 @@ final class Scene {
         if (UInt32(bitPattern: pixel) & 0x00FF_FFFF) == 0x00FF_00FF {
             return fallback
         }
-        return pixel
+        return blendTerrainTexture(pixel, with: fallback)
+    }
+
+    private func blendTerrainTexture(_ texturePixel: Int32, with terrainColor: Int32) -> Int32 {
+        let texture = UInt32(bitPattern: texturePixel)
+        let terrain = UInt32(bitPattern: terrainColor)
+
+        let tr = Int((texture >> 16) & 0xFF)
+        let tg = Int((texture >> 8) & 0xFF)
+        let tb = Int(texture & 0xFF)
+
+        let fr = Int((terrain >> 16) & 0xFF)
+        let fg = Int((terrain >> 8) & 0xFF)
+        let fb = Int(terrain & 0xFF)
+
+        // Preserve texture detail but let the existing flat terrain colour
+        // carry the current overlay/elevation tone until the Java brightness
+        // ramp path replaces this lightweight sampler.
+        let r = (tr * 3 + fr) / 4
+        let g = (tg * 3 + fg) / 4
+        let b = (tb * 3 + fb) / 4
+        return Int32(bitPattern: 0xFF00_0000 | UInt32(r << 16) | UInt32(g << 8) | UInt32(b))
     }
 
     // MARK: - Rasterization
