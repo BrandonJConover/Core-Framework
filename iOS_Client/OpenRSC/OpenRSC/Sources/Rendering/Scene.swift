@@ -539,7 +539,7 @@ final class Scene {
         }
     }
 
-    private func terrainTextureForFace(model: RSModel, faceIndex: Int) -> (pixels: [Int32], width: Int, height: Int)? {
+    private func terrainTextureForFace(model: RSModel, faceIndex: Int) -> (pixels: [Int32], width: Int, height: Int, ramps: Int)? {
         guard faceIndex >= 0 && faceIndex < model.faceTextureBack.count else { return nil }
         let textureIndex = Int(model.faceTextureBack[faceIndex])
         guard textureIndex >= 0,
@@ -555,11 +555,12 @@ final class Scene {
         } else {
             width = max(1, Int(Double(pixels.count).squareRoot()))
         }
-        let height = max(1, pixels.count / width)
-        return (pixels, width, height)
+        let basePixels = width * width
+        let ramps = basePixels > 0 ? max(1, pixels.count / basePixels) : 1
+        return (pixels, width, width, ramps)
     }
 
-    private func sampleTerrainTexture(_ texture: (pixels: [Int32], width: Int, height: Int),
+    private func sampleTerrainTexture(_ texture: (pixels: [Int32], width: Int, height: Int, ramps: Int),
                                       x: Int, y: Int,
                                       screenPts: [(x: Int, y: Int)],
                                       fallback: Int32) -> Int32? {
@@ -568,14 +569,30 @@ final class Scene {
                                                screenPts: screenPts) else { return nil }
         let u = max(0, min(texture.width - 1, Int(uv.u * Double(texture.width - 1))))
         let v = max(0, min(texture.height - 1, Int(uv.v * Double(texture.height - 1))))
-        let pixel = texture.pixels[v * texture.width + u]
+        let ramp = terrainBrightnessRamp(for: fallback, rampCount: texture.ramps)
+        let pageSize = texture.width * texture.height
+        let pixel = texture.pixels[min(texture.pixels.count - 1, ramp * pageSize + v * texture.width + u)]
 
         // Java treats magenta as texture transparency after texture loading.
         // Keep the existing flat terrain colour for those holes.
-        if (UInt32(bitPattern: pixel) & 0x00FF_FFFF) == 0x00FF_00FF {
+        let rgb = UInt32(bitPattern: pixel) & 0x00FF_FFFF
+        if rgb == 0 || rgb == 0x00FF_00FF {
             return fallback
         }
         return blendTerrainTexture(pixel, with: fallback)
+    }
+
+    private func terrainBrightnessRamp(for terrainColor: Int32, rampCount: Int) -> Int {
+        guard rampCount > 1 else { return 0 }
+        let terrain = UInt32(bitPattern: terrainColor)
+        let r = Int((terrain >> 16) & 0xFF)
+        let g = Int((terrain >> 8) & 0xFF)
+        let b = Int(terrain & 0xFF)
+        let luminance = (r * 30 + g * 59 + b * 11) / 100
+        if luminance < 58 { return min(rampCount - 1, 3) }
+        if luminance < 92 { return min(rampCount - 1, 2) }
+        if luminance < 132 { return min(rampCount - 1, 1) }
+        return 0
     }
 
     private func terrainUVForScreenPoint(x: Double, y: Double,
@@ -820,10 +837,41 @@ final class Scene {
     func loadTexture(index: Int, pixels: [Int32], type: Int, data: Data?) {
         guard index >= 0 else { return }
         ensureTextureCapacity(index + 1)
-        resourceDatabase[index] = pixels
+        resourceDatabase[index] = buildTexturePages(palette: pixels, type: type, data: data)
         textureTypes[index] = type
         textureIndexData[index] = data
         m_L[index] = pixels
+    }
+
+    private func buildTexturePages(palette: [Int32], type: Int, data: Data?) -> [Int32] {
+        guard let data, !data.isEmpty, !palette.isEmpty else { return palette }
+        let size = type > 0 ? 128 : 64
+        let baseCount = size * size
+        guard data.count >= baseCount else { return palette }
+
+        var pages = [Int32](repeating: 0, count: baseCount * 4)
+        let mask: UInt32 = 0x00F8_F8FF
+        for i in 0..<baseCount {
+            let paletteIndex = Int(data[data.startIndex + i])
+            let palettePixel = paletteIndex < palette.count ? palette[paletteIndex] : 0
+            var rgb = UInt32(bitPattern: palettePixel) & 0x00FF_FFFF
+            rgb &= mask
+            if rgb == 0 {
+                rgb = 1
+            } else if rgb == 0x00F8_00FF {
+                rgb = 0
+            }
+
+            let p0 = rgb
+            let p1 = (p0 &- (p0 >> 3)) & mask
+            let p2 = (p0 &- (p0 >> 2)) & mask
+            let p3 = (p0 &- (p0 >> 3) &- (p0 >> 2)) & mask
+            pages[i] = Int32(bitPattern: 0xFF00_0000 | p0)
+            pages[baseCount + i] = Int32(bitPattern: 0xFF00_0000 | p1)
+            pages[baseCount * 2 + i] = Int32(bitPattern: 0xFF00_0000 | p2)
+            pages[baseCount * 3 + i] = Int32(bitPattern: 0xFF00_0000 | p3)
+        }
+        return pages
     }
 
     private func ensureTextureCapacity(_ needed: Int) {
