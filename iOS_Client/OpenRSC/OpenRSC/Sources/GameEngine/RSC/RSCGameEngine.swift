@@ -2672,10 +2672,12 @@ final class RSCGameEngine: ObservableObject {
             await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnWall.rawValue))
+            // PayloadCustomParser/protocol-235 spell packets read spell first,
+            // then target coordinate + boundary direction.
+            buf.putShort(spellId)
             buf.putShort(x)
             buf.putShort(z)
             buf.putByte(direction)
-            buf.putShort(spellId)
             try? await connection.send(buf.finishPacket())
         }
     }
