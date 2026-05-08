@@ -467,10 +467,21 @@ final class Scene {
             guard minY <= maxY && minX <= maxX else { continue }
 
             let w = Int(graphics.width2)
+            let terrainTexture = terrainTextureForFace(model: model, faceIndex: fIdx)
             for y in minY...maxY {
                 let rowBase = y * w
                 for x in minX...maxX {
-                    graphics.pixelData[rowBase + x] = color
+                    if let terrainTexture {
+                        graphics.pixelData[rowBase + x] = sampleTerrainTexture(
+                            terrainTexture,
+                            x: x, y: y,
+                            minX: minX, maxX: maxX,
+                            minY: minY, maxY: maxY,
+                            fallback: color
+                        )
+                    } else {
+                        graphics.pixelData[rowBase + x] = color
+                    }
                 }
             }
         }
@@ -516,6 +527,45 @@ final class Scene {
                 )
             }
         }
+    }
+
+    private func terrainTextureForFace(model: RSModel, faceIndex: Int) -> (pixels: [Int32], width: Int, height: Int)? {
+        guard faceIndex >= 0 && faceIndex < model.faceTextureBack.count else { return nil }
+        let textureIndex = Int(model.faceTextureBack[faceIndex])
+        guard textureIndex >= 0,
+              textureIndex < resourceDatabase.count,
+              let pixels = resourceDatabase[textureIndex],
+              !pixels.isEmpty else { return nil }
+
+        let width: Int
+        if textureIndex < textureTypes.count, textureTypes[textureIndex] > 0, pixels.count >= 128 * 128 {
+            width = 128
+        } else if pixels.count >= 64 * 64 {
+            width = 64
+        } else {
+            width = max(1, Int(Double(pixels.count).squareRoot()))
+        }
+        let height = max(1, pixels.count / width)
+        return (pixels, width, height)
+    }
+
+    private func sampleTerrainTexture(_ texture: (pixels: [Int32], width: Int, height: Int),
+                                      x: Int, y: Int,
+                                      minX: Int, maxX: Int,
+                                      minY: Int, maxY: Int,
+                                      fallback: Int32) -> Int32 {
+        let spanX = max(1, maxX - minX + 1)
+        let spanY = max(1, maxY - minY + 1)
+        let u = max(0, min(texture.width - 1, ((x - minX) * texture.width) / spanX))
+        let v = max(0, min(texture.height - 1, ((y - minY) * texture.height) / spanY))
+        let pixel = texture.pixels[v * texture.width + u]
+
+        // Java treats magenta as texture transparency after texture loading.
+        // Keep the existing flat terrain colour for those holes.
+        if (UInt32(bitPattern: pixel) & 0x00FF_FFFF) == 0x00FF_00FF {
+            return fallback
+        }
+        return pixel
     }
 
     // MARK: - Rasterization
