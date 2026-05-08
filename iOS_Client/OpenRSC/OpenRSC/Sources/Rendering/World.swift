@@ -37,14 +37,7 @@ final class World {
 
         // Initialize collision and elevation
         self.collisionFlags = [[Int]](repeating: [Int](repeating: 0, count: 96), count: 96)
-        // Synthetic terrain elevation for visual testing
-        var elevation = [[Int]](repeating: [Int](repeating: 0, count: 96), count: 96)
-        for z in 0..<96 {
-            for x in 0..<96 {
-                elevation[z][x] = Int((sin(Double(x) * 0.3) + cos(Double(z) * 0.2)) * 20)
-            }
-        }
-        self.tileElevationCache = elevation
+        self.tileElevationCache = [[Int]](repeating: [Int](repeating: 0, count: 96), count: 96)
 
         // Build color-to-resource palette (simplified)
         self.colorToResource = [Int](repeating: 0, count: 256)
@@ -128,15 +121,18 @@ final class World {
                 // tileX/tileZ are already relative offsets from -half to +half
                 let baseX = Int32(tileX) * tileSize
                 let baseZ = Int32(tileZ) * tileSize
-                let y = -elev * 3  // Scale elevation
+                let y00 = -landscapeElevation(worldTileX: worldTX, worldTileZ: worldTZ, plane: plane, fallback: elev) * 3
+                let y10 = -landscapeElevation(worldTileX: worldTX + 1, worldTileZ: worldTZ, plane: plane, fallback: elev) * 3
+                let y11 = -landscapeElevation(worldTileX: worldTX + 1, worldTileZ: worldTZ + 1, plane: plane, fallback: elev) * 3
+                let y01 = -landscapeElevation(worldTileX: worldTX, worldTileZ: worldTZ + 1, plane: plane, fallback: elev) * 3
 
                 // 4 vertices for quad — use direct array access (skip duplicate search for speed)
                 let vi = model.vertHead
                 guard vi + 3 < model.vertexCount2 else { continue }
-                model.vertX[Int(vi)] = baseX;     model.vertY[Int(vi)] = y;     model.vertZ[Int(vi)] = baseZ
-                model.vertX[Int(vi+1)] = baseX + tileSize; model.vertY[Int(vi+1)] = y; model.vertZ[Int(vi+1)] = baseZ
-                model.vertX[Int(vi+2)] = baseX + tileSize; model.vertY[Int(vi+2)] = y; model.vertZ[Int(vi+2)] = baseZ + tileSize
-                model.vertX[Int(vi+3)] = baseX;   model.vertY[Int(vi+3)] = y;   model.vertZ[Int(vi+3)] = baseZ + tileSize
+                model.vertX[Int(vi)] = baseX;     model.vertY[Int(vi)] = y00;   model.vertZ[Int(vi)] = baseZ
+                model.vertX[Int(vi+1)] = baseX + tileSize; model.vertY[Int(vi+1)] = y10; model.vertZ[Int(vi+1)] = baseZ
+                model.vertX[Int(vi+2)] = baseX + tileSize; model.vertY[Int(vi+2)] = y11; model.vertZ[Int(vi+2)] = baseZ + tileSize
+                model.vertX[Int(vi+3)] = baseX;   model.vertY[Int(vi+3)] = y01; model.vertZ[Int(vi+3)] = baseZ + tileSize
                 model.vertHead += 4
                 let v0 = vi; let v1 = vi + 1; let v2 = vi + 2; let v3 = vi + 3
 
@@ -162,34 +158,60 @@ final class World {
     // MARK: - Elevation
 
     func getElevation(x: Int, z: Int) -> Int {
-        // Bilinear interpolation of elevation at world position (x, z)
-        // Terrain is 96x96 tiles, each tile is 128 game units
-        let tileX = x / 128
-        let tileZ = z / 128
-        let fracX = (x % 128) / 128
-        let fracZ = (z % 128) / 128
+        // Java World.getElevation expects scene-local world units and samples
+        // the 96x96 terrain window. Our mesh is generated relative to the
+        // current player tile, so convert the local unit coordinate back to an
+        // absolute landscape tile before sampling.
+        let tileOffsetX = Self.floorDiv(x, 128)
+        let tileOffsetZ = Self.floorDiv(z, 128)
+        var xLerp = Self.floorMod(x, 128)
+        var zLerp = Self.floorMod(z, 128)
 
-        guard tileX >= 0 && tileZ >= 0 && tileX < 95 && tileZ < 95 else {
-            return 0  // Out of bounds
+        let xTile = currentBaseX + tileOffsetX
+        let zTile = currentBaseZ + tileOffsetZ
+
+        let tileCorner: Int
+        let dEX: Int
+        let dEZ: Int
+        if xLerp <= 128 - zLerp {
+            tileCorner = scaledLandscapeElevation(worldTileX: xTile, worldTileZ: zTile)
+            dEX = scaledLandscapeElevation(worldTileX: xTile + 1, worldTileZ: zTile) - tileCorner
+            dEZ = scaledLandscapeElevation(worldTileX: xTile, worldTileZ: zTile + 1) - tileCorner
+        } else {
+            tileCorner = scaledLandscapeElevation(worldTileX: xTile + 1, worldTileZ: zTile + 1)
+            dEX = scaledLandscapeElevation(worldTileX: xTile, worldTileZ: zTile + 1) - tileCorner
+            dEZ = scaledLandscapeElevation(worldTileX: xTile + 1, worldTileZ: zTile) - tileCorner
+            xLerp = 128 - xLerp
+            zLerp = 128 - zLerp
         }
 
-        // Get the four corner elevation values
-        let e00 = tileElevationCache[tileZ][tileX]
-        let e10 = tileElevationCache[tileZ][tileX + 1]
-        let e01 = tileElevationCache[tileZ + 1][tileX]
-        let e11 = tileElevationCache[tileZ + 1][tileX + 1]
+        return tileCorner + dEX * xLerp / 128 + dEZ * zLerp / 128
+    }
 
-        // Bilinear interpolation
-        // e(x,z) = e00*(1-x)*(1-z) + e10*x*(1-z) + e01*(1-x)*z + e11*x*z
-        let one_x = 128 - fracX
-        let one_z = 128 - fracZ
+    private func landscapeElevation(worldTileX: Int, worldTileZ: Int, plane: Int, fallback: Int32 = 0) -> Int32 {
+        guard let loader = landscapeLoader, loader.isLoaded,
+              let tile = loader.getTile(worldX: worldTileX, worldZ: worldTileZ, plane: plane) else {
+            return fallback
+        }
+        return Int32(tile.groundElevation)
+    }
 
-        let result = (e00 * one_x * one_z +
-                      e10 * fracX * one_z +
-                      e01 * one_x * fracZ +
-                      e11 * fracX * fracZ) / (128 * 128)
+    private func scaledLandscapeElevation(worldTileX: Int, worldTileZ: Int) -> Int {
+        Int(landscapeElevation(worldTileX: worldTileX, worldTileZ: worldTileZ, plane: currentPlane)) * 3
+    }
 
-        return result
+    private static func floorDiv(_ value: Int, _ divisor: Int) -> Int {
+        var quotient = value / divisor
+        let remainder = value % divisor
+        if remainder != 0 && ((remainder > 0) != (divisor > 0)) {
+            quotient -= 1
+        }
+        return quotient
+    }
+
+    private static func floorMod(_ value: Int, _ divisor: Int) -> Int {
+        let remainder = value % divisor
+        return remainder >= 0 ? remainder : remainder + abs(divisor)
     }
 
     // MARK: - Collision
