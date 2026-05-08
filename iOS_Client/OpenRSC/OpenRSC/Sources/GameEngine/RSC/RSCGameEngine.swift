@@ -1703,6 +1703,61 @@ final class RSCGameEngine: ObservableObject {
         return best
     }
 
+    private func projectedScreenPoint(tileX: Double, tileZ: Double, yOffset: Int32 = 0) -> (x: Double, y: Double, depth: Int32)? {
+        guard let scene = self.scene else { return nil }
+        let localX = Int32(((tileX - Double(worldState.localPlayerX)) * 128.0).rounded()) + 64
+        let localZ = Int32(((tileZ - Double(worldState.localPlayerY)) * 128.0).rounded()) + 64
+        let proj = scene.projectPoint(worldX: localX, worldY: yOffset, worldZ: localZ)
+        guard proj.depth >= scene.rot1024_zTop else { return nil }
+        return (Double(proj.screenX), Double(proj.screenY), proj.depth)
+    }
+
+    /// Prefer screen-space entity hit tests over tile-nearest picking. Mobile
+    /// taps land on the visible sprite, not always on the projected tile centre;
+    /// this mirrors the PC client's menu building, which starts from what is
+    /// actually under the cursor.
+    private func nearestNPCOnScreen(gameX: Double, gameY: Double) -> RSCNPC? {
+        var best: (npc: RSCNPC, score: Double, depth: Int32)?
+        for npc in worldState.npcs {
+            guard let p = projectedScreenPoint(tileX: npc.interpolatedX, tileZ: npc.interpolatedY) else { continue }
+            let dx = (p.x - gameX) / 26.0
+            let dy = (p.y - 42.0 - gameY) / 48.0
+            let score = dx * dx + dy * dy
+            if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
+                best = (npc, score, p.depth)
+            }
+        }
+        return best?.npc
+    }
+
+    private func nearestPlayerOnScreen(gameX: Double, gameY: Double) -> RSCPlayer? {
+        var best: (player: RSCPlayer, score: Double, depth: Int32)?
+        for player in worldState.players {
+            guard let p = projectedScreenPoint(tileX: player.interpolatedX, tileZ: player.interpolatedY) else { continue }
+            let dx = (p.x - gameX) / 26.0
+            let dy = (p.y - 42.0 - gameY) / 48.0
+            let score = dx * dx + dy * dy
+            if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
+                best = (player, score, p.depth)
+            }
+        }
+        return best?.player
+    }
+
+    private func nearestGroundItemOnScreen(gameX: Double, gameY: Double) -> RSCGroundItem? {
+        var best: (item: RSCGroundItem, score: Double, depth: Int32)?
+        for item in worldState.groundItems {
+            guard let p = projectedScreenPoint(tileX: Double(item.x), tileZ: Double(item.y), yOffset: -8) else { continue }
+            let dx = p.x - gameX
+            let dy = p.y - gameY
+            let score = dx * dx + dy * dy
+            if score <= 18.0 * 18.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
+                best = (item, score, p.depth)
+            }
+        }
+        return best?.item
+    }
+
     private func nearestNPC(toX x: Int, z: Int) -> RSCNPC? {
         var nearest: RSCNPC? = nil
         var nearestDist = Int.max
@@ -1800,13 +1855,15 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func handleTap(x: Int, y: Int) {
+        let gameX = Double(x)
+        let gameY = Double(y)
         let target = worldTileNearestScreenPoint(gameX: Double(x), gameY: Double(y))
         let destX = target.x
         let destZ = target.z
 
-        let targetNPC = nearestNPC(toX: destX, z: destZ)
-        let targetPlayer = nearestPlayer(toX: destX, z: destZ)
-        let targetGroundItem = nearestGroundItem(toX: destX, z: destZ)
+        let targetNPC = nearestNPCOnScreen(gameX: gameX, gameY: gameY) ?? nearestNPC(toX: destX, z: destZ)
+        let targetPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY) ?? nearestPlayer(toX: destX, z: destZ)
+        let targetGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY) ?? nearestGroundItem(toX: destX, z: destZ)
         let targetObject = nearestGameObject(toX: destX, z: destZ)
 
         // Item-use target mode — armed by inventory "Use". The next tap on a
@@ -1895,6 +1952,9 @@ final class RSCGameEngine: ObservableObject {
         let target = worldTileNearestScreenPoint(gameX: gx, gameY: gy)
         let worldX = target.x
         let worldZ = target.z
+        let screenNPC = nearestNPCOnScreen(gameX: gx, gameY: gy)
+        let screenPlayer = nearestPlayerOnScreen(gameX: gx, gameY: gy)
+        let screenItem = nearestGroundItemOnScreen(gameX: gx, gameY: gy)
 
         var actions: [(label: String, icon: String, action: () -> Void)] = []
         var title = "(\(worldX), \(worldZ))"
@@ -1905,10 +1965,10 @@ final class RSCGameEngine: ObservableObject {
 
         // Check NPCs (within 2 tiles). Always offer Examine; offer Attack only
         // for combat-eligible NPCs (NPCDef.attackable == true).
-        for npc in worldState.npcs {
+        for npc in screenNPC.map({ [$0] }) ?? worldState.npcs {
             let dx: Int = npc.x - worldX; let dz: Int = npc.y - worldZ
             let distSq: Int = dx * dx + dz * dz
-            if distSq <= 4 {
+            if screenNPC?.id == npc.id || distSq <= 4 {
                 title = npc.name
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(npc.name)", "hand.point.up.left", { [weak self] in
@@ -1946,9 +2006,9 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Check players (within 2 tiles). Add Trade + Duel + Follow + Examine.
-        for player in worldState.players {
+        for player in screenPlayer.map({ [$0] }) ?? worldState.players {
             let pdx: Int = player.x - worldX; let pdz: Int = player.y - worldZ
-            if pdx * pdx + pdz * pdz <= 4 {
+            if screenPlayer?.id == player.id || pdx * pdx + pdz * pdz <= 4 {
                 title = player.name
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(player.name)", "hand.point.up.left", { [weak self] in
@@ -1975,9 +2035,10 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Check ground items (within 2 tiles)
-        for item in worldState.groundItems {
+        for item in screenItem.map({ [$0] }) ?? worldState.groundItems {
             let idx: Int = item.x - worldX; let idz: Int = item.y - worldZ
-            if idx * idx + idz * idz <= 4 {
+            if (screenItem?.x == item.x && screenItem?.y == item.y && screenItem?.itemId == item.itemId)
+                || idx * idx + idz * idz <= 4 {
                 let itemName = ItemNames.name(for: item.itemId)
                 title = itemName
                 if let pendingItemSlot {
