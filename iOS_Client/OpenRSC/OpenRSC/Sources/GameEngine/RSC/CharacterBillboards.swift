@@ -144,7 +144,19 @@ enum CharacterBillboards {
             if animId < 0 { continue }
             guard let anim = AnimationDefs.get(animId) else { continue }
 
-            let spriteID = anim.number + var14
+            let layerFrame = frameOffsetForLayer(
+                layer: layerIdx,
+                baseOffset: var14,
+                actualAnimDir: actualAnimDir,
+                mirrorX: flip,
+                animation: anim,
+                stepFrame: stepFrame,
+                walkModel: walkModel,
+                combatRole: combatRole
+            )
+            guard let layerFrame else { continue }
+
+            let spriteID = anim.number + layerFrame.offset
             guard let gs = spriteLoader.getSprite(spriteID) else { continue }
 
             // The sprite is stored as a TRIMMED bitmap of size (gs.width, gs.height)
@@ -161,10 +173,10 @@ enum CharacterBillboards {
             let spriteW = Int32(gs.width)
             let spriteH = Int32(gs.height)
 
-            let boxLeft = anchorScreenX - authW / 2 + anchorXAdjust
+            let boxLeft = anchorScreenX - authW / 2 + anchorXAdjust + Int32(layerFrame.xOffset)
             let boxTop = anchorScreenY - authH
             let drawX = boxLeft + Int32(gs.xShift)
-            let drawY = boxTop + Int32(gs.yShift)
+            let drawY = boxTop + Int32(gs.yShift) + Int32(layerFrame.yOffset)
 
             // Per-layer color masks. Java mudclient.java:6637-6646 picks mask1
             // based on the AnimationDef.charColour role:
@@ -189,5 +201,63 @@ enum CharacterBillboards {
                 mirrorX: flip
             )
         }
+    }
+
+    private static func frameOffsetForLayer(layer: Int,
+                                            baseOffset: Int,
+                                            actualAnimDir: Int,
+                                            mirrorX: Bool,
+                                            animation: AnimationDef,
+                                            stepFrame: Int,
+                                            walkModel: Int,
+                                            combatRole: CombatRole) -> (offset: Int, xOffset: Int, yOffset: Int)? {
+        // Java mudclient.java:6625: combat direction 5 is only drawable when
+        // the animation actually owns combat-A frames. Ranged weapons such as
+        // crossbow/longbow set hasA=false; indexing +15 anyway lands in the
+        // next animation's sprite range and visually equips the wrong item.
+        if actualAnimDir == 5 && !animation.hasA {
+            return nil
+        }
+
+        var offset = baseOffset
+        var xOffset = 0
+        var yOffset = 0
+
+        // Java mudclient.java:6590-6623: mirrored side-facing weapon/shield
+        // layers either use special F sprites or get hand-tuned offsets so the
+        // held item remains attached to the correct hand after mirroring.
+        guard mirrorX && actualAnimDir >= 1 && actualAnimDir <= 3 && combatRole == .none else {
+            return (offset, xOffset, yOffset)
+        }
+
+        if animation.hasF {
+            offset += 15
+        } else if layer == 4 && actualAnimDir == 1 {
+            offset = actualAnimDir * 3 + animFrameToSprite_Walk[((stepFrame / max(1, walkModel)) + 2) % 4]
+            xOffset = -22
+            yOffset = -3
+        } else if layer == 4 && actualAnimDir == 2 {
+            offset = actualAnimDir * 3 + animFrameToSprite_Walk[((stepFrame / max(1, walkModel)) + 2) % 4]
+            xOffset = 0
+            yOffset = -8
+        } else if layer == 4 && actualAnimDir == 3 {
+            offset = actualAnimDir * 3 + animFrameToSprite_Walk[((stepFrame / max(1, walkModel)) + 2) % 4]
+            xOffset = 26
+            yOffset = -5
+        } else if layer == 3 && actualAnimDir == 1 {
+            offset = actualAnimDir * 3 + animFrameToSprite_Walk[((stepFrame / max(1, walkModel)) + 2) % 4]
+            xOffset = 22
+            yOffset = 3
+        } else if layer == 3 && actualAnimDir == 2 {
+            offset = actualAnimDir * 3 + animFrameToSprite_Walk[((stepFrame / max(1, walkModel)) + 2) % 4]
+            xOffset = 0
+            yOffset = 8
+        } else if layer == 3 && actualAnimDir == 3 {
+            offset = actualAnimDir * 3 + animFrameToSprite_Walk[((stepFrame / max(1, walkModel)) + 2) % 4]
+            xOffset = -26
+            yOffset = 5
+        }
+
+        return (offset, xOffset, yOffset)
     }
 }
