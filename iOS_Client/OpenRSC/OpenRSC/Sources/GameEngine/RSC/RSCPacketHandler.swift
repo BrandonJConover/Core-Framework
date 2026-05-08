@@ -184,16 +184,17 @@ final class RSCPacketHandler {
             ws.tradeAccepted = buf.getByte() == 1
 
         case 149: // sendConnectionMessage — friend login/logout
-            let friendName = buf.getZeroPaddedString()
-            let _ = buf.getZeroPaddedString() // formerName
+            let friendName = buf.getString()
+            let formerName = buf.getString()
             let onlineStatus = buf.getUnsignedByte()
+            let rename = (onlineStatus & 1) != 0
             let isOnline = (onlineStatus & 4) != 0
             var world149: String? = nil
-            if isOnline { world149 = buf.getZeroPaddedString() }
+            if isOnline { world149 = buf.getString() }
             // Update friend in list
-            if let idx = ws.friendsList.firstIndex(where: { $0.name == friendName }) {
+            if let idx = ws.friendsList.firstIndex(where: { $0.name == friendName || (rename && $0.name == formerName) }) {
                 ws.friendsList[idx] = (name: friendName, online: isOnline)
-            } else {
+            } else if !rename {
                 ws.friendsList.append((name: friendName, online: isOnline))
             }
             let statusText = isOnline ? "logged in" : "logged out"
@@ -354,23 +355,27 @@ final class RSCPacketHandler {
             }
 
         case 109: // SET_IGNORE — Java updateIgnoreList()
-            // Format: BYTE count, then per entry: 4x zero-quoted strings (duplicated current/former names)
+            // Format: BYTE count, then per entry: 4x RSC strings
+            // (raw/display current name, raw/display former name).
             let ignoreCount = buf.getUnsignedByte()
             var ignores: [String] = []
             for _ in 0..<ignoreCount {
-                let name = buf.getZeroPaddedString()
-                let _ = buf.getZeroPaddedString() // duplicate current name
-                let _ = buf.getZeroPaddedString() // formerName
-                let _ = buf.getZeroPaddedString() // duplicate formerName
+                let rawName = buf.getString()
+                var name = buf.getString() // display current name
+                if name.isEmpty { name = rawName }
+                let _ = buf.getString() // raw formerName
+                let _ = buf.getString() // display formerName
                 ignores.append(name)
             }
             ws.ignoreList = ignores
 
         case 237: // updateIgnoreListBecauseNameChange
-            let name = buf.getZeroPaddedString()
-            let _ = buf.getZeroPaddedString() // duplicate current name
-            let formerName = buf.getZeroPaddedString()
-            let _ = buf.getZeroPaddedString() // duplicate formerName
+            let rawName = buf.getString()
+            var name = buf.getString()
+            if name.isEmpty { name = rawName }
+            let rawFormerName = buf.getString()
+            var formerName = buf.getString()
+            if formerName.isEmpty { formerName = rawName.isEmpty ? rawFormerName : rawName }
             let updateExisting = buf.getUnsignedByte() == 1
             if updateExisting, let idx = ws.ignoreList.firstIndex(of: formerName) {
                 ws.ignoreList[idx] = name
