@@ -82,10 +82,10 @@
             }
 
             .mudclient-keyboard {
-                background: none;
+                background: rgba(0, 0, 0, 0.01);
                 font-family: Arial, sans-serif;
                 border: 0;
-                color: transparent;
+                color: #ffffff;
                 display: block;
                 left: -9999px;
                 top: -9999px;
@@ -94,12 +94,13 @@
                 resize: none;
                 text-align: center;
                 transform-origin: 0 0;
-                -webkit-text-fill-color: transparent;
-                caret-color: transparent;
-                opacity: 0.01;
+                -webkit-text-fill-color: #ffffff;
+                caret-color: #ffffff;
+                opacity: 1;
                 min-height: 32px;
                 min-width: 160px;
                 font-size: 16px;
+                z-index: 20;
             }
 
             .mudclient-keyboard:focus {
@@ -608,10 +609,15 @@
                 var launchReadyTimer = 0;
                 var nativeConfig = window.rscNativeConfig || {};
                 var isNativeIOSWebClient = nativeConfig.platform === 'ios';
+                var isWebLauncherClient = nativeConfig.platform === 'web-launcher';
                 window._mudclientStartupReturned = false;
                 window._mudclientNativeAutoLoginPending = false;
                 (function installNativeStartupDetector() {
-                    if (!isNativeIOSWebClient || console.__mudclientNativeStartupDetector) {
+                    if (
+                        (!isNativeIOSWebClient && !isWebLauncherClient) ||
+                        !nativeConfig.autoLogin ||
+                        console.__mudclientNativeStartupDetector
+                    ) {
                         return;
                     }
 
@@ -813,11 +819,17 @@
                         var text = args.map(stringify).join(' ');
                         if (/\bLogin response:\s*0\b/.test(text)) {
                             window._mudclientWelcomeCloseAssistUntil = Date.now() + 90000;
+                            if (window._mudclientMarkNativeDirectAutoLoginComplete) {
+                                window._mudclientMarkNativeDirectAutoLoginComplete('login-response');
+                            }
                         }
                         if (/\bINFO:\s*Started application\b/.test(text)) {
                             setLaunchStatus('Game ready');
                             markLaunchReady(550);
                         } else if (/\bWebSocket connected\b/.test(text)) {
+                            if (window._mudclientMarkNativeDirectAutoLoginComplete) {
+                                window._mudclientMarkNativeDirectAutoLoginComplete('websocket');
+                            }
                             setLaunchStatus('Connected');
                             setLaunchProgress(88);
                         } else if (/\bINFO:\s*Loading\b/.test(text)) {
@@ -1763,9 +1775,12 @@
 
             var iosKeyboardBtn = document.getElementById('ios-keyboard-btn');
             var _activeKeyboardInput = null;
+            var pendingAutofillUsername = '';
             var pendingAutofillPassword = '';
             var lastKeyboardValue = '';
             var lastPasswordValue = '';
+            var lastObservedKeyboardValue = '';
+            var lastObservedPasswordValue = '';
             var lastTrustedInputGestureAt = 0;
             var nativeAutoLogin = (function() {
                 var credentials =
@@ -2029,19 +2044,44 @@
             }
 
             function applyPendingAutofillFor(input) {
-                if (input !== passwordInput || !pendingAutofillPassword) {
-                    return;
+                if (input === keyboardInput && pendingAutofillUsername) {
+                    keyboardInput.value = pendingAutofillUsername;
+                    pendingAutofillUsername = '';
+                    keyboardInputEvent({ target: keyboardInput });
                 }
 
-                passwordInput.value = pendingAutofillPassword;
-                pendingAutofillPassword = '';
-                keyboardInputEvent({ target: passwordInput });
+                if (input === passwordInput && pendingAutofillPassword) {
+                    passwordInput.value = pendingAutofillPassword;
+                    pendingAutofillPassword = '';
+                    keyboardInputEvent({ target: passwordInput });
+                }
+            }
+
+            function trackAutofillChanges() {
+                if (keyboardInput.value !== lastObservedKeyboardValue) {
+                    lastObservedKeyboardValue = keyboardInput.value;
+                    if (_activeKeyboardInput === keyboardInput) {
+                        syncKeyboardElement(keyboardInput, { target: keyboardInput });
+                    } else if (keyboardInput.value) {
+                        pendingAutofillUsername = keyboardInput.value;
+                    }
+                }
+
+                if (passwordInput.value !== lastObservedPasswordValue) {
+                    lastObservedPasswordValue = passwordInput.value;
+                    if (_activeKeyboardInput === passwordInput) {
+                        syncKeyboardElement(passwordInput, { target: passwordInput });
+                    } else if (passwordInput.value) {
+                        pendingAutofillPassword = passwordInput.value;
+                    }
+                }
             }
 
             // Hook into the keyboard inputs: poll for when C code positions them.
             // MutationObserver doesn't reliably fire for EM_JS inline style changes.
             // Instead, poll every 100ms to detect when an input moves on-screen.
             setInterval(function() {
+                trackAutofillChanges();
                 var inputs = [keyboardInput, passwordInput];
                 for (var i = 0; i < inputs.length; i++) {
                     var el = inputs[i];
@@ -2049,12 +2089,14 @@
                     if (!isNaN(left) && left >= 0 && parseFloat(el.style.width) > 0) {
                         if (_activeKeyboardInput !== el) {
                             _activeKeyboardInput = el;
+                            applyPendingAutofillFor(el);
                             if (el === keyboardInput) {
                                 lastKeyboardValue = el.value;
+                                lastObservedKeyboardValue = el.value;
                             } else if (el === passwordInput) {
                                 lastPasswordValue = el.value;
+                                lastObservedPasswordValue = el.value;
                             }
-                            applyPendingAutofillFor(el);
                             console.log('[keyboard] Input positioned at left=' + left);
                         }
                         maybeApplyNativeAutoLogin(el);
@@ -2168,21 +2210,93 @@
             }
 
             var nativeDirectAutoLoginStarted = false;
+            var nativeDirectAutoLoginCompleted = false;
+            var nativeDirectAutoLoginSubmitted = false;
+            var nativeDirectAutoLoginAttempts = 0;
+            var nativeDirectAutoLoginLastAttemptAt = 0;
+            var nativeDirectAutoLoginMaxAttempts = 30;
+
+            function nativeLoginLog(message) {
+                console.log('[native-login] ' + message);
+                if (typeof sendNative === 'function') {
+                    sendNative('log', {
+                        level: 'native-login',
+                        message: message
+                    });
+                }
+            }
 
             function nativeDirectAutoLoginEnabled() {
                 var config = window.rscNativeConfig || {};
                 var autoLogin = config.autoLogin || {};
+                var platform = config.platform || '';
                 return !!(
-                    config.platform === 'ios' &&
+                    (platform === 'ios' || platform === 'web-launcher') &&
                     autoLogin.direct !== false &&
+                    !nativeDirectAutoLoginCompleted &&
+                    !nativeDirectAutoLoginSubmitted &&
+                    nativeDirectAutoLoginAttempts < nativeDirectAutoLoginMaxAttempts &&
                     hasNativeAutoLoginCredentials()
                 );
             }
 
             function tapNativeGamePoint(x, y) {
-                dispatchMouse('mousedown', x, y, 0);
-                dispatchMouse('mouseup', x, y, 0);
-                dispatchMouse('click', x, y, 0);
+                if (typeof window._mudclientFireLeftClick === 'function') {
+                    window._mudclientFireLeftClick(x, y);
+                    return;
+                }
+
+                if (!canvas) {
+                    return;
+                }
+                var rect = canvas.getBoundingClientRect();
+                var backingWidth = canvas.width || rect.width || 1;
+                var backingHeight = canvas.height || rect.height || 1;
+                var scaleX = rect.width > 0 ? rect.width / backingWidth : 1;
+                var scaleY = rect.height > 0 ? rect.height / backingHeight : 1;
+                var clientX = rect.left + x * scaleX;
+                var clientY = rect.top + y * scaleY;
+
+                ['mousedown', 'mouseup', 'click'].forEach(function(type) {
+                    var event = new MouseEvent(type, {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window,
+                        clientX: clientX,
+                        clientY: clientY,
+                        screenX: clientX,
+                        screenY: clientY,
+                        button: 0,
+                        buttons: type === 'mouseup' ? 0 : 1
+                    });
+                    canvas.dispatchEvent(event);
+                });
+            }
+
+            function runLauncherLoginExport() {
+                if (typeof Module === 'undefined' || typeof Module.ccall !== 'function') {
+                    return false;
+                }
+                if (typeof Module._browser_launcher_login !== 'function') {
+                    return false;
+                }
+
+                try {
+                    Module.ccall(
+                        'browser_launcher_login',
+                        null,
+                        ['string', 'string'],
+                        [nativeAutoLogin.username, nativeAutoLogin.password]
+                    );
+                    nativeAutoLogin.usernameApplied = true;
+                    nativeAutoLogin.passwordApplied = true;
+                    nativeAutoLogin.submitQueued = true;
+                    nativeDirectAutoLoginSubmitted = true;
+                    return true;
+                } catch (err) {
+                    nativeLoginLog('browser_launcher_login failed: ' + (err && err.message ? err.message : String(err)));
+                    return false;
+                }
             }
 
             function clearNativeGameInputLine() {
@@ -2203,28 +2317,52 @@
                     return false;
                 }
 
-                if (!window._mudclientStartupReturned) {
+                var runtimeReady = !!(
+                    window._mudclientStartupReturned ||
+                    (typeof Module !== 'undefined' && Module.calledRun)
+                );
+                if (!runtimeReady) {
                     window._mudclientNativeAutoLoginPending = true;
                     return false;
                 }
 
+                var now = Date.now();
+                if (now - nativeDirectAutoLoginLastAttemptAt < 2500) {
+                    return false;
+                }
+
                 nativeDirectAutoLoginStarted = true;
+                nativeDirectAutoLoginAttempts++;
+                nativeDirectAutoLoginLastAttemptAt = now;
                 window._mudclientNativeAutoLoginPending = false;
 
                 var width = (canvas && canvas.width) || 765;
                 var height = (canvas && canvas.height) || 503;
-                var existingUserX = Math.floor(width / 2) + 80;
-                var existingUserY = Math.floor(height / 2) + 40;
-                var loginX = Math.floor(width / 2) - 80;
-                var loginY = Math.floor(height / 2) + 70;
+                var halfWidth = Math.floor(width / 2);
+                var halfHeight = Math.floor(height / 2);
+                var loginEntryX = halfWidth;
+                var loginEntryY = halfHeight + 235;
+                var loginX = halfWidth + 154;
+                var loginY = halfHeight + 155;
 
-                console.log('[native-login] Starting direct iOS login flow reason=' + reason);
+                nativeLoginLog('Starting direct login flow reason=' + reason + ' attempt=' + nativeDirectAutoLoginAttempts);
                 if (window._mudclientSetLaunchStatus) {
                     window._mudclientSetLaunchStatus('Signing in...', false);
                 }
 
+                if (runLauncherLoginExport()) {
+                    nativeLoginLog('Submitted direct exported login attempt=' + nativeDirectAutoLoginAttempts);
+                    return true;
+                }
+
+                nativeAutoLogin.usernameApplied = true;
+                nativeAutoLogin.passwordApplied = true;
+                nativeAutoLogin.submitQueued = true;
+                pendingAutofillUsername = '';
+                pendingAutofillPassword = '';
+
                 setTimeout(function() {
-                    tapNativeGamePoint(existingUserX, existingUserY);
+                    tapNativeGamePoint(loginEntryX, loginEntryY);
                 }, 120);
                 setTimeout(function() {
                     clearNativeGameInputLine();
@@ -2237,14 +2375,24 @@
                 }, 760);
                 setTimeout(function() {
                     tapNativeGamePoint(loginX, loginY);
-                    nativeAutoLogin.usernameApplied = true;
-                    nativeAutoLogin.passwordApplied = true;
                     nativeAutoLogin.submitQueued = true;
-                    console.log('[native-login] Submitted direct iOS login flow');
+                    nativeDirectAutoLoginSubmitted = true;
+                    nativeDirectAutoLoginStarted = false;
+                    nativeLoginLog('Submitted direct login flow attempt=' + nativeDirectAutoLoginAttempts);
                 }, 1080);
 
                 return true;
             }
+
+            window._mudclientMarkNativeDirectAutoLoginComplete = function(reason) {
+                nativeDirectAutoLoginCompleted = true;
+                nativeDirectAutoLoginSubmitted = true;
+                nativeDirectAutoLoginStarted = false;
+                nativeAutoLogin.usernameApplied = true;
+                nativeAutoLogin.passwordApplied = true;
+                nativeAutoLogin.submitQueued = true;
+                nativeLoginLog('Completed direct login flow reason=' + reason);
+            };
 
             window._mudclientTryNativeDirectAutoLogin = function(reason) {
                 return runNativeDirectAutoLogin(reason || 'external');
@@ -2254,10 +2402,13 @@
             var nativeDirectAutoLoginTimer = setInterval(function() {
                 nativeDirectAutoLoginPolls++;
                 if (runNativeDirectAutoLogin('poll')) {
-                    clearInterval(nativeDirectAutoLoginTimer);
                     return;
                 }
-                if (nativeDirectAutoLoginPolls > 600 || !nativeDirectAutoLoginEnabled()) {
+                if (
+                    nativeDirectAutoLoginCompleted ||
+                    nativeDirectAutoLoginPolls > 1200 ||
+                    !nativeDirectAutoLoginEnabled()
+                ) {
                     clearInterval(nativeDirectAutoLoginTimer);
                 }
             }, 100);
@@ -2314,21 +2465,35 @@
 
             function keyboardInputEvent(event) {
                 if (event.target !== _activeKeyboardInput) {
-                    if (event.target === passwordInput && passwordInput.value) {
+                    if (event.target === keyboardInput && keyboardInput.value) {
+                        pendingAutofillUsername = keyboardInput.value;
+                    } else if (event.target === passwordInput && passwordInput.value) {
                         pendingAutofillPassword = passwordInput.value;
                     }
+                    return;
+                }
+
+                syncKeyboardElement(event.target, event);
+            }
+
+            function syncKeyboardElement(input, event) {
+                if (!input) {
                     return;
                 }
 
                 if (event.target === keyboardInput) {
                     syncGameInputValue(lastKeyboardValue, keyboardInput.value, event);
                     lastKeyboardValue = keyboardInput.value;
+                    lastObservedKeyboardValue = keyboardInput.value;
+                    pendingAutofillUsername = '';
                     if (passwordInput.value && passwordInput.value !== lastPasswordValue) {
                         pendingAutofillPassword = passwordInput.value;
+                        lastObservedPasswordValue = passwordInput.value;
                     }
                 } else if (event.target === passwordInput) {
                     syncGameInputValue(lastPasswordValue, passwordInput.value, event);
                     lastPasswordValue = passwordInput.value;
+                    lastObservedPasswordValue = passwordInput.value;
                     pendingAutofillPassword = '';
                 }
             }
@@ -2354,7 +2519,12 @@
             keyboardInput.addEventListener('keydown', keyboardDownEvent);
             passwordInput.addEventListener('keydown', keyboardDownEvent);
 
-            function keyboardBlurEvent() {
+            function keyboardBlurEvent(event) {
+                if (event.target === keyboardInput) {
+                    syncKeyboardElement(keyboardInput, { target: keyboardInput });
+                } else if (event.target === passwordInput) {
+                    syncKeyboardElement(passwordInput, { target: passwordInput });
+                }
                 window._mudclientCanResize = false;
 
                 setTimeout(() => {
@@ -2371,6 +2541,7 @@
                 if (event.target === keyboardInput || event.target === passwordInput) {
                     _activeKeyboardInput = event.target;
                     applyPendingAutofillFor(event.target);
+                    trackAutofillChanges();
                 }
                 if (event.target.dataset.selectAllOnFocus === 'true') {
                     event.target.selectionStart = 0;
@@ -2914,6 +3085,7 @@
                         button: 0
                     }));
                 }
+                window._mudclientFireLeftClick = fireLeftClick;
 
                 function centerPoint() {
                     return {

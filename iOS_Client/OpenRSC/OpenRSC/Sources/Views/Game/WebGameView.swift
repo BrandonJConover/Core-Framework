@@ -255,6 +255,11 @@ struct WebGameView: UIViewRepresentable {
             recordLog(level: "navigation", message: "Provisional navigation failed: \(error)")
         }
 
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            recordLog(level: "navigation", message: "Web client navigation finished: \(webView.url?.absoluteString ?? "nil")")
+            kickNativeAutoLogin(reason: "did-finish")
+        }
+
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             let bounds = webView.bounds
             let progress = String(format: "%.2f", webView.estimatedProgress)
@@ -406,6 +411,7 @@ struct WebGameView: UIViewRepresentable {
                     self?.recordLog(level: "lifecycle", message: "UIApplication willEnterForeground")
                     UIApplication.shared.isIdleTimerDisabled = true
                     self?.notifyWebClientOfAppVisibility(isVisible: true)
+                    self?.kickNativeAutoLogin(reason: "foreground")
                 }
             )
         }
@@ -453,6 +459,29 @@ struct WebGameView: UIViewRepresentable {
             webView?.evaluateJavaScript(script) { [weak self] _, error in
                 if let error {
                     self?.recordLog(level: "lifecycle", message: "Unable to notify web client visibility=\(isVisible): \(error)")
+                }
+            }
+        }
+
+        private func kickNativeAutoLogin(reason: String) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                guard let self,
+                      let webView = self.webView else {
+                    return
+                }
+
+                let escapedReason = reason
+                    .replacingOccurrences(of: "\\", with: "\\\\")
+                    .replacingOccurrences(of: "'", with: "\\'")
+                let script = """
+                window._mudclientTryNativeDirectAutoLogin && window._mudclientTryNativeDirectAutoLogin('\(escapedReason)')
+                """
+                webView.evaluateJavaScript(script) { [weak self] _, error in
+                    if let error {
+                        self?.recordLog(level: "native-login", message: "Unable to kick native auto-login reason=\(reason): \(error)")
+                    } else {
+                        self?.recordLog(level: "native-login", message: "Kicked native auto-login reason=\(reason)")
+                    }
                 }
             }
         }
