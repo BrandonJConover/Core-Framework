@@ -676,6 +676,12 @@ final class Scene {
 
     // MARK: - Texture management
 
+    var loadedTextureCount: Int {
+        resourceDatabase.reduce(0) { count, texture in
+            texture == nil ? count : count + 1
+        }
+    }
+
     func loadTexture(index: Int, pixels: [Int32], type: Int, data: Data?) {
         guard index >= 0 else { return }
         ensureTextureCapacity(index + 1)

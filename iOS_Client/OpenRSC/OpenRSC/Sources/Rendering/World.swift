@@ -96,7 +96,9 @@ final class World {
         let absBaseZ = currentBaseZ
 
         var faceCount = 0
+        var texturedFaceCount = 0
         let half = viewSize / 2
+        let loadedTextureCount = scene.loadedTextureCount
 
         for tileZ in (-half)..<half {
             for tileX in (-half)..<half {
@@ -104,11 +106,15 @@ final class World {
                 let worldTZ = absBaseZ + tileZ
 
                 var color: Int32
+                var terrainTextureIndex: Int32 = -1
                 var elev: Int32 = 0
 
                 if let loader = landscapeLoader, loader.isLoaded,
                    let tile = loader.getTile(worldX: worldTX, worldZ: worldTZ, plane: plane) {
                     color = LandscapeLoader.tileColor(overlay: tile.groundOverlay, texture: tile.groundTexture, elevation: tile.groundElevation)
+                    if tile.groundTexture > 0 && tile.groundTexture <= loadedTextureCount {
+                        terrainTextureIndex = Int32(tile.groundTexture - 1)
+                    }
                     elev = Int32(tile.groundElevation)
                 } else {
                     let tileDef = EntityDefinitions.getTileDef((tileZ * 96 + tileX) % 25)
@@ -136,13 +142,14 @@ final class World {
 
                 // Face with color as front texture
                 let faceIndices: [Int32] = [v0, v1, v2, v3]
-                model.insertFace(count: 4, indices: faceIndices, texFront: color, texBack: -1)
+                model.insertFace(count: 4, indices: faceIndices, texFront: color, texBack: terrainTextureIndex)
 
                 faceCount += 1
+                if terrainTextureIndex >= 0 { texturedFaceCount += 1 }
             }
         }
 
-        print("[World] Generated landscape: \(faceCount) faces, \(model.vertHead) verts")
+        print("[World] Generated landscape: \(faceCount) faces, \(model.vertHead) verts, textured=\(texturedFaceCount)")
 
         // Force full bounding box recalculation (m_Yb=2 sets bounds to ±9999999)
         model.m_Yb = 2
