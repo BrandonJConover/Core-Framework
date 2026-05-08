@@ -476,13 +476,14 @@ final class Scene {
                 let rowBase = y * w
                 for x in minX...maxX {
                     if let terrainTexture {
-                        graphics.pixelData[rowBase + x] = sampleTerrainTexture(
+                        if let sampled = sampleTerrainTexture(
                             terrainTexture,
                             x: x, y: y,
-                            minX: minX, maxX: maxX,
-                            minY: minY, maxY: maxY,
+                            screenPts: screenPts,
                             fallback: color
-                        )
+                        ) {
+                            graphics.pixelData[rowBase + x] = sampled
+                        }
                     } else {
                         graphics.pixelData[rowBase + x] = color
                     }
@@ -556,13 +557,13 @@ final class Scene {
 
     private func sampleTerrainTexture(_ texture: (pixels: [Int32], width: Int, height: Int),
                                       x: Int, y: Int,
-                                      minX: Int, maxX: Int,
-                                      minY: Int, maxY: Int,
-                                      fallback: Int32) -> Int32 {
-        let spanX = max(1, maxX - minX + 1)
-        let spanY = max(1, maxY - minY + 1)
-        let u = max(0, min(texture.width - 1, ((x - minX) * texture.width) / spanX))
-        let v = max(0, min(texture.height - 1, ((y - minY) * texture.height) / spanY))
+                                      screenPts: [(x: Int, y: Int)],
+                                      fallback: Int32) -> Int32? {
+        guard let uv = terrainUVForScreenPoint(x: Double(x) + 0.5,
+                                               y: Double(y) + 0.5,
+                                               screenPts: screenPts) else { return nil }
+        let u = max(0, min(texture.width - 1, Int(uv.u * Double(texture.width - 1))))
+        let v = max(0, min(texture.height - 1, Int(uv.v * Double(texture.height - 1))))
         let pixel = texture.pixels[v * texture.width + u]
 
         // Java treats magenta as texture transparency after texture loading.
@@ -571,6 +572,55 @@ final class Scene {
             return fallback
         }
         return blendTerrainTexture(pixel, with: fallback)
+    }
+
+    private func terrainUVForScreenPoint(x: Double, y: Double,
+                                         screenPts: [(x: Int, y: Int)]) -> (u: Double, v: Double)? {
+        guard screenPts.count >= 3 else { return nil }
+
+        if screenPts.count >= 4 {
+            let uv0 = (u: 0.0, v: 0.0)
+            let uv1 = (u: 1.0, v: 0.0)
+            let uv2 = (u: 1.0, v: 1.0)
+            let uv3 = (u: 0.0, v: 1.0)
+            if let uv = barycentricUV(x: x, y: y,
+                                      p0: screenPts[0], p1: screenPts[1], p2: screenPts[2],
+                                      uv0: uv0, uv1: uv1, uv2: uv2) {
+                return uv
+            }
+            return barycentricUV(x: x, y: y,
+                                 p0: screenPts[0], p1: screenPts[2], p2: screenPts[3],
+                                 uv0: uv0, uv1: uv2, uv2: uv3)
+        }
+
+        return barycentricUV(x: x, y: y,
+                             p0: screenPts[0], p1: screenPts[1], p2: screenPts[2],
+                             uv0: (0.0, 0.0), uv1: (1.0, 0.0), uv2: (0.5, 1.0))
+    }
+
+    private func barycentricUV(x: Double, y: Double,
+                               p0: (x: Int, y: Int),
+                               p1: (x: Int, y: Int),
+                               p2: (x: Int, y: Int),
+                               uv0: (u: Double, v: Double),
+                               uv1: (u: Double, v: Double),
+                               uv2: (u: Double, v: Double)) -> (u: Double, v: Double)? {
+        let x0 = Double(p0.x), y0 = Double(p0.y)
+        let x1 = Double(p1.x), y1 = Double(p1.y)
+        let x2 = Double(p2.x), y2 = Double(p2.y)
+        let denom = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+        guard abs(denom) > 0.000001 else { return nil }
+
+        let a = ((y1 - y2) * (x - x2) + (x2 - x1) * (y - y2)) / denom
+        let b = ((y2 - y0) * (x - x2) + (x0 - x2) * (y - y2)) / denom
+        let c = 1.0 - a - b
+        let epsilon = -0.0001
+        guard a >= epsilon, b >= epsilon, c >= epsilon else { return nil }
+
+        return (
+            u: a * uv0.u + b * uv1.u + c * uv2.u,
+            v: a * uv0.v + b * uv1.v + c * uv2.v
+        )
     }
 
     private func blendTerrainTexture(_ texturePixel: Int32, with terrainColor: Int32) -> Int32 {
