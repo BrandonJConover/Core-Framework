@@ -78,7 +78,7 @@ final class Pathfinder {
                 let nh = hash(nx, nz)
 
                 guard !closedSet.contains(nh) else { continue }
-                guard isWalkable(absX: nx, absZ: nz) else { continue }
+                guard isStepAllowed(fromAbsX: current.x, fromAbsZ: current.z, toAbsX: nx, toAbsZ: nz) else { continue }
 
                 // Diagonal movement costs more
                 let moveCost = (dx != 0 && dz != 0) ? 14 : 10
@@ -98,6 +98,87 @@ final class Pathfinder {
 
         // No path found — return direct line
         return [(x: toX, z: toZ)]
+    }
+
+    private func isStepAllowed(fromAbsX: Int, fromAbsZ: Int, toAbsX: Int, toAbsZ: Int) -> Bool {
+        guard isWalkable(absX: toAbsX, absZ: toAbsZ) else { return false }
+
+        let fromLocalX = fromAbsX - worldState.worldOffsetX
+        let fromLocalZ = fromAbsZ - worldState.worldOffsetZ
+        let toLocalX = toAbsX - worldState.worldOffsetX
+        let toLocalZ = toAbsZ - worldState.worldOffsetZ
+
+        guard !isBlockedByObject(localX: toLocalX, localZ: toLocalZ) else { return false }
+        guard !isBlockedByWall(fromX: fromLocalX, fromZ: fromLocalZ, toX: toLocalX, toZ: toLocalZ) else { return false }
+
+        let dx = toLocalX - fromLocalX
+        let dz = toLocalZ - fromLocalZ
+        if dx != 0 && dz != 0 {
+            // Do not cut diagonally through a blocked corner. Java's collision
+            // flags check both adjacent cardinal sides before allowing a
+            // diagonal step; this approximates that using live object/wall
+            // state retained from opcodes 48/91.
+            if isBlockedByObject(localX: fromLocalX + dx, localZ: fromLocalZ)
+                || isBlockedByObject(localX: fromLocalX, localZ: fromLocalZ + dz)
+                || isBlockedByWall(fromX: fromLocalX, fromZ: fromLocalZ, toX: fromLocalX + dx, toZ: fromLocalZ)
+                || isBlockedByWall(fromX: fromLocalX, fromZ: fromLocalZ, toX: fromLocalX, toZ: fromLocalZ + dz) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    private func isBlockedByObject(localX: Int, localZ: Int) -> Bool {
+        for object in worldState.gameObjects {
+            guard let def = GameObjectDefinitions.get(object.objectId) else {
+                if object.x == localX && object.y == localZ { return true }
+                continue
+            }
+
+            var width = max(1, def.width)
+            var height = max(1, def.height)
+            if object.direction != 0 && object.direction != 4 {
+                swap(&width, &height)
+            }
+
+            if localX >= object.x && localX < object.x + width
+                && localZ >= object.y && localZ < object.y + height {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func isBlockedByWall(fromX: Int, fromZ: Int, toX: Int, toZ: Int) -> Bool {
+        let dx = toX - fromX
+        let dz = toZ - fromZ
+        guard abs(dx) <= 1, abs(dz) <= 1, dx != 0 || dz != 0 else { return false }
+
+        for wall in worldState.wallObjects {
+            switch wall.direction {
+            case 0:
+                // Horizontal boundary on the north side of (x,z): blocks
+                // movement between (x,z-1) and (x,z).
+                if ((fromX == wall.x && fromZ == wall.y - 1 && toX == wall.x && toZ == wall.y)
+                    || (fromX == wall.x && fromZ == wall.y && toX == wall.x && toZ == wall.y - 1)) {
+                    return true
+                }
+            case 1:
+                // Vertical boundary on the west/east tile edge used by Java's
+                // walkToWall approach: blocks movement between (x-1,z) and
+                // (x,z).
+                if ((fromX == wall.x - 1 && fromZ == wall.y && toX == wall.x && toZ == wall.y)
+                    || (fromX == wall.x && fromZ == wall.y && toX == wall.x - 1 && toZ == wall.y)) {
+                    return true
+                }
+            default:
+                // Diagonal/corner boundary objects occupy the tile for our
+                // coarse native pathfinder.
+                if toX == wall.x && toZ == wall.y { return true }
+            }
+        }
+        return false
     }
 
     /// Check if a tile is walkable using landscape data
