@@ -224,6 +224,20 @@ struct RSCUnlockedAppearances: Equatable {
     var bottomColours: [Bool] = []
 }
 
+struct RSCBankPresetItem: Equatable {
+    var itemId: Int
+    var amount: Int
+    var noted: Bool
+
+    static let empty = RSCBankPresetItem(itemId: 0, amount: 0, noted: false)
+}
+
+struct RSCBankPreset: Equatable {
+    var slotIndex: Int
+    var inventory: [RSCBankPresetItem]
+    var equipment: [RSCBankPresetItem]
+}
+
 enum ChatChannel: Int, Codable, CaseIterable {
     case chat = 0
     case privateMsg
@@ -434,6 +448,7 @@ final class RSCWorldState: ObservableObject {
     // Bank state (opcode 42 showBank, 203 closeBank)
     @Published var bankOpen: Bool = false
     @Published var bankItems: [(id: Int, amount: Int)] = []
+    @Published var bankPresets: [Int: RSCBankPreset] = [:]
     var bankMaxItems: Int = 0
 
     // Shop state (opcode 101 showShop, 137 closeShop)

@@ -590,12 +590,15 @@ final class RSCPacketHandler {
         case 144: // SEND_OPENPK_POINTS_TO_GP_RATIO — no payload, opens Java conversion prompt
             ws.openPKPointsToGpPromptOpen = true
 
+        case 150: // SEND_BANK_PRESET
+            handleBankPreset(buf: buf, ws: ws)
+
         case 250: // UPDATE_UNLOCKED_APPEARANCES
             handleUnlockedAppearances(buf: buf, ws: ws)
 
         // Remaining opcodes — skip their data to keep things clean
         case 7, 16, 21, 23, 28, 29, 32, 34, 37, 39, 49, 50, 55,
-             94, 95, 119, 132, 133, 150, 157, 189, 224, 232, 246:
+             94, 95, 119, 132, 133, 157, 189, 224, 232, 246:
             break
 
         default:
@@ -724,6 +727,35 @@ final class RSCPacketHandler {
             topColours: topColours,
             bottomColours: bottomColours
         )
+    }
+
+    private func handleBankPreset(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining >= 2 else { return }
+        let slotIndex = buf.getShort()
+
+        func readPresetItem(hasNotedByte: Bool) -> RSCBankPresetItem {
+            guard buf.bytesRemaining > 0 else { return .empty }
+            let first = buf.getUnsignedByte()
+            // Server writes a single byte ItemId.NOTHING (0) for empty slots,
+            // otherwise it writes a full short item id. We have already read
+            // the high byte, so stitch the short back together.
+            if first == 0 { return .empty }
+            guard buf.bytesRemaining > 0 else { return .empty }
+            let itemId = (first << 8) | buf.getUnsignedByte()
+            var noted = false
+            if hasNotedByte, buf.bytesRemaining > 0 {
+                noted = buf.getUnsignedByte() != 0
+            }
+            var amount = 1
+            if ItemDefinitions.isStackable(itemId, noted: noted), buf.bytesRemaining >= 4 {
+                amount = max(1, buf.get32())
+            }
+            return RSCBankPresetItem(itemId: itemId, amount: amount, noted: noted)
+        }
+
+        let inventory = (0..<30).map { _ in readPresetItem(hasNotedByte: true) }
+        let equipment = (0..<14).map { _ in readPresetItem(hasNotedByte: false) }
+        ws.bankPresets[slotIndex] = RSCBankPreset(slotIndex: slotIndex, inventory: inventory, equipment: equipment)
     }
 
     private func handleServerConfig(buf: ByteBuffer, ws: RSCWorldState) {
