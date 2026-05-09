@@ -208,6 +208,22 @@ struct RSCPartyMember: Identifiable {
     var shareExp: Bool
 }
 
+struct RSCOnlinePlayer: Identifiable, Equatable {
+    var id: String { name }
+    var name: String
+    var icon: Int
+    var location: String
+}
+
+struct RSCUnlockedAppearances: Equatable {
+    var hairStyles: [Bool] = []
+    var bodyTypes: [Bool] = []
+    var skinColours: [Bool] = []
+    var hairColours: [Bool] = []
+    var topColours: [Bool] = []
+    var bottomColours: [Bool] = []
+}
+
 enum ChatChannel: Int, Codable, CaseIterable {
     case chat = 0
     case privateMsg
@@ -346,9 +362,23 @@ final class RSCWorldState: ObservableObject {
     @Published var petFatigue: Int = 0
     @Published var expShared: Int = 0
     @Published var openPKPoints: Int64 = 0
+    @Published var openPKPointsToGpPromptOpen: Bool = false
     @Published var kills2: Int = 0
     @Published var lastNpcKilledId: Int = 0
     @Published var kills3: Int = 0
+    @Published var isOnBlackHole: Bool = false
+    @Published var ironmanInterfaceOpen: Bool = false
+    @Published var ironmanType: Int = 0
+    @Published var ironmanRestriction: Int = 0
+    @Published var onlinePlayerCount: Int = 0
+    @Published var onlinePlayers: [RSCOnlinePlayer] = []
+    @Published var bankPinOpen: Bool = false
+    @Published var elixirTicks: Int = 0
+    @Published var statusProgressOpen: Bool = false
+    @Published var statusProgressInterfaceId: Int = 0
+    @Published var statusProgressDelay: Int = 0
+    @Published var statusProgressRepeats: Int = 0
+    @Published var unlockedAppearances: RSCUnlockedAppearances = RSCUnlockedAppearances()
     @Published var isDead: Bool = false
     /// Java sets `deathScreenTimeout = 250` on opcode 83 and counts it down
     /// once per game tick before returning control to the world.

@@ -119,6 +119,15 @@ final class RSCPacketHandler {
         case 129: // SEND_COMBAT_STYLE
             ws.combatStyle = buf.getByte()
 
+        case 134: // SEND_STATUS_PROGRESS_BAR
+            handleStatusProgress(buf: buf, ws: ws)
+
+        case 135: // SEND_BANK_PIN_INTERFACE
+            if buf.bytesRemaining >= 1 { ws.bankPinOpen = buf.getUnsignedByte() != 0 }
+
+        case 136: // SEND_ONLINE_LIST
+            handleOnlineList(buf: buf, ws: ws)
+
         case 99:  // showGroundItems
             handleShowGroundItems(buf: buf, ws: ws)
 
@@ -210,6 +219,9 @@ final class RSCPacketHandler {
             ws.deathScreenTimeout = 250
             ws.exitCombat()
 
+        case 54: // SEND_ELIXIR
+            if buf.bytesRemaining >= 2 { ws.elixirTicks = buf.getShort() }
+
         case 114: // SET_FATIGUE
             if buf.bytesRemaining >= 2 { ws.fatigue = buf.getShort() }
             if buf.bytesRemaining >= 2 { ws.fatigueAuthentic = buf.getShort() }
@@ -288,6 +300,12 @@ final class RSCPacketHandler {
 
         case 111: // COMPLETED_TUTORIAL
             break
+
+        case 113: // SEND_IRONMAN
+            handleIronman(buf: buf, ws: ws)
+
+        case 115: // SEND_ON_BLACK_HOLE
+            if buf.bytesRemaining >= 1 { ws.isOnBlackHole = buf.getUnsignedByte() != 0 }
 
         case 84:  // WAKE_UP
             ws.isSleeping = false
@@ -569,10 +587,15 @@ final class RSCPacketHandler {
                 ws.petFatigue = buf.getShort()
             }
 
+        case 144: // SEND_OPENPK_POINTS_TO_GP_RATIO — no payload, opens Java conversion prompt
+            ws.openPKPointsToGpPromptOpen = true
+
+        case 250: // UPDATE_UNLOCKED_APPEARANCES
+            handleUnlockedAppearances(buf: buf, ws: ws)
+
         // Remaining opcodes — skip their data to keep things clean
-        case 7, 16, 21, 23, 28, 29, 32, 34, 37, 39, 49, 50, 54, 55,
-             94, 95, 113, 115, 119, 132, 133, 134, 135, 136, 144,
-             150, 157, 189, 224, 232, 246, 250:
+        case 7, 16, 21, 23, 28, 29, 32, 34, 37, 39, 49, 50, 55,
+             94, 95, 119, 132, 133, 150, 157, 189, 224, 232, 246:
             break
 
         default:
@@ -615,6 +638,92 @@ final class RSCPacketHandler {
             }
         }
         return String(chars)
+    }
+
+    private func handleIronman(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining >= 2 else { return }
+        let interfaceId = buf.getUnsignedByte()
+        let actionId = buf.getUnsignedByte()
+        switch actionId {
+        case 0:
+            if buf.bytesRemaining >= 2 {
+                ws.ironmanType = buf.getUnsignedByte()
+                ws.ironmanRestriction = buf.getUnsignedByte()
+            }
+        case 1:
+            ws.ironmanInterfaceOpen = interfaceId != 0
+        case 2:
+            ws.ironmanInterfaceOpen = false
+        default:
+            break
+        }
+    }
+
+    private func handleStatusProgress(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining >= 1 else { return }
+        let interfaceId = buf.getUnsignedByte()
+        ws.statusProgressInterfaceId = interfaceId
+        ws.statusProgressOpen = interfaceId > 0 && interfaceId != 2
+        if ws.statusProgressOpen {
+            if interfaceId == 1, buf.bytesRemaining >= 2 {
+                ws.statusProgressDelay = buf.getShort()
+            }
+            if buf.bytesRemaining >= 1 {
+                ws.statusProgressRepeats = buf.getUnsignedByte()
+            }
+        } else if interfaceId == 2 {
+            ws.statusProgressDelay = 0
+            ws.statusProgressRepeats = 0
+        }
+    }
+
+    private func handleOnlineList(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining >= 2 else { return }
+        ws.onlinePlayerCount = buf.getShort()
+        var players: [RSCOnlinePlayer] = []
+        while buf.bytesRemaining > 0 {
+            let name = buf.getString()
+            guard buf.bytesRemaining >= 4 else { break }
+            let icon = buf.get32()
+            let location = buf.getString()
+            if !name.isEmpty {
+                players.append(RSCOnlinePlayer(name: name, icon: icon, location: location))
+            }
+        }
+        ws.onlinePlayers = players
+    }
+
+    private func handleUnlockedAppearances(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining >= 24 else { return }
+        let hairStyleCount = max(0, buf.get32())
+        let bodyTypeCount = max(0, buf.get32())
+        let skinColourCount = max(0, buf.get32())
+        let hairColourCount = max(0, buf.get32())
+        let topColourCount = max(0, buf.get32())
+        let bottomColourCount = max(0, buf.get32())
+
+        func readBoolArray(_ count: Int) -> [Bool] {
+            guard count > 0 else { return [] }
+            return (0..<count).map { _ in buf.getBitMask(1) == 1 }
+        }
+
+        buf.startBitAccess()
+        let hairStyles = readBoolArray(hairStyleCount)
+        let bodyTypes = readBoolArray(bodyTypeCount)
+        let skinColours = readBoolArray(skinColourCount)
+        let hairColours = readBoolArray(hairColourCount)
+        let topColours = readBoolArray(topColourCount)
+        let bottomColours = readBoolArray(bottomColourCount)
+        buf.endBitAccess()
+
+        ws.unlockedAppearances = RSCUnlockedAppearances(
+            hairStyles: hairStyles,
+            bodyTypes: bodyTypes,
+            skinColours: skinColours,
+            hairColours: hairColours,
+            topColours: topColours,
+            bottomColours: bottomColours
+        )
     }
 
     private func handleServerConfig(buf: ByteBuffer, ws: RSCWorldState) {
