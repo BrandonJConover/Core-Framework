@@ -2031,6 +2031,16 @@ final class RSCGameEngine: ObservableObject {
         return path
     }
 
+    func blink(toX x: Int, z: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.blink.rawValue))
+            buf.putShort(x)
+            buf.putShort(z)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
     private func handleTap(x: Int, y: Int) {
         let gameX = Double(x)
         let gameY = Double(y)
@@ -2443,6 +2453,18 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    func reportAbuse(playerName: String, reason: Int, suggestsOrMutes: Bool) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.reportAbuse.rawValue))
+            buf.putZeroPaddedString(playerName)
+            buf.putByte(reason)
+            buf.putByte(suggestsOrMutes ? 1 : 0)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
     // MARK: - Inventory actions
 
     func equipItem(slot: Int) {
@@ -2460,6 +2482,16 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUnequip.rawValue))
             buf.putShort(slot)
+            let data = buf.finishPacket()
+            try? await connection.send(data)
+        }
+    }
+
+    func unequipEquipmentSlot(_ slot: Int) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemUnequipFromEquipment.rawValue))
+            buf.putByte(slot)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
@@ -2700,6 +2732,68 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemRemoveToBank.rawValue))
             buf.putByte(slot)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func setBankNoteSwap(enabled: Bool) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.interfaceOptions.rawValue))
+            buf.putByte(1) // InterfaceOptions.SWAP_NOTE
+            buf.putByte(enabled ? 1 : 0)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func setCertSwap(enabled: Bool) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.interfaceOptions.rawValue))
+            buf.putByte(0) // InterfaceOptions.SWAP_CERT
+            buf.putByte(enabled ? 1 : 0)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func moveBankItem(from slot: Int, to targetSlot: Int, insert: Bool) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.interfaceOptions.rawValue))
+            buf.putByte(insert ? 3 : 2) // BANK_INSERT / BANK_SWAP
+            buf.putInt(slot)
+            buf.putInt(targetSlot)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func moveInventoryItem(from slot: Int, to targetSlot: Int, insert: Bool) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.interfaceOptions.rawValue))
+            buf.putByte(insert ? 4 : 5) // INVENTORY_INSERT / INVENTORY_SWAP
+            buf.putInt(slot)
+            buf.putInt(targetSlot)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func cancelBatchAction() {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.interfaceOptions.rawValue))
+            buf.putByte(6) // InterfaceOptions.CANCEL_BATCH
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func submitBankPin(_ pin: String) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.interfaceOptions.rawValue))
+            buf.putByte(8) // InterfaceOptions.BANK_PIN
+            buf.putByte(0) // submit entered pin
+            buf.putString(pin)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -2971,6 +3065,15 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.removeIgnore.rawValue))
+            buf.putZeroPaddedString(name)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func addDelayedIgnore(name: String) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.addDelayedIgnore.rawValue))
             buf.putZeroPaddedString(name)
             try? await connection.send(buf.finishPacket())
         }

@@ -23,9 +23,11 @@ enum RSCOutOpcode: UInt8 {
     case playerFollow       = 165
     case combatStyleChange  = 29
     case dialogueAnswer     = 116
+    case blink              = 59
     case groundItemTake     = 247
     case itemDrop           = 246
     case itemCommand        = 90
+    case itemUnequipFromEquipment = 168
     case itemEquip          = 169
     case itemUnequip        = 170
     case itemUseOnItem      = 91
@@ -52,6 +54,7 @@ enum RSCOutOpcode: UInt8 {
     case bankDepositAllEquipment = 26
     case bankSavePreset     = 27
     case bankLoadPreset     = 28
+    case interfaceOptions   = 199
     case itemEquipFromBank  = 172
     case itemRemoveToBank   = 173
     case castOnSelf         = 137
@@ -66,7 +69,9 @@ enum RSCOutOpcode: UInt8 {
     case addFriend          = 195
     case removeFriend       = 167
     case addIgnore          = 132
+    case addDelayedIgnore   = 194
     case removeIgnore       = 241
+    case reportAbuse        = 206
     case gameSettings       = 111
     case privacySettings    = 64
     case appearanceChange   = 235
