@@ -91,6 +91,42 @@ enum NPCDefinitions {
         return defs[id]
     }
 
+    static func upsert(_ def: NPCDefinition) {
+        guard def.id >= 0 else { return }
+        if def.id >= defs.count {
+            defs.append(contentsOf: (defs.count...def.id).map { placeholder(id: $0) })
+        }
+        defs[def.id] = def
+    }
+
+    private static func placeholder(id: Int) -> NPCDefinition {
+        NPCDefinition(
+            id: id,
+            name: "NPC \(id)",
+            description: "",
+            command: "",
+            command2: "",
+            attack: 0,
+            strength: 0,
+            hits: 0,
+            defense: 0,
+            combatLevel: 0,
+            attackable: false,
+            aggressive: false,
+            respawnTime: 0,
+            sprites: Array(repeating: -1, count: 12),
+            hairColour: 0,
+            topColour: 0,
+            bottomColour: 0,
+            skinColour: 0,
+            camera1: 0,
+            camera2: 0,
+            walkModel: 6,
+            combatModel: 6,
+            combatSprite: 5
+        )
+    }
+
     /// Reproduces mudclient.loadEntitiesAuthentic() — assigns sprite-archive offsets
     /// to each AnimationDef.number. Each unique animation name consumes 27 sprite
     /// slots (15 walk + 3 combat-A + 9 combat-F). Range 1998..<3300 is reserved

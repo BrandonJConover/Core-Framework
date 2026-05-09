@@ -557,11 +557,7 @@ final class RSCPacketHandler {
             ws.addChat(sender: "[Server]", text: msg89)
 
         case 88:  // createNPC — dynamic NPC definition from server
-            // SHORT id, STRING name, STRING desc, BYTE cmdLen, [STRING cmd],
-            // 4x BYTE stats, BYTE attackable, BYTE spriteCount, spriteCount*INT sprites, 4*INT colours...
-            // Just skip all data for now — bundled NpcDefs.json carries the
-            // static definitions used by the native renderer.
-            while buf.bytesRemaining > 0 { let _ = buf.getUnsignedByte() }
+            handleCreateNPC(buf: buf, ws: ws)
 
         case 112: // updateClan
             handleUpdateClan(buf: buf, ws: ws)
@@ -655,6 +651,77 @@ final class RSCPacketHandler {
         let high = UInt64(UInt32(bitPattern: Int32(buf.get32())))
         let low = UInt64(UInt32(bitPattern: Int32(buf.get32())))
         return Int64(bitPattern: (high << 32) | low)
+    }
+
+    private func handleCreateNPC(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining >= 2 else { return }
+        let id = buf.getShort()
+        let name = buf.getString()
+        let description = buf.getString()
+
+        let commandLength = buf.bytesRemaining > 0 ? buf.getUnsignedByte() : 0
+        let command = commandLength > 0 ? buf.getString() : ""
+
+        guard buf.bytesRemaining >= 6 else { return }
+        let attack = buf.getUnsignedByte()
+        let strength = buf.getUnsignedByte()
+        let defense = buf.getUnsignedByte()
+        let hits = buf.getUnsignedByte()
+        let attackable = buf.getUnsignedByte() == 1
+
+        let spriteCount = buf.getUnsignedByte()
+        var sprites = Array(repeating: 0, count: 12)
+        for i in 0..<spriteCount {
+            let sprite = buf.bytesRemaining >= 4 ? buf.get32() : 0
+            if i < sprites.count { sprites[i] = sprite }
+        }
+
+        guard buf.bytesRemaining >= 22 else { return }
+        let hairColour = buf.get32()
+        let topColour = buf.get32()
+        let bottomColour = buf.get32()
+        let skinColour = buf.get32()
+        let camera1 = buf.getShort()
+        let camera2 = buf.getShort()
+        let walkModel = buf.getUnsignedByte()
+        let combatModel = buf.getUnsignedByte()
+        let combatSprite = buf.getUnsignedByte()
+
+        let combatLevel = (attack + strength + defense + hits) / 4
+        let def = NPCDefinition(
+            id: id,
+            name: name.isEmpty ? "NPC \(id)" : name,
+            description: description,
+            command: command,
+            command2: "",
+            attack: attack,
+            strength: strength,
+            hits: hits,
+            defense: defense,
+            combatLevel: combatLevel,
+            attackable: attackable,
+            aggressive: false,
+            respawnTime: 0,
+            sprites: sprites,
+            hairColour: hairColour,
+            topColour: topColour,
+            bottomColour: bottomColour,
+            skinColour: skinColour,
+            camera1: camera1,
+            camera2: camera2,
+            walkModel: walkModel,
+            combatModel: combatModel,
+            combatSprite: combatSprite
+        )
+        NPCDefinitions.upsert(def)
+
+        for idx in ws.npcs.indices where ws.npcs[idx].npcId == id {
+            ws.npcs[idx].name = def.name
+            if ws.npcs[idx].maxHp == 0 {
+                ws.npcs[idx].maxHp = hits
+                ws.npcs[idx].currentHp = hits
+            }
+        }
     }
 
     private static func username(fromHash hash: Int64) -> String {
@@ -1053,8 +1120,9 @@ final class RSCPacketHandler {
 
             let npcTileX = localX + relX
             let npcTileZ = localZ + relZ
+            let npcName = NPCDefinitions.get(npcTypeId)?.name ?? NPCNames.name(for: npcTypeId)
             var npc = RSCNPC(id: serverIndex, x: npcTileX, y: npcTileZ,
-                             npcId: npcTypeId, name: NPCNames.name(for: npcTypeId))
+                             npcId: npcTypeId, name: npcName)
             npc.direction = dir & 7
             keptNPCs.append(npc)
             newCount += 1
