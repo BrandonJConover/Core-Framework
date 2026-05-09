@@ -67,6 +67,7 @@ final class Scene {
     var m_mask1: [Int32]  // colorMask1 (gray-pixel tint)
     var m_mask2: [Int32]  // colorMask2 (white-axis-pixel tint)
     var m_blueMask: [Int32]  // blue-channel mask for select equipment layers
+    var m_colourTransform: [Int32]  // Java drawSpriteClipping colourTransform
     var m_flip: [Bool]    // mirrorX flag for direction 5/6/7
     var m_n: Int = 0   // sprite count
 
@@ -112,6 +113,7 @@ final class Scene {
         self.m_mask1 = [Int32](repeating: 0, count: spriteCount)
         self.m_mask2 = [Int32](repeating: 0, count: spriteCount)
         self.m_blueMask = [Int32](repeating: 0, count: spriteCount)
+        self.m_colourTransform = [Int32](repeating: Int32(bitPattern: 0xFFFFFFFF), count: spriteCount)
         self.m_flip = [Bool](repeating: false, count: spriteCount)
 
         // Initialize texture database
@@ -164,6 +166,7 @@ final class Scene {
     /// color). 0 means no tint for that channel.
     func drawSpriteTinted(depth: Int32, x: Int32, y: Int32, width: Int32, height: Int32,
                           spriteIdx: Int32, mask1: Int32, mask2: Int32, blueMask: Int32 = 0,
+                          colourTransform: Int32 = Int32(bitPattern: 0xFFFFFFFF),
                           mirrorX: Bool) {
         guard m_n < m_Ob.count else { return }
         m_ob[m_n] = depth
@@ -175,6 +178,7 @@ final class Scene {
         m_mask1[m_n] = mask1
         m_mask2[m_n] = mask2
         m_blueMask[m_n] = blueMask
+        m_colourTransform[m_n] = colourTransform
         m_flip[m_n] = mirrorX
         m_n += 1
     }
@@ -520,13 +524,16 @@ final class Scene {
             let mask1 = m_mask1[i]
             let mask2 = m_mask2[i]
             let blueMask = m_blueMask[i]
+            let colourTransform = m_colourTransform[i]
             let mirror = m_flip[i]
-            if mask1 != 0 || mask2 != 0 || blueMask != 0 {
+            if mask1 != 0 || mask2 != 0 || blueMask != 0 || colourTransform != Int32(bitPattern: 0xFFFFFFFF) {
                 graphics.drawEntityTinted(
                     index: spriteIdx,
                     x: spriteX, y: spriteY,
                     width: spriteW, height: spriteH,
-                    mask1: mask1, mask2: mask2, blueMask: blueMask, mirrorX: mirror
+                    mask1: mask1, mask2: mask2, blueMask: blueMask,
+                    colourTransform: colourTransform,
+                    mirrorX: mirror
                 )
             } else {
                 graphics.drawEntity(

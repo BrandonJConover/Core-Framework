@@ -69,6 +69,7 @@ enum CharacterBillboards {
         topColor: Int32 = 0,
         bottomColor: Int32 = 0,
         skinColor: Int32 = 0,
+        colourTransform: Int32 = Int32(bitPattern: 0xFFFFFFFF),
         combatRole: CombatRole = .none,
         combatModel: Int = 6,
         combatSprite: Int = 5,
@@ -214,6 +215,7 @@ enum CharacterBillboards {
                 width: spriteW, height: spriteH,
                 spriteIdx: Int32(spriteID),
                 mask1: mask1, mask2: mask2, blueMask: Int32(anim.blueMask),
+                colourTransform: colourTransform,
                 mirrorX: flip
             )
         }

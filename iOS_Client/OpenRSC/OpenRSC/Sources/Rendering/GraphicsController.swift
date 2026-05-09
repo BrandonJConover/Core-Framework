@@ -432,7 +432,9 @@ final class GraphicsController {
     /// Transparent pixels (full-zero) are skipped. The destination width/height
     /// are honoured so character layers match Java's drawSpriteClipping path.
     func drawEntityTinted(index: Int, x: Int32, y: Int32, width: Int32, height: Int32,
-                          mask1: Int32, mask2: Int32, blueMask: Int32 = 0, mirrorX: Bool) {
+                          mask1: Int32, mask2: Int32, blueMask: Int32 = 0,
+                          colourTransform: Int32 = Int32(bitPattern: 0xFFFFFFFF),
+                          mirrorX: Bool) {
         guard index >= 0 && index < sprites.count, let sprite = sprites[index] else { return }
         guard sprite.width > 0 && sprite.height > 0 && width > 0 && height > 0 else { return }
         let m1 = mask1 == 0 ? Int32(0xFFFFFF) : mask1
@@ -441,6 +443,12 @@ final class GraphicsController {
         let m1R = (Int(m1) >> 16) & 0xFF, m1G = (Int(m1) >> 8) & 0xFF, m1B = Int(m1) & 0xFF
         let m2R = (Int(m2) >> 16) & 0xFF, m2G = (Int(m2) >> 8) & 0xFF, m2B = Int(m2) & 0xFF
         let bmR = (Int(bm) >> 16) & 0xFF, bmG = (Int(bm) >> 8) & 0xFF, bmB = Int(bm) & 0xFF
+        let transform = UInt32(bitPattern: colourTransform)
+        let alpha = Int((transform >> 24) & 0xFF)
+        let tr = Int((transform >> 16) & 0xFF)
+        let tg = Int((transform >> 8) & 0xFF)
+        let tb = Int(transform & 0xFF)
+        let appliesTransform = transform != 0xFFFFFFFF
 
         let sw = Int(sprite.width); let sh = Int(sprite.height)
         let dw = Int(width2); let dh = Int(height2)
@@ -484,6 +492,21 @@ final class GraphicsController {
                     b = (bmB * shifter) >> 16
                 }
                 // else: pass through unchanged
+
+                if appliesTransform {
+                    r = (r * tr) / 255
+                    g = (g * tg) / 255
+                    b = (b * tb) / 255
+                    if alpha < 255 {
+                        let oldColor = UInt32(bitPattern: pixelData[rowBase + dx])
+                        let oldR = Int((oldColor >> 16) & 0xFF)
+                        let oldG = Int((oldColor >> 8) & 0xFF)
+                        let oldB = Int(oldColor & 0xFF)
+                        r = (oldR * (255 - alpha) + r * alpha) / 255
+                        g = (oldG * (255 - alpha) + g * alpha) / 255
+                        b = (oldB * (255 - alpha) + b * alpha) / 255
+                    }
+                }
 
                 let outARGB = Int32(bitPattern: UInt32(0xFF000000) | (UInt32(r) << 16) | (UInt32(g) << 8) | UInt32(b))
                 pixelData[rowBase + dx] = outARGB

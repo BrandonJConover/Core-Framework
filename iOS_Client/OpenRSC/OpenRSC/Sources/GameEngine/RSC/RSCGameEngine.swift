@@ -501,6 +501,7 @@ final class RSCGameEngine: ObservableObject {
                 let topIdx = appearance?.colourTop ?? defaultTopIdx
                 let bottomIdx = appearance?.colourBottom ?? defaultBottomIdx
                 let skinIdx = appearance?.colourSkin ?? defaultSkinIdx
+                let colourTransform = playerColourTransform(for: appearance)
                 let tileX = player.interpolatedX - Double(px)
                 let tileZ = player.interpolatedY - Double(pz)
                 CharacterBillboards.register(
@@ -515,6 +516,7 @@ final class RSCGameEngine: ObservableObject {
                     topColor: PlayerPalettes.clothingColour(topIdx),
                     bottomColor: PlayerPalettes.clothingColour(bottomIdx),
                     skinColor: PlayerPalettes.skinColour(skinIdx),
+                    colourTransform: colourTransform,
                     elevation: elevationForTileOffset(tileX: tileX, tileZ: tileZ)
                 )
             }
@@ -535,6 +537,7 @@ final class RSCGameEngine: ObservableObject {
                     topColor: PlayerPalettes.clothingColour(localApp.colourTop),
                     bottomColor: PlayerPalettes.clothingColour(localApp.colourBottom),
                     skinColor: PlayerPalettes.skinColour(localApp.colourSkin),
+                    colourTransform: playerColourTransform(for: localApp),
                     combatRole: localCombatRole,
                     combatModel: 6,
                     combatSprite: 5,
@@ -564,6 +567,17 @@ final class RSCGameEngine: ObservableObject {
 
         // Upload to Metal texture
         renderer.updatePixels(pixelData)
+    }
+
+    private func playerColourTransform(for appearance: RSCPlayerAppearance?) -> Int32 {
+        var transform = UInt32(0xFFFFFFFF)
+        if appearance?.isInvisible == true {
+            transform &= 0x80FFFFFF
+        }
+        if appearance?.isInvulnerable == true {
+            transform &= 0xFF202020
+        }
+        return Int32(bitPattern: transform)
     }
 
     // HUD overlay drawn on top of the 3D scene: coordinates bar + player center marker.

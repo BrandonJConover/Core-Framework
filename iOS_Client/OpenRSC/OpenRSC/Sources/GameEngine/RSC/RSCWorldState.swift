@@ -89,6 +89,10 @@ struct RSCPlayerAppearance: Equatable {
     var combatLevel: Int
     var skulled: Bool
     var clanTag: String?
+    var isInvisible: Bool = false
+    var isInvulnerable: Bool = false
+    var groupId: Int = 0
+    var icon: Int = 0
 }
 
 struct RSCNPC: Identifiable {

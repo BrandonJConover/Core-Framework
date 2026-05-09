@@ -1437,10 +1437,10 @@ final class RSCPacketHandler {
                 let skulled = buf.getUnsignedByte()
                 var clanTag: String? = nil
                 if buf.getByte() == 1 { clanTag = buf.getString() }
-                let _ = buf.getByte() // isInvisible
-                let _ = buf.getByte() // isInvulnerable
-                let _ = buf.getByte() // groupID
-                let _ = buf.get32() // icon
+                let isInvisible = buf.getByte() == 1
+                let isInvulnerable = buf.getByte() == 1
+                let groupId = buf.getByte()
+                let icon = buf.get32()
 
                 ws.playerAppearances[serverIndex] = RSCPlayerAppearance(
                     layerSprites: sprites,
@@ -1450,7 +1450,11 @@ final class RSCPacketHandler {
                     colourSkin: skinColour,
                     combatLevel: combatLevel,
                     skulled: skulled != 0,
-                    clanTag: clanTag
+                    clanTag: clanTag,
+                    isInvisible: isInvisible,
+                    isInvulnerable: isInvulnerable,
+                    groupId: groupId,
+                    icon: icon
                 )
 
                 if let idx = ws.players.firstIndex(where: { $0.id == serverIndex }) {
