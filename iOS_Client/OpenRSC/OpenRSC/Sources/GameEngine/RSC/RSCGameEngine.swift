@@ -2670,7 +2670,6 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.bankDeposit.rawValue))
             buf.putShort(itemId)
             buf.putInt(amount)
-            buf.putInt(0)
             try? await connection.send(buf.finishPacket())
         }
     }
