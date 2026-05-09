@@ -22,6 +22,7 @@ enum RSCOutOpcode: UInt8 {
     case playerTrade        = 142
     case playerFollow       = 165
     case combatStyleChange  = 29
+    case changePassword     = 25
     case dialogueAnswer     = 116
     case blink              = 59
     case groundItemTake     = 247
@@ -77,6 +78,7 @@ enum RSCOutOpcode: UInt8 {
     case appearanceChange   = 235
     case setRecovery        = 208
     case setContactDetails  = 253
+    case cancelRecoveryRequest = 196
     case duelAccept         = 176
     case duelDecline        = 197
     case duelConfirmAccept  = 77

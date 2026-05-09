@@ -3265,6 +3265,24 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    func changePassword(oldPassword: String, newPassword: String) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.changePassword.rawValue))
+            buf.putString(oldPassword)
+            buf.putString(newPassword)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func cancelRecoveryRequest() {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.cancelRecoveryRequest.rawValue))
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
     func submitRecoveryQuestions(_ pairs: [(question: String, answer: String)]) {
         worldState.recoveryQuestionsOpen = false
         Task {
