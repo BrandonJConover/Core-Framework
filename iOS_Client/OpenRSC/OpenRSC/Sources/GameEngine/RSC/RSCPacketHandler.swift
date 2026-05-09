@@ -287,6 +287,8 @@ final class RSCPacketHandler {
 
         case 4:   // closeConnection
             ws.exitCombat()
+            ws.connectionClosedText = "The server has ended your session."
+            ws.connectionClosedOpen = true
 
         case 183: // cantLogout
             ws.addChat(sender: "[System]", text: "You can't logout right now.")

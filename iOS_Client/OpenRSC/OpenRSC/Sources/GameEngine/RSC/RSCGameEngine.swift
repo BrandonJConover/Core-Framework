@@ -520,27 +520,26 @@ final class RSCGameEngine: ObservableObject {
             // is in combat with a tracked target, render in the combatB pose so
             // the player faces the NPC mid-fight.
             let localCombatRole: CharacterBillboards.CombatRole = worldState.inCombat ? .combatB : .none
-            let localApp = worldState.playerAppearances[worldState.playerServerIndex]
-            let localSprites: [Int] = localApp.map { app in
-                app.layerSprites.map { $0 <= 0 ? -1 : $0 - 1 }
-            } ?? defaultPlayerSprites
-            CharacterBillboards.register(
-                scene: scene, spriteLoader: spriteLoader,
-                tileX: 0, tileZ: 0,
-                rsDir: worldState.localPlayerDirection, stepFrame: renderLogCount,
-                walkModel: 6,
-                cameraRotation: cameraRotation,
-                sprites: localSprites,
-                hairColor: PlayerPalettes.hairColour(localApp?.colourHair ?? defaultHairIdx),
-                topColor: PlayerPalettes.clothingColour(localApp?.colourTop ?? defaultTopIdx),
-                bottomColor: PlayerPalettes.clothingColour(localApp?.colourBottom ?? defaultBottomIdx),
-                skinColor: PlayerPalettes.skinColour(localApp?.colourSkin ?? defaultSkinIdx),
-                combatRole: localCombatRole,
-                combatModel: 6,
-                combatSprite: 5,
-                overlayMovement: 32,
-                elevation: elevationForTileOffset(tileX: 0, tileZ: 0)
-            )
+            if let localApp = worldState.playerAppearances[worldState.playerServerIndex] {
+                let localSprites = localApp.layerSprites.map { $0 <= 0 ? -1 : $0 - 1 }
+                CharacterBillboards.register(
+                    scene: scene, spriteLoader: spriteLoader,
+                    tileX: 0, tileZ: 0,
+                    rsDir: worldState.localPlayerDirection, stepFrame: renderLogCount,
+                    walkModel: 6,
+                    cameraRotation: cameraRotation,
+                    sprites: localSprites,
+                    hairColor: PlayerPalettes.hairColour(localApp.colourHair),
+                    topColor: PlayerPalettes.clothingColour(localApp.colourTop),
+                    bottomColor: PlayerPalettes.clothingColour(localApp.colourBottom),
+                    skinColor: PlayerPalettes.skinColour(localApp.colourSkin),
+                    combatRole: localCombatRole,
+                    combatModel: 6,
+                    combatSprite: 5,
+                    overlayMovement: 32,
+                    elevation: elevationForTileOffset(tileX: 0, tileZ: 0)
+                )
+            }
 
             scene.endScene(1)
 
