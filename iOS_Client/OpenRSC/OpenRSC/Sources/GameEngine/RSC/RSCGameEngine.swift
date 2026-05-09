@@ -2477,6 +2477,29 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    func itemCommands(for itemId: Int) -> [String] {
+        ItemDefinitions.commands(for: itemId).filter { command in
+            let lowered = command.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return !lowered.isEmpty && lowered != "null"
+        }
+    }
+
+    func itemCommand(slot: Int, commandIndex: Int, amount: Int = 1) {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.itemCommand.rawValue))
+            buf.putShort(slot)
+            buf.putInt(max(1, amount))
+            buf.putByte(commandIndex)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func itemCommandAll(slot: Int, commandIndex: Int) {
+        let amount = worldState.inventory.first(where: { $0.id == slot })?.amount ?? 1
+        itemCommand(slot: slot, commandIndex: commandIndex, amount: amount)
+    }
+
     func useItem(slot: Int) {
         if let pending = worldState.pendingItemUseSlot {
             if pending == slot {
