@@ -260,6 +260,12 @@ final class RSCPacketHandler {
             ws.serverMessageDialogOpen = true
             ws.addChat(sender: "[Server]", text: text)
 
+        case 224: // SEND_OPEN_RECOVERY — Java setShowRecoveryDialogue(true)
+            ws.recoveryQuestionsOpen = true
+
+        case 232: // SEND_OPEN_DETAILS — Java setShowContactDialogue(true)
+            ws.contactDetailsOpen = true
+
         case 4:   // closeConnection
             ws.exitCombat()
 
@@ -604,7 +610,7 @@ final class RSCPacketHandler {
 
         // Remaining opcodes — skip their data to keep things clean
         case 7, 16, 21, 23, 28, 29, 32, 34, 37, 39, 49, 50, 55,
-             94, 95, 119, 132, 133, 157, 189, 224, 232, 246:
+             94, 95, 119, 132, 133, 157, 189, 246:
             break
 
         default:

@@ -70,6 +70,8 @@ enum RSCOutOpcode: UInt8 {
     case gameSettings       = 111
     case privacySettings    = 64
     case appearanceChange   = 235
+    case setRecovery        = 208
+    case setContactDetails  = 253
     case duelAccept         = 176
     case duelDecline        = 197
     case duelConfirmAccept  = 77

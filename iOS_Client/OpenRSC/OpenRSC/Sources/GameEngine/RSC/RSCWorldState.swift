@@ -411,6 +411,12 @@ final class RSCWorldState: ObservableObject {
     @Published var inputPromptOpen: Bool = false
     @Published var inputPromptText: String = ""
 
+    /// Account-security prompts opened by Java opcodes 232 (contact details)
+    /// and 224 (recovery questions). The native forms submit protocol-235
+    /// SET_DETAILS / SET_RECOVERY packets through RSCGameEngine.
+    @Published var contactDetailsOpen: Bool = false
+    @Published var recoveryQuestionsOpen: Bool = false
+
     /// Ticks remaining until the server reboots (opcode 52). Server sends
     /// ticks-of-32ms; Java code multiplies by 32 to get milliseconds. We
     /// keep that scaled value here so the banner shows seconds = ticks/1000.

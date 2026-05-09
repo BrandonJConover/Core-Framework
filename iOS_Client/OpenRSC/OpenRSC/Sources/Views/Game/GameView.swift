@@ -267,6 +267,12 @@ struct GameView: View {
         if engine.worldState.inputPromptOpen {
             InputPromptDialog(worldState: engine.worldState)
         }
+        if engine.worldState.contactDetailsOpen {
+            ContactDetailsDialog(worldState: engine.worldState, engine: engine)
+        }
+        if engine.worldState.recoveryQuestionsOpen {
+            RecoveryQuestionsDialog(worldState: engine.worldState, engine: engine)
+        }
         if engine.worldState.showAppearanceChange {
             AppearancePanel(worldState: engine.worldState, engine: engine)
         }
@@ -387,6 +393,226 @@ private struct InputPromptDialog: View {
     private func close() {
         worldState.inputPromptOpen = false
         worldState.inputPromptText = ""
+    }
+}
+
+// MARK: - Account Security Dialogs
+
+private struct ContactDetailsDialog: View {
+    @ObservedObject var worldState: RSCWorldState
+    let engine: RSCGameEngine
+    @State private var fullName = ""
+    @State private var zipCode = ""
+    @State private var country = ""
+    @State private var email = ""
+    @State private var error = ""
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                Text("Please supply your contact details")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(.yellow)
+
+                Text("We need this information to provide account support and recovery help.")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.88))
+                    .multilineTextAlignment(.center)
+
+                securityTextField("Full name", text: $fullName)
+                securityTextField("Postcode/Zipcode", text: $zipCode)
+                securityTextField("Country", text: $country)
+                securityTextField("Email address", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+
+                if !error.isEmpty {
+                    Text(error)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color(hex: "#ff7a7a"))
+                        .multilineTextAlignment(.center)
+                }
+
+                HStack(spacing: 12) {
+                    Button("Not now") {
+                        worldState.contactDetailsOpen = false
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.white.opacity(0.75))
+
+                    Button("Submit") {
+                        submit()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color(hex: "#ff5a5a"))
+                }
+                .padding(.top, 4)
+            }
+            .padding(20)
+            .frame(maxWidth: 420)
+            .padding(.horizontal, 16)
+            .background(Color.black.opacity(0.92))
+            .overlay(
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
+            )
+        }
+    }
+
+    private func securityTextField(_ title: String, text: Binding<String>) -> some View {
+        TextField(title, text: text)
+            .textFieldStyle(.plain)
+            .font(.system(size: 14))
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+            )
+    }
+
+    private func submit() {
+        let name = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let zip = zipCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let contactCountry = country.trimmingCharacters(in: .whitespacesAndNewlines)
+        let contactEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !name.isEmpty, !zip.isEmpty, !contactCountry.isEmpty, !contactEmail.isEmpty else {
+            error = "Please fill in all the requested details."
+            return
+        }
+        guard contactEmail.contains("@"), contactEmail.contains(".") else {
+            error = "Please use a valid email address."
+            return
+        }
+
+        engine.submitContactDetails(name: name, zipCode: zip, country: contactCountry, email: contactEmail)
+    }
+}
+
+private struct RecoveryQuestionsDialog: View {
+    @ObservedObject var worldState: RSCWorldState
+    let engine: RSCGameEngine
+    @State private var selectedQuestions = [0, 1, 2, 3, 4]
+    @State private var answers = Array(repeating: "", count: 5)
+    @State private var error = ""
+
+    private let questions = [
+        "Where were you born?",
+        "What was your first teacher's name?",
+        "What is your father's middle name?",
+        "Who was your first best friend?",
+        "What is your favourite vacation spot?",
+        "What is your mother's middle name?",
+        "What was your first pet's name?",
+        "What was the name of your first school?",
+        "What is your mother's maiden name?",
+        "Who was your first boyfriend/girlfriend?",
+        "What was the first computer game you purchased?",
+        "Who is your favourite actor/actress?",
+        "Who is your favourite author?",
+        "Who is your favourite musician?",
+        "Who is your favourite cartoon character?",
+        "What is your favourite book?",
+        "What is your favourite food?",
+        "What is your favourite movie?"
+    ]
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    Text("Please provide 5 security questions")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(.yellow)
+
+                    Text("These answers are used only if you need to recover your account. Give answers you can type exactly again later.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.88))
+                        .multilineTextAlignment(.center)
+
+                    ForEach(0..<5, id: \.self) { idx in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Picker("Question \(idx + 1)", selection: $selectedQuestions[idx]) {
+                                ForEach(questions.indices, id: \.self) { q in
+                                    Text(questions[q]).tag(q)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .tint(.white)
+
+                            SecureField("Answer \(idx + 1)", text: $answers[idx])
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 14))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                                )
+                        }
+                    }
+
+                    if !error.isEmpty {
+                        Text(error)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Color(hex: "#ff7a7a"))
+                            .multilineTextAlignment(.center)
+                    }
+
+                    HStack(spacing: 12) {
+                        Button("Not now") {
+                            worldState.recoveryQuestionsOpen = false
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.white.opacity(0.75))
+
+                        Button("Click here when finished") {
+                            submit()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(Color(hex: "#ff5a5a"))
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(20)
+                .frame(maxWidth: 460)
+                .padding(.horizontal, 16)
+                .background(Color.black.opacity(0.92))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                )
+            }
+            .frame(maxHeight: 520)
+        }
+    }
+
+    private func submit() {
+        let cleanAnswers = answers.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard let shortIndex = cleanAnswers.firstIndex(where: { $0.count < 3 }) else {
+            let lowered = cleanAnswers.map { $0.lowercased() }
+            guard Set(lowered).count == lowered.count else {
+                error = "Each question must have a different answer."
+                return
+            }
+            let pairs = selectedQuestions.indices.map { idx in
+                (question: questions[selectedQuestions[idx]], answer: cleanAnswers[idx])
+            }
+            engine.submitRecoveryQuestions(pairs)
+            return
+        }
+        error = "Please provide a longer answer to question \(shortIndex + 1)."
     }
 }
 

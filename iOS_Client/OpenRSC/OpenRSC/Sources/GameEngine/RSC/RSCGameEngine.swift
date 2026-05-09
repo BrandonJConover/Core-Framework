@@ -2956,6 +2956,34 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    // MARK: - Account Security
+
+    func submitContactDetails(name: String, zipCode: String, country: String, email: String) {
+        worldState.contactDetailsOpen = false
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.setContactDetails.rawValue))
+            buf.putString(name)
+            buf.putString(zipCode)
+            buf.putString(country)
+            buf.putString(email)
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func submitRecoveryQuestions(_ pairs: [(question: String, answer: String)]) {
+        worldState.recoveryQuestionsOpen = false
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.setRecovery.rawValue))
+            for pair in pairs.prefix(5) {
+                buf.putString(String(pair.question.prefix(50)))
+                buf.putString(String(pair.answer.prefix(100)))
+            }
+            try? await connection.send(buf.finishPacket())
+        }
+    }
+
     // MARK: - Duel
 
     func duelAccept() {
