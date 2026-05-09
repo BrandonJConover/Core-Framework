@@ -531,8 +531,21 @@ final class RSCPacketHandler {
                 ws.teleportBubbles.append(RSCTeleportBubble(type: type, x: x, y: z))
             }
 
-        case 71:  // friend list init — same format as 149, handled by those updates
-            break
+        case 71:  // legacy SEND_FRIEND_LIST — BYTE count, [LONG usernameHash, BYTE world]
+            let friendCount = buf.getUnsignedByte()
+            var friends: [(name: String, online: Bool)] = []
+            for _ in 0..<friendCount {
+                guard buf.bytesRemaining >= 9 else { break }
+                let hash = getInt64(buf)
+                let world = buf.getUnsignedByte()
+                let name = Self.username(fromHash: hash)
+                if !name.isEmpty && name != "invalid_name" {
+                    friends.append((name: name, online: world != 0 && world != 255))
+                }
+            }
+            if !friends.isEmpty || friendCount == 0 {
+                ws.friendsList = friends
+            }
 
         case 147: // SEND_KILLS2 — Java reads 3x INT
             if buf.bytesRemaining >= 12 {
@@ -582,6 +595,26 @@ final class RSCPacketHandler {
         let high = UInt64(UInt32(bitPattern: Int32(buf.get32())))
         let low = UInt64(UInt32(bitPattern: Int32(buf.get32())))
         return Int64(bitPattern: (high << 32) | low)
+    }
+
+    private static func username(fromHash hash: Int64) -> String {
+        guard hash >= 0 else { return "invalid_name" }
+        var value = hash
+        var chars: [Character] = []
+        while value != 0 {
+            let idx = Int(value % 37)
+            value /= 37
+            if idx == 0 {
+                chars.insert(" ", at: 0)
+            } else if idx < 27 {
+                let scalar = UnicodeScalar((value % 37 == 0 ? 65 : 97) + idx - 1)!
+                chars.insert(Character(scalar), at: 0)
+            } else {
+                let scalar = UnicodeScalar(48 + idx - 27)!
+                chars.insert(Character(scalar), at: 0)
+            }
+        }
+        return String(chars)
     }
 
     private func handleServerConfig(buf: ByteBuffer, ws: RSCWorldState) {
