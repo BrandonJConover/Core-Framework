@@ -50,16 +50,15 @@ final class RSCPacketHandler {
             let displayName = clan131.isEmpty ? prefix : "[\(clan131)] \(prefix)"
             ws.addChat(sender: displayName, text: message131, isPrivate: isPriv, channel: channel)
 
-        case 120: // receivePrivateMsg — ZERO_STRING sender/former, BYTE icon, 8-byte id, RSC string
-            let pmSender = buf.getZeroPaddedString()
-            let _ = buf.getZeroPaddedString() // formerName
-            let _ = buf.getUnsignedByte() // icon
-            if buf.bytesRemaining >= 8 { _ = buf.getBytes(8) } // message id
+        case 120: // receivePrivateMsg — RSC_STRING sender/former, INT icon, encrypted string
+            let pmSender = buf.getString()
+            let _ = buf.getString() // formerName
+            let _ = buf.get32() // crown/icon sprite
             let pmMessage = buf.getEncryptedString()
             ws.addChat(sender: pmSender, text: pmMessage, isPrivate: true)
 
-        case 87:  // sendPrivateMessage confirmation — ZERO_STRING recipient, RSC string message
-            let pmRecipient = buf.getZeroPaddedString()
+        case 87:  // sendPrivateMessage confirmation — RSC_STRING recipient, encrypted string
+            let pmRecipient = buf.getString()
             let pmSent = buf.getEncryptedString()
             ws.addChat(sender: "To \(pmRecipient)", text: pmSent, isPrivate: true)
 
