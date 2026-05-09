@@ -1736,17 +1736,18 @@ final class RSCPacketHandler {
                 let maxHp = buf.getUnsignedByte()
                 let cbLvl = buf.getUnsignedByte()
                 let skull = buf.getUnsignedByte()
-                _ = buf.getUnsignedByte() // pMemD
+                let memberStatus = buf.getUnsignedByte()
                 let shareLoot = buf.getUnsignedByte() == 1
-                _ = buf.getUnsignedByte() // partyMembersTotal
-                _ = buf.getUnsignedByte() // inCombat
+                let partyMembersTotal = buf.getUnsignedByte()
+                let inCombat = buf.getUnsignedByte() == 1
                 let shareExp = buf.getUnsignedByte() == 1
-                _ = buf.get32() // expShared high
-                _ = buf.get32() // expShared low
+                let expShared = getInt64(buf)
                 members.append(RSCPartyMember(
                     name: name, rank: rank, online: online,
                     currentHp: curHp, maxHp: maxHp, combatLevel: cbLvl,
-                    skull: skull, shareLoot: shareLoot, shareExp: shareExp
+                    skull: skull, memberStatus: memberStatus,
+                    shareLoot: shareLoot, partyMembersTotal: partyMembersTotal,
+                    inCombat: inCombat, shareExp: shareExp, expShared: expShared
                 ))
             }
             ws.partyMembers = members

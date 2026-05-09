@@ -215,8 +215,12 @@ struct RSCPartyMember: Identifiable {
     var maxHp: Int
     var combatLevel: Int
     var skull: Int
+    var memberStatus: Int
     var shareLoot: Bool
+    var partyMembersTotal: Int
+    var inCombat: Bool
     var shareExp: Bool
+    var expShared: Int64
 }
 
 struct RSCPartySearchResult: Identifiable, Equatable {
