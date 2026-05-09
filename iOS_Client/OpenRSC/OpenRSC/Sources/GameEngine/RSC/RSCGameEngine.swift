@@ -2111,18 +2111,7 @@ final class RSCGameEngine: ObservableObject {
         }
 
         if let npc = targetNPC {
-            // Tap near NPC → talk to it
-            print("[Input] Talk to NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
-            Task {
-                // First walk to NPC (opcode 16 = WALK_TO_ENTITY path payload)
-                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
-
-                // Then send talk command (opcode 153)
-                let talkBuf = ByteBuffer()
-                talkBuf.newPacket(opcode: 153)
-                talkBuf.putShort(npc.id)
-                try? await connection.send(talkBuf.finishPacket())
-            }
+            performPrimaryNPCAction(npc)
         } else if let item = targetGroundItem {
             // PC left-click priority takes ground items when the click lands on
             // the item marker. Keep plain terrain taps as walking.
@@ -2145,6 +2134,33 @@ final class RSCGameEngine: ObservableObject {
             Task {
                 await sendWalkPath(toX: destX, toZ: destZ, walkToEntity: false)
             }
+        }
+    }
+
+    private func performPrimaryNPCAction(_ npc: RSCNPC) {
+        guard let def = NPCDefinitions.get(npc.npcId) else {
+            print("[Input] Talk to NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
+            talkToNPC(serverIndex: npc.id)
+            return
+        }
+
+        let command1 = def.command.trimmingCharacters(in: .whitespacesAndNewlines)
+        let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
+        let command1Valid = !command1.isEmpty && command1.lowercased() != "null"
+        let command2Valid = !command2.isEmpty && command2.lowercased() != "null"
+
+        if command1Valid {
+            print("[Input] \(command1) NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
+            npcCommand(serverIndex: npc.id)
+        } else if def.attackable {
+            print("[Input] Attack NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
+            attackNPC(serverIndex: npc.id)
+        } else if command2Valid {
+            print("[Input] \(command2) NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
+            npcCommand2(serverIndex: npc.id)
+        } else {
+            print("[Input] Talk to NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
+            talkToNPC(serverIndex: npc.id)
         }
     }
 
