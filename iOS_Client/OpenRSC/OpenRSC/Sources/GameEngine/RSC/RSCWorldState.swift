@@ -373,6 +373,7 @@ final class RSCWorldState: ObservableObject {
     @Published var runEnabled: Bool = false
     /// 0...100 energy display derived from the server's fatigue packet.
     @Published var runEnergy: Int = 100
+    @Published var experienceFrozen: Bool = false
     @Published var petFatigue: Int = 0
     @Published var expShared: Int = 0
     @Published var openPKPoints: Int64 = 0
@@ -418,6 +419,9 @@ final class RSCWorldState: ObservableObject {
     /// the server tree, so native exposes it as an acknowledged prompt.
     @Published var inputPromptOpen: Bool = false
     @Published var inputPromptText: String = ""
+
+    @Published var connectionClosedOpen: Bool = false
+    @Published var connectionClosedText: String = ""
 
     /// Account-security prompts opened by Java opcodes 232 (contact details)
     /// and 224 (recovery questions). The native forms submit protocol-235

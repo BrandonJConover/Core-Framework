@@ -133,6 +133,19 @@ struct GameView: View {
                 VStack {
                     Spacer().frame(height: 18)
                     SystemUpdateBanner(worldState: engine.worldState)
+                    if engine.worldState.experienceFrozen {
+                        Text("Exp gain off")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(Color(hex: "#ff5a5a"))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.black.opacity(0.72))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 2)
+                                    .stroke(Color(hex: "#ff5a5a").opacity(0.55), lineWidth: 1)
+                            )
+                            .padding(.top, 4)
+                    }
                     Spacer()
                 }
 
@@ -271,6 +284,9 @@ struct GameView: View {
         if engine.worldState.inputPromptOpen {
             InputPromptDialog(worldState: engine.worldState)
         }
+        if engine.worldState.connectionClosedOpen {
+            ConnectionClosedDialog(worldState: engine.worldState, appState: appState, server: server)
+        }
         if engine.worldState.contactDetailsOpen {
             ContactDetailsDialog(worldState: engine.worldState, engine: engine)
         }
@@ -397,6 +413,48 @@ private struct InputPromptDialog: View {
     private func close() {
         worldState.inputPromptOpen = false
         worldState.inputPromptText = ""
+    }
+}
+
+// MARK: - Connection Closed
+
+private struct ConnectionClosedDialog: View {
+    @ObservedObject var worldState: RSCWorldState
+    @ObservedObject var appState: AppState
+    let server: ServerProfile
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.55).ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                Text("Connection lost")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+
+                Text(worldState.connectionClosedText.isEmpty ? "Disconnected from the server." : worldState.connectionClosedText)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.86))
+                    .multilineTextAlignment(.center)
+
+                Button("Return to servers") {
+                    worldState.connectionClosedOpen = false
+                    appState.currentView = .serverBrowser(server.gameType)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(Color(hex: "#ff5a5a"))
+                .padding(.top, 4)
+            }
+            .padding(20)
+            .frame(maxWidth: 360)
+            .padding(.horizontal, 16)
+            .background(Color.black.opacity(0.92))
+            .overlay(
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
+            )
+        }
     }
 }
 

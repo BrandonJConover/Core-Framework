@@ -90,7 +90,10 @@ final class RSCGameEngine: ObservableObject {
         }
         connection.onDisconnect = { [weak self] in
             Task { @MainActor in
-                self?.isRunning = false
+                guard let self else { return }
+                self.isRunning = false
+                self.worldState.connectionClosedText = "Disconnected from the server."
+                self.worldState.connectionClosedOpen = true
             }
         }
         connection.onLoginResponse = { [weak self] code in

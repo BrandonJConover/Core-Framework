@@ -97,6 +97,15 @@ final class RSCPacketHandler {
             let xp33 = Int(UInt32(bitPattern: Int32(buf.get32()))) / 4
             ws.updateExperience(skill: skill33, xp: xp33)
 
+        case 34: // SEND_EXPERIENCE_TOGGLE — BYTE 1=frozen, 0=enabled
+            if buf.bytesRemaining >= 1 {
+                let frozen = buf.getUnsignedByte() == 1
+                if ws.experienceFrozen != frozen {
+                    ws.addChat(sender: "[System]", text: frozen ? "Experience gain is now off." : "Experience gain is now on.")
+                }
+                ws.experienceFrozen = frozen
+            }
+
         case 159: // UPDATE_STAT — Java updateExperience(): BYTE skill, BYTE current, BYTE base, INT xp
             // Note: Java opcode 159 calls updateExperience() which reads current+base+xp
             if buf.bytesRemaining >= 7 {
@@ -312,7 +321,8 @@ final class RSCPacketHandler {
             handleShowWalls(buf: buf, ws: ws)
 
         case 165: // CLOSE_CONNECTION
-            break
+            ws.connectionClosedText = "The server has closed the connection."
+            ws.connectionClosedOpen = true
 
         case 111: // COMPLETED_TUTORIAL
             break
@@ -619,7 +629,7 @@ final class RSCPacketHandler {
             handleUnlockedAppearances(buf: buf, ws: ws)
 
         // Remaining opcodes — skip their data to keep things clean
-        case 7, 16, 21, 23, 28, 29, 32, 34, 37, 39, 49, 50, 55,
+        case 7, 16, 21, 23, 28, 29, 32, 37, 39, 49, 50, 55,
              94, 95, 119, 157, 189, 246:
             break
 
