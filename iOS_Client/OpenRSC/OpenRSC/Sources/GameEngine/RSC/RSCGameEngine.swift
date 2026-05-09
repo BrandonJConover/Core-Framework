@@ -1789,6 +1789,38 @@ final class RSCGameEngine: ObservableObject {
         return best?.item
     }
 
+    private func nearestGameObjectOnScreen(gameX: Double, gameY: Double) -> RSCGameObject? {
+        var best: (object: RSCGameObject, score: Double, depth: Int32)?
+        for object in worldState.gameObjects {
+            let footprint = objectFootprint(for: object)
+            let centerX = (Double(footprint.minX) + Double(footprint.maxX) + 1.0) / 2.0
+            let centerZ = (Double(footprint.minZ) + Double(footprint.maxZ) + 1.0) / 2.0
+            guard let p = projectedScreenPoint(tileX: centerX, tileZ: centerZ, yOffset: -20) else { continue }
+            let radius = Double(max(24, min(64, 18 * max(1, max(footprint.maxX - footprint.minX + 1, footprint.maxZ - footprint.minZ + 1)))))
+            let dx = (p.x - gameX) / radius
+            let dy = (p.y - gameY) / radius
+            let score = dx * dx + dy * dy
+            if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
+                best = (object, score, p.depth)
+            }
+        }
+        return best?.object
+    }
+
+    private func nearestWallObjectOnScreen(gameX: Double, gameY: Double) -> RSCWallObject? {
+        var best: (wall: RSCWallObject, score: Double, depth: Int32)?
+        for wall in worldState.wallObjects {
+            guard let p = projectedScreenPoint(tileX: Double(wall.x), tileZ: Double(wall.y), yOffset: -18) else { continue }
+            let dx = (p.x - gameX) / 24.0
+            let dy = (p.y - gameY) / 24.0
+            let score = dx * dx + dy * dy
+            if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
+                best = (wall, score, p.depth)
+            }
+        }
+        return best?.wall
+    }
+
     private func nearestNPC(toX x: Int, z: Int) -> RSCNPC? {
         var nearest: RSCNPC? = nil
         var nearestDist = Int.max
@@ -2009,8 +2041,8 @@ final class RSCGameEngine: ObservableObject {
         let targetNPC = nearestNPCOnScreen(gameX: gameX, gameY: gameY)
         let targetPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY)
         let targetGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY) ?? nearestGroundItem(toX: destX, z: destZ)
-        let targetObject = nearestGameObject(toX: destX, z: destZ)
-        let targetWall = nearestWallObject(toX: destX, z: destZ)
+        let targetObject = nearestGameObjectOnScreen(gameX: gameX, gameY: gameY) ?? nearestGameObject(toX: destX, z: destZ)
+        let targetWall = nearestWallObjectOnScreen(gameX: gameX, gameY: gameY) ?? nearestWallObject(toX: destX, z: destZ)
 
         // Item-use target mode — armed by inventory "Use". The next tap on a
         // world entity consumes the pending item instead of doing default walk
@@ -2120,6 +2152,8 @@ final class RSCGameEngine: ObservableObject {
         let screenNPC = nearestNPCOnScreen(gameX: gx, gameY: gy)
         let screenPlayer = nearestPlayerOnScreen(gameX: gx, gameY: gy)
         let screenItem = nearestGroundItemOnScreen(gameX: gx, gameY: gy)
+        let screenObject = nearestGameObjectOnScreen(gameX: gx, gameY: gy)
+        let screenWall = nearestWallObjectOnScreen(gameX: gx, gameY: gy)
 
         var actions: [(label: String, icon: String, action: () -> Void)] = []
         var title = "(\(worldX), \(worldZ))"
@@ -2219,9 +2253,9 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Check game objects (within 2 tiles)
-        for obj in worldState.gameObjects {
+        for obj in screenObject.map({ [$0] }) ?? worldState.gameObjects {
             let odx: Int = obj.x - worldX; let odz: Int = obj.y - worldZ
-            if odx * odx + odz * odz <= 4 {
+            if screenObject?.id == obj.id || odx * odx + odz * odz <= 4 {
                 let def = GameObjectDefinitions.get(obj.objectId)
                 let objName = def?.name.isEmpty == false ? def!.name : ObjectNames.name(for: obj.objectId)
                 title = objName
@@ -2252,10 +2286,10 @@ final class RSCGameEngine: ObservableObject {
         // Check boundary/wall objects (doors, gates, fences). Java keeps these
         // separate from scenery and sends boundary-specific opcodes that include
         // direction, so route them through their own actions.
-        for wall in worldState.wallObjects {
+        for wall in screenWall.map({ [$0] }) ?? worldState.wallObjects {
             let wdx = wall.x - worldX
             let wdz = wall.y - worldZ
-            if wdx * wdx + wdz * wdz <= 4 {
+            if screenWall?.id == wall.id || wdx * wdx + wdz * wdz <= 4 {
                 let wallName = EntityDefinitions.getDoorDef(wall.wallId)?.name ?? "Door"
                 title = wallName
                 if let pendingItemSlot {
