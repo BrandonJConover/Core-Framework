@@ -261,6 +261,10 @@ struct GameView: View {
         if engine.worldState.contextMenuOpen {
             ContextMenuOverlay(worldState: engine.worldState, engine: engine)
         }
+        if engine.worldState.fishingTrawlerOpen {
+            FishingTrawlerStatusOverlay(worldState: engine.worldState)
+                .allowsHitTesting(false)
+        }
         if engine.worldState.serverMessageDialogOpen {
             ServerMessageDialog(worldState: engine.worldState)
         }
@@ -613,6 +617,48 @@ private struct RecoveryQuestionsDialog: View {
             return
         }
         error = "Please provide a longer answer to question \(shortIndex + 1)."
+    }
+}
+
+// MARK: - Fishing Trawler
+
+private struct FishingTrawlerStatusOverlay: View {
+    @ObservedObject var worldState: RSCWorldState
+
+    var body: some View {
+        VStack {
+            HStack(spacing: 10) {
+                trawlerMetric("Water", "\(worldState.fishingTrawlerWaterLevel)")
+                trawlerMetric("Fish", "\(worldState.fishingTrawlerFishCaught)")
+                trawlerMetric("Time", "\(worldState.fishingTrawlerMinutesLeft)m")
+                if worldState.fishingTrawlerNetBroken {
+                    Text("Net broken")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Color(hex: "#ff5a5a"))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Color.black.opacity(0.78))
+            .overlay(
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(Color.white.opacity(0.35), lineWidth: 1)
+            )
+
+            Spacer()
+        }
+        .padding(.top, 18)
+    }
+
+    private func trawlerMetric(_ title: String, _ value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .foregroundColor(.white.opacity(0.72))
+            Text(value)
+                .foregroundColor(.yellow)
+                .fontWeight(.bold)
+        }
+        .font(.system(size: 12, design: .monospaced))
     }
 }
 

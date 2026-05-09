@@ -392,6 +392,14 @@ final class RSCWorldState: ObservableObject {
     @Published var statusProgressInterfaceId: Int = 0
     @Published var statusProgressDelay: Int = 0
     @Published var statusProgressRepeats: Int = 0
+    @Published var auctionProgressInterfaceId: Int = 0
+    @Published var auctionProgressDelay: Int = 0
+    @Published var auctionProgressRepeats: Int = 0
+    @Published var fishingTrawlerOpen: Bool = false
+    @Published var fishingTrawlerWaterLevel: Int = 0
+    @Published var fishingTrawlerFishCaught: Int = 0
+    @Published var fishingTrawlerMinutesLeft: Int = 0
+    @Published var fishingTrawlerNetBroken: Bool = false
     @Published var unlockedAppearances: RSCUnlockedAppearances = RSCUnlockedAppearances()
     @Published var isDead: Bool = false
     /// Java sets `deathScreenTimeout = 250` on opcode 83 and counts it down

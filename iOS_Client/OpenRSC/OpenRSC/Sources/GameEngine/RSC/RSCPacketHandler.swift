@@ -119,6 +119,16 @@ final class RSCPacketHandler {
         case 129: // SEND_COMBAT_STYLE
             ws.combatStyle = buf.getByte()
 
+        case 132: // SEND_AUCTION_PROGRESS — custom interface/delay/repeat triplet
+            if buf.bytesRemaining >= 3 {
+                ws.auctionProgressInterfaceId = buf.getUnsignedByte()
+                ws.auctionProgressDelay = buf.getUnsignedByte()
+                ws.auctionProgressRepeats = buf.getUnsignedByte()
+            }
+
+        case 133: // SEND_FISHING_TRAWLER — custom show/update/hide interface
+            handleFishingTrawler(buf: buf, ws: ws)
+
         case 134: // SEND_STATUS_PROGRESS_BAR
             handleStatusProgress(buf: buf, ws: ws)
 
@@ -610,7 +620,7 @@ final class RSCPacketHandler {
 
         // Remaining opcodes — skip their data to keep things clean
         case 7, 16, 21, 23, 28, 29, 32, 34, 37, 39, 49, 50, 55,
-             94, 95, 119, 132, 133, 157, 189, 246:
+             94, 95, 119, 157, 189, 246:
             break
 
         default:
@@ -689,6 +699,27 @@ final class RSCPacketHandler {
         } else if interfaceId == 2 {
             ws.statusProgressDelay = 0
             ws.statusProgressRepeats = 0
+        }
+    }
+
+    private func handleFishingTrawler(buf: ByteBuffer, ws: RSCWorldState) {
+        guard buf.bytesRemaining >= 2 else { return }
+        _ = buf.getUnsignedByte() // interface id; Java currently uses 6.
+        let action = buf.getUnsignedByte()
+        switch action {
+        case 0:
+            ws.fishingTrawlerOpen = true
+        case 1:
+            guard buf.bytesRemaining >= 6 else { return }
+            ws.fishingTrawlerOpen = true
+            ws.fishingTrawlerWaterLevel = buf.getShort()
+            ws.fishingTrawlerFishCaught = buf.getShort()
+            ws.fishingTrawlerMinutesLeft = buf.getUnsignedByte()
+            ws.fishingTrawlerNetBroken = buf.getUnsignedByte() == 1
+        case 2:
+            ws.fishingTrawlerOpen = false
+        default:
+            break
         }
     }
 
