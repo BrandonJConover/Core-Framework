@@ -14,31 +14,37 @@ final class RSCPacketHandler {
 
         switch opcode {
         case 131: // SEND_MESSAGE — Java showMessage()
-            // Format: BYTE msgType, BYTE formatFlags, ZERO_STRING message
-            // If formatFlags & 1: ZERO_STRING sender, ZERO_STRING clan
-            // If formatFlags & 2: ZERO_STRING colour
+            // Format: INT crown, BYTE MessageType.rsID, BYTE formatFlags,
+            // RSC_STRING message. If formatFlags & 1: sender + former/clan
+            // strings. If formatFlags & 2: colour override string.
+            let _ = buf.get32() // crown/icon sprite; retained later when HUD supports crowns.
             let msgTypeRaw = buf.getUnsignedByte()
             let formatFlags = buf.getUnsignedByte()
-            let message131 = buf.getZeroPaddedString()
+            let message131 = buf.getString()
             var sender131 = ""
             var clan131 = ""
             if (formatFlags & 1) != 0 {
-                sender131 = buf.getZeroPaddedString()
-                clan131 = buf.getZeroPaddedString()
+                sender131 = buf.getString()
+                clan131 = buf.getString()
             }
             if (formatFlags & 2) != 0 {
-                let _ = buf.getZeroPaddedString() // colour code
+                let _ = buf.getString() // colour code
             }
-            // Message types: 1=chat, 2=private, 3=quest/NPC, 4=trade, 5=system, 6=global
+            // MessageType.java: 0=GAME, 1=PRIVATE_RECIEVE, 2=PRIVATE_SEND,
+            // 3=QUEST, 4=CHAT, 5=FRIEND_STATUS, 6=TRADE, 7=INVENTORY,
+            // 8=GLOBAL_CHAT, 9=CLAN_CHAT.
             let prefix: String
             let isPriv: Bool
             let channel: ChatChannel
             switch msgTypeRaw {
-            case 1: prefix = sender131.isEmpty ? "[Chat]" : sender131; isPriv = false; channel = .chat
-            case 2: prefix = sender131.isEmpty ? "[PM]" : sender131; isPriv = true; channel = .privateMsg
+            case 1, 2: prefix = sender131.isEmpty ? "[PM]" : sender131; isPriv = true; channel = .privateMsg
             case 3: prefix = sender131.isEmpty ? "[Quest]" : sender131; isPriv = false; channel = .quest
-            case 4: prefix = "[Trade]"; isPriv = false; channel = .trade
-            case 5, 6: prefix = "[System]"; isPriv = false; channel = .system
+            case 4: prefix = sender131.isEmpty ? "[Chat]" : sender131; isPriv = false; channel = .chat
+            case 5: prefix = sender131.isEmpty ? "[Friend]" : sender131; isPriv = false; channel = .system
+            case 6: prefix = sender131.isEmpty ? "[Trade]" : sender131; isPriv = false; channel = .trade
+            case 8: prefix = sender131.isEmpty ? "[Global]" : sender131; isPriv = false; channel = .chat
+            case 9: prefix = sender131.isEmpty ? "[Clan]" : sender131; isPriv = false; channel = .clan
+            case 0, 7: prefix = "[System]"; isPriv = false; channel = .system
             default: prefix = sender131.isEmpty ? "[Msg]" : sender131; isPriv = false; channel = .chat
             }
             let displayName = clan131.isEmpty ? prefix : "[\(clan131)] \(prefix)"
