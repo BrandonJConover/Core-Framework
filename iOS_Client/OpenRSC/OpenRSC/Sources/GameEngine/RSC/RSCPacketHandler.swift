@@ -261,7 +261,7 @@ final class RSCPacketHandler {
             handleShowOptionsMenu(buf: buf, ws: ws)
 
         case 204: // playSound — Java PacketHandler.playSound() / soundPlayer.playSoundFile()
-            let soundName = buf.getZeroPaddedString()
+            let soundName = buf.getString()
             SoundManager.shared.play(name: soundName)
 
         case 118: // killAnnouncement — Java PacketHandler.announceKill():
@@ -511,7 +511,7 @@ final class RSCPacketHandler {
         case 172: // showDuelConfirmDialog — confirmation screen
             ws.duelOpen = false
             ws.duelConfirmOpen = true
-            ws.duelOpponentName = buf.getZeroPaddedString()
+            ws.duelOpponentName = buf.getString()
             // Their stake
             let duelTheirCount = buf.getUnsignedByte()
             var duelTheirItems: [(id: Int, amount: Int)] = []
@@ -1617,7 +1617,7 @@ final class RSCPacketHandler {
 
     // opcode 20 — confirmTrade: show confirmation screen
     private func handleTradeConfirm(buf: ByteBuffer, ws: RSCWorldState) {
-        let partnerName = buf.getZeroPaddedString()
+        let partnerName = buf.getString()
         ws.tradePartnerName = partnerName
         let theirCount = buf.getUnsignedByte()
         var theirItems: [(id: Int, amount: Int)] = []
