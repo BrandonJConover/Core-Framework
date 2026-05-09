@@ -28,7 +28,7 @@ final class RSCGameEngine: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     // Camera/zoom state for mobile controls
-    @Published var zoomLevel: CGFloat = 1.0 // 0.5 = zoomed out, 2.0 = zoomed in
+    @Published var zoomLevel: CGFloat = 0.75 // 0.5 = zoomed out, 2.0 = zoomed in
     @Published var cameraAngle: CGFloat = 0.0 // degrees rotation
 
     // Render logging counter
@@ -46,8 +46,8 @@ final class RSCGameEngine: ObservableObject {
     // looking down (matches mudclient.java default).
     private var cameraRotation: Int32 = 0
     private var cameraPitch: Int32 = 64
-    private var cameraZoom: Int32 = 1200  // Java default: 750; native starts wider on phone screens
-    private var cameraOcclusionZoom: Int32 = 1200
+    private var cameraZoom: Int32 = 1600  // Java default: 750; native starts wider on phone screens
+    private var cameraOcclusionZoom: Int32 = 1600
 
     /// Camera rotation in degrees (0..360). Read by gesture handlers in GameView.
     var cameraRotationDegrees: Double { Double(cameraRotation) * 360.0 / 256.0 }
@@ -134,12 +134,14 @@ final class RSCGameEngine: ObservableObject {
             setCameraPitchDegrees(prefs.lastCameraPitchDegrees)
         }
         if prefs.lastCameraZoom > 0 {
-            // Early native builds persisted the old Java-like 750 camera zoom,
-            // which is too tight on a phone viewport and makes targeting feel
-            // cramped. Treat that legacy default as "no preference" and widen
-            // it to the current native default; preserve deliberate wider/closer
-            // user changes outside that band.
-            let rawZoom = (700.0...820.0).contains(prefs.lastCameraZoom) ? 1200.0 : prefs.lastCameraZoom
+            // Early native builds persisted Java-like 750 and later native
+            // 1200-ish defaults, both of which feel cramped on a phone
+            // viewport. Treat those default bands as "no preference" and
+            // widen them to the current native default; preserve deliberate
+            // wider/closer user changes outside those bands.
+            let legacyDefault = (700.0...820.0).contains(prefs.lastCameraZoom)
+                || (1050.0...1300.0).contains(prefs.lastCameraZoom)
+            let rawZoom = legacyDefault ? 1600.0 : prefs.lastCameraZoom
             let persistedZoom = max(900.0, min(2400.0, rawZoom))
             cameraZoom = Int32(persistedZoom)
             cameraOcclusionZoom = Int32(persistedZoom)
