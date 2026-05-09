@@ -1689,18 +1689,29 @@ final class RSCPacketHandler {
             ws.clanSettings = [buf.getUnsignedByte(), buf.getUnsignedByte(), buf.getUnsignedByte()]
             ws.clanAllowed = [buf.getUnsignedByte() == 1, buf.getUnsignedByte() == 1]
 
-        case 4: // Search results; skip until a native search UI owns it.
+        case 4: // Search results
             let count = buf.getShort()
+            var results: [RSCClanSearchResult] = []
             for _ in 0..<count {
                 guard buf.bytesRemaining > 0 else { break }
-                _ = buf.getShort()       // clanID
-                _ = buf.getString()      // clanName
-                _ = buf.getString()      // clanTag
-                _ = buf.getUnsignedByte() // members
-                _ = buf.getUnsignedByte() // canJoin
-                _ = buf.get32()          // clanPoints
-                _ = buf.getShort()       // clanRank
+                let clanId = buf.getShort()
+                let clanName = buf.getString()
+                let clanTag = buf.getString()
+                let members = buf.getUnsignedByte()
+                let canJoin = buf.getUnsignedByte() == 1
+                let clanPoints = buf.get32()
+                let clanRank = buf.getShort()
+                results.append(RSCClanSearchResult(
+                    clanId: clanId,
+                    name: clanName,
+                    tag: clanTag,
+                    members: members,
+                    canJoin: canJoin,
+                    points: clanPoints,
+                    rank: clanRank
+                ))
             }
+            ws.clanSearchResults = results
 
         default:
             while buf.bytesRemaining > 0 { _ = buf.getUnsignedByte() }
@@ -1758,16 +1769,25 @@ final class RSCPacketHandler {
             ws.partySettings = [buf.getUnsignedByte(), buf.getUnsignedByte(), buf.getUnsignedByte()]
             ws.partyAllowed = [buf.getUnsignedByte() == 1, buf.getUnsignedByte() == 1]
 
-        case 4: // Search results; skip until a native search UI owns it.
+        case 4: // Search results
             let count = buf.getShort()
+            var results: [RSCPartySearchResult] = []
             for _ in 0..<count {
                 guard buf.bytesRemaining > 0 else { break }
-                _ = buf.getShort()       // partyID
-                _ = buf.getUnsignedByte() // members
-                _ = buf.getUnsignedByte() // canJoin
-                _ = buf.get32()          // partyPoints
-                _ = buf.getShort()       // partyRank
+                let partyId = buf.getShort()
+                let members = buf.getUnsignedByte()
+                let canJoin = buf.getUnsignedByte() == 1
+                let partyPoints = buf.get32()
+                let partyRank = buf.getShort()
+                results.append(RSCPartySearchResult(
+                    partyId: partyId,
+                    members: members,
+                    canJoin: canJoin,
+                    points: partyPoints,
+                    rank: partyRank
+                ))
             }
+            ws.partySearchResults = results
 
         default:
             while buf.bytesRemaining > 0 { _ = buf.getUnsignedByte() }

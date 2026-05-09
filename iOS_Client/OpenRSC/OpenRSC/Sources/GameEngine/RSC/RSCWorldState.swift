@@ -195,6 +195,17 @@ struct RSCClanMember: Identifiable {
     var online: Bool
 }
 
+struct RSCClanSearchResult: Identifiable, Equatable {
+    var id: Int { clanId }
+    var clanId: Int
+    var name: String
+    var tag: String
+    var members: Int
+    var canJoin: Bool
+    var points: Int
+    var rank: Int
+}
+
 struct RSCPartyMember: Identifiable {
     var id: String { name }
     var name: String
@@ -206,6 +217,15 @@ struct RSCPartyMember: Identifiable {
     var skull: Int
     var shareLoot: Bool
     var shareExp: Bool
+}
+
+struct RSCPartySearchResult: Identifiable, Equatable {
+    var id: Int { partyId }
+    var partyId: Int
+    var members: Int
+    var canJoin: Bool
+    var points: Int
+    var rank: Int
 }
 
 struct RSCOnlinePlayer: Identifiable, Equatable {
@@ -605,6 +625,7 @@ final class RSCWorldState: ObservableObject {
     @Published var clanInviteName: String = ""
     @Published var clanSettings: [Int] = [0, 0, 0]
     @Published var clanAllowed: [Bool] = [false, false]
+    @Published var clanSearchResults: [RSCClanSearchResult] = []
 
     @Published var inParty: Bool = false
     @Published var partyLeader: String = ""
@@ -614,6 +635,7 @@ final class RSCWorldState: ObservableObject {
     @Published var partyInviteName: String = ""
     @Published var partySettings: [Int] = [0, 0, 0]
     @Published var partyAllowed: [Bool] = [false, false]
+    @Published var partySearchResults: [RSCPartySearchResult] = []
 
     /// Damage splat for the local player. Java counts down combatTimeout
     /// from 200 and draws the splat while it stays > 150 (~50 render ticks).
