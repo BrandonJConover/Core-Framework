@@ -1875,6 +1875,94 @@ final class RSCGameEngine: ObservableObject {
         return command
     }
 
+    private func objectFootprint(for object: RSCGameObject) -> (minX: Int, maxX: Int, minZ: Int, maxZ: Int) {
+        guard let def = GameObjectDefinitions.get(object.objectId) else {
+            return (object.x, object.x, object.y, object.y)
+        }
+
+        var width = def.width
+        var height = def.height
+        if object.direction != 0 && object.direction != 4 {
+            swap(&width, &height)
+        }
+
+        var minX = object.x
+        var minZ = object.y
+        // Type 2/3 objects use the expanded direction-sensitive reach box in
+        // mudclient.walkToObject(); this keeps doors/gates and diagonal scenery
+        // from trying to path onto the blocked origin tile.
+        if def.type == 2 || def.type == 3 {
+            switch object.direction {
+            case 0:
+                width += 1
+                minX -= 1
+            case 2:
+                height += 1
+            case 4:
+                width += 1
+            case 6:
+                minZ -= 1
+                height += 1
+            default:
+                break
+            }
+        }
+
+        return (minX, minX + max(1, width) - 1, minZ, minZ + max(1, height) - 1)
+    }
+
+    private func nearestApproachTile(around footprint: (minX: Int, maxX: Int, minZ: Int, maxZ: Int)) -> (x: Int, z: Int) {
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+        var best = (x: footprint.minX, z: footprint.minZ)
+        var bestDist = Int.max
+
+        var candidates: [(x: Int, z: Int)] = []
+        for x in (footprint.minX - 1)...(footprint.maxX + 1) {
+            candidates.append((x, footprint.minZ - 1))
+            candidates.append((x, footprint.maxZ + 1))
+        }
+        if footprint.minZ <= footprint.maxZ {
+            for z in footprint.minZ...footprint.maxZ {
+                candidates.append((footprint.minX - 1, z))
+                candidates.append((footprint.maxX + 1, z))
+            }
+        }
+
+        for candidate in candidates {
+            let dx = candidate.x - px
+            let dz = candidate.z - pz
+            let dist = dx * dx + dz * dz
+            if dist < bestDist {
+                best = candidate
+                bestDist = dist
+            }
+        }
+        return best
+    }
+
+    private func approachTile(for object: RSCGameObject) -> (x: Int, z: Int) {
+        nearestApproachTile(around: objectFootprint(for: object))
+    }
+
+    private func approachTileForObject(x: Int, z: Int) -> (x: Int, z: Int) {
+        if let object = worldState.gameObjects.first(where: { $0.x == x && $0.y == z }) {
+            return approachTile(for: object)
+        }
+        return (x, z)
+    }
+
+    private func approachTileForWall(x: Int, z: Int, direction: Int) -> (x: Int, z: Int) {
+        switch direction {
+        case 0:
+            return (x, z - 1)
+        case 1:
+            return (x - 1, z)
+        default:
+            return (x, z)
+        }
+    }
+
     @discardableResult
     private func sendWalkPath(toX destX: Int, toZ destZ: Int, walkToEntity: Bool) async -> [(x: Int, z: Int)] {
         let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
@@ -2433,7 +2521,8 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnObject(slot: Int, x: Int, z: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let approach = approachTileForObject(x: x, z: z)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnObject.rawValue))
             buf.putShort(x)
@@ -2446,7 +2535,8 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnWall(slot: Int, x: Int, z: Int, direction: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let approach = approachTileForWall(x: x, z: z, direction: direction)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.wallUseItem.rawValue))
             buf.putShort(x)
@@ -2603,7 +2693,8 @@ final class RSCGameEngine: ObservableObject {
 
     func objectAction1(x: Int, z: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let approach = approachTileForObject(x: x, z: z)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand1.rawValue))
             buf.putShort(x)
@@ -2614,7 +2705,8 @@ final class RSCGameEngine: ObservableObject {
 
     func objectAction2(x: Int, z: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let approach = approachTileForObject(x: x, z: z)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand2.rawValue))
             buf.putShort(x)
@@ -2625,7 +2717,8 @@ final class RSCGameEngine: ObservableObject {
 
     func wallAction1(x: Int, z: Int, direction: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let approach = approachTileForWall(x: x, z: z, direction: direction)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand1.rawValue))
             buf.putShort(x)
@@ -2637,7 +2730,8 @@ final class RSCGameEngine: ObservableObject {
 
     func wallAction2(x: Int, z: Int, direction: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let approach = approachTileForWall(x: x, z: z, direction: direction)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand2.rawValue))
             buf.putShort(x)
@@ -2693,7 +2787,8 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnObject(spellId: Int, x: Int, z: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let approach = approachTileForObject(x: x, z: z)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnObject.rawValue))
             buf.putShort(spellId)
@@ -2705,7 +2800,8 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnWall(spellId: Int, x: Int, z: Int, direction: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            let approach = approachTileForWall(x: x, z: z, direction: direction)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnWall.rawValue))
             // PayloadCustomParser/protocol-235 spell packets read spell first,
