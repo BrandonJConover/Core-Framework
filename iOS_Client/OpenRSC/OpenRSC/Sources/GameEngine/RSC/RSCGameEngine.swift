@@ -2438,7 +2438,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.privateMessage.rawValue))
-            buf.putZeroPaddedString(recipient)
+            buf.putString(recipient)
             buf.putEncryptedString(text)
             let data = buf.finishPacket()
             try? await connection.send(data)
@@ -2449,7 +2449,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.command.rawValue))
-            buf.putZeroPaddedString(command)
+            buf.putString(command)
             let data = buf.finishPacket()
             try? await connection.send(data)
         }
@@ -2459,7 +2459,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.reportAbuse.rawValue))
-            buf.putZeroPaddedString(playerName)
+            buf.putString(playerName)
             buf.putByte(reason)
             buf.putByte(suggestsOrMutes ? 1 : 0)
             let data = buf.finishPacket()
@@ -3039,7 +3039,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.addFriend.rawValue))
-            buf.putZeroPaddedString(name)
+            buf.putString(name)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -3048,7 +3048,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.removeFriend.rawValue))
-            buf.putZeroPaddedString(name)
+            buf.putString(name)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -3057,7 +3057,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.addIgnore.rawValue))
-            buf.putZeroPaddedString(name)
+            buf.putString(name)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -3066,7 +3066,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.removeIgnore.rawValue))
-            buf.putZeroPaddedString(name)
+            buf.putString(name)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -3075,7 +3075,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.addDelayedIgnore.rawValue))
-            buf.putZeroPaddedString(name)
+            buf.putString(name)
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -3330,7 +3330,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.sleepWord.rawValue))
-            buf.putZeroPaddedString(word)
+            buf.putString(word)
             try? await connection.send(buf.finishPacket())
         }
         worldState.sleepStatusText = "Checking..."
