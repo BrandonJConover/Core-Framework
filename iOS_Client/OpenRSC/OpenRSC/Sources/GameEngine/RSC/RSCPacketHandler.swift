@@ -582,6 +582,12 @@ final class RSCPacketHandler {
                 ws.expShared = buf.getShort()
             }
 
+        case 110: // SEND_INPUT_BOX — custom prompt string
+            let prompt = buf.getString()
+            ws.inputPromptText = prompt
+            ws.inputPromptOpen = true
+            ws.addChat(sender: "[Server]", text: prompt)
+
         case 140: // pet fatigue
             if buf.bytesRemaining >= 2 {
                 ws.petFatigue = buf.getShort()

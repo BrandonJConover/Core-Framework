@@ -264,6 +264,9 @@ struct GameView: View {
         if engine.worldState.serverMessageDialogOpen {
             ServerMessageDialog(worldState: engine.worldState)
         }
+        if engine.worldState.inputPromptOpen {
+            InputPromptDialog(worldState: engine.worldState)
+        }
         if engine.worldState.showAppearanceChange {
             AppearancePanel(worldState: engine.worldState, engine: engine)
         }
@@ -338,6 +341,52 @@ private struct ServerMessageDialog: View {
     private func close() {
         worldState.serverMessageDialogOpen = false
         worldState.serverMessageDialogText = ""
+    }
+}
+
+// MARK: - Custom Input Prompt
+
+private struct InputPromptDialog: View {
+    @ObservedObject var worldState: RSCWorldState
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .onTapGesture { close() }
+
+            VStack(spacing: 16) {
+                Text(worldState.inputPromptText)
+                    .font(.system(size: 15))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .frame(maxWidth: .infinity)
+
+                Button(action: close) {
+                    Text("Click here to continue")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(hex: "#ff5a5a"))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+            .frame(maxWidth: 400)
+            .padding(.horizontal, 16)
+            .background(Color.black.opacity(0.92))
+            .overlay(
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
+            )
+        }
+    }
+
+    private func close() {
+        worldState.inputPromptOpen = false
+        worldState.inputPromptText = ""
     }
 }
 

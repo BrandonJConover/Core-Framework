@@ -405,6 +405,12 @@ final class RSCWorldState: ObservableObject {
     @Published var serverMessageDialogText: String = ""
     @Published var serverMessageDialogTop: Bool = false
 
+    /// Custom protocol SEND_INPUT_BOX (opcode 110). The current server payload
+    /// only contains a prompt string; no matching response parser exists in
+    /// the server tree, so native exposes it as an acknowledged prompt.
+    @Published var inputPromptOpen: Bool = false
+    @Published var inputPromptText: String = ""
+
     /// Ticks remaining until the server reboots (opcode 52). Server sends
     /// ticks-of-32ms; Java code multiplies by 32 to get milliseconds. We
     /// keep that scaled value here so the banner shows seconds = ticks/1000.
