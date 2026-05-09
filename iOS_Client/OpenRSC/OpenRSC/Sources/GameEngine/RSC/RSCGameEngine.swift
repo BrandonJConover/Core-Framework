@@ -2675,13 +2675,13 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
-    func bankWithdraw(itemId: Int, amount: Int) {
+    func bankWithdraw(itemId: Int, amount: Int, noted: Bool = false) {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.bankWithdraw.rawValue))
             buf.putShort(itemId)
             buf.putInt(amount)
-            buf.putInt(0)
+            buf.putByte(noted ? 1 : 0)
             try? await connection.send(buf.finishPacket())
         }
     }
