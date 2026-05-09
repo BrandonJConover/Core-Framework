@@ -1864,6 +1864,17 @@ final class RSCGameEngine: ObservableObject {
         return nearest
     }
 
+    private func primaryObjectCommand(for object: RSCGameObject) -> String? {
+        let command = GameObjectDefinitions.get(object.objectId)?
+            .command1
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let lowered = command.lowercased()
+        guard !command.isEmpty, lowered != "walkto", lowered != "null", lowered != "examine" else {
+            return nil
+        }
+        return command
+    }
+
     @discardableResult
     private func sendWalkPath(toX destX: Int, toZ destZ: Int, walkToEntity: Bool) async -> [(x: Int, z: Int)] {
         let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
@@ -1980,6 +1991,19 @@ final class RSCGameEngine: ObservableObject {
                 talkBuf.putShort(npc.id)
                 try? await connection.send(talkBuf.finishPacket())
             }
+        } else if let item = targetGroundItem {
+            // PC left-click priority takes ground items when the click lands on
+            // the item marker. Keep plain terrain taps as walking.
+            print("[Input] Take ground item \(item.itemId) at (\(item.x),\(item.y))")
+            pickupGroundItem(x: item.x, y: item.y, itemId: item.itemId)
+        } else if let object = targetObject,
+                  let command = primaryObjectCommand(for: object),
+                  !command.isEmpty {
+            print("[Input] \(command) object \(object.objectId) at (\(object.x),\(object.y))")
+            objectAction1(x: object.x, z: object.y)
+        } else if let wall = targetWall {
+            print("[Input] Use wall \(wall.wallId) at (\(wall.x),\(wall.y)) dir=\(wall.direction)")
+            wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
         } else {
             // No NPC nearby → walk to destination with pathfinding
             let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
@@ -2167,11 +2191,7 @@ final class RSCGameEngine: ObservableObject {
         // Always add walk option
         actions.append(("Walk here", "figure.walk", { [weak self] in
             Task {
-                let buf = ByteBuffer()
-                buf.newPacket(opcode: 187)
-                buf.putShort(worldX)
-                buf.putShort(worldZ)
-                try? await self?.connection.send(buf.finishPacket())
+                await self?.sendWalkPath(toX: worldX, toZ: worldZ, walkToEntity: false)
             }
         }))
 
@@ -2199,6 +2219,9 @@ final class RSCGameEngine: ObservableObject {
 
     func attackPlayer(serverIndex: Int) {
         Task {
+            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerAttack.rawValue))
             buf.putShort(serverIndex)
@@ -2437,6 +2460,7 @@ final class RSCGameEngine: ObservableObject {
 
     func pickupGroundItem(x: Int, y: Int, itemId: Int) {
         Task {
+            await sendWalkPath(toX: x, toZ: y, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.groundItemTake.rawValue))
             buf.putShort(x)
@@ -2579,6 +2603,7 @@ final class RSCGameEngine: ObservableObject {
 
     func objectAction1(x: Int, z: Int) {
         Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand1.rawValue))
             buf.putShort(x)
@@ -2589,6 +2614,7 @@ final class RSCGameEngine: ObservableObject {
 
     func objectAction2(x: Int, z: Int) {
         Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand2.rawValue))
             buf.putShort(x)
@@ -2881,6 +2907,9 @@ final class RSCGameEngine: ObservableObject {
 
     func followPlayer(serverIndex: Int) {
         Task {
+            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerFollow.rawValue))
             buf.putShort(serverIndex)
@@ -2893,6 +2922,9 @@ final class RSCGameEngine: ObservableObject {
     /// accepts (TradePanel opens) or declines.
     func requestTrade(serverIndex: Int) {
         Task {
+            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerTrade.rawValue))
             buf.putShort(serverIndex)
@@ -2904,6 +2936,9 @@ final class RSCGameEngine: ObservableObject {
     /// confirms, the DuelPanel opens for both sides.
     func requestDuel(serverIndex: Int) {
         Task {
+            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
+                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerDuel.rawValue))
             buf.putShort(serverIndex)
