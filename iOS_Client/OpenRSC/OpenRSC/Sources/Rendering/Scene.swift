@@ -50,6 +50,7 @@ final class Scene {
     // Rasterizer references
     var graphics: GraphicsController
     var shader: Shader
+    var billboardOcclusionDepth: [Int32]
 
     // Working state
     var m_A: Int32 = 256  // screen center X
@@ -82,6 +83,7 @@ final class Scene {
     init(graphics: GraphicsController, modelCount: Int, polyCount: Int, spriteCount: Int) {
         self.graphics = graphics
         self.shader = Shader()
+        self.billboardOcclusionDepth = [Int32](repeating: Int32.max, count: Int(graphics.width2 * graphics.height2))
 
         // Initialize model array
         self.modelCount = 0
@@ -288,6 +290,7 @@ final class Scene {
     func endScene(_ var1: Int32) {
         // Clear framebuffer
         graphics.blackScreen()
+        resetBillboardOcclusionDepth()
 
         // Compute frustum extents (matches Java Scene.java:2557-2580)
         let var7 = m_A &* fogLandscapeDistance >> rot1024_vp_src
@@ -487,6 +490,9 @@ final class Scene {
                                        minY: minY, maxY: maxY,
                                        color: color)
             }
+            if model.occludesBillboards {
+                recordBillboardOccluder(screenPts: screenPts, minY: minY, maxY: maxY, depth: poly.m_t)
+            }
         }
 
         if debugFrameCount <= 5 && m_zb > 0 {
@@ -516,6 +522,9 @@ final class Scene {
             let blueMask = m_blueMask[i]
             let colourTransform = m_colourTransform[i]
             let mirror = m_flip[i]
+            if isBillboardOccluded(x: spriteX, y: spriteY, width: spriteW, height: spriteH, depth: m_ob[i]) {
+                continue
+            }
             if mask1 != 0 || mask2 != 0 || blueMask != 0 || colourTransform != Int32(bitPattern: 0xFFFFFFFF) {
                 graphics.drawEntityTinted(
                     index: spriteIdx,
@@ -534,6 +543,69 @@ final class Scene {
                 )
             }
         }
+    }
+
+    private func resetBillboardOcclusionDepth() {
+        let count = Int(graphics.width2 * graphics.height2)
+        if billboardOcclusionDepth.count != count {
+            billboardOcclusionDepth = [Int32](repeating: Int32.max, count: count)
+        } else {
+            billboardOcclusionDepth.withUnsafeMutableBufferPointer { buf in
+                for i in 0..<count { buf[i] = Int32.max }
+            }
+        }
+    }
+
+    private func recordBillboardOccluder(screenPts: [(x: Int, y: Int)],
+                                         minY: Int, maxY: Int,
+                                         depth: Int32) {
+        guard !billboardOcclusionDepth.isEmpty else { return }
+        let yStart = max(0, minY)
+        let yEnd = min(Int(graphics.height2) - 1, maxY)
+        guard yStart <= yEnd else { return }
+        let width = Int(graphics.width2)
+        for y in yStart...yEnd {
+            guard let span = polygonSpan(atY: y, screenPts: screenPts) else { continue }
+            let x0 = max(0, span.x0)
+            let x1 = min(width - 1, span.x1)
+            guard x0 <= x1 else { continue }
+            let row = y * width
+            for x in x0...x1 {
+                let idx = row + x
+                if depth < billboardOcclusionDepth[idx] {
+                    billboardOcclusionDepth[idx] = depth
+                }
+            }
+        }
+    }
+
+    private func isBillboardOccluded(x: Int32, y: Int32, width: Int32, height: Int32, depth: Int32) -> Bool {
+        guard width > 0, height > 0, depth >= rot1024_zTop else { return false }
+        let screenW = Int(graphics.width2)
+        let screenH = Int(graphics.height2)
+        guard screenW > 0 && screenH > 0 else { return false }
+
+        let left = max(0, Int(x))
+        let right = min(screenW - 1, Int(x + width - 1))
+        let top = max(0, Int(y + height / 3))
+        let bottom = min(screenH - 1, Int(y + height - 1))
+        guard left <= right && top <= bottom else { return false }
+
+        let xs = [left, (left + right) / 2, right]
+        let ys = [top, (top + bottom) / 2, bottom]
+        var covered = 0
+        var samples = 0
+        let margin: Int32 = 32
+        for sy in ys {
+            for sx in xs {
+                samples += 1
+                let occluderDepth = billboardOcclusionDepth[sy * screenW + sx]
+                if occluderDepth != Int32.max && occluderDepth + margin < depth {
+                    covered += 1
+                }
+            }
+        }
+        return samples > 0 && covered * 2 >= samples
     }
 
     private func terrainTextureForFace(model: RSModel, faceIndex: Int) -> (index: Int, pixels: [Int32], width: Int, height: Int, ramps: Int)? {

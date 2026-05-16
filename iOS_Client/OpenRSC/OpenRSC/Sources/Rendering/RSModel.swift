@@ -61,6 +61,10 @@ final class RSModel {
     var vertCount: Int32 = 0
     var faceCount: Int32 = 0
     var visible: Bool = false
+    /// Terrain is drawn as the floor and should not hide character billboards.
+    /// Object and boundary models keep the default `true`, letting Scene build
+    /// a coarse depth mask before billboard layers are composited.
+    var occludesBillboards: Bool = true
 
     // MARK: - Internal flags (matching Java obfuscated names)
     var m_cb: Bool = false
@@ -404,6 +408,7 @@ final class RSModel {
         copy.vertexCount2 = vertexCount2
         copy.m_Yb = m_Yb
         copy.m_dc = m_dc
+        copy.occludesBillboards = occludesBillboards
 
         // Deep-copy arrays
         copy.vertX = vertX; copy.vertY = vertY; copy.vertZ = vertZ

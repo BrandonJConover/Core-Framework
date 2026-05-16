@@ -149,6 +149,7 @@ final class World {
 
         // Force full bounding box recalculation (m_Yb=2 sets bounds to ±9999999)
         model.m_Yb = 2
+        model.occludesBillboards = false
 
         // Add model to scene
         modelLandscapeGrid[plane] = model
