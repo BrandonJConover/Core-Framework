@@ -586,7 +586,11 @@ final class Scene {
         let ramp = terrainBrightnessRamp(for: fallback, rampCount: texture.ramps)
         let page = max(0, min(texture.ramps - 1, ramp))
         let pageStart = min(texture.pixels.count - pageSize, page * pageSize)
-        let source = Array(texture.pixels[pageStart..<(pageStart + pageSize)])
+        let source = shaderCompatibleTerrainPage(
+            pixels: Array(texture.pixels[pageStart..<(pageStart + pageSize)]),
+            width: texture.width,
+            height: texture.height
+        )
 
         graphics.pixelData.withUnsafeMutableBufferPointer { destBuffer in
             guard let dest = destBuffer.baseAddress else { return }
@@ -616,41 +620,49 @@ final class Scene {
                                                               screenPts: screenPts) else { continue }
 
                     let spanWidth = max(1, x1 - x0 + 1)
-                    let u0 = Int32(max(0, min(texture.width - 1, Int(uvStart.u * Double(texture.width - 1)))))
-                    let v0 = Int32(max(0, min(texture.height - 1, Int(uvStart.v * Double(texture.height - 1)))))
-                    let u1 = Int32(max(0, min(texture.width - 1, Int(uvEnd.u * Double(texture.width - 1)))))
-                    let v1 = Int32(max(0, min(texture.height - 1, Int(uvEnd.v * Double(texture.height - 1)))))
+                    let u0 = Int32(max(0, min(63, Int(uvStart.u * 63.0))))
+                    let v0 = Int32(max(0, min(63, Int(uvStart.v * 63.0))))
+                    let u1 = Int32(max(0, min(63, Int(uvEnd.u * 63.0))))
+                    let v1 = Int32(max(0, min(63, Int(uvEnd.v * 63.0))))
                     let uBlockDelta = ((u1 - u0) * 16) / Int32(spanWidth)
                     let vBlockDelta = ((v1 - v0) * 16) / Int32(spanWidth)
                     let destIndex = Int32(rowBase + x0)
 
-                    // The existing texture pack is 64x64 today. If a future
-                    // texture type reports larger pages, keep the fill stable by
-                    // falling back to the affine sampler until the large Java
-                    // overload is wired with its different fixed-point scale.
-                    if texture.width == 64 {
-                        shader.shadeScanlineTransparentNormal(
-                            var0: vBlockDelta, var1: 0, var2: 0, var3: 0,
-                            dest: dest,
-                            var5: 1, var6: 0,
-                            var7: u0, var8: v0, var9: destIndex,
-                            var10: 0, var11: 0, var12: 0,
-                            var13: uBlockDelta, texture: src,
-                            var15: Int32(spanWidth)
-                        )
-                    } else {
-                        for x in x0...x1 {
-                            if let sampled = sampleTerrainTexture(texture,
-                                                                   x: x, y: y,
-                                                                   screenPts: screenPts,
-                                                                   fallback: fallback) {
-                                dest[rowBase + x] = sampled
-                            }
-                        }
-                    }
+                    shader.shadeScanlineTransparentNormal(
+                        var0: vBlockDelta, var1: 0, var2: 0, var3: 0,
+                        dest: dest,
+                        var5: 1, var6: 0,
+                        var7: u0, var8: v0, var9: destIndex,
+                        var10: 0, var11: 0, var12: 0,
+                        var13: uBlockDelta, texture: src,
+                        var15: Int32(spanWidth)
+                    )
                 }
             }
         }
+    }
+
+    private func shaderCompatibleTerrainPage(pixels: [Int32], width: Int, height: Int) -> [Int32] {
+        guard width > 0, height > 0, pixels.count >= width * height else {
+            return [Int32](repeating: 0, count: 64 * 64)
+        }
+        guard width != 64 || height != 64 else { return pixels }
+
+        // The transparent-normal Swift shader is currently the Java-compatible
+        // path used by terrain faces. Larger texture pages still need the full
+        // Java large-overload dispatcher, but they should not fall back to the
+        // old affine sampler. Normalize them to a 64x64 page so every terrain
+        // face goes through the same skip-0 scanline semantics while preserving
+        // stable visual output for 128px pages parsed from the cache.
+        var normalized = [Int32](repeating: 0, count: 64 * 64)
+        for y in 0..<64 {
+            let srcY = min(height - 1, (y * height) / 64)
+            for x in 0..<64 {
+                let srcX = min(width - 1, (x * width) / 64)
+                normalized[y * 64 + x] = pixels[srcY * width + srcX]
+            }
+        }
+        return normalized
     }
 
     private func polygonSpan(atY y: Int, screenPts: [(x: Int, y: Int)]) -> (x0: Int, x1: Int)? {
