@@ -53,11 +53,37 @@ struct DoorDef {
 
 struct ObjectDef {
     let name: String
-    let type: Int = 0
-    let width: Int = 1
-    let height: Int = 1
-    let objectModel: Int = 0
-    let groundItemVar: Int = 0
+    let description: String
+    let command1: String
+    let command2: String
+    let type: Int
+    let width: Int
+    let height: Int
+    let objectModel: Int
+    let modelName: String
+    let groundItemVar: Int
+
+    init(name: String,
+         description: String = "",
+         command1: String = "WalkTo",
+         command2: String = "Examine",
+         type: Int = 0,
+         width: Int = 1,
+         height: Int = 1,
+         objectModel: Int = 0,
+         modelName: String = "",
+         groundItemVar: Int = 0) {
+        self.name = name
+        self.description = description
+        self.command1 = command1
+        self.command2 = command2
+        self.type = type
+        self.width = width
+        self.height = height
+        self.objectModel = objectModel
+        self.modelName = modelName
+        self.groundItemVar = groundItemVar
+    }
 }
 
 struct NPCDef {
@@ -72,20 +98,38 @@ struct ItemDef {
 enum EntityDefinitions {
     static let TRANSPARENT: Int32 = 12345678
 
-    // Minimal tile set
-    static let tiles: [TileDef] = (0..<25).map { i in
+    // Minimal fallback tile set used only if TileDef.xml is unavailable.
+    private static let fallbackTiles: [TileDef] = (0..<25).map { i in
         let baseColor: Int32 = Int32(bitPattern: 0xFF808080)
         let color = baseColor &+ Int32(i * 0x101010)
         return TileDef(colour: color, tileValue: i, objectType: 0)
     }
 
+    private(set) static var tiles: [TileDef] = fallbackTiles
     static let elevations: [ElevationDef] = [ElevationDef()]
+    private static var didTryLoadingTiles = false
     private(set) static var doors: [DoorDef] = [DoorDef(name: "Door")]
-    static let objects: [ObjectDef] = [ObjectDef(name: "Object")]
+    private(set) static var objects: [ObjectDef] = [ObjectDef(name: "Object")]
     static let npcs: [NPCDef] = [NPCDef(name: "NPC")]
     static let items: [ItemDef] = [ItemDef()]
 
+    static var tileCount: Int {
+        loadTileDefinitionsIfNeeded()
+        return tiles.count
+    }
+
+    static var doorCount: Int {
+        loadDoorDefinitionsIfNeeded()
+        return doors.count
+    }
+
+    static var objectCount: Int {
+        loadObjectDefinitionsIfNeeded()
+        return objects.count
+    }
+
     static func getTileDef(_ id: Int) -> TileDef? {
+        loadTileDefinitionsIfNeeded()
         guard id >= 0 && id < tiles.count else { return nil }
         return tiles[id]
     }
@@ -97,6 +141,7 @@ enum EntityDefinitions {
     }
 
     static func getObjectDef(_ id: Int) -> ObjectDef? {
+        loadObjectDefinitionsIfNeeded()
         guard id >= 0 && id < objects.count else { return nil }
         return objects[id]
     }
@@ -109,6 +154,35 @@ enum EntityDefinitions {
     static func getItemDef(_ id: Int) -> ItemDef? {
         guard id >= 0 && id < items.count else { return nil }
         return items[id]
+    }
+
+    private static func loadTileDefinitionsIfNeeded() {
+        guard !didTryLoadingTiles else { return }
+        didTryLoadingTiles = true
+        guard let path = Bundle.main.path(forResource: "TileDef", ofType: "xml"),
+              let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let xml = String(data: data, encoding: .utf8) else {
+            return
+        }
+
+        let blockPattern = #"<(?:[A-Za-z0-9_.]+\.)?TileDef>([\s\S]*?)</(?:[A-Za-z0-9_.]+\.)?TileDef>"#
+        let parsed = allGroups(pattern: blockPattern, in: xml).compactMap { block -> TileDef? in
+            guard let colourText = firstGroup(pattern: "<colour>([^<]*)</colour>", in: block),
+                  let colour = Int32(colourText.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+                return nil
+            }
+
+            return TileDef(
+                colour: colour,
+                tileValue: Int(firstGroup(pattern: "<unknown>([^<]*)</unknown>", in: block) ?? "0") ?? 0,
+                objectType: Int(firstGroup(pattern: "<objectType>([^<]*)</objectType>", in: block) ?? "0") ?? 0
+            )
+        }
+
+        if !parsed.isEmpty {
+            tiles = parsed
+            print("[TileDef] Loaded \(tiles.count) tile definitions")
+        }
     }
 
     private static func loadDoorDefinitionsIfNeeded() {
@@ -139,6 +213,38 @@ enum EntityDefinitions {
         if !parsed.isEmpty {
             doors = parsed
             print("[DoorDef] Loaded \(doors.count) door definitions")
+        }
+    }
+
+    private static func loadObjectDefinitionsIfNeeded() {
+        guard objects.count == 1, objects[0].name == "Object",
+              let path = Bundle.main.path(forResource: "GameObjectDef", ofType: "xml"),
+              let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let xml = String(data: data, encoding: .utf8) else {
+            return
+        }
+
+        let blockPattern = #"<(?:[A-Za-z0-9_.]+\.)?GameObjectDef>([\s\S]*?)</(?:[A-Za-z0-9_.]+\.)?GameObjectDef>"#
+        let parsed = allGroups(pattern: blockPattern, in: xml).compactMap { block -> ObjectDef? in
+            guard block.contains("<name>") else { return nil }
+            let modelName = xmlUnescaped(firstGroup(pattern: "<objectModel>([^<]*)</objectModel>", in: block) ?? "")
+            return ObjectDef(
+                name: xmlUnescaped(firstGroup(pattern: "<name>([^<]*)</name>", in: block) ?? ""),
+                description: xmlUnescaped(firstGroup(pattern: "<description>([^<]*)</description>", in: block) ?? ""),
+                command1: xmlUnescaped(firstGroup(pattern: "<command1>([^<]*)</command1>", in: block) ?? ""),
+                command2: xmlUnescaped(firstGroup(pattern: "<command2>([^<]*)</command2>", in: block) ?? ""),
+                type: Int(firstGroup(pattern: "<type>([^<]*)</type>", in: block) ?? "0") ?? 0,
+                width: Int(firstGroup(pattern: "<width>([^<]*)</width>", in: block) ?? "1") ?? 1,
+                height: Int(firstGroup(pattern: "<height>([^<]*)</height>", in: block) ?? "1") ?? 1,
+                objectModel: Int(modelName) ?? 0,
+                modelName: modelName,
+                groundItemVar: Int(firstGroup(pattern: "<groundItemVar>([^<]*)</groundItemVar>", in: block) ?? "0") ?? 0
+            )
+        }
+
+        if !parsed.isEmpty {
+            objects = parsed
+            print("[ObjectDef] Loaded \(objects.count) object definitions")
         }
     }
 

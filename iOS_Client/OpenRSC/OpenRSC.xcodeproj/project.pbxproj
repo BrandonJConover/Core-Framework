@@ -32,6 +32,7 @@
 		48198E65F85056BF3CD2BCE6 /* ModelArchiveLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9F6A909F89CE0F94742AF5 /* ModelArchiveLoader.swift */; };
 		49BE2E9E20608DF7F8491734 /* landscape.dat in Resources */ = {isa = PBXBuildFile; fileRef = EB1994B23C1113BEF842C514 /* landscape.dat */; };
 		4B6D93F4FBEAD30A6A116F46 /* GameObjectDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4EDAB057950782165E6034E /* GameObjectDefinitions.swift */; };
+		4D7408A647B9429DAF2F1778 /* TileDef.xml in Resources */ = {isa = PBXBuildFile; fileRef = 4D7408A547B9429DAF2F1778 /* TileDef.xml */; };
 		4EDFD6C354CB77D0C3011728 /* RSCWorldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CBD0EBDD0DAD78E31727091 /* RSCWorldState.swift */; };
 		552BAD94C1418B5032196D70 /* BiometricLoginStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368DEB5A277F7F3412F785E4 /* BiometricLoginStore.swift */; };
 		5D992464CE94A9E8AD9FE4FE /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA34960346994775CDF265C /* LoginView.swift */; };
@@ -100,6 +101,7 @@
 		47C3A69581252F63EC5EAA1E /* GameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameView.swift; sourceTree = "<group>"; };
 		4AA431B51F6327E8909C7691 /* BankPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BankPanel.swift; sourceTree = "<group>"; };
 		4C427C9F5B86C2E46A8D4C79 /* Authentic_Sprites.orsc */ = {isa = PBXFileReference; path = Authentic_Sprites.orsc; sourceTree = "<group>"; };
+		4D7408A547B9429DAF2F1778 /* TileDef.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = TileDef.xml; sourceTree = "<group>"; };
 		4EAAA291551DD814CD0DA0F3 /* RSModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSModel.swift; sourceTree = "<group>"; };
 		5242B6A5DCB117B084B12B9C /* SystemUpdateBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemUpdateBanner.swift; sourceTree = "<group>"; };
 		5576569325B6C2223C6DEE7E /* NPCNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPCNames.swift; sourceTree = "<group>"; };
@@ -252,6 +254,7 @@
 				FFEE1170686C181AC0F64F7F /* NpcDefs.json */,
 				DA44202D4E360DF84525A203 /* sprites_v2.dat */,
 				A10B951D45EB676566FF7CB1 /* sprites.dat */,
+				4D7408A547B9429DAF2F1778 /* TileDef.xml */,
 				EEB3325A965B51B67539C863 /* Sources */,
 			);
 			path = OpenRSC;
@@ -435,6 +438,7 @@
 				EF9B796974E87C5ABA49F84A /* GameObjectDef.xml in Resources */,
 				D10043D1E4A4315989E35C21 /* ItemDefs.json in Resources */,
 				7E6C152D0E1B360DA926B507 /* NpcDefs.json in Resources */,
+				4D7408A647B9429DAF2F1778 /* TileDef.xml in Resources */,
 				338FA91C1E0E26BAAEA38C25 /* WebClient in Resources */,
 				49BE2E9E20608DF7F8491734 /* landscape.dat in Resources */,
 				406DA2FFE25D7DA56EC24D73 /* models.orsc in Resources */,
