@@ -266,6 +266,16 @@ struct RSCBankPreset: Equatable {
     var equipment: [RSCBankPresetItem]
 }
 
+struct RSCItemStackMetadata: Equatable {
+    var id: Int
+    var amount: Int
+    var noted: Bool
+
+    var legacyStack: (id: Int, amount: Int) {
+        (id: id, amount: amount)
+    }
+}
+
 enum ChatChannel: Int, Codable, CaseIterable {
     case chat = 0
     case privateMsg
@@ -358,6 +368,10 @@ struct RSCEquipmentStats {
 
 @MainActor
 final class RSCWorldState: ObservableObject {
+    static let maxTradeOfferSlots = 12
+    static let maxDuelStakeSlots = 8
+    static let maxShopSlots = 40
+
     @Published var localPlayerX: Int = 0
     @Published var localPlayerY: Int = 0
     /// Local player's 0..7 facing direction from showOtherPlayers's
@@ -506,7 +520,11 @@ final class RSCWorldState: ObservableObject {
     // Shop state (opcode 101 showShop, 137 closeShop)
     @Published var shopOpen: Bool = false
     @Published var shopItems: [(id: Int, stock: Int, price: Int)] = []
+    @Published var shopSellableItemIds: Set<Int> = []
     var shopType: Int = 0
+    var shopSellModifier: Int = 0
+    var shopBuyModifier: Int = 0
+    var shopPriceMultiplier: Int = 0
 
     // Dialogue state (opcode 245 showOptionsMenu, 252 disableOptionsMenu)
     @Published var dialogueOpen: Bool = false
@@ -520,6 +538,8 @@ final class RSCWorldState: ObservableObject {
     @Published var tradePartnerAccepted: Bool = false
     @Published var tradeMyOffer: [(id: Int, amount: Int)] = []
     @Published var tradeTheirOffer: [(id: Int, amount: Int)] = []
+    @Published var tradeMyOfferMetadata: [RSCItemStackMetadata] = []
+    @Published var tradeTheirOfferMetadata: [RSCItemStackMetadata] = []
 
     // Friends/Ignore
     @Published var friendsList: [(name: String, online: Bool)] = []
@@ -560,6 +580,8 @@ final class RSCWorldState: ObservableObject {
     @Published var duelOpponentName: String = ""
     @Published var duelMyStake: [(id: Int, amount: Int)] = []
     @Published var duelTheirStake: [(id: Int, amount: Int)] = []
+    @Published var duelMyStakeMetadata: [RSCItemStackMetadata] = []
+    @Published var duelTheirStakeMetadata: [RSCItemStackMetadata] = []
     @Published var duelSettings: [Bool] = [false, false, false, false] // retreat, magic, prayer, weapons
     @Published var duelAccepted: Bool = false
     @Published var duelOpponentAccepted: Bool = false

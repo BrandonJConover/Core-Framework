@@ -2942,29 +2942,34 @@ final class RSCGameEngine: ObservableObject {
     // MARK: - Shop actions
 
     func shopBuy(itemId: Int, amount: Int) {
+        let safeAmount = max(0, min(amount, 65_535))
+        guard safeAmount > 0 else { return }
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.shopBuy.rawValue))
             buf.putShort(itemId)
             buf.putShort(worldState.shopItems.first(where: { $0.id == itemId })?.stock ?? 0)
-            buf.putShort(amount)
+            buf.putShort(safeAmount)
             try? await connection.send(buf.finishPacket())
         }
     }
 
     func shopSell(itemId: Int, amount: Int) {
+        let safeAmount = max(0, min(amount, 65_535))
+        guard safeAmount > 0 else { return }
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.shopSell.rawValue))
             buf.putShort(itemId)
             buf.putShort(worldState.shopItems.first(where: { $0.id == itemId })?.stock ?? 0)
-            buf.putShort(amount)
+            buf.putShort(safeAmount)
             try? await connection.send(buf.finishPacket())
         }
     }
 
     func closeShop() {
         worldState.shopOpen = false
+        worldState.shopSellableItemIds = []
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.shopClose.rawValue))
@@ -3491,18 +3496,29 @@ final class RSCGameEngine: ObservableObject {
     /// Java client mudclient.java:17215 — replaces server-side offer with the full list.
     /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount, SHORT noted.
     func tradeOffer(_ items: [(id: Int, amount: Int)]) {
+        sendTradeOffer(items.map { RSCItemStackMetadata(id: $0.id, amount: $0.amount, noted: false) })
+    }
+
+    /// Metadata-aware trade offer helper for future noted-item panels.
+    func tradeOffer(_ items: [RSCItemStackMetadata]) {
+        sendTradeOffer(items)
+    }
+
+    private func sendTradeOffer(_ items: [RSCItemStackMetadata]) {
+        let prepared = prepareOfferItems(items, maxSlots: RSCWorldState.maxTradeOfferSlots)
         // Optimistic local update — packet handler will overwrite from server later.
-        worldState.tradeMyOffer = items
+        worldState.tradeMyOfferMetadata = prepared
+        worldState.tradeMyOffer = prepared.map { $0.legacyStack }
         worldState.tradeAccepted = false
         worldState.tradePartnerAccepted = false
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.tradeOffer.rawValue))
-            buf.putByte(items.count)
-            for it in items {
+            buf.putByte(prepared.count)
+            for it in prepared {
                 buf.putShort(it.id)
                 buf.putInt(it.amount)
-                buf.putShort(0)
+                buf.putShort(it.noted ? 1 : 0)
             }
             try? await connection.send(buf.finishPacket())
         }
@@ -3523,17 +3539,28 @@ final class RSCGameEngine: ObservableObject {
     /// Java client mudclient.java:11102 — same format as trade offer.
     /// Format: BYTE itemCount, then per item: SHORT itemId, INT amount, SHORT noted.
     func duelOffer(_ items: [(id: Int, amount: Int)]) {
-        worldState.duelMyStake = items
+        sendDuelOffer(items.map { RSCItemStackMetadata(id: $0.id, amount: $0.amount, noted: false) })
+    }
+
+    /// Metadata-aware duel stake helper for future noted-item panels.
+    func duelOffer(_ items: [RSCItemStackMetadata]) {
+        sendDuelOffer(items)
+    }
+
+    private func sendDuelOffer(_ items: [RSCItemStackMetadata]) {
+        let prepared = prepareOfferItems(items, maxSlots: RSCWorldState.maxDuelStakeSlots)
+        worldState.duelMyStakeMetadata = prepared
+        worldState.duelMyStake = prepared.map { $0.legacyStack }
         worldState.duelAccepted = false
         worldState.duelOpponentAccepted = false
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.duelOffer.rawValue))
-            buf.putByte(items.count)
-            for it in items {
+            buf.putByte(prepared.count)
+            for it in prepared {
                 buf.putShort(it.id)
                 buf.putInt(it.amount)
-                buf.putShort(0)
+                buf.putShort(it.noted ? 1 : 0)
             }
             try? await connection.send(buf.finishPacket())
         }
@@ -3554,6 +3581,14 @@ final class RSCGameEngine: ObservableObject {
             buf.putByte(prayer ? 1 : 0)
             buf.putByte(weapons ? 1 : 0)
             try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    private func prepareOfferItems(_ items: [RSCItemStackMetadata], maxSlots: Int) -> [RSCItemStackMetadata] {
+        items.prefix(maxSlots).compactMap { item in
+            let amount = max(0, item.amount)
+            guard amount > 0 else { return nil }
+            return RSCItemStackMetadata(id: item.id, amount: amount, noted: item.noted)
         }
     }
 }
