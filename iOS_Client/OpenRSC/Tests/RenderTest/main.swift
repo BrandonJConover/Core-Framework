@@ -168,6 +168,33 @@ final class RenderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func test_rsc_trade_confirm_uses_rsc_strings_and_int_amounts() {
+        let ws = RSCWorldState()
+        ws.tradeOpen = true
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 20, payload: Data(rscStringBytes("Alice") + [
+            0x01,                   // partner count
+            0x01, 0x2C,             // partner item id 300
+            0x00, 0x00, 0x00, 0x04, // partner amount 4
+            0x01,                   // my count
+            0x01, 0x90,             // my item id 400
+            0x00, 0x01, 0x11, 0x70  // my amount 70000
+        ]))
+
+        XCTAssertEqual(ws.tradePartnerName, "Alice")
+        XCTAssertFalse(ws.tradeOpen)
+        XCTAssertTrue(ws.tradeConfirmOpen)
+        XCTAssertEqual(ws.tradeTheirOffer.count, 1)
+        XCTAssertEqual(ws.tradeTheirOffer[0].id, 300)
+        XCTAssertEqual(ws.tradeTheirOffer[0].amount, 4)
+        XCTAssertEqual(ws.tradeMyOffer.count, 1)
+        XCTAssertEqual(ws.tradeMyOffer[0].id, 400)
+        XCTAssertEqual(ws.tradeMyOffer[0].amount, 70_000)
+    }
+
+    @MainActor
     func test_rsc_duel_settings_use_java_order_and_one_means_restriction() {
         let ws = RSCWorldState()
         let handler = RSCPacketHandler()
@@ -176,6 +203,149 @@ final class RenderPipelineTests: XCTestCase {
         handler.handlePacket(opcode: 30, payload: Data([1, 0, 1, 0]))
 
         XCTAssertEqual(ws.duelSettings, [true, false, true, false])
+    }
+
+    @MainActor
+    func test_rsc_duel_confirm_uses_rsc_strings_stakes_and_settings() {
+        let ws = RSCWorldState()
+        ws.duelOpen = true
+        ws.duelSettings = [false, false, false, false]
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 172, payload: Data(rscStringBytes("Bob") + [
+            0x01,                   // opponent stake count
+            0x00, 0x65,             // opponent item id 101
+            0x00, 0x00, 0x00, 0x02, // opponent amount 2
+            0x02,                   // my stake count
+            0x00, 0x66,             // my item id 102
+            0x00, 0x00, 0x00, 0x03, // my amount 3
+            0x00, 0x67,             // my item id 103
+            0x00, 0x01, 0x11, 0x70, // my amount 70000
+            1, 0, 1, 0              // retreat/magic/prayer/weapons restrictions
+        ]))
+
+        XCTAssertFalse(ws.duelOpen)
+        XCTAssertTrue(ws.duelConfirmOpen)
+        XCTAssertEqual(ws.duelOpponentName, "Bob")
+        XCTAssertEqual(ws.duelTheirStake.count, 1)
+        XCTAssertEqual(ws.duelTheirStake[0].id, 101)
+        XCTAssertEqual(ws.duelTheirStake[0].amount, 2)
+        XCTAssertEqual(ws.duelMyStake.count, 2)
+        XCTAssertEqual(ws.duelMyStake[0].id, 102)
+        XCTAssertEqual(ws.duelMyStake[0].amount, 3)
+        XCTAssertEqual(ws.duelMyStake[1].id, 103)
+        XCTAssertEqual(ws.duelMyStake[1].amount, 70_000)
+        XCTAssertEqual(ws.duelSettings, [true, false, true, false])
+    }
+
+    @MainActor
+    func test_rsc_game_object_packet_adds_replaces_and_removes_by_tile() {
+        let ws = RSCWorldState()
+        ws.localPlayerX = 100
+        ws.localPlayerY = 200
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 48, payload: Data([
+            0x01, 0x02,  // object id 258
+            0x03,        // x = local + 3
+            0xFE,        // y = local - 2
+            0x06         // direction
+        ]))
+
+        XCTAssertEqual(ws.gameObjects.count, 1)
+        XCTAssertEqual(ws.gameObjects[0].x, 103)
+        XCTAssertEqual(ws.gameObjects[0].y, 198)
+        XCTAssertEqual(ws.gameObjects[0].objectId, 258)
+        XCTAssertEqual(ws.gameObjects[0].direction, 6)
+
+        handler.handlePacket(opcode: 48, payload: Data([
+            0x01, 0x03,  // replacement object id 259 at same tile
+            0x03,
+            0xFE,
+            0x02
+        ]))
+
+        XCTAssertEqual(ws.gameObjects.count, 1)
+        XCTAssertEqual(ws.gameObjects[0].objectId, 259)
+        XCTAssertEqual(ws.gameObjects[0].direction, 2)
+
+        handler.handlePacket(opcode: 48, payload: Data([
+            0xEA, 0x60,  // object id 60000 means remove-only
+            0x03,
+            0xFE,
+            0x00
+        ]))
+
+        XCTAssertTrue(ws.gameObjects.isEmpty)
+    }
+
+    @MainActor
+    func test_rsc_game_object_packet_batch_removes_8x8_region() {
+        let ws = RSCWorldState()
+        ws.localPlayerX = 100
+        ws.localPlayerY = 200
+        ws.gameObjects = [
+            RSCGameObject(x: 100, y: 200, objectId: 1, direction: 0),
+            RSCGameObject(x: 107, y: 207, objectId: 2, direction: 0),
+            RSCGameObject(x: 108, y: 208, objectId: 3, direction: 0)
+        ]
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 48, payload: Data([
+            0xFF,  // batch remove
+            0x00,  // region x = local x
+            0x00   // region z = local y
+        ]))
+
+        XCTAssertEqual(ws.gameObjects.count, 1)
+        XCTAssertEqual(ws.gameObjects[0].objectId, 3)
+    }
+
+    @MainActor
+    func test_rsc_wall_packet_replaces_same_direction_only_and_removes_sentinel() {
+        let ws = RSCWorldState()
+        ws.localPlayerX = 50
+        ws.localPlayerY = 60
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 91, payload: Data([
+            0x00, 0x2A,  // wall id 42
+            0x01,
+            0x02,
+            0x00,
+            0x00, 0x2B,  // wall id 43, same tile but different direction
+            0x01,
+            0x02,
+            0x01
+        ]))
+
+        XCTAssertEqual(ws.wallObjects.count, 2)
+
+        handler.handlePacket(opcode: 91, payload: Data([
+            0x00, 0x2C,  // replaces only direction 0
+            0x01,
+            0x02,
+            0x00
+        ]))
+
+        XCTAssertEqual(ws.wallObjects.count, 2)
+        XCTAssertEqual(ws.wallObjects.first { $0.direction == 0 }?.wallId, 44)
+        XCTAssertEqual(ws.wallObjects.first { $0.direction == 1 }?.wallId, 43)
+
+        handler.handlePacket(opcode: 91, payload: Data([
+            0xEA, 0x60,  // wall id 60000 removes same tile/direction only
+            0x01,
+            0x02,
+            0x00
+        ]))
+
+        XCTAssertEqual(ws.wallObjects.count, 1)
+        XCTAssertEqual(ws.wallObjects[0].wallId, 43)
+        XCTAssertEqual(ws.wallObjects[0].direction, 1)
     }
 
     // --- 1. Sprite archive format ---
@@ -212,6 +382,52 @@ final class RenderPipelineTests: XCTestCase {
         let u = (UInt32(b[i]) << 24) | (UInt32(b[i+1]) << 16)
               | (UInt32(b[i+2]) << 8) | UInt32(b[i+3])
         return Int(Int32(bitPattern: u))
+    }
+
+    // --- 1b. Texture page semantics ---
+
+    func test_scene_load_texture_builds_java_style_brightness_pages() throws {
+        let (_, scene) = buildEngine()
+        let black: Int32 = 0x000000
+        let transparentMagenta: Int32 = 0xF800FF
+        let color: Int32 = 0x123456
+        let palette = [black, transparentMagenta, color]
+        var indices = [UInt8](repeating: 2, count: 64 * 64)
+        indices[0] = 0
+        indices[1] = 1
+
+        scene.loadTexture(index: 83, pixels: palette, type: 0, data: Data(indices))
+
+        XCTAssertEqual(scene.loadedTextureCount, 1)
+        XCTAssertGreaterThan(scene.resourceDatabase.count, 83)
+        XCTAssertEqual(scene.textureTypes[83], 0)
+        XCTAssertEqual(scene.textureIndexData[83], Data(indices))
+        XCTAssertEqual(scene.m_L[83], palette)
+        XCTAssertEqual(scene.m_Hb[83], 0)
+
+        let pages = try XCTUnwrap(scene.resourceDatabase[83])
+        XCTAssertEqual(pages.count, 64 * 64 * 4)
+        XCTAssertEqual(pages[0], 1, "Black texture pixels are coerced to 1 so 0 stays reserved for transparency")
+        XCTAssertEqual(pages[1], 0, "Java transparent-magenta sentinel becomes transparent 0")
+
+        let maskedColor = UInt32(bitPattern: color) & 0x00F8_F8FF
+        XCTAssertEqual(pages[2], Int32(bitPattern: maskedColor))
+        XCTAssertEqual(pages[64 * 64 + 2], Int32(bitPattern: (maskedColor &- (maskedColor >> 3)) & 0x00F8_F8FF))
+        XCTAssertEqual(pages[64 * 64 * 2 + 2], Int32(bitPattern: (maskedColor &- (maskedColor >> 2)) & 0x00F8_F8FF))
+        XCTAssertEqual(pages[64 * 64 * 3 + 2], Int32(bitPattern: (maskedColor &- (maskedColor >> 3) &- (maskedColor >> 2)) & 0x00F8_F8FF))
+    }
+
+    func test_scene_load_large_texture_uses_128_square_pages() throws {
+        let (_, scene) = buildEngine()
+        let palette: [Int32] = [0x112233]
+        let indices = Data([UInt8](repeating: 0, count: 128 * 128))
+
+        scene.loadTexture(index: 2, pixels: palette, type: 1, data: indices)
+
+        let pages = try XCTUnwrap(scene.resourceDatabase[2])
+        XCTAssertEqual(pages.count, 128 * 128 * 4)
+        XCTAssertEqual(scene.textureTypes[2], 1)
+        XCTAssertEqual(scene.m_Hb[2], 1)
     }
 
     // --- 2. AnimationDef number assignment ---
@@ -375,5 +591,9 @@ final class RenderPipelineTests: XCTestCase {
         let g = GraphicsController(width: 512, height: 334, spriteCount: 5000)
         let s = Scene(graphics: g, modelCount: 100, polyCount: 10000, spriteCount: 200)
         return (g, s)
+    }
+
+    private func rscStringBytes(_ string: String) -> [UInt8] {
+        Array(string.utf8) + [0x0A]
     }
 }
