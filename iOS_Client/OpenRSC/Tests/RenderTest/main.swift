@@ -20,6 +20,164 @@ final class RenderPipelineTests: XCTestCase {
         return FileManager.default.currentDirectoryPath + "/Tests/RenderTest/Fixtures"
     }
 
+    // --- RSC packet parser smoke tests ---
+
+    @MainActor
+    func test_rsc_bank_open_uses_short_counts_and_int_amounts() {
+        let ws = RSCWorldState()
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 42, payload: Data([
+            0x00, 0x02,             // item count
+            0x02, 0x00,             // max items = 512
+            0x00, 0x0A,             // item id 10
+            0x00, 0x01, 0x11, 0x70, // amount 70000
+            0x00, 0x14,             // item id 20
+            0x00, 0x00, 0x00, 0x03  // amount 3
+        ]))
+
+        XCTAssertTrue(ws.bankOpen)
+        XCTAssertEqual(ws.bankMaxItems, 512)
+        XCTAssertEqual(ws.bankItems.count, 2)
+        XCTAssertEqual(ws.bankItems[0].id, 10)
+        XCTAssertEqual(ws.bankItems[0].amount, 70_000)
+        XCTAssertEqual(ws.bankItems[1].id, 20)
+        XCTAssertEqual(ws.bankItems[1].amount, 3)
+    }
+
+    @MainActor
+    func test_rsc_bank_update_uses_byte_slot_short_id_and_int_amount() {
+        let ws = RSCWorldState()
+        ws.bankItems = [(id: 10, amount: 1)]
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 249, payload: Data([
+            0x00,                   // slot
+            0x00, 0x0A,             // item id 10
+            0x00, 0x01, 0x11, 0x70  // amount 70000
+        ]))
+
+        XCTAssertEqual(ws.bankItems.count, 1)
+        XCTAssertEqual(ws.bankItems[0].id, 10)
+        XCTAssertEqual(ws.bankItems[0].amount, 70_000)
+    }
+
+    @MainActor
+    func test_rsc_bank_update_removes_slot_when_amount_is_zero() {
+        let ws = RSCWorldState()
+        ws.bankItems = [(id: 10, amount: 1), (id: 20, amount: 2), (id: 30, amount: 3)]
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 249, payload: Data([
+            0x01,                   // slot
+            0x00, 0x14,             // item id 20
+            0x00, 0x00, 0x00, 0x00  // amount 0 removes the slot
+        ]))
+
+        XCTAssertEqual(ws.bankItems.count, 2)
+        XCTAssertEqual(ws.bankItems[0].id, 10)
+        XCTAssertEqual(ws.bankItems[0].amount, 1)
+        XCTAssertEqual(ws.bankItems[1].id, 30)
+        XCTAssertEqual(ws.bankItems[1].amount, 3)
+    }
+
+    @MainActor
+    func test_rsc_bank_update_appends_when_slot_matches_count() {
+        let ws = RSCWorldState()
+        ws.bankItems = [(id: 10, amount: 1)]
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 249, payload: Data([
+            0x01,                   // slot == current count
+            0x00, 0x28,             // item id 40
+            0x00, 0x00, 0x00, 0x05  // amount 5
+        ]))
+
+        XCTAssertEqual(ws.bankItems.count, 2)
+        XCTAssertEqual(ws.bankItems[0].id, 10)
+        XCTAssertEqual(ws.bankItems[0].amount, 1)
+        XCTAssertEqual(ws.bankItems[1].id, 40)
+        XCTAssertEqual(ws.bankItems[1].amount, 5)
+    }
+
+    @MainActor
+    func test_rsc_trade_update_replaces_partner_and_local_offers() {
+        let ws = RSCWorldState()
+        ws.tradeTheirOffer = [(id: 1, amount: 1)]
+        ws.tradeMyOffer = [(id: 2, amount: 2)]
+        ws.tradeAccepted = true
+        ws.tradePartnerAccepted = true
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 97, payload: Data([
+            0x01,                   // partner count
+            0x00, 0x64,             // partner item id 100
+            0x00, 0x00, 0x00, 0x02, // partner amount 2
+            0x02,                   // my count
+            0x00, 0xC8,             // my item id 200
+            0x00, 0x00, 0x00, 0x03, // my amount 3
+            0x00, 0xC9,             // my item id 201
+            0x00, 0x01, 0x11, 0x70  // my amount 70000
+        ]))
+
+        XCTAssertEqual(ws.tradeTheirOffer.count, 1)
+        XCTAssertEqual(ws.tradeTheirOffer[0].id, 100)
+        XCTAssertEqual(ws.tradeTheirOffer[0].amount, 2)
+        XCTAssertEqual(ws.tradeMyOffer.count, 2)
+        XCTAssertEqual(ws.tradeMyOffer[0].id, 200)
+        XCTAssertEqual(ws.tradeMyOffer[0].amount, 3)
+        XCTAssertEqual(ws.tradeMyOffer[1].id, 201)
+        XCTAssertEqual(ws.tradeMyOffer[1].amount, 70_000)
+        XCTAssertFalse(ws.tradeAccepted)
+        XCTAssertFalse(ws.tradePartnerAccepted)
+    }
+
+    @MainActor
+    func test_rsc_trade_update_stops_at_truncated_stack() {
+        let ws = RSCWorldState()
+        ws.tradeTheirOffer = [(id: 1, amount: 1)]
+        ws.tradeMyOffer = [(id: 2, amount: 2)]
+        ws.tradeAccepted = true
+        ws.tradePartnerAccepted = true
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 97, payload: Data([
+            0x01,                   // partner count
+            0x00, 0x64,             // partner item id 100
+            0x00, 0x00, 0x00, 0x02, // partner amount 2
+            0x02,                   // my count declares two stacks
+            0x00, 0xC8,             // my item id 200
+            0x00, 0x00, 0x00, 0x03, // my amount 3
+            0x00, 0xC9              // truncated second stack: id without amount
+        ]))
+
+        XCTAssertEqual(ws.tradeTheirOffer.count, 1)
+        XCTAssertEqual(ws.tradeTheirOffer[0].id, 100)
+        XCTAssertEqual(ws.tradeTheirOffer[0].amount, 2)
+        XCTAssertEqual(ws.tradeMyOffer.count, 1)
+        XCTAssertEqual(ws.tradeMyOffer[0].id, 200)
+        XCTAssertEqual(ws.tradeMyOffer[0].amount, 3)
+        XCTAssertFalse(ws.tradeAccepted)
+        XCTAssertFalse(ws.tradePartnerAccepted)
+    }
+
+    @MainActor
+    func test_rsc_duel_settings_use_java_order_and_one_means_restriction() {
+        let ws = RSCWorldState()
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 30, payload: Data([1, 0, 1, 0]))
+
+        XCTAssertEqual(ws.duelSettings, [true, false, true, false])
+    }
+
     // --- 1. Sprite archive format ---
 
     func test_sprite_archive_loads_with_expected_count_and_metadata() throws {

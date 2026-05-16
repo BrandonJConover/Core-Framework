@@ -1,6 +1,4 @@
 // Loads GameObjectDef.xml for trees, rocks, doors, buildings.
-// RSC uses 3D models for objects, but for a 2D isometric projection we
-// can render objects as colored blocks + icon sprites from the sprites archive.
 
 import Foundation
 
@@ -51,9 +49,9 @@ enum GameObjectDefinitions {
             let height = Int(firstGroup(pattern: "<height>([^<]*)</height>", in: block) ?? "1") ?? 1
             let modelID = firstGroup(pattern: "<objectModel>([^<]*)</objectModel>", in: block) ?? ""
             parsed.append(GameObjectDefinition(
-                id: idCounter, name: name, description: desc,
-                command1: command1, command2: command2, type: type,
-                width: width, height: height, modelID: modelID
+                id: idCounter, name: xmlUnescaped(name), description: xmlUnescaped(desc),
+                command1: xmlUnescaped(command1), command2: xmlUnescaped(command2), type: type,
+                width: width, height: height, modelID: xmlUnescaped(modelID)
             ))
             idCounter += 1
         }
@@ -82,5 +80,14 @@ enum GameObjectDefinitions {
             guard match.numberOfRanges > 1 else { return nil }
             return ns.substring(with: match.range(at: 1))
         }
+    }
+
+    private static func xmlUnescaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&apos;", with: "'")
     }
 }

@@ -58,6 +58,10 @@ targets:
         type: file
         buildPhase: resources
         optional: true
+      - path: OpenRSC/DoorDef.xml
+        type: file
+        buildPhase: resources
+        optional: true
       - path: OpenRSC/NpcDefs.json
         type: file
         buildPhase: resources

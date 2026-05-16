@@ -59,6 +59,7 @@
 		AFB05CAF0757B4C1C741DCBF /* EntityDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABDC850EF4975AC38D6C8306 /* EntityDefinitions.swift */; };
 		AFB330532316E550054ECF33 /* PlayerPalettes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E7CB6F413D57AD45817C2D /* PlayerPalettes.swift */; };
 		B8725914B85D1E9DFE630D12 /* RSModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EAAA291551DD814CD0DA0F3 /* RSModel.swift */; };
+		BAF91952B389E3B73067BCA0 /* DoorDef.xml in Resources */ = {isa = PBXBuildFile; fileRef = 00E48D2F06CB0A321FC87DA1 /* DoorDef.xml */; };
 		BB7A1B71A3C297D0770B6E89 /* SystemUpdateBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5242B6A5DCB117B084B12B9C /* SystemUpdateBanner.swift */; };
 		C12585663E2FB82518F60F4E /* ItemDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D54F169977103F6BA3CE019 /* ItemDefinitions.swift */; };
 		C17AE88BA79A247836F1CFBB /* sprites.dat in Resources */ = {isa = PBXBuildFile; fileRef = A10B951D45EB676566FF7CB1 /* sprites.dat */; };
@@ -83,6 +84,7 @@
 
 /* Begin PBXFileReference section */
 		00878BEFAD27286B1E048F3B /* HUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDView.swift; sourceTree = "<group>"; };
+		00E48D2F06CB0A321FC87DA1 /* DoorDef.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = DoorDef.xml; sourceTree = "<group>"; };
 		0C5DA77DFB8A641346DA3FD3 /* DuelPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuelPanel.swift; sourceTree = "<group>"; };
 		1E03CEC760DF829859E3CFBB /* ItemNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemNames.swift; sourceTree = "<group>"; };
 		29FBC620FEE34BCB304CCA49 /* AnimationDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationDefs.swift; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 				8B57ED468FC1209E7D5335BC /* Audio */,
 				66DF674CB40A4F01E8EBEEC1 /* Authentic_Landscape.orsc */,
 				4C427C9F5B86C2E46A8D4C79 /* Authentic_Sprites.orsc */,
+				00E48D2F06CB0A321FC87DA1 /* DoorDef.xml */,
 				B31B8BD08541F5B8861754B6 /* GameObjectDef.xml */,
 				CAC8D2CF9A6083B23FDBC4C8 /* ItemDefs.json */,
 				EB1994B23C1113BEF842C514 /* landscape.dat */,
@@ -428,6 +431,7 @@
 				173ADFFA4E8DB40C15342E6B /* Audio in Resources */,
 				42639A01C5A6A4A50E55E50F /* Authentic_Landscape.orsc in Resources */,
 				8816B8332CC031CA6433B1A2 /* Authentic_Sprites.orsc in Resources */,
+				BAF91952B389E3B73067BCA0 /* DoorDef.xml in Resources */,
 				EF9B796974E87C5ABA49F84A /* GameObjectDef.xml in Resources */,
 				D10043D1E4A4315989E35C21 /* ItemDefs.json in Resources */,
 				7E6C152D0E1B360DA926B507 /* NpcDefs.json in Resources */,

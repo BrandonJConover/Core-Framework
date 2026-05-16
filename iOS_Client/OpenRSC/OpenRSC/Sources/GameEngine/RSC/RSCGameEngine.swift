@@ -262,6 +262,7 @@ final class RSCGameEngine: ObservableObject {
     /// Anything past this index is per-frame ephemera (game objects). We
     /// truncate back to this on every tick before re-instantiating objects.
     private var terrainModelCount: Int = 0
+    private var loggedMissingObjectModels = Set<String>()
     private let projectileMaxRange = 40
 
     private func tick() {
@@ -386,16 +387,23 @@ final class RSCGameEngine: ObservableObject {
                 guard abs(dx) <= 24 && abs(dz) <= 24 else { continue }
 
                 let def = GameObjectDefinitions.get(obj.objectId)
-                let modelName = def?.modelID ?? ""
+                let modelName = def?.modelID.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard shouldRenderObjectModel(modelName) else { continue }
+                guard ModelArchiveLoader.shared.getModel(named: modelName) != nil else {
+                    logMissingObjectModel(modelName, objectId: obj.objectId, objectName: def?.name)
+                    continue
+                }
+
                 let width = def?.width ?? 1
                 let height = def?.height ?? 1
+                let placement = rotatedObjectFootprint(width: width, height: height, direction: obj.direction)
 
                 // Y-elevation in world coords: terrain-mesh Y is negative-up,
                 // and World.getElevation expects world coords. The mesh is
                 // built in player-local space so we pass dx/dz scaled by
                 // tileSize (128) for elevation lookup.
-                let xWorld = (dx * 2 + width) * 128 / 2
-                let zWorld = (dz * 2 + height) * 128 / 2
+                let xWorld = (dx * 2 + placement.width) * 128 / 2
+                let zWorld = (dz * 2 + placement.height) * 128 / 2
                 let elevation = world.getElevation(x: xWorld, z: zWorld)
 
                 ModelArchiveLoader.shared.instantiate(
@@ -406,6 +414,14 @@ final class RSCGameEngine: ObservableObject {
                     elevation: elevation,
                     scene: scene
                 )
+            }
+            for wall in worldState.wallObjects {
+                let dx = wall.x - px
+                let dz = wall.y - pz
+                guard abs(dx) <= 24 && abs(dz) <= 24 else { continue }
+                if let model = makeBoundaryWallModel(tileX: dx, tileZ: dz, direction: wall.direction, wallId: wall.wallId, world: world) {
+                    scene.addModel(model)
+                }
             }
 
             // Camera setup. The terrain mesh is built in player-local coordinates
@@ -578,6 +594,91 @@ final class RSCGameEngine: ObservableObject {
             transform &= 0xFF202020
         }
         return Int32(bitPattern: transform)
+    }
+
+    private func shouldRenderObjectModel(_ modelName: String) -> Bool {
+        let key = modelName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return !key.isEmpty && key != "na"
+    }
+
+    private func logMissingObjectModel(_ modelName: String, objectId: Int, objectName: String?) {
+        let key = "\(objectId):\(modelName.lowercased())"
+        guard loggedMissingObjectModels.insert(key).inserted else { return }
+        let displayName = objectName.map { " '\($0)'" } ?? ""
+        print("[Models] missing object model '\(modelName)' for object \(objectId)\(displayName)")
+    }
+
+    private func rotatedObjectFootprint(width: Int, height: Int, direction: Int) -> (width: Int, height: Int) {
+        if direction == 0 || direction == 4 {
+            return (width, height)
+        }
+        return (height, width)
+    }
+
+    private func makeBoundaryWallModel(tileX: Int, tileZ: Int, direction: Int, wallId: Int, world: World) -> RSModel? {
+        let tileSize = 128
+        let baseX = tileX * tileSize
+        let baseZ = tileZ * tileSize
+        let endpoints: ((Int, Int), (Int, Int))
+
+        switch direction & 3 {
+        case 0:
+            endpoints = ((baseX, baseZ), (baseX + tileSize, baseZ))
+        case 1:
+            endpoints = ((baseX, baseZ), (baseX, baseZ + tileSize))
+        case 2:
+            endpoints = ((baseX + tileSize, baseZ), (baseX, baseZ + tileSize))
+        default:
+            endpoints = ((baseX, baseZ), (baseX + tileSize, baseZ + tileSize))
+        }
+
+        let y0 = -world.getElevation(x: endpoints.0.0, z: endpoints.0.1)
+        let y1 = -world.getElevation(x: endpoints.1.0, z: endpoints.1.1)
+        let height = boundaryWallHeight(wallId: wallId)
+        let model = RSModel(vertexCount: 4, faceCount: 1)
+        let v0 = model.insertVertex(x: Int32(endpoints.0.0), y: Int32(y0), z: Int32(endpoints.0.1))
+        let v1 = model.insertVertex(x: Int32(endpoints.0.0), y: Int32(y0 - height), z: Int32(endpoints.0.1))
+        let v2 = model.insertVertex(x: Int32(endpoints.1.0), y: Int32(y1 - height), z: Int32(endpoints.1.1))
+        let v3 = model.insertVertex(x: Int32(endpoints.1.0), y: Int32(y1), z: Int32(endpoints.1.1))
+        guard v0 >= 0, v1 >= 0, v2 >= 0, v3 >= 0 else { return nil }
+
+        let resources = boundaryWallFaceResources(wallId: wallId)
+        model.insertFace(count: 4, indices: [v0, v1, v2, v3],
+                         texFront: resources.front, texBack: resources.back)
+        model.setDiffuseLightAndColor(-50, -10, -50, 60, 24, false, -95)
+        model.m_Yb = 1
+        return model
+    }
+
+    private func boundaryWallHeight(wallId: Int) -> Int {
+        EntityDefinitions.getDoorDef(wallId)?.wallObjectHeight ?? 100
+    }
+
+    private func boundaryWallColor(wallId: Int) -> Int32 {
+        let name = (EntityDefinitions.getDoorDef(wallId)?.name ?? "").lowercased()
+        if name.contains("gate") || name.contains("door") {
+            return Int32(bitPattern: 0xFF7A5230)
+        }
+        return Int32(bitPattern: 0xFF6B6254)
+    }
+
+    private func boundaryWallFaceResources(wallId: Int) -> (front: Int32, back: Int32) {
+        let fallback = boundaryWallColor(wallId: wallId)
+        guard let def = EntityDefinitions.getDoorDef(wallId) else {
+            return (fallback, fallback)
+        }
+
+        // Java createWallObjectModel feeds DoorDef.modelVar2/modelVar3
+        // straight into insertFace as front/back texture resources. The
+        // native renderer also needs a packed-colour fallback for ids whose
+        // texture pages are not available yet, so keep the visible front face
+        // stable and expose the Java texture candidate through texBack.
+        let front = def.frontTexture >= 0 ? Int32(def.frontTexture) : fallback
+        let back = def.backTexture >= 0 ? Int32(def.backTexture) : fallback
+        if front == 0 && back == 0 {
+            return (fallback, fallback)
+        }
+        return (fallback, back)
     }
 
     // HUD overlay drawn on top of the 3D scene: coordinates bar + player center marker.

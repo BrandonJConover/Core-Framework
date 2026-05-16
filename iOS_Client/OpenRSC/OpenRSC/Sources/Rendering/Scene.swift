@@ -433,7 +433,9 @@ final class Scene {
             self.polygons[i].m_t > self.polygons[j].m_t  // larger Z = farther = draw first
         }
 
-        // Rasterize polygons — use direct quad fill for terrain (faster and more reliable than scanline for small quads)
+        // Rasterize polygons. Textured terrain now goes through the ported
+        // Shader scanline path; the direct sampler remains only as dead fallback
+        // helpers until the Java renderer port is fully retired.
         for idx in sortedIndices {
             let poly = polygons[idx]
             guard let model = poly.model else { continue }
@@ -474,28 +476,16 @@ final class Scene {
             let maxX = min(Int(graphics.width2) - 1, Int(poly.maxP6))
             guard minY <= maxY && minX <= maxX else { continue }
 
-            let w = Int(graphics.width2)
             let terrainTexture = terrainTextureForFace(model: model, faceIndex: fIdx)
-            for y in minY...maxY {
-                let rowBase = y * w
-                for x in minX...maxX {
-                    if let terrainTexture {
-                        if let sampled = sampleTerrainTexture(
-                            terrainTexture,
-                            x: x, y: y,
-                            screenPts: screenPts,
-                            fallback: color
-                        ) {
-                            graphics.pixelData[rowBase + x] = sampled
-                        }
-                    } else {
-                        if containsScreenPoint(x: Double(x) + 0.5,
-                                               y: Double(y) + 0.5,
-                                               screenPts: screenPts) {
-                            graphics.pixelData[rowBase + x] = color
-                        }
-                    }
-                }
+            if let terrainTexture {
+                rasterizeTerrainTextureScanlines(texture: terrainTexture,
+                                                 screenPts: screenPts,
+                                                 minY: minY, maxY: maxY,
+                                                 fallback: color)
+            } else {
+                rasterizeFlatScanlines(screenPts: screenPts,
+                                       minY: minY, maxY: maxY,
+                                       color: color)
             }
         }
 
@@ -546,7 +536,7 @@ final class Scene {
         }
     }
 
-    private func terrainTextureForFace(model: RSModel, faceIndex: Int) -> (pixels: [Int32], width: Int, height: Int, ramps: Int)? {
+    private func terrainTextureForFace(model: RSModel, faceIndex: Int) -> (index: Int, pixels: [Int32], width: Int, height: Int, ramps: Int)? {
         guard faceIndex >= 0 && faceIndex < model.faceTextureBack.count else { return nil }
         let textureIndex = Int(model.faceTextureBack[faceIndex])
         guard textureIndex >= 0,
@@ -564,10 +554,130 @@ final class Scene {
         }
         let basePixels = width * width
         let ramps = basePixels > 0 ? max(1, pixels.count / basePixels) : 1
-        return (pixels, width, width, ramps)
+        return (textureIndex, pixels, width, width, ramps)
     }
 
-    private func sampleTerrainTexture(_ texture: (pixels: [Int32], width: Int, height: Int, ramps: Int),
+    private func rasterizeFlatScanlines(screenPts: [(x: Int, y: Int)],
+                                        minY: Int, maxY: Int,
+                                        color: Int32) {
+        let yStart = max(0, minY)
+        let yEnd = min(Int(graphics.height2) - 1, maxY)
+        guard yStart <= yEnd else { return }
+
+        for y in yStart...yEnd {
+            guard let span = polygonSpan(atY: y, screenPts: screenPts) else { continue }
+            let x0 = max(0, span.x0)
+            let x1 = min(Int(graphics.width2) - 1, span.x1)
+            guard x0 <= x1 else { continue }
+            graphics.drawLineHoriz(x: Int32(x0), y: Int32(y), width: Int32(x1 - x0 + 1), rgb: color)
+        }
+    }
+
+    private func rasterizeTerrainTextureScanlines(texture: (index: Int, pixels: [Int32], width: Int, height: Int, ramps: Int),
+                                                  screenPts: [(x: Int, y: Int)],
+                                                  minY: Int, maxY: Int,
+                                                  fallback: Int32) {
+        let yStart = max(0, minY)
+        let yEnd = min(Int(graphics.height2) - 1, maxY)
+        guard yStart <= yEnd else { return }
+
+        let pageSize = texture.width * texture.height
+        guard pageSize > 0, texture.pixels.count >= pageSize else { return }
+        let ramp = terrainBrightnessRamp(for: fallback, rampCount: texture.ramps)
+        let page = max(0, min(texture.ramps - 1, ramp))
+        let pageStart = min(texture.pixels.count - pageSize, page * pageSize)
+        let source = Array(texture.pixels[pageStart..<(pageStart + pageSize)])
+
+        graphics.pixelData.withUnsafeMutableBufferPointer { destBuffer in
+            guard let dest = destBuffer.baseAddress else { return }
+            source.withUnsafeBufferPointer { srcBuffer in
+                guard let src = srcBuffer.baseAddress else { return }
+
+                for y in yStart...yEnd {
+                    guard let span = polygonSpan(atY: y, screenPts: screenPts) else { continue }
+                    let x0 = max(0, span.x0)
+                    let x1 = min(Int(graphics.width2) - 1, span.x1)
+                    guard x0 <= x1 else { continue }
+
+                    // Lay down the face's flat colour first. The selected
+                    // Java-style brightness page already carries the terrain
+                    // luminance; transparent texture pixels (0 after magenta
+                    // conversion) preserve this base colour.
+                    let rowBase = y * Int(graphics.width2)
+                    for x in x0...x1 {
+                        dest[rowBase + x] = fallback
+                    }
+
+                    guard let uvStart = terrainUVForScreenPoint(x: Double(x0) + 0.5,
+                                                                y: Double(y) + 0.5,
+                                                                screenPts: screenPts),
+                          let uvEnd = terrainUVForScreenPoint(x: Double(x1) + 0.5,
+                                                              y: Double(y) + 0.5,
+                                                              screenPts: screenPts) else { continue }
+
+                    let spanWidth = max(1, x1 - x0 + 1)
+                    let u0 = Int32(max(0, min(texture.width - 1, Int(uvStart.u * Double(texture.width - 1)))))
+                    let v0 = Int32(max(0, min(texture.height - 1, Int(uvStart.v * Double(texture.height - 1)))))
+                    let u1 = Int32(max(0, min(texture.width - 1, Int(uvEnd.u * Double(texture.width - 1)))))
+                    let v1 = Int32(max(0, min(texture.height - 1, Int(uvEnd.v * Double(texture.height - 1)))))
+                    let uBlockDelta = ((u1 - u0) * 16) / Int32(spanWidth)
+                    let vBlockDelta = ((v1 - v0) * 16) / Int32(spanWidth)
+                    let destIndex = Int32(rowBase + x0)
+
+                    // The existing texture pack is 64x64 today. If a future
+                    // texture type reports larger pages, keep the fill stable by
+                    // falling back to the affine sampler until the large Java
+                    // overload is wired with its different fixed-point scale.
+                    if texture.width == 64 {
+                        shader.shadeScanlineTransparentNormal(
+                            var0: vBlockDelta, var1: 0, var2: 0, var3: 0,
+                            dest: dest,
+                            var5: 1, var6: 0,
+                            var7: u0, var8: v0, var9: destIndex,
+                            var10: 0, var11: 0, var12: 0,
+                            var13: uBlockDelta, texture: src,
+                            var15: Int32(spanWidth)
+                        )
+                    } else {
+                        for x in x0...x1 {
+                            if let sampled = sampleTerrainTexture(texture,
+                                                                   x: x, y: y,
+                                                                   screenPts: screenPts,
+                                                                   fallback: fallback) {
+                                dest[rowBase + x] = sampled
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func polygonSpan(atY y: Int, screenPts: [(x: Int, y: Int)]) -> (x0: Int, x1: Int)? {
+        guard screenPts.count >= 3 else { return nil }
+        let sampleY = Double(y) + 0.5
+        var xs: [Double] = []
+        for i in 0..<screenPts.count {
+            let a = screenPts[i]
+            let b = screenPts[(i + 1) % screenPts.count]
+            let y0 = Double(a.y)
+            let y1 = Double(b.y)
+            if y0 == y1 { continue }
+            let minY = min(y0, y1)
+            let maxY = max(y0, y1)
+            guard sampleY >= minY && sampleY < maxY else { continue }
+            let t = (sampleY - y0) / (y1 - y0)
+            xs.append(Double(a.x) + t * Double(b.x - a.x))
+        }
+        guard xs.count >= 2 else { return nil }
+        xs.sort()
+        let left = Int(ceil(xs[0]))
+        let right = Int(floor(xs[xs.count - 1]))
+        guard left <= right else { return nil }
+        return (left, right)
+    }
+
+    private func sampleTerrainTexture(_ texture: (index: Int, pixels: [Int32], width: Int, height: Int, ramps: Int),
                                       x: Int, y: Int,
                                       screenPts: [(x: Int, y: Int)],
                                       fallback: Int32) -> Int32? {
@@ -848,6 +958,7 @@ final class Scene {
         textureTypes[index] = type
         textureIndexData[index] = data
         m_L[index] = pixels
+        m_Hb[index] = Int32(type)
     }
 
     private func buildTexturePages(palette: [Int32], type: Int, data: Data?) -> [Int32] {
@@ -873,10 +984,10 @@ final class Scene {
             let p1 = (p0 &- (p0 >> 3)) & mask
             let p2 = (p0 &- (p0 >> 2)) & mask
             let p3 = (p0 &- (p0 >> 3) &- (p0 >> 2)) & mask
-            pages[i] = Int32(bitPattern: 0xFF00_0000 | p0)
-            pages[baseCount + i] = Int32(bitPattern: 0xFF00_0000 | p1)
-            pages[baseCount * 2 + i] = Int32(bitPattern: 0xFF00_0000 | p2)
-            pages[baseCount * 3 + i] = Int32(bitPattern: 0xFF00_0000 | p3)
+            pages[i] = Int32(bitPattern: p0)
+            pages[baseCount + i] = Int32(bitPattern: p1)
+            pages[baseCount * 2 + i] = Int32(bitPattern: p2)
+            pages[baseCount * 3 + i] = Int32(bitPattern: p3)
         }
         return pages
     }

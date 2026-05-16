@@ -459,12 +459,18 @@ final class RSCPacketHandler {
             handleUpdateEquipmentSlot(buf: buf, ws: ws)
 
         case 249: // updateBank — individual bank slot update
-            if buf.bytesRemaining >= 5 {
+            if buf.bytesRemaining >= 7 {
                 let slot249 = buf.getUnsignedByte()
                 let itemId249 = buf.getUnsignedShort()
-                let amount249 = buf.getUnsignedShortInt()
-                if slot249 < ws.bankItems.count {
+                let amount249 = buf.get32()
+                if amount249 <= 0 {
+                    if slot249 < ws.bankItems.count {
+                        ws.bankItems.remove(at: slot249)
+                    }
+                } else if slot249 < ws.bankItems.count {
                     ws.bankItems[slot249] = (id: itemId249, amount: amount249)
+                } else if slot249 == ws.bankItems.count {
+                    ws.bankItems.append((id: itemId249, amount: amount249))
                 }
             }
 
@@ -1246,15 +1252,15 @@ final class RSCPacketHandler {
         print("[Packet] Ground items: \(ws.groundItems.count) total")
     }
 
-    // Port of PacketHandler.java showBank() — opcode 42
-    // Format: BYTE itemCount, BYTE maxItems, then per item: SHORT id, ushort/int amount
+    // Port of custom PacketHandler.java showBank() — opcode 42
+    // Format: SHORT itemCount, SHORT maxItems, then per item: SHORT id, INT amount
     private func handleShowBank(buf: ByteBuffer, ws: RSCWorldState) {
-        let itemCount = buf.getUnsignedByte()
-        let maxItems = buf.getUnsignedByte()
+        let itemCount = buf.getUnsignedShort()
+        let maxItems = buf.getUnsignedShort()
         var items: [(id: Int, amount: Int)] = []
         for _ in 0..<itemCount {
             let id = buf.getUnsignedShort()
-            let amount = buf.getUnsignedShortInt()
+            let amount = buf.get32()
             items.append((id: id, amount: amount))
         }
         ws.bankItems = items
@@ -1600,19 +1606,17 @@ final class RSCPacketHandler {
 
     // MARK: - Trade Updates
 
-    // opcode 97 — updateTradeDialog: opponent items only
+    // opcode 97 — updateTradeDialog: opponent items, then our items
     private func handleUpdateTradeDialog(buf: ByteBuffer, ws: RSCWorldState) {
         let theirCount = buf.getUnsignedByte()
-        var theirItems: [(id: Int, amount: Int)] = []
-        for _ in 0..<theirCount {
-            let itemId = buf.getShort()
-            let amount = buf.get32()
-            theirItems.append((id: itemId, amount: amount))
-        }
+        let theirItems = readItemStacks(buf: buf, count: theirCount)
+        let myCount = buf.bytesRemaining > 0 ? buf.getUnsignedByte() : 0
+        let myItems = readItemStacks(buf: buf, count: myCount)
         ws.tradeTheirOffer = theirItems
+        ws.tradeMyOffer = myItems
         ws.tradeAccepted = false
         ws.tradePartnerAccepted = false
-        print("[Packet] Trade update: their=\(theirCount) items")
+        print("[Packet] Trade update: their=\(theirCount) items, mine=\(myCount) items")
     }
 
     // opcode 20 — confirmTrade: show confirmation screen
@@ -1638,6 +1642,17 @@ final class RSCPacketHandler {
         ws.tradeOpen = false
         ws.tradeConfirmOpen = true
         print("[Packet] Trade confirm with \(partnerName)")
+    }
+
+    private func readItemStacks(buf: ByteBuffer, count: Int) -> [(id: Int, amount: Int)] {
+        var items: [(id: Int, amount: Int)] = []
+        for _ in 0..<count {
+            guard buf.bytesRemaining >= 6 else { break }
+            let itemId = buf.getUnsignedShort()
+            let amount = buf.get32()
+            items.append((id: itemId, amount: amount))
+        }
+        return items
     }
 
     // Port of PacketHandler.java togglePrayer(length) — opcode 206.
