@@ -406,7 +406,7 @@ final class RSCGameEngine: ObservableObject {
                 let zWorld = (dz * 2 + placement.height) * 128 / 2
                 let elevation = world.getElevation(x: xWorld, z: zWorld)
 
-                ModelArchiveLoader.shared.instantiate(
+                let model = ModelArchiveLoader.shared.instantiate(
                     named: modelName,
                     atTileX: dx, atTileZ: dz,
                     direction: obj.direction,
@@ -414,6 +414,13 @@ final class RSCGameEngine: ObservableObject {
                     elevation: elevation,
                     scene: scene
                 )
+                // Java mudclient.java:14361 applies a special vertical offset
+                // to object id 74 after placement. Keep this outside
+                // ModelArchiveLoader so the avoid-owned loader remains a pure
+                // archive/instantiate boundary.
+                if obj.objectId == 74 {
+                    model.translate2(0, -480, 0)
+                }
             }
             for wall in worldState.wallObjects {
                 let dx = wall.x - px
