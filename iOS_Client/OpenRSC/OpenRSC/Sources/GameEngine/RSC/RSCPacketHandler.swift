@@ -6,6 +6,34 @@ import Foundation
 final class RSCPacketHandler {
     weak var worldState: RSCWorldState?
 
+    private enum TransactionalPanel {
+        case bank, shop, trade, duel
+    }
+
+    private func closeTransactionalPanels(_ ws: RSCWorldState, except panel: TransactionalPanel) {
+        ws.contextMenuOpen = false
+        ws.contextMenuActions = []
+
+        if panel != .bank {
+            ws.bankOpen = false
+        }
+        if panel != .shop {
+            ws.shopOpen = false
+        }
+        if panel != .trade {
+            ws.tradeOpen = false
+            ws.tradeConfirmOpen = false
+            ws.tradeAccepted = false
+            ws.tradePartnerAccepted = false
+        }
+        if panel != .duel {
+            ws.duelOpen = false
+            ws.duelConfirmOpen = false
+            ws.duelAccepted = false
+            ws.duelOpponentAccepted = false
+        }
+    }
+
     func handlePacket(opcode: UInt8, payload: Data) {
         guard let ws = worldState else { return }
         print("[Packet] Received opcode \(opcode) (\(payload.count) bytes)")
@@ -118,6 +146,7 @@ final class RSCPacketHandler {
                 let current159 = buf.getUnsignedByte()
                 let base159 = buf.getUnsignedByte()
                 let xp159 = Int(UInt32(bitPattern: Int32(buf.get32()))) / 4
+                ws.ensureSkillExists(skill159)
                 if skill159 < ws.skills.count {
                     let oldXP = ws.skills[skill159].experience
                     ws.skills[skill159].current = current159
@@ -187,6 +216,7 @@ final class RSCPacketHandler {
 
         case 92:  // showTradeDialog — Java: SHORT serverIndex
             let tradePartnerIdx = buf.getShort()
+            closeTransactionalPanels(ws, except: .trade)
             // Find partner name from players list
             if let partner = ws.players.first(where: { $0.id == tradePartnerIdx }) {
                 ws.tradePartnerName = partner.name
@@ -499,6 +529,7 @@ final class RSCPacketHandler {
 
         case 176: // beginDuelOptions — opens duel stake window
             let duelPartnerIdx = buf.getShort()
+            closeTransactionalPanels(ws, except: .duel)
             if let partner = ws.players.first(where: { $0.id == duelPartnerIdx }) {
                 ws.duelOpponentName = partner.name
             }
@@ -895,9 +926,38 @@ final class RSCPacketHandler {
     private func handleServerConfig(buf: ByteBuffer, ws: RSCWorldState) {
         ws.serverName = buf.getString()
         ws.serverWelcomeMessage = buf.getString()
-        ws.playerCount = buf.getShort()
-        ws.playerMax = buf.getShort()
-        ws.isMembersWorld = buf.getByte() != 0
+        guard buf.bytesRemaining > 0 else { return }
+
+        if buf.bytesRemaining < 12 {
+            ws.playerCount = buf.bytesRemaining >= 2 ? buf.getShort() : 0
+            ws.playerMax = buf.bytesRemaining >= 2 ? buf.getShort() : 0
+            ws.isMembersWorld = buf.bytesRemaining > 0 ? buf.getByte() != 0 : false
+            return
+        }
+
+        // Custom protocol 10009 sends a dense server-feature block after the
+        // two strings. Java indexes it from 3 because serverName/welcome are
+        // fields 1/2; field 42 and 45 are strings embedded in the byte list.
+        // Keep parsing aligned far enough to learn optional skill-count flags.
+        for field in 3...83 {
+            guard buf.bytesRemaining > 0 else { break }
+            switch field {
+            case 42:
+                let welcomeText = buf.getString()
+                if !welcomeText.isEmpty { ws.serverWelcomeMessage = welcomeText }
+            case 45:
+                _ = buf.getString() // logoSpriteID
+            case 43:
+                ws.isMembersWorld = buf.getUnsignedByte() != 0
+            case 60:
+                ws.wantRunecraft = buf.getUnsignedByte() != 0
+            case 73:
+                ws.wantHarvesting = buf.getUnsignedByte() != 0
+            default:
+                _ = buf.getUnsignedByte()
+            }
+        }
+        ws.ensureSkillCount(ws.serverSkillCount)
     }
 
     /// Port of PacketHandler.java updateOptionsMenuSettings() for the settings
@@ -1265,6 +1325,7 @@ final class RSCPacketHandler {
             items.append((id: id, amount: amount))
         }
         ws.bankItems = items
+        closeTransactionalPanels(ws, except: .bank)
         ws.bankOpen = true
         ws.bankMaxItems = maxItems
         print("[Packet] Bank opened: \(itemCount) items, max \(maxItems)")
@@ -1289,6 +1350,7 @@ final class RSCPacketHandler {
             }
         }
         ws.shopItems = items
+        closeTransactionalPanels(ws, except: .shop)
         ws.shopOpen = true
         ws.shopType = shopType
         ws.shopSellModifier = sellMod
@@ -1324,7 +1386,10 @@ final class RSCPacketHandler {
     // Port of PacketHandler.java loadStats() + loadExperience() + loadQuestPoints() — opcode 156
     // Format: 18x BYTE currentLevel, 18x BYTE baseLevel, 18x INT experience, BYTE questPoints
     private func handleLoadStats(buf: ByteBuffer, ws: RSCWorldState) {
-        let skillCount = 18  // RSC has 18 skills
+        let remaining = buf.bytesRemaining
+        let inferredCount = remaining > 1 && (remaining - 1) % 6 == 0 ? (remaining - 1) / 6 : 18
+        let skillCount = inferredCount >= 18 ? inferredCount : max(18, ws.serverSkillCount)
+        guard remaining >= skillCount * 6 else { return }
 
         // Read all current levels first
         var currentLevels = [Int]()
@@ -1622,9 +1687,9 @@ final class RSCPacketHandler {
     // opcode 97 — updateTradeDialog: opponent items, then our items
     private func handleUpdateTradeDialog(buf: ByteBuffer, ws: RSCWorldState) {
         let theirCount = buf.getUnsignedByte()
-        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots)
+        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: true)
         let myCount = buf.bytesRemaining > 0 ? buf.getUnsignedByte() : 0
-        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots)
+        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: true)
         ws.tradeTheirOfferMetadata = theirItems
         ws.tradeMyOfferMetadata = myItems
         ws.tradeTheirOffer = legacyStacks(theirItems)
@@ -1639,9 +1704,9 @@ final class RSCPacketHandler {
         let partnerName = buf.getString()
         ws.tradePartnerName = partnerName
         let theirCount = buf.getUnsignedByte()
-        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots)
+        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: true)
         let myCount = buf.getUnsignedByte()
-        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots)
+        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: true)
         ws.tradeTheirOfferMetadata = theirItems
         ws.tradeMyOfferMetadata = myItems
         ws.tradeTheirOffer = legacyStacks(theirItems)
@@ -1651,14 +1716,15 @@ final class RSCPacketHandler {
         print("[Packet] Trade confirm with \(partnerName)")
     }
 
-    private func readItemStackMetadata(buf: ByteBuffer, count: Int, maxStored: Int) -> [RSCItemStackMetadata] {
+    private func readItemStackMetadata(buf: ByteBuffer, count: Int, maxStored: Int, includesNotedByte: Bool = true) -> [RSCItemStackMetadata] {
         var items: [RSCItemStackMetadata] = []
         for index in 0..<count {
-            guard buf.bytesRemaining >= 6 else { break }
+            guard buf.bytesRemaining >= (includesNotedByte ? 7 : 6) else { break }
             let itemId = buf.getUnsignedShort()
+            let noted = includesNotedByte ? (buf.getUnsignedByte() != 0) : false
             let amount = buf.get32()
             if index < maxStored {
-                items.append(RSCItemStackMetadata(id: itemId, amount: amount, noted: false))
+                items.append(RSCItemStackMetadata(id: itemId, amount: amount, noted: noted))
             }
         }
         return items

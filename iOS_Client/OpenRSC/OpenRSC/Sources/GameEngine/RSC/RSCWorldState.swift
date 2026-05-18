@@ -402,6 +402,11 @@ final class RSCWorldState: ObservableObject {
     /// state stays aligned with the observable mirror.
     @Published var preferences: UserPreferences = UserPreferences()
     @Published var skills: [RSCSkill] = []
+    @Published var wantRunecraft: Bool = false
+    @Published var wantHarvesting: Bool = false
+    var serverSkillCount: Int {
+        18 + (wantRunecraft ? 1 : 0) + (wantHarvesting ? 1 : 0)
+    }
     @Published var serverName: String = ""
     @Published var serverWelcomeMessage: String = ""
     @Published var playerCount: Int = 0
@@ -557,7 +562,7 @@ final class RSCWorldState: ObservableObject {
     func addXPDrop(skillId: Int, amount: Int) {
         let names = ["Attack","Defense","Strength","Hits","Ranged","Prayer","Magic","Cooking",
                      "Woodcut","Fletching","Fishing","Firemaking","Crafting","Smithing","Mining",
-                     "Herblaw","Agility","Thieving"]
+                     "Herblaw","Agility","Thieving","Runecraft","Harvesting"]
         let name = skillId < names.count ? names[skillId] : "Skill"
         xpDrops.append(XPDrop(skill: name, amount: amount, timestamp: Date()))
         pruneExpiredXPDrops()
@@ -736,13 +741,28 @@ final class RSCWorldState: ObservableObject {
     }
 
     func updateExperience(skill: Int, xp: Int) {
+        ensureSkillExists(skill)
         guard skill >= 0 && skill < skills.count else { return }
         skills[skill].experience = xp
     }
 
     func updateStatCurrent(skill: Int, level: Int) {
+        ensureSkillExists(skill)
         guard skill >= 0 && skill < skills.count else { return }
         skills[skill].current = level
+    }
+
+    func ensureSkillCount(_ count: Int) {
+        guard count > skills.count else { return }
+        for id in skills.count..<count {
+            let base = id == 3 ? 10 : 1
+            skills.append(RSCSkill(id: id, current: base, base: base, experience: 0))
+        }
+    }
+
+    func ensureSkillExists(_ skill: Int) {
+        guard skill >= 0 else { return }
+        ensureSkillCount(skill + 1)
     }
 
     func enterCombat(target: RSCCombatTarget) {
