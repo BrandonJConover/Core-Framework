@@ -28,15 +28,15 @@ struct GameView: View {
                 MetalViewRepresentable(engine: engine)
                     .ignoresSafeArea()
                     // Single-finger drag = pan-rotate camera. A drag that
-                    // never moves more than ~10pt is treated as a tap when
-                    // it ends. Threshold avoids tiny finger jitter being
-                    // counted as a drag.
+                    // never moves more than ~18pt is treated as a tap when
+                    // it ends. Real thumb taps drift more than desktop clicks,
+                    // so keep this forgiving enough for tap-to-walk/interact.
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
                                 if !dragMovedFar {
                                     let dist = hypot(value.translation.width, value.translation.height)
-                                    if dist < 10 { return }   // still treating this as a tap-in-progress
+                                    if dist < 18 { return }   // still treating this as a tap-in-progress
                                     dragMovedFar = true
                                     dragStartCameraRotation = CGFloat(engine.cameraRotationDegrees)
                                     dragStartCameraPitch = CGFloat(engine.cameraPitchDegrees)
