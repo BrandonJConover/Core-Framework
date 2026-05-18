@@ -2397,6 +2397,15 @@ final class RSCGameEngine: ObservableObject {
         let pendingItemName = pendingItemSlot
             .flatMap { slot in worldState.inventory.first(where: { $0.id == slot })?.itemId }
             .map { ItemNames.name(for: $0) } ?? "item"
+        let pendingSpellId = worldState.pendingSpellId
+
+        if pendingItemSlot != nil || pendingSpellId != nil {
+            actions.append(("Cancel target selection", "xmark.circle", { [weak self] in
+                self?.worldState.pendingItemUseSlot = nil
+                self?.worldState.pendingSpellId = nil
+                self?.worldState.addChat(sender: "[Action]", text: "Cancelled")
+            }))
+        }
 
         // Check NPCs (within 2 tiles). Always offer Examine; offer Attack only
         // for combat-eligible NPCs (NPCDef.attackable == true).
@@ -2553,7 +2562,7 @@ final class RSCGameEngine: ObservableObject {
             }
         }))
 
-        if actions.count > 1 {  // More than just "walk here"
+        if !actions.isEmpty {
             worldState.contextMenuTitle = title
             worldState.contextMenuActions = actions
             worldState.contextMenuOpen = true
