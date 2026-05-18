@@ -2174,9 +2174,9 @@ final class RSCGameEngine: ObservableObject {
 
         let targetNPC = nearestNPCOnScreen(gameX: gameX, gameY: gameY)
         let targetPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY)
-        let targetGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY) ?? nearestGroundItem(toX: destX, z: destZ)
-        let targetObject = nearestGameObjectOnScreen(gameX: gameX, gameY: gameY) ?? nearestGameObject(toX: destX, z: destZ)
-        let targetWall = nearestWallObjectOnScreen(gameX: gameX, gameY: gameY) ?? nearestWallObject(toX: destX, z: destZ)
+        let targetGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY)
+        let targetObject = nearestGameObjectOnScreen(gameX: gameX, gameY: gameY)
+        let targetWall = nearestWallObjectOnScreen(gameX: gameX, gameY: gameY)
 
         // Item-use target mode — armed by inventory "Use". The next tap on a
         // world entity consumes the pending item instead of doing default walk

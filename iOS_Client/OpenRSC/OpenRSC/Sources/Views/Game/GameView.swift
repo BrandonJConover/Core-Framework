@@ -305,9 +305,6 @@ struct GameView: View {
         if engine.worldState.isSleeping {
             SleepPanel(worldState: engine.worldState, engine: engine)
         }
-        if engine.worldState.isSleeping {
-            SleepOverlayView(worldState: engine.worldState, engine: engine)
-        }
         if engine.worldState.isDead || engine.worldState.deathScreenTimeout > 0 {
             Color.black.opacity(0.7).ignoresSafeArea()
             VStack(spacing: 16) {
