@@ -326,19 +326,23 @@ final class RSCPacketHandler {
 
         case 222: // showServerMsg — Java showServerMessageDialog(), top box
             let text = buf.getString()
+            ws.clearPendingTargetMode()
             ws.serverMessageDialogText = text
             ws.serverMessageDialogTop = true
             ws.serverMessageDialogOpen = true
             ws.addChat(sender: "[Server]", text: text)
 
         case 224: // SEND_OPEN_RECOVERY — Java setShowRecoveryDialogue(true)
+            ws.clearPendingTargetMode()
             ws.recoveryQuestionsOpen = true
 
         case 232: // SEND_OPEN_DETAILS — Java setShowContactDialogue(true)
+            ws.clearPendingTargetMode()
             ws.contactDetailsOpen = true
 
         case 4:   // closeConnection
             ws.exitCombat()
+            ws.closeBlockingUIForConnectionClosed()
             ws.connectionClosedText = "The server has ended your session."
             ws.connectionClosedOpen = true
 
@@ -375,6 +379,7 @@ final class RSCPacketHandler {
             handleShowWalls(buf: buf, ws: ws)
 
         case 165: // CLOSE_CONNECTION
+            ws.closeBlockingUIForConnectionClosed()
             ws.connectionClosedText = "The server has closed the connection."
             ws.connectionClosedOpen = true
 
@@ -410,6 +415,7 @@ final class RSCPacketHandler {
             }
 
         case 59:  // SHOW_APPEARANCE_CHANGE — character creation screen
+            ws.clearPendingTargetMode()
             ws.showAppearanceChange = true
             print("[Packet] Character creation screen requested")
 
@@ -431,6 +437,9 @@ final class RSCPacketHandler {
                 while ws.inventory.count <= slot90 {
                     ws.inventory.append(RSCInventoryItem(id: ws.inventory.count, itemId: 0, amount: 0, equipped: false))
                 }
+                if ws.pendingItemUseSlot == slot90 && itemID90 == 0 {
+                    ws.clearPendingTargetMode()
+                }
                 ws.inventory[slot90].itemId = itemID90
                 ws.inventory[slot90].equipped = equipped90
                 ws.inventory[slot90].amount = amount90
@@ -443,6 +452,13 @@ final class RSCPacketHandler {
                 if slot123 < ws.inventory.count {
                     let removed = ws.inventory[slot123]
                     ws.inventory.remove(at: slot123)
+                    if let pendingSlot = ws.pendingItemUseSlot {
+                        if pendingSlot == slot123 {
+                            ws.clearPendingTargetMode()
+                        } else if pendingSlot > slot123 {
+                            ws.pendingItemUseSlot = pendingSlot - 1
+                        }
+                    }
                     // Re-index remaining items
                     for i in 0..<ws.inventory.count {
                         ws.inventory[i] = RSCInventoryItem(id: i, itemId: ws.inventory[i].itemId,
@@ -509,6 +525,7 @@ final class RSCPacketHandler {
         case 252: // DISABLE_OPTION_MENU
             ws.dialogueOpen = false
             ws.dialogueOptions = []
+            ws.clearPendingTargetMode()
 
         case 213: // NO_OP_WHILE_WAITING_FOR_NEW_APPEARANCE
             break
@@ -615,6 +632,7 @@ final class RSCPacketHandler {
 
         case 89:  // showServerMessageDialogTwo — Java lower/centered server modal
             let msg89 = buf.getString()
+            ws.clearPendingTargetMode()
             ws.serverMessageDialogText = msg89
             ws.serverMessageDialogTop = false
             ws.serverMessageDialogOpen = true
@@ -672,6 +690,7 @@ final class RSCPacketHandler {
 
         case 110: // SEND_INPUT_BOX — custom prompt string
             let prompt = buf.getString()
+            ws.clearPendingTargetMode()
             ws.inputPromptText = prompt
             ws.inputPromptOpen = true
             ws.addChat(sender: "[Server]", text: prompt)
@@ -1242,6 +1261,10 @@ final class RSCPacketHandler {
             items.append(RSCInventoryItem(id: i, itemId: itemId, amount: amount, equipped: equipped))
         }
         ws.inventory = items
+        if let pendingSlot = ws.pendingItemUseSlot,
+           pendingSlot >= items.count || items[pendingSlot].itemId == 0 {
+            ws.clearPendingTargetMode()
+        }
         print("[Packet] Inventory: \(count) items")
     }
 

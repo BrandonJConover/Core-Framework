@@ -291,9 +291,6 @@ struct GameView: View {
         if engine.worldState.inputPromptOpen {
             InputPromptDialog(worldState: engine.worldState)
         }
-        if engine.worldState.connectionClosedOpen {
-            ConnectionClosedDialog(worldState: engine.worldState, appState: appState, server: server)
-        }
         if engine.worldState.contactDetailsOpen {
             ContactDetailsDialog(worldState: engine.worldState, engine: engine)
         }
@@ -318,6 +315,9 @@ struct GameView: View {
                 Text("You have died").font(.system(size: 24, weight: .bold)).foregroundColor(.red)
                 Text(deathSubtitle).font(.system(size: 14)).foregroundColor(Color(hex: "#888888"))
             }
+        }
+        if engine.worldState.connectionClosedOpen {
+            ConnectionClosedDialog(worldState: engine.worldState, appState: appState, server: server)
         }
     }
 

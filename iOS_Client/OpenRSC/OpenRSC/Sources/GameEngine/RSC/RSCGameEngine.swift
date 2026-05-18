@@ -91,9 +91,7 @@ final class RSCGameEngine: ObservableObject {
         connection.onDisconnect = { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
-                self.isRunning = false
-                self.worldState.connectionClosedText = "Disconnected from the server."
-                self.worldState.connectionClosedOpen = true
+                self.presentConnectionClosed("Disconnected from the server.")
             }
         }
         connection.onLoginResponse = { [weak self] code in
@@ -220,6 +218,7 @@ final class RSCGameEngine: ObservableObject {
         } catch {
             print("[Engine] Connection failed: \(error)")
             worldState.addChat(sender: "[System]", text: "Connection failed: \(error.localizedDescription)")
+            presentConnectionClosed("Connection failed: \(error.localizedDescription)")
         }
     }
 
@@ -230,6 +229,17 @@ final class RSCGameEngine: ObservableObject {
         pingTimer?.invalidate()
         pingTimer = nil
         connection.disconnect()
+    }
+
+    private func presentConnectionClosed(_ message: String) {
+        isRunning = false
+        tickTimer?.invalidate()
+        tickTimer = nil
+        pingTimer?.invalidate()
+        pingTimer = nil
+        worldState.closeBlockingUIForConnectionClosed()
+        worldState.connectionClosedText = message
+        worldState.connectionClosedOpen = true
     }
 
     // MARK: - Game loop
@@ -3077,6 +3087,7 @@ final class RSCGameEngine: ObservableObject {
 
     func closeBank() {
         worldState.bankOpen = false
+        worldState.clearPendingTargetMode()
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.bankClose.rawValue))
@@ -3115,6 +3126,7 @@ final class RSCGameEngine: ObservableObject {
     func closeShop() {
         worldState.shopOpen = false
         worldState.shopSellableItemIds = []
+        worldState.clearPendingTargetMode()
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.shopClose.rawValue))
@@ -3177,6 +3189,7 @@ final class RSCGameEngine: ObservableObject {
     // MARK: - Magic & Prayer
 
     func castSpellOnSelf(spellId: Int) {
+        worldState.clearPendingTargetMode()
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnSelf.rawValue))
@@ -3314,6 +3327,7 @@ final class RSCGameEngine: ObservableObject {
     /// Cast a spell on an inventory item (e.g. enchant, low alch, superheat).
     /// Mirrors mudclient.java ITEM_CAST_SPELL: opcode 4, [short spellId][short slot].
     func castSpellOnItem(spellId: Int, slot: Int) {
+        worldState.clearPendingTargetMode()
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnItem.rawValue))

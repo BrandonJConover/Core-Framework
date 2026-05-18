@@ -499,6 +499,56 @@ final class RSCWorldState: ObservableObject {
         friendToasts.removeAll { $0.createdAt < cutoff }
     }
 
+    func clearPendingTargetMode() {
+        pendingItemUseSlot = nil
+        pendingSpellId = nil
+    }
+
+    /// Close blocking UI before showing a terminal connection state. This
+    /// keeps stale welcome/sleep/trade/etc. overlays from sitting above the
+    /// connection-lost dialog and trapping touch input.
+    func closeBlockingUIForConnectionClosed() {
+        clearPendingTargetMode()
+        contextMenuOpen = false
+        contextMenuActions = []
+        bankOpen = false
+        bankPinOpen = false
+        shopOpen = false
+        shopSellableItemIds = []
+        tradeOpen = false
+        tradeConfirmOpen = false
+        tradeAccepted = false
+        tradePartnerAccepted = false
+        tradeMyOffer = []
+        tradeTheirOffer = []
+        tradeMyOfferMetadata = []
+        tradeTheirOfferMetadata = []
+        duelOpen = false
+        duelConfirmOpen = false
+        duelAccepted = false
+        duelOpponentAccepted = false
+        duelMyStake = []
+        duelTheirStake = []
+        duelMyStakeMetadata = []
+        duelTheirStakeMetadata = []
+        dialogueOpen = false
+        dialogueOptions = []
+        serverMessageDialogOpen = false
+        inputPromptOpen = false
+        contactDetailsOpen = false
+        recoveryQuestionsOpen = false
+        showAppearanceChange = false
+        welcomeOpen = false
+        wildernessWarningOpen = false
+        openPKPointsToGpPromptOpen = false
+        ironmanInterfaceOpen = false
+        statusProgressOpen = false
+        fishingTrawlerOpen = false
+        isSleeping = false
+        isDead = false
+        deathScreenTimeout = 0
+    }
+
     // Welcome dialog state — populated by opcode 182 (PacketHandler.showLoginDialog).
     // Shown once per session right after the first character/skills sync.
     /// Sticky session-only flag — true once opcode 182 has been ingested,
