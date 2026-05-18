@@ -149,6 +149,17 @@ final class RSCGameEngine: ObservableObject {
 
     // Connect to server and send login packet.
     func start(server: ServerProfile, username: String, password: String, appState: AppState) async {
+        // Server indexes can be reused across sessions. Clear transient world
+        // state before connecting so stale appearances/entities cannot make
+        // the local avatar borrow another player's gear while the first fresh
+        // update packets are still arriving.
+        worldState.playerAppearances = [:]
+        worldState.players = []
+        worldState.npcs = []
+        worldState.groundItems = []
+        worldState.gameObjects = []
+        worldState.wallObjects = []
+
         // Initialize 3D rendering pipeline
         let graphics = GraphicsController(width: Int32(MetalRenderer.gameWidth), height: Int32(MetalRenderer.gameHeight), spriteCount: 5000)
         let scene = Scene(graphics: graphics, modelCount: 25000, polyCount: 50000, spriteCount: 5000)
@@ -525,10 +536,7 @@ final class RSCGameEngine: ObservableObject {
             for player in worldState.players {
                 let appearance = worldState.playerAppearances[player.id]
                 let sprites: [Int] = appearance.map { app in
-                    // Java zero-fills unequipped slots; treat 0 as "no sprite"
-                    // and subtract 1 from non-zero layerAnimation values before
-                    // AnimationDef lookup (mudclient.java:6584).
-                    app.layerSprites.map { $0 <= 0 ? -1 : $0 - 1 }
+                    app.layerSprites.map(animationIndexFromAppearanceId)
                 } ?? defaultPlayerSprites
                 let hairIdx = appearance?.colourHair ?? defaultHairIdx
                 let topIdx = appearance?.colourTop ?? defaultTopIdx
@@ -558,7 +566,7 @@ final class RSCGameEngine: ObservableObject {
             // the player faces the NPC mid-fight.
             let localCombatRole: CharacterBillboards.CombatRole = worldState.inCombat ? .combatB : .none
             if let localApp = worldState.playerAppearances[worldState.playerServerIndex] {
-                let localSprites = localApp.layerSprites.map { $0 <= 0 ? -1 : $0 - 1 }
+                let localSprites = localApp.layerSprites.map(animationIndexFromAppearanceId)
                 CharacterBillboards.register(
                     scene: scene, spriteLoader: spriteLoader,
                     tileX: 0, tileZ: 0,
@@ -611,6 +619,13 @@ final class RSCGameEngine: ObservableObject {
             transform &= 0xFF202020
         }
         return Int32(bitPattern: transform)
+    }
+
+    private func animationIndexFromAppearanceId(_ id: Int) -> Int {
+        // Server player appearance layers are 1-based. Java's drawPlayer uses
+        // `layerAnimation[mappedLayer] - 1`; rendering the raw id shifts boots
+        // into full helms and shields into crossbows.
+        id <= 0 ? -1 : id - 1
     }
 
     private func shouldRenderObjectModel(_ modelName: String) -> Bool {
@@ -2056,15 +2071,27 @@ final class RSCGameEngine: ObservableObject {
         return nearest
     }
 
-    private func primaryObjectCommand(for object: RSCGameObject) -> String? {
-        let command = GameObjectDefinitions.get(object.objectId)?
-            .command1
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    private func isActionableCommand(_ command: String) -> Bool {
         let lowered = command.lowercased()
-        guard !command.isEmpty, lowered != "walkto", lowered != "null", lowered != "examine" else {
-            return nil
-        }
-        return command
+        return !command.isEmpty && lowered != "walkto" && lowered != "null" && lowered != "examine"
+    }
+
+    private func primaryObjectAction(for object: RSCGameObject) -> (command: String, useFirstAction: Bool)? {
+        guard let def = GameObjectDefinitions.get(object.objectId) else { return nil }
+        let command1 = def.command1.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isActionableCommand(command1) { return (command1, true) }
+        let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isActionableCommand(command2) { return (command2, false) }
+        return nil
+    }
+
+    private func primaryWallAction(for wall: RSCWallObject) -> (command: String, useFirstAction: Bool)? {
+        guard let def = EntityDefinitions.getDoorDef(wall.wallId) else { return nil }
+        let command1 = def.command1.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isActionableCommand(command1) { return (command1, true) }
+        let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isActionableCommand(command2) { return (command2, false) }
+        return nil
     }
 
     private func objectFootprint(for object: RSCGameObject) -> (minX: Int, maxX: Int, minZ: Int, maxZ: Int) {
@@ -2363,13 +2390,21 @@ final class RSCGameEngine: ObservableObject {
             print("[Input] Take ground item \(item.itemId) at (\(item.x),\(item.y))")
             pickupGroundItem(x: item.x, y: item.y, itemId: item.itemId)
         } else if let object = targetObject,
-                  let command = primaryObjectCommand(for: object),
-                  !command.isEmpty {
-            print("[Input] \(command) object \(object.objectId) at (\(object.x),\(object.y))")
-            objectAction1(x: object.x, z: object.y)
+                  let action = primaryObjectAction(for: object) {
+            print("[Input] \(action.command) object \(object.objectId) at (\(object.x),\(object.y))")
+            if action.useFirstAction {
+                objectAction1(x: object.x, z: object.y)
+            } else {
+                objectAction2(x: object.x, z: object.y)
+            }
         } else if let wall = targetWall {
-            print("[Input] Use wall \(wall.wallId) at (\(wall.x),\(wall.y)) dir=\(wall.direction)")
-            wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
+            let action = primaryWallAction(for: wall)
+            print("[Input] \(action?.command ?? "Use") wall \(wall.wallId) at (\(wall.x),\(wall.y)) dir=\(wall.direction)")
+            if action?.useFirstAction == false {
+                wallAction2(x: wall.x, z: wall.y, direction: wall.direction)
+            } else {
+                wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
+            }
         } else {
             // No NPC nearby → walk to destination with pathfinding
             let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
@@ -2461,6 +2496,11 @@ final class RSCGameEngine: ObservableObject {
                         self?.useItemOnNPC(slot: pendingItemSlot, serverIndex: npc.id)
                     }))
                 }
+                if let pendingSpellId {
+                    actions.append(("Cast spell on \(npc.name)", "sparkles", { [weak self] in
+                        self?.castSpellOnNPC(spellId: pendingSpellId, npcServerIndex: npc.id)
+                    }))
+                }
                 actions.append(("Talk to \(npc.name)", "bubble.left", { [weak self] in
                     self?.talkToNPC(serverIndex: npc.id)
                 }))
@@ -2472,12 +2512,12 @@ final class RSCGameEngine: ObservableObject {
                             self?.attackNPC(serverIndex: npc.id)
                         }))
                     }
-                    if !command1.isEmpty && command1.lowercased() != "null" {
+                    if isActionableCommand(command1) {
                         actions.append(("\(command1) \(npc.name)", "hand.raised", { [weak self] in
                             self?.npcCommand(serverIndex: npc.id)
                         }))
                     }
-                    if !command2.isEmpty && command2.lowercased() != "null" {
+                    if isActionableCommand(command2) {
                         actions.append(("\(command2) \(npc.name)", "ellipsis.circle", { [weak self] in
                             self?.npcCommand2(serverIndex: npc.id)
                         }))
@@ -2499,6 +2539,11 @@ final class RSCGameEngine: ObservableObject {
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(player.name)", "hand.point.up.left", { [weak self] in
                         self?.useItemOnPlayer(slot: pendingItemSlot, serverIndex: player.id)
+                    }))
+                }
+                if let pendingSpellId {
+                    actions.append(("Cast spell on \(player.name)", "sparkles", { [weak self] in
+                        self?.castSpellOnPlayer(spellId: pendingSpellId, playerServerIndex: player.id)
                     }))
                 }
                 actions.append(("Attack \(player.name)", "bolt.fill", { [weak self] in
@@ -2532,6 +2577,11 @@ final class RSCGameEngine: ObservableObject {
                         self?.useItemOnGroundItem(slot: pendingItemSlot, x: item.x, z: item.y, itemId: item.itemId)
                     }))
                 }
+                if let pendingSpellId {
+                    actions.append(("Cast spell on \(itemName)", "sparkles", { [weak self] in
+                        self?.castSpellOnGroundItem(spellId: pendingSpellId, x: item.x, z: item.y, itemId: item.itemId)
+                    }))
+                }
                 actions.append(("Take \(itemName)", "arrow.down.circle", { [weak self] in
                     self?.pickupGroundItem(x: item.x, y: item.y, itemId: item.itemId)
                 }))
@@ -2553,12 +2603,17 @@ final class RSCGameEngine: ObservableObject {
                         self?.useItemOnObject(slot: pendingItemSlot, x: obj.x, z: obj.y)
                     }))
                 }
-                if !command1.isEmpty && command1.lowercased() != "walkto" && command1.lowercased() != "null" {
+                if let pendingSpellId {
+                    actions.append(("Cast spell on \(objName)", "sparkles", { [weak self] in
+                        self?.castSpellOnObject(spellId: pendingSpellId, x: obj.x, z: obj.y)
+                    }))
+                }
+                if isActionableCommand(command1) {
                     actions.append(("\(command1) \(objName)", "hand.tap", { [weak self] in
                         self?.objectAction1(x: obj.x, z: obj.y)
                     }))
                 }
-                if !command2.isEmpty && command2.lowercased() != "examine" && command2.lowercased() != "null" {
+                if isActionableCommand(command2) {
                     actions.append(("\(command2) \(objName)", "ellipsis.circle", { [weak self] in
                         self?.objectAction2(x: obj.x, z: obj.y)
                     }))
@@ -2584,12 +2639,32 @@ final class RSCGameEngine: ObservableObject {
                         self?.useItemOnWall(slot: pendingItemSlot, x: wall.x, z: wall.y, direction: wall.direction)
                     }))
                 }
-                actions.append(("Open \(wallName)", "door.left.hand.open", { [weak self] in
-                    self?.wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
-                }))
-                actions.append(("Close \(wallName)", "door.left.hand.closed", { [weak self] in
-                    self?.wallAction2(x: wall.x, z: wall.y, direction: wall.direction)
-                }))
+                if let pendingSpellId {
+                    actions.append(("Cast spell on \(wallName)", "sparkles", { [weak self] in
+                        self?.castSpellOnWall(spellId: pendingSpellId, x: wall.x, z: wall.y, direction: wall.direction)
+                    }))
+                }
+                if let def = EntityDefinitions.getDoorDef(wall.wallId) {
+                    let command1 = def.command1.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if isActionableCommand(command1) {
+                        actions.append(("\(command1) \(wallName)", "door.left.hand.open", { [weak self] in
+                            self?.wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
+                        }))
+                    }
+                    if isActionableCommand(command2) {
+                        actions.append(("\(command2) \(wallName)", "door.left.hand.closed", { [weak self] in
+                            self?.wallAction2(x: wall.x, z: wall.y, direction: wall.direction)
+                        }))
+                    }
+                } else {
+                    actions.append(("Open \(wallName)", "door.left.hand.open", { [weak self] in
+                        self?.wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
+                    }))
+                    actions.append(("Close \(wallName)", "door.left.hand.closed", { [weak self] in
+                        self?.wallAction2(x: wall.x, z: wall.y, direction: wall.direction)
+                    }))
+                }
                 actions.append(("Examine \(wallName)", "eye", { [weak self] in
                     self?.worldState.addChat(sender: "[Examine]", text: wallName)
                 }))
@@ -3199,6 +3274,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func castSpellOnNPC(spellId: Int, npcServerIndex: Int) {
+        worldState.clearPendingTargetMode()
         Task {
             if let npc = worldState.npcs.first(where: { $0.id == npcServerIndex }) {
                 await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
@@ -3212,6 +3288,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func castSpellOnPlayer(spellId: Int, playerServerIndex: Int) {
+        worldState.clearPendingTargetMode()
         Task {
             if let player = worldState.players.first(where: { $0.id == playerServerIndex }) {
                 await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
@@ -3225,6 +3302,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func castSpellOnGroundItem(spellId: Int, x: Int, z: Int, itemId: Int) {
+        worldState.clearPendingTargetMode()
         Task {
             let approach = approachTileForGroundItem(x: x, z: z)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
@@ -3239,6 +3317,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func castSpellOnObject(spellId: Int, x: Int, z: Int) {
+        worldState.clearPendingTargetMode()
         Task {
             let approach = approachTileForObject(x: x, z: z)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
@@ -3252,6 +3331,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func castSpellOnWall(spellId: Int, x: Int, z: Int, direction: Int) {
+        worldState.clearPendingTargetMode()
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
@@ -3313,6 +3393,7 @@ final class RSCGameEngine: ObservableObject {
     /// Cast a spell on a ground tile (telekinetic grab, alch on ground item).
     /// Mirrors RSCOutOpcode.castOnLand (158) with [short spellId][short x][short z].
     func castSpellOnGround(spellId: Int, x: Int, z: Int) {
+        worldState.clearPendingTargetMode()
         Task {
             await sendWalkPath(toX: x, toZ: z, walkToEntity: true)
             let buf = ByteBuffer()
