@@ -1867,20 +1867,33 @@ final class RSCGameEngine: ObservableObject {
         return (Double(proj.screenX), Double(proj.screenY), proj.depth)
     }
 
+    private func minimumGameRadius(forScreenPoints points: CGFloat) -> Double {
+        let viewSize = touchTranslator.viewSize
+        guard viewSize.width > 0, viewSize.height > 0 else {
+            return Double(points)
+        }
+        let xRadius = Double(points * CGFloat(MetalRenderer.gameWidth) / viewSize.width)
+        let yRadius = Double(points * CGFloat(MetalRenderer.gameHeight) / viewSize.height)
+        return max(xRadius, yRadius)
+    }
+
     /// Prefer screen-space entity hit tests over tile-nearest picking. Mobile
     /// taps land on the visible sprite, not always on the projected tile centre;
     /// this mirrors the PC client's menu building, which starts from what is
     /// actually under the cursor.
     private func nearestNPCOnScreen(gameX: Double, gameY: Double) -> RSCNPC? {
         var best: (npc: RSCNPC, score: Double, depth: Int32)?
+        let minRadius = minimumGameRadius(forScreenPoints: 22)
+        let radiusX = max(34.0, minRadius)
+        let radiusY = max(58.0, minRadius * 1.35)
         for npc in worldState.npcs {
             guard let p = projectedScreenPoint(tileX: npc.interpolatedX, tileZ: npc.interpolatedY) else { continue }
             // Feet are anchored at p.y; mobile taps often land on the lower
             // half of the visible sprite. Use a slightly taller ellipse than
             // the desktop cursor hotspot so tapping an NPC's body/feet still
             // resolves to the actor instead of falling through to ground walk.
-            let dx = (p.x - gameX) / 34.0
-            let dy = (p.y - 36.0 - gameY) / 58.0
+            let dx = (p.x - gameX) / radiusX
+            let dy = (p.y - 36.0 - gameY) / radiusY
             let score = dx * dx + dy * dy
             if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
                 best = (npc, score, p.depth)
@@ -1891,10 +1904,13 @@ final class RSCGameEngine: ObservableObject {
 
     private func nearestPlayerOnScreen(gameX: Double, gameY: Double) -> RSCPlayer? {
         var best: (player: RSCPlayer, score: Double, depth: Int32)?
+        let minRadius = minimumGameRadius(forScreenPoints: 22)
+        let radiusX = max(34.0, minRadius)
+        let radiusY = max(58.0, minRadius * 1.35)
         for player in worldState.players {
             guard let p = projectedScreenPoint(tileX: player.interpolatedX, tileZ: player.interpolatedY) else { continue }
-            let dx = (p.x - gameX) / 34.0
-            let dy = (p.y - 36.0 - gameY) / 58.0
+            let dx = (p.x - gameX) / radiusX
+            let dy = (p.y - 36.0 - gameY) / radiusY
             let score = dx * dx + dy * dy
             if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
                 best = (player, score, p.depth)
@@ -1905,12 +1921,13 @@ final class RSCGameEngine: ObservableObject {
 
     private func nearestGroundItemOnScreen(gameX: Double, gameY: Double) -> RSCGroundItem? {
         var best: (item: RSCGroundItem, score: Double, depth: Int32)?
+        let radius = max(18.0, minimumGameRadius(forScreenPoints: 18))
         for item in worldState.groundItems {
             guard let p = projectedScreenPoint(tileX: Double(item.x), tileZ: Double(item.y), yOffset: -8) else { continue }
             let dx = p.x - gameX
             let dy = p.y - gameY
             let score = dx * dx + dy * dy
-            if score <= 18.0 * 18.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
+            if score <= radius * radius && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
                 best = (item, score, p.depth)
             }
         }
@@ -1924,7 +1941,11 @@ final class RSCGameEngine: ObservableObject {
             let centerX = (Double(footprint.minX) + Double(footprint.maxX) + 1.0) / 2.0
             let centerZ = (Double(footprint.minZ) + Double(footprint.maxZ) + 1.0) / 2.0
             guard let p = projectedScreenPoint(tileX: centerX, tileZ: centerZ, yOffset: -20) else { continue }
-            let radius = Double(max(24, min(64, 18 * max(1, max(footprint.maxX - footprint.minX + 1, footprint.maxZ - footprint.minZ + 1)))))
+            let physicalMin = minimumGameRadius(forScreenPoints: 22)
+            let radius = max(
+                physicalMin,
+                Double(max(24, min(64, 18 * max(1, max(footprint.maxX - footprint.minX + 1, footprint.maxZ - footprint.minZ + 1)))))
+            )
             let dx = (p.x - gameX) / radius
             let dy = (p.y - gameY) / radius
             let score = dx * dx + dy * dy
@@ -1937,10 +1958,11 @@ final class RSCGameEngine: ObservableObject {
 
     private func nearestWallObjectOnScreen(gameX: Double, gameY: Double) -> RSCWallObject? {
         var best: (wall: RSCWallObject, score: Double, depth: Int32)?
+        let radius = max(24.0, minimumGameRadius(forScreenPoints: 22))
         for wall in worldState.wallObjects {
             guard let p = projectedScreenPoint(tileX: Double(wall.x), tileZ: Double(wall.y), yOffset: -18) else { continue }
-            let dx = (p.x - gameX) / 24.0
-            let dy = (p.y - gameY) / 24.0
+            let dx = (p.x - gameX) / radius
+            let dy = (p.y - gameY) / radius
             let score = dx * dx + dy * dy
             if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
                 best = (wall, score, p.depth)
