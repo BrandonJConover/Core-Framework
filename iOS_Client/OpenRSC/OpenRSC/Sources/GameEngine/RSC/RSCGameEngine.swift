@@ -2130,29 +2130,35 @@ final class RSCGameEngine: ObservableObject {
             maxSteps: 25
         )
 
-        let markerEnd = path.last
+        let encodedPath: [(x: Int, z: Int)]
+        if path.isEmpty {
+            encodedPath = [(x: destX, z: destZ)]
+        } else {
+            encodedPath = path
+        }
+
+        let markerEnd = encodedPath.last
         worldState.walkTargetX = markerEnd?.x ?? destX
         worldState.walkTargetY = markerEnd?.z ?? destZ
         worldState.walkTargetTimeout = 80
 
         let buf = ByteBuffer()
         buf.newPacket(opcode: walkToEntity ? 16 : 187)
-        // Same packet layout as WALK_TO_POINT: [SHORT startX][SHORT startZ]
-        // followed by signed waypoint deltas from the starting tile. Opcode 16
-        // uses the same path payload but tells the server this walk is attached
-        // to an entity action.
-        let startX = worldState.localPlayerX
-        let startZ = worldState.localPlayerY
-        buf.putShort(startX)
-        buf.putShort(startZ)
-        for wp in path {
-            let dx = max(-128, min(127, wp.x - startX))
-            let dz = max(-128, min(127, wp.z - startZ))
+        // Java sends the first actual path step as the packet anchor, then
+        // up to 25 signed waypoint deltas relative to that anchor. The server
+        // adds the anchor itself as step zero, so using the current player tile
+        // here makes movement/action paths collapse or lag behind the tap.
+        let firstStep = encodedPath[0]
+        buf.putShort(firstStep.x)
+        buf.putShort(firstStep.z)
+        for wp in encodedPath.dropFirst().prefix(25) {
+            let dx = max(-128, min(127, wp.x - firstStep.x))
+            let dz = max(-128, min(127, wp.z - firstStep.z))
             buf.putByte(dx)
             buf.putByte(dz)
         }
         try? await connection.send(buf.finishPacket())
-        return path
+        return encodedPath
     }
 
     func blink(toX x: Int, z: Int) {
