@@ -16,6 +16,8 @@ struct GameView: View {
     @State private var dragStartCameraRotation: CGFloat = 0
     @State private var dragStartCameraPitch: CGFloat = 0
     @State private var dragMovedFar: Bool = false
+    @State private var longPressConsumed: Bool = false
+    @State private var isPinching: Bool = false
     @State private var pinchStartZoom: CGFloat = 1.0
 
     var body: some View {
@@ -34,6 +36,7 @@ struct GameView: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
+                                dragStartLocation = value.location
                                 if !dragMovedFar {
                                     let dist = hypot(value.translation.width, value.translation.height)
                                     if dist < 18 { return }   // still treating this as a tap-in-progress
@@ -49,11 +52,12 @@ struct GameView: View {
                                 engine.setCameraPitchDegrees(Double(dragStartCameraPitch + pitchDelta))
                             }
                             .onEnded { value in
-                                if !dragMovedFar {
+                                if !dragMovedFar && !longPressConsumed && !isPinching {
                                     // Treated as a tap.
                                     engine.touchTranslator.handleTap(at: value.location)
                                 }
                                 dragMovedFar = false
+                                longPressConsumed = false
                             }
                     )
                     // Long-press = right-click context menu.
@@ -63,7 +67,8 @@ struct GameView: View {
                             .onEnded { value in
                                 switch value {
                                 case .second(true, let drag):
-                                    engine.showContextMenu(at: drag?.location ?? .zero)
+                                    longPressConsumed = true
+                                    engine.showContextMenu(at: drag?.location ?? dragStartLocation)
                                 default: break
                                 }
                             }
@@ -74,6 +79,7 @@ struct GameView: View {
                     .simultaneousGesture(
                         MagnificationGesture()
                             .onChanged { scale in
+                                isPinching = true
                                 if abs(scale - 1.0) < 0.01 {
                                     pinchStartZoom = engine.zoomLevel
                                 }
@@ -82,6 +88,7 @@ struct GameView: View {
                             }
                             .onEnded { _ in
                                 pinchStartZoom = engine.zoomLevel
+                                isPinching = false
                             }
                     )
 

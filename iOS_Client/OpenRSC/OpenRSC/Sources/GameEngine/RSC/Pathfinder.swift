@@ -96,8 +96,9 @@ final class Pathfinder {
             }
         }
 
-        // No path found — return direct line
-        return [(x: toX, z: toZ)]
+        // No path found. Java's world.findPath reports -1; callers decide
+        // whether to suppress plain walking or use an action fallback.
+        return []
     }
 
     private func isStepAllowed(fromAbsX: Int, fromAbsZ: Int, toAbsX: Int, toAbsZ: Int) -> Bool {

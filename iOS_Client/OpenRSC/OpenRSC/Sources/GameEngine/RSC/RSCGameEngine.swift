@@ -2072,11 +2072,6 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func nearestApproachTile(around footprint: (minX: Int, maxX: Int, minZ: Int, maxZ: Int)) -> (x: Int, z: Int) {
-        let px = worldState.localPlayerX
-        let pz = worldState.localPlayerY
-        var best = (x: footprint.minX, z: footprint.minZ)
-        var bestDist = Int.max
-
         var candidates: [(x: Int, z: Int)] = []
         for x in (footprint.minX - 1)...(footprint.maxX + 1) {
             candidates.append((x, footprint.minZ - 1))
@@ -2088,21 +2083,51 @@ final class RSCGameEngine: ObservableObject {
                 candidates.append((footprint.maxX + 1, z))
             }
         }
+        return nearestReachableTile(from: candidates, fallback: (footprint.minX, footprint.minZ))
+    }
+
+    private func nearestInteractionTile(inside area: (minX: Int, maxX: Int, minZ: Int, maxZ: Int)) -> (x: Int, z: Int) {
+        var candidates: [(x: Int, z: Int)] = []
+        for x in area.minX...area.maxX {
+            for z in area.minZ...area.maxZ {
+                candidates.append((x, z))
+            }
+        }
+        return nearestReachableTile(from: candidates, fallback: (area.minX, area.minZ))
+    }
+
+    private func nearestReachableTile(from candidates: [(x: Int, z: Int)], fallback: (x: Int, z: Int)) -> (x: Int, z: Int) {
+        let px = worldState.localPlayerX
+        let pz = worldState.localPlayerY
+        let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
+        var best = fallback
+        var bestDist = Int.max
+        var bestPathLength = Int.max
 
         for candidate in candidates {
             let dx = candidate.x - px
             let dz = candidate.z - pz
             let dist = dx * dx + dz * dz
-            if dist < bestDist {
+            if candidate.x == px && candidate.z == pz {
+                return candidate
+            }
+            let path = pathfinder.findPath(fromX: px, fromZ: pz, toX: candidate.x, toZ: candidate.z, maxSteps: 25)
+            guard !path.isEmpty else { continue }
+            if path.count < bestPathLength || (path.count == bestPathLength && dist < bestDist) {
                 best = candidate
                 bestDist = dist
+                bestPathLength = path.count
             }
         }
         return best
     }
 
     private func approachTile(for object: RSCGameObject) -> (x: Int, z: Int) {
-        nearestApproachTile(around: objectFootprint(for: object))
+        let footprint = objectFootprint(for: object)
+        if let def = GameObjectDefinitions.get(object.objectId), def.type == 2 || def.type == 3 {
+            return nearestInteractionTile(inside: footprint)
+        }
+        return nearestApproachTile(around: footprint)
     }
 
     private func approachTileForObject(x: Int, z: Int) -> (x: Int, z: Int) {
@@ -2121,6 +2146,44 @@ final class RSCGameEngine: ObservableObject {
         default:
             return (x, z)
         }
+    }
+
+    private func approachTileForGroundItem(x: Int, z: Int) -> (x: Int, z: Int) {
+        let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
+        if !pathfinder.findPath(
+            fromX: worldState.localPlayerX,
+            fromZ: worldState.localPlayerY,
+            toX: x,
+            toZ: z,
+            maxSteps: 25
+        ).isEmpty {
+            return (x, z)
+        }
+
+        let candidates = [
+            (x, z - 1), (x + 1, z), (x, z + 1), (x - 1, z),
+            (x + 1, z - 1), (x + 1, z + 1), (x - 1, z + 1), (x - 1, z - 1)
+        ].sorted {
+            let da = ($0.0 - worldState.localPlayerX) * ($0.0 - worldState.localPlayerX)
+                + ($0.1 - worldState.localPlayerY) * ($0.1 - worldState.localPlayerY)
+            let db = ($1.0 - worldState.localPlayerX) * ($1.0 - worldState.localPlayerX)
+                + ($1.1 - worldState.localPlayerY) * ($1.1 - worldState.localPlayerY)
+            return da < db
+        }
+
+        for candidate in candidates {
+            let path = pathfinder.findPath(
+                fromX: worldState.localPlayerX,
+                fromZ: worldState.localPlayerY,
+                toX: candidate.0,
+                toZ: candidate.1,
+                maxSteps: 25
+            )
+            if !path.isEmpty || (candidate.0 == worldState.localPlayerX && candidate.1 == worldState.localPlayerY) {
+                return candidate
+            }
+        }
+        return (x, z)
     }
 
     private func absoluteWorldX(_ localX: Int) -> Int {
@@ -2143,7 +2206,10 @@ final class RSCGameEngine: ObservableObject {
         )
 
         let encodedPath: [(x: Int, z: Int)]
-        if path.isEmpty {
+        if path.isEmpty && !walkToEntity {
+            worldState.walkTargetTimeout = 0
+            return []
+        } else if path.isEmpty {
             encodedPath = [(x: destX, z: destZ)]
         } else {
             encodedPath = path
@@ -2756,7 +2822,8 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnGroundItem(slot: Int, x: Int, z: Int, itemId: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: true)
+            let approach = approachTileForGroundItem(x: x, z: z)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnGround.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -2799,7 +2866,8 @@ final class RSCGameEngine: ObservableObject {
 
     func pickupGroundItem(x: Int, y: Int, itemId: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: y, walkToEntity: true)
+            let approach = approachTileForGroundItem(x: x, z: y)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.groundItemTake.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -3095,7 +3163,8 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnGroundItem(spellId: Int, x: Int, z: Int, itemId: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: true)
+            let approach = approachTileForGroundItem(x: x, z: z)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnGroundItem.rawValue))
             buf.putShort(spellId)
@@ -3335,9 +3404,6 @@ final class RSCGameEngine: ObservableObject {
 
     func followPlayer(serverIndex: Int) {
         Task {
-            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
-            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerFollow.rawValue))
             buf.putShort(serverIndex)
@@ -3350,9 +3416,6 @@ final class RSCGameEngine: ObservableObject {
     /// accepts (TradePanel opens) or declines.
     func requestTrade(serverIndex: Int) {
         Task {
-            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
-            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerTrade.rawValue))
             buf.putShort(serverIndex)
@@ -3364,9 +3427,6 @@ final class RSCGameEngine: ObservableObject {
     /// confirms, the DuelPanel opens for both sides.
     func requestDuel(serverIndex: Int) {
         Task {
-            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
-            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerDuel.rawValue))
             buf.putShort(serverIndex)
