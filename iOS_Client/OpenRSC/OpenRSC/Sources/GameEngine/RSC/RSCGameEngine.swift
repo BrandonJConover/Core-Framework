@@ -1875,8 +1875,12 @@ final class RSCGameEngine: ObservableObject {
         var best: (npc: RSCNPC, score: Double, depth: Int32)?
         for npc in worldState.npcs {
             guard let p = projectedScreenPoint(tileX: npc.interpolatedX, tileZ: npc.interpolatedY) else { continue }
-            let dx = (p.x - gameX) / 26.0
-            let dy = (p.y - 42.0 - gameY) / 48.0
+            // Feet are anchored at p.y; mobile taps often land on the lower
+            // half of the visible sprite. Use a slightly taller ellipse than
+            // the desktop cursor hotspot so tapping an NPC's body/feet still
+            // resolves to the actor instead of falling through to ground walk.
+            let dx = (p.x - gameX) / 34.0
+            let dy = (p.y - 36.0 - gameY) / 58.0
             let score = dx * dx + dy * dy
             if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
                 best = (npc, score, p.depth)
@@ -1889,8 +1893,8 @@ final class RSCGameEngine: ObservableObject {
         var best: (player: RSCPlayer, score: Double, depth: Int32)?
         for player in worldState.players {
             guard let p = projectedScreenPoint(tileX: player.interpolatedX, tileZ: player.interpolatedY) else { continue }
-            let dx = (p.x - gameX) / 26.0
-            let dy = (p.y - 42.0 - gameY) / 48.0
+            let dx = (p.x - gameX) / 34.0
+            let dy = (p.y - 36.0 - gameY) / 58.0
             let score = dx * dx + dy * dy
             if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
                 best = (player, score, p.depth)
