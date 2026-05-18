@@ -2208,6 +2208,7 @@ final class RSCGameEngine: ObservableObject {
         let encodedPath: [(x: Int, z: Int)]
         if path.isEmpty && !walkToEntity {
             worldState.walkTargetTimeout = 0
+            worldState.addChat(sender: "[Path]", text: "I can't reach that.")
             return []
         } else if path.isEmpty {
             encodedPath = [(x: destX, z: destZ)]
