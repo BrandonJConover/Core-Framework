@@ -2209,11 +2209,15 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func absoluteWorldX(_ localX: Int) -> Int {
-        worldState.worldOffsetX + localX
+        // `localPlayerX/Y` and all entity tiles retained by RSCPacketHandler
+        // are already absolute server tiles. `worldOffsetX/Z` is only used by
+        // the terrain/cache loader, so adding it here double-offsets action
+        // packets and makes server-side object/wall/item lookups miss.
+        localX
     }
 
     private func absoluteWorldZ(_ localZ: Int) -> Int {
-        worldState.worldOffsetZ + localZ
+        localZ
     }
 
     @discardableResult

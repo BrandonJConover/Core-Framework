@@ -13,24 +13,35 @@ final class RSCPacketHandler {
     private func closeTransactionalPanels(_ ws: RSCWorldState, except panel: TransactionalPanel) {
         ws.contextMenuOpen = false
         ws.contextMenuActions = []
+        ws.pendingItemUseSlot = nil
+        ws.pendingSpellId = nil
 
         if panel != .bank {
             ws.bankOpen = false
         }
         if panel != .shop {
             ws.shopOpen = false
+            ws.shopSellableItemIds = []
         }
         if panel != .trade {
             ws.tradeOpen = false
             ws.tradeConfirmOpen = false
             ws.tradeAccepted = false
             ws.tradePartnerAccepted = false
+            ws.tradeMyOffer = []
+            ws.tradeTheirOffer = []
+            ws.tradeMyOfferMetadata = []
+            ws.tradeTheirOfferMetadata = []
         }
         if panel != .duel {
             ws.duelOpen = false
             ws.duelConfirmOpen = false
             ws.duelAccepted = false
             ws.duelOpponentAccepted = false
+            ws.duelMyStake = []
+            ws.duelTheirStake = []
+            ws.duelMyStakeMetadata = []
+            ws.duelTheirStakeMetadata = []
         }
     }
 
@@ -474,10 +485,18 @@ final class RSCPacketHandler {
 
         case 203: // CLOSE_BANK
             ws.bankOpen = false
+            ws.bankItems = []
+            ws.contextMenuOpen = false
+            ws.pendingItemUseSlot = nil
+            ws.pendingSpellId = nil
 
         case 137: // EXIT_SHOP
             ws.shopOpen = false
+            ws.shopItems = []
             ws.shopSellableItemIds = []
+            ws.contextMenuOpen = false
+            ws.pendingItemUseSlot = nil
+            ws.pendingSpellId = nil
 
         case 194: // INCORRECT_SLEEPWORD
             ws.sleepStatusText = "Incorrect - Please wait..."
