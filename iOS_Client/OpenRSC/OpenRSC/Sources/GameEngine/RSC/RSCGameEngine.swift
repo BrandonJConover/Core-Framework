@@ -2756,7 +2756,7 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnGroundItem(slot: Int, x: Int, z: Int, itemId: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnGround.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -2771,7 +2771,7 @@ final class RSCGameEngine: ObservableObject {
     func useItemOnObject(slot: Int, x: Int, z: Int) {
         Task {
             let approach = approachTileForObject(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnObject.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -2785,7 +2785,7 @@ final class RSCGameEngine: ObservableObject {
     func useItemOnWall(slot: Int, x: Int, z: Int, direction: Int) {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.wallUseItem.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -2799,7 +2799,7 @@ final class RSCGameEngine: ObservableObject {
 
     func pickupGroundItem(x: Int, y: Int, itemId: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: y, walkToEntity: false)
+            await sendWalkPath(toX: x, toZ: y, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.groundItemTake.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -3009,7 +3009,7 @@ final class RSCGameEngine: ObservableObject {
     func objectAction1(x: Int, z: Int) {
         Task {
             let approach = approachTileForObject(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand1.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -3021,7 +3021,7 @@ final class RSCGameEngine: ObservableObject {
     func objectAction2(x: Int, z: Int) {
         Task {
             let approach = approachTileForObject(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand2.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -3033,7 +3033,7 @@ final class RSCGameEngine: ObservableObject {
     func wallAction1(x: Int, z: Int, direction: Int) {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand1.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -3046,7 +3046,7 @@ final class RSCGameEngine: ObservableObject {
     func wallAction2(x: Int, z: Int, direction: Int) {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand2.rawValue))
             buf.putShort(absoluteWorldX(x))
@@ -3069,6 +3069,9 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnNPC(spellId: Int, npcServerIndex: Int) {
         Task {
+            if let npc = worldState.npcs.first(where: { $0.id == npcServerIndex }) {
+                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnNpc.rawValue))
             buf.putShort(spellId)
@@ -3079,6 +3082,9 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnPlayer(spellId: Int, playerServerIndex: Int) {
         Task {
+            if let player = worldState.players.first(where: { $0.id == playerServerIndex }) {
+                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnPlayer.rawValue))
             buf.putShort(spellId)
@@ -3089,7 +3095,7 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnGroundItem(spellId: Int, x: Int, z: Int, itemId: Int) {
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: false)
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnGroundItem.rawValue))
             buf.putShort(spellId)
@@ -3103,7 +3109,7 @@ final class RSCGameEngine: ObservableObject {
     func castSpellOnObject(spellId: Int, x: Int, z: Int) {
         Task {
             let approach = approachTileForObject(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnObject.rawValue))
             buf.putShort(spellId)
@@ -3116,11 +3122,12 @@ final class RSCGameEngine: ObservableObject {
     func castSpellOnWall(spellId: Int, x: Int, z: Int, direction: Int) {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: false)
+            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnWall.rawValue))
-            // PayloadCustomParser/protocol-235 spell packets read spell first,
-            // then target coordinate + boundary direction.
+            // The native login targets the custom 10009 protocol branch, whose
+            // spell structs read spell first, then target coordinate + boundary
+            // direction.
             buf.putShort(spellId)
             buf.putShort(absoluteWorldX(x))
             buf.putShort(absoluteWorldZ(z))
@@ -3175,6 +3182,7 @@ final class RSCGameEngine: ObservableObject {
     /// Mirrors RSCOutOpcode.castOnLand (158) with [short spellId][short x][short z].
     func castSpellOnGround(spellId: Int, x: Int, z: Int) {
         Task {
+            await sendWalkPath(toX: x, toZ: z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnLand.rawValue))
             buf.putShort(spellId)
