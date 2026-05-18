@@ -2406,13 +2406,18 @@ final class RSCGameEngine: ObservableObject {
                 self?.worldState.addChat(sender: "[Action]", text: "Cancelled")
             }))
         }
+        if worldState.insideTutorial {
+            actions.append(("Skip tutorial", "forward.end.fill", { [weak self] in
+                self?.skipTutorial()
+            }))
+        }
 
         // Check NPCs (within 2 tiles). Always offer Examine; offer Attack only
         // for combat-eligible NPCs (NPCDef.attackable == true).
         for npc in screenNPC.map({ [$0] }) ?? worldState.npcs {
             let dx: Int = npc.x - worldX; let dz: Int = npc.y - worldZ
             let distSq: Int = dx * dx + dz * dz
-            if screenNPC?.id == npc.id || distSq <= 4 {
+            if screenNPC?.id == npc.id || (screenNPC == nil && distSq <= 1) {
                 title = npc.name
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(npc.name)", "hand.point.up.left", { [weak self] in
@@ -2452,7 +2457,7 @@ final class RSCGameEngine: ObservableObject {
         // Check players (within 2 tiles). Add Trade + Duel + Follow + Examine.
         for player in screenPlayer.map({ [$0] }) ?? worldState.players {
             let pdx: Int = player.x - worldX; let pdz: Int = player.y - worldZ
-            if screenPlayer?.id == player.id || pdx * pdx + pdz * pdz <= 4 {
+            if screenPlayer?.id == player.id || (screenPlayer == nil && pdx * pdx + pdz * pdz <= 1) {
                 title = player.name
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(player.name)", "hand.point.up.left", { [weak self] in
@@ -2482,7 +2487,7 @@ final class RSCGameEngine: ObservableObject {
         for item in screenItem.map({ [$0] }) ?? worldState.groundItems {
             let idx: Int = item.x - worldX; let idz: Int = item.y - worldZ
             if (screenItem?.x == item.x && screenItem?.y == item.y && screenItem?.itemId == item.itemId)
-                || idx * idx + idz * idz <= 4 {
+                || (screenItem == nil && idx * idx + idz * idz <= 1) {
                 let itemName = ItemNames.name(for: item.itemId)
                 title = itemName
                 if let pendingItemSlot {
@@ -2500,7 +2505,7 @@ final class RSCGameEngine: ObservableObject {
         // Check game objects (within 2 tiles)
         for obj in screenObject.map({ [$0] }) ?? worldState.gameObjects {
             let odx: Int = obj.x - worldX; let odz: Int = obj.y - worldZ
-            if screenObject?.id == obj.id || odx * odx + odz * odz <= 4 {
+            if screenObject?.id == obj.id || (screenObject == nil && odx * odx + odz * odz <= 1) {
                 let def = GameObjectDefinitions.get(obj.objectId)
                 let objName = def?.name.isEmpty == false ? def!.name : ObjectNames.name(for: obj.objectId)
                 title = objName
@@ -2534,7 +2539,7 @@ final class RSCGameEngine: ObservableObject {
         for wall in screenWall.map({ [$0] }) ?? worldState.wallObjects {
             let wdx = wall.x - worldX
             let wdz = wall.y - worldZ
-            if screenWall?.id == wall.id || wdx * wdx + wdz * wdz <= 4 {
+            if screenWall?.id == wall.id || (screenWall == nil && wdx * wdx + wdz * wdz <= 1) {
                 let wallName = EntityDefinitions.getDoorDef(wall.wallId)?.name ?? "Door"
                 title = wallName
                 if let pendingItemSlot {
@@ -2650,6 +2655,15 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.logout.rawValue))
             try? await connection.send(buf.finishPacket())
+        }
+    }
+
+    func skipTutorial() {
+        Task {
+            let buf = ByteBuffer()
+            buf.newPacket(opcode: Int(RSCOutOpcode.skipTutorial.rawValue))
+            try? await connection.send(buf.finishPacket())
+            worldState.addChat(sender: "[Tutorial]", text: "Skip tutorial requested.")
         }
     }
 

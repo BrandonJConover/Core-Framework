@@ -367,8 +367,10 @@ final class RSCPacketHandler {
             ws.connectionClosedText = "The server has closed the connection."
             ws.connectionClosedOpen = true
 
-        case 111: // COMPLETED_TUTORIAL
-            break
+        case 111: // SEND_ON_TUTORIAL — Java setInsideTutorial(byte != 0)
+            if buf.bytesRemaining > 0 {
+                ws.insideTutorial = buf.getUnsignedByte() != 0
+            }
 
         case 113: // SEND_IRONMAN
             handleIronman(buf: buf, ws: ws)

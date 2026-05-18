@@ -85,6 +85,7 @@ enum RSCOutOpcode: UInt8 {
     case sleepWord          = 45
     case duelOffer          = 33
     case duelSettings       = 8
+    case skipTutorial       = 84
     case serverConfigRequest = 19
 }
 

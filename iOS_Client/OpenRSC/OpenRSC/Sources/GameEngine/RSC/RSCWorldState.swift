@@ -469,6 +469,7 @@ final class RSCWorldState: ObservableObject {
 
     @Published var connectionClosedOpen: Bool = false
     @Published var connectionClosedText: String = ""
+    @Published var insideTutorial: Bool = false
 
     /// Account-security prompts opened by Java opcodes 232 (contact details)
     /// and 224 (recovery questions). The native forms submit protocol-235
