@@ -249,10 +249,14 @@ final class RSCPacketHandler {
         case 128: // TRADE_CONFIRMED — close trade screens
             ws.tradeOpen = false
             ws.tradeConfirmOpen = false
+            ws.tradeAccepted = false
+            ws.tradePartnerAccepted = false
             ws.tradeMyOffer = []
             ws.tradeTheirOffer = []
             ws.tradeMyOfferMetadata = []
             ws.tradeTheirOfferMetadata = []
+            ws.contextMenuOpen = false
+            ws.clearPendingTargetMode()
 
         case 20:  // confirmTrade — show confirmation screen
             handleTradeConfirm(buf: buf, ws: ws)
@@ -327,6 +331,9 @@ final class RSCPacketHandler {
         case 222: // showServerMsg — Java showServerMessageDialog(), top box
             let text = buf.getString()
             ws.clearPendingTargetMode()
+            ws.contextMenuOpen = false
+            ws.dialogueOpen = false
+            ws.dialogueOptions = []
             ws.serverMessageDialogText = text
             ws.serverMessageDialogTop = true
             ws.serverMessageDialogOpen = true
@@ -501,6 +508,7 @@ final class RSCPacketHandler {
 
         case 203: // CLOSE_BANK
             ws.bankOpen = false
+            ws.bankPinOpen = false
             ws.bankItems = []
             ws.contextMenuOpen = false
             ws.pendingItemUseSlot = nil
@@ -611,10 +619,14 @@ final class RSCPacketHandler {
         case 225: // closeDuelDialog
             ws.duelOpen = false
             ws.duelConfirmOpen = false
+            ws.duelAccepted = false
+            ws.duelOpponentAccepted = false
             ws.duelMyStake = []
             ws.duelTheirStake = []
             ws.duelMyStakeMetadata = []
             ws.duelTheirStakeMetadata = []
+            ws.contextMenuOpen = false
+            ws.clearPendingTargetMode()
 
         case 30:  // toggleDuelSetting — 4 bytes for retreat/magic/prayer/weapons
             ws.duelSettings[0] = buf.getUnsignedByte() == 1
@@ -633,6 +645,9 @@ final class RSCPacketHandler {
         case 89:  // showServerMessageDialogTwo — Java lower/centered server modal
             let msg89 = buf.getString()
             ws.clearPendingTargetMode()
+            ws.contextMenuOpen = false
+            ws.dialogueOpen = false
+            ws.dialogueOptions = []
             ws.serverMessageDialogText = msg89
             ws.serverMessageDialogTop = false
             ws.serverMessageDialogOpen = true
@@ -691,6 +706,9 @@ final class RSCPacketHandler {
         case 110: // SEND_INPUT_BOX — custom prompt string
             let prompt = buf.getString()
             ws.clearPendingTargetMode()
+            ws.contextMenuOpen = false
+            ws.dialogueOpen = false
+            ws.dialogueOptions = []
             ws.inputPromptText = prompt
             ws.inputPromptOpen = true
             ws.addChat(sender: "[Server]", text: prompt)
@@ -1420,6 +1438,10 @@ final class RSCPacketHandler {
         for _ in 0..<count {
             options.append(buf.getString())
         }
+        ws.clearPendingTargetMode()
+        ws.contextMenuOpen = false
+        ws.serverMessageDialogOpen = false
+        ws.inputPromptOpen = false
         ws.dialogueOptions = options
         ws.dialogueOpen = true
         print("[Packet] Dialogue: \(count) options")
