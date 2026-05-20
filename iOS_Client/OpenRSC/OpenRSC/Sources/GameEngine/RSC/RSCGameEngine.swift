@@ -2053,14 +2053,14 @@ final class RSCGameEngine: ObservableObject {
         return dx * dx + dy * dy
     }
 
-    private func nearestNPC(toX x: Int, z: Int) -> RSCNPC? {
+    private func nearestNPC(toX x: Int, z: Int, maxDistanceSquared: Int = 4) -> RSCNPC? {
         var nearest: RSCNPC? = nil
         var nearestDist = Int.max
         for npc in worldState.npcs {
             let dx = npc.x - x
             let dz = npc.y - z
             let dist = dx * dx + dz * dz
-            if dist < nearestDist && dist <= 4 {
+            if dist < nearestDist && dist <= maxDistanceSquared {
                 nearestDist = dist
                 nearest = npc
             }
@@ -2068,14 +2068,14 @@ final class RSCGameEngine: ObservableObject {
         return nearest
     }
 
-    private func nearestPlayer(toX x: Int, z: Int) -> RSCPlayer? {
+    private func nearestPlayer(toX x: Int, z: Int, maxDistanceSquared: Int = 4) -> RSCPlayer? {
         var nearest: RSCPlayer? = nil
         var nearestDist = Int.max
         for player in worldState.players {
             let dx = player.x - x
             let dz = player.y - z
             let dist = dx * dx + dz * dz
-            if dist < nearestDist && dist <= 4 {
+            if dist < nearestDist && dist <= maxDistanceSquared {
                 nearestDist = dist
                 nearest = player
             }
@@ -2386,7 +2386,9 @@ final class RSCGameEngine: ObservableObject {
         let destZ = target.z
 
         let targetNPC = nearestNPCOnScreen(gameX: gameX, gameY: gameY)
+            ?? nearestNPC(toX: destX, z: destZ, maxDistanceSquared: 1)
         let targetPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY)
+            ?? nearestPlayer(toX: destX, z: destZ, maxDistanceSquared: 1)
         let targetGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY)
         let targetObject = nearestGameObjectOnScreen(gameX: gameX, gameY: gameY)
         let targetWall = nearestWallObjectOnScreen(gameX: gameX, gameY: gameY)
