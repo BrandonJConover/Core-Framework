@@ -2493,8 +2493,8 @@ final class RSCGameEngine: ObservableObject {
 
         let command1 = def.command.trimmingCharacters(in: .whitespacesAndNewlines)
         let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
-        let command1Valid = !command1.isEmpty && command1.lowercased() != "null"
-        let command2Valid = !command2.isEmpty && command2.lowercased() != "null"
+        let command1Valid = isActionableCommand(command1)
+        let command2Valid = isActionableCommand(command2)
 
         if command1Valid {
             print("[Input] \(command1) NPC \(npc.npcId) (server index \(npc.id)) at (\(npc.x),\(npc.y))")
