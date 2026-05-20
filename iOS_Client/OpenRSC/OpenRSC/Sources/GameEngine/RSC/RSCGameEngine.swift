@@ -2395,24 +2395,28 @@ final class RSCGameEngine: ObservableObject {
         // world entity consumes the pending item instead of doing default walk
         // or talk behavior.
         if let itemSlot = worldState.pendingItemUseSlot {
-            worldState.pendingItemUseSlot = nil
             if let npc = targetNPC {
+                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on NPC \(npc.id)")
                 useItemOnNPC(slot: itemSlot, serverIndex: npc.id)
             } else if let player = targetPlayer {
+                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on player \(player.id)")
                 useItemOnPlayer(slot: itemSlot, serverIndex: player.id)
             } else if let item = targetGroundItem {
+                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on ground item \(item.itemId)")
                 useItemOnGroundItem(slot: itemSlot, x: item.x, z: item.y, itemId: item.itemId)
             } else if let object = targetObject {
+                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on object \(object.objectId)")
                 useItemOnObject(slot: itemSlot, x: object.x, z: object.y)
             } else if let wall = targetWall {
+                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on wall \(wall.wallId)")
                 useItemOnWall(slot: itemSlot, x: wall.x, z: wall.y, direction: wall.direction)
             } else {
-                worldState.addChat(sender: "[Use]", text: "No target selected.")
+                worldState.addChat(sender: "[Use]", text: "No target selected. Tap a target or cancel.")
             }
             return
         }
