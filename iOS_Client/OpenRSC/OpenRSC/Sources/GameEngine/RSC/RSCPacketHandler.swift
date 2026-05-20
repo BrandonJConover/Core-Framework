@@ -739,6 +739,7 @@ final class RSCPacketHandler {
     private func handleCreateNPC(buf: ByteBuffer, ws: RSCWorldState) {
         guard buf.bytesRemaining >= 2 else { return }
         let id = buf.getShort()
+        let existing = NPCDefinitions.get(id)
         let name = buf.getString()
         let description = buf.getString()
 
@@ -770,22 +771,23 @@ final class RSCPacketHandler {
         let combatModel = buf.getUnsignedByte()
         let combatSprite = buf.getUnsignedByte()
 
+        let spritesToUse = spriteCount > 0 ? sprites : (existing?.sprites ?? sprites)
         let combatLevel = (attack + strength + defense + hits) / 4
         let def = NPCDefinition(
             id: id,
-            name: name.isEmpty ? "NPC \(id)" : name,
-            description: description,
-            command: command,
-            command2: "",
+            name: name.isEmpty ? (existing?.name ?? "NPC \(id)") : name,
+            description: description.isEmpty ? (existing?.description ?? "") : description,
+            command: command.isEmpty ? (existing?.command ?? "") : command,
+            command2: existing?.command2 ?? "",
             attack: attack,
             strength: strength,
             hits: hits,
             defense: defense,
             combatLevel: combatLevel,
             attackable: attackable,
-            aggressive: false,
-            respawnTime: 0,
-            sprites: sprites,
+            aggressive: existing?.aggressive ?? false,
+            respawnTime: existing?.respawnTime ?? 0,
+            sprites: spritesToUse,
             hairColour: hairColour,
             topColour: topColour,
             bottomColour: bottomColour,
