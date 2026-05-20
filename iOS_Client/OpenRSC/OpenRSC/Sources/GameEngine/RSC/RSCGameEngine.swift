@@ -1985,15 +1985,72 @@ final class RSCGameEngine: ObservableObject {
         var best: (wall: RSCWallObject, score: Double, depth: Int32)?
         let radius = max(24.0, minimumGameRadius(forScreenPoints: 22))
         for wall in worldState.wallObjects {
-            guard let p = projectedScreenPoint(tileX: Double(wall.x), tileZ: Double(wall.y), yOffset: -18) else { continue }
-            let dx = (p.x - gameX) / radius
-            let dy = (p.y - gameY) / radius
-            let score = dx * dx + dy * dy
-            if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && p.depth < best!.depth)) {
-                best = (wall, score, p.depth)
+            let sample = projectedWallSegment(for: wall, yOffset: -18)
+            let score: Double
+            let depth: Int32
+            if let sample {
+                score = distanceSquaredToSegment(
+                    px: gameX,
+                    py: gameY,
+                    ax: sample.a.x,
+                    ay: sample.a.y,
+                    bx: sample.b.x,
+                    by: sample.b.y
+                ) / (radius * radius)
+                depth = min(sample.a.depth, sample.b.depth)
+            } else if let p = projectedScreenPoint(tileX: Double(wall.x), tileZ: Double(wall.y), yOffset: -18) {
+                let dx = (p.x - gameX) / radius
+                let dy = (p.y - gameY) / radius
+                score = dx * dx + dy * dy
+                depth = p.depth
+            } else {
+                continue
+            }
+            if score <= 1.0 && (best == nil || score < best!.score || (score == best!.score && depth < best!.depth)) {
+                best = (wall, score, depth)
             }
         }
         return best?.wall
+    }
+
+    private func projectedWallSegment(for wall: RSCWallObject, yOffset: Int32 = 0) -> (a: (x: Double, y: Double, depth: Int32), b: (x: Double, y: Double, depth: Int32))? {
+        let tileX = Double(wall.x)
+        let tileZ = Double(wall.y)
+        let start: (x: Double, z: Double)
+        let end: (x: Double, z: Double)
+        switch wall.direction {
+        case 0:
+            start = (tileX, tileZ)
+            end = (tileX + 1.0, tileZ)
+        case 1:
+            start = (tileX, tileZ)
+            end = (tileX, tileZ + 1.0)
+        default:
+            start = (tileX, tileZ)
+            end = (tileX + 1.0, tileZ + 1.0)
+        }
+        guard let a = projectedScreenPoint(tileX: start.x - 0.5, tileZ: start.z - 0.5, yOffset: yOffset),
+              let b = projectedScreenPoint(tileX: end.x - 0.5, tileZ: end.z - 0.5, yOffset: yOffset) else {
+            return nil
+        }
+        return (a, b)
+    }
+
+    private func distanceSquaredToSegment(px: Double, py: Double, ax: Double, ay: Double, bx: Double, by: Double) -> Double {
+        let vx = bx - ax
+        let vy = by - ay
+        let lenSq = vx * vx + vy * vy
+        guard lenSq > 0.0001 else {
+            let dx = px - ax
+            let dy = py - ay
+            return dx * dx + dy * dy
+        }
+        let t = max(0.0, min(1.0, ((px - ax) * vx + (py - ay) * vy) / lenSq))
+        let cx = ax + t * vx
+        let cy = ay + t * vy
+        let dx = px - cx
+        let dy = py - cy
+        return dx * dx + dy * dy
     }
 
     private func nearestNPC(toX x: Int, z: Int) -> RSCNPC? {
