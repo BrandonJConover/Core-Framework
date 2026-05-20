@@ -931,7 +931,10 @@ private struct InventoryPanelCompact: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 4), spacing: 2) {
                     ForEach(worldState.inventory) { item in
                         Button(action: {
-                            if let sourceSlot = worldState.pendingItemUseSlot {
+                            if let pendingSpellId = worldState.pendingSpellId {
+                                engine.castSpellOnItem(spellId: pendingSpellId, slot: item.id)
+                                selectedSlot = nil
+                            } else if let sourceSlot = worldState.pendingItemUseSlot {
                                 if sourceSlot != item.id {
                                     engine.useItemOnItem(slot1: sourceSlot, slot2: item.id)
                                 } else {
@@ -982,7 +985,9 @@ private struct InventoryPanelCompact: View {
                 HStack(spacing: 6) {
                     Text(ItemNames.name(for: item.itemId)).font(.system(size: 9, weight: .medium)).foregroundColor(Color(hex: "#c8a951")).lineLimit(1)
                     Spacer()
-                    Button(worldState.pendingItemUseSlot == nil ? "Use" : "Use with") { engine.useItem(slot: slot); selectedSlot = nil }
+                    Button(worldState.pendingSpellId == nil
+                           ? (worldState.pendingItemUseSlot == nil ? "Use" : "Use with")
+                           : "Cast") { engine.useItem(slot: slot); selectedSlot = nil }
                         .font(.system(size: 9)).foregroundColor(.blue)
                     Button(item.equipped ? "Unequip" : "Equip") {
                         item.equipped ? engine.unequipItem(slot: slot) : engine.equipItem(slot: slot); selectedSlot = nil

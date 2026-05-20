@@ -25,15 +25,13 @@ final class Pathfinder {
         self.worldState = worldState
     }
 
-    /// Find a path from (startX, startZ) to (destX, destZ) in world coordinates
+    /// Find a path from (startX, startZ) to (destX, destZ) in absolute server
+    /// tile coordinates. RSCPacketHandler stores player/entity positions in
+    /// this same coordinate space; worldOffset is only for terrain/archive
+    /// loading and must not be added here.
     /// Returns array of waypoints (excluding start), or empty if no path found
     func findPath(fromX: Int, fromZ: Int, toX: Int, toZ: Int, maxSteps: Int = 200) -> [(x: Int, z: Int)] {
         guard fromX != toX || fromZ != toZ else { return [] }
-
-        let absStartX = worldState.worldOffsetX + fromX
-        let absStartZ = worldState.worldOffsetZ + fromZ
-        let absDestX = worldState.worldOffsetX + toX
-        let absDestZ = worldState.worldOffsetZ + toZ
 
         var openSet = [PathNode]()
         var closedSet = Set<Int>()  // hash of x,z
@@ -41,10 +39,10 @@ final class Pathfinder {
 
         func hash(_ x: Int, _ z: Int) -> Int { x * 100000 + z }
         func heuristic(_ x: Int, _ z: Int) -> Int {
-            abs(x - absDestX) + abs(z - absDestZ)  // Manhattan distance
+            abs(x - toX) + abs(z - toZ)  // Manhattan distance
         }
 
-        openSet.append(PathNode(x: absStartX, z: absStartZ, g: 0, h: heuristic(absStartX, absStartZ)))
+        openSet.append(PathNode(x: fromX, z: fromZ, g: 0, h: heuristic(fromX, fromZ)))
 
         let directions = [(0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-1, 1), (1, 1)]
 
@@ -57,13 +55,12 @@ final class Pathfinder {
             let current = openSet.removeFirst()
             let ch = hash(current.x, current.z)
 
-            if current.x == absDestX && current.z == absDestZ {
+            if current.x == toX && current.z == toZ {
                 // Reconstruct path
                 var path = [(x: Int, z: Int)]()
                 var cx = current.x; var cz = current.z
                 while let prev = cameFrom[hash(cx, cz)] {
-                    // Convert back to local coordinates
-                    path.append((x: cx - worldState.worldOffsetX, z: cz - worldState.worldOffsetZ))
+                    path.append((x: cx, z: cz))
                     cx = prev.x; cz = prev.z
                 }
                 path.reverse()
@@ -78,7 +75,7 @@ final class Pathfinder {
                 let nh = hash(nx, nz)
 
                 guard !closedSet.contains(nh) else { continue }
-                guard isStepAllowed(fromAbsX: current.x, fromAbsZ: current.z, toAbsX: nx, toAbsZ: nz) else { continue }
+                guard isStepAllowed(fromX: current.x, fromZ: current.z, toX: nx, toZ: nz) else { continue }
 
                 // Diagonal movement costs more
                 let moveCost = (dx != 0 && dz != 0) ? 14 : 10
@@ -101,28 +98,22 @@ final class Pathfinder {
         return []
     }
 
-    private func isStepAllowed(fromAbsX: Int, fromAbsZ: Int, toAbsX: Int, toAbsZ: Int) -> Bool {
-        guard isWalkable(absX: toAbsX, absZ: toAbsZ) else { return false }
+    private func isStepAllowed(fromX: Int, fromZ: Int, toX: Int, toZ: Int) -> Bool {
+        guard isWalkable(absX: toX, absZ: toZ) else { return false }
+        guard !isBlockedByObject(x: toX, z: toZ) else { return false }
+        guard !isBlockedByWall(fromX: fromX, fromZ: fromZ, toX: toX, toZ: toZ) else { return false }
 
-        let fromLocalX = fromAbsX - worldState.worldOffsetX
-        let fromLocalZ = fromAbsZ - worldState.worldOffsetZ
-        let toLocalX = toAbsX - worldState.worldOffsetX
-        let toLocalZ = toAbsZ - worldState.worldOffsetZ
-
-        guard !isBlockedByObject(localX: toLocalX, localZ: toLocalZ) else { return false }
-        guard !isBlockedByWall(fromX: fromLocalX, fromZ: fromLocalZ, toX: toLocalX, toZ: toLocalZ) else { return false }
-
-        let dx = toLocalX - fromLocalX
-        let dz = toLocalZ - fromLocalZ
+        let dx = toX - fromX
+        let dz = toZ - fromZ
         if dx != 0 && dz != 0 {
             // Do not cut diagonally through a blocked corner. Java's collision
             // flags check both adjacent cardinal sides before allowing a
             // diagonal step; this approximates that using live object/wall
             // state retained from opcodes 48/91.
-            if isBlockedByObject(localX: fromLocalX + dx, localZ: fromLocalZ)
-                || isBlockedByObject(localX: fromLocalX, localZ: fromLocalZ + dz)
-                || isBlockedByWall(fromX: fromLocalX, fromZ: fromLocalZ, toX: fromLocalX + dx, toZ: fromLocalZ)
-                || isBlockedByWall(fromX: fromLocalX, fromZ: fromLocalZ, toX: fromLocalX, toZ: fromLocalZ + dz) {
+            if isBlockedByObject(x: fromX + dx, z: fromZ)
+                || isBlockedByObject(x: fromX, z: fromZ + dz)
+                || isBlockedByWall(fromX: fromX, fromZ: fromZ, toX: fromX + dx, toZ: fromZ)
+                || isBlockedByWall(fromX: fromX, fromZ: fromZ, toX: fromX, toZ: fromZ + dz) {
                 return false
             }
         }
@@ -130,10 +121,10 @@ final class Pathfinder {
         return true
     }
 
-    private func isBlockedByObject(localX: Int, localZ: Int) -> Bool {
+    private func isBlockedByObject(x: Int, z: Int) -> Bool {
         for object in worldState.gameObjects {
             guard let def = GameObjectDefinitions.get(object.objectId) else {
-                if object.x == localX && object.y == localZ { return true }
+                if object.x == x && object.y == z { return true }
                 continue
             }
 
@@ -143,8 +134,8 @@ final class Pathfinder {
                 swap(&width, &height)
             }
 
-            if localX >= object.x && localX < object.x + width
-                && localZ >= object.y && localZ < object.y + height {
+            if x >= object.x && x < object.x + width
+                && z >= object.y && z < object.y + height {
                 return true
             }
         }

@@ -2197,14 +2197,20 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func approachTileForWall(x: Int, z: Int, direction: Int) -> (x: Int, z: Int) {
+        let candidates: [(x: Int, z: Int)]
         switch direction {
         case 0:
-            return (x, z - 1)
+            // Java walkToWall uses the area spanning both sides of the north
+            // boundary: (x,z-1) through (x,z). Pick the reachable side nearest
+            // the player instead of always forcing the north tile.
+            candidates = [(x, z - 1), (x, z)]
         case 1:
-            return (x - 1, z)
+            // Vertical boundary: reachable from either (x-1,z) or (x,z).
+            candidates = [(x - 1, z), (x, z)]
         default:
-            return (x, z)
+            candidates = [(x, z)]
         }
+        return nearestReachableTile(from: candidates, fallback: candidates[0])
     }
 
     private func approachTileForGroundItem(x: Int, z: Int) -> (x: Int, z: Int) {
@@ -2894,6 +2900,11 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func useItem(slot: Int) {
+        if let spellId = worldState.pendingSpellId {
+            castSpellOnItem(spellId: spellId, slot: slot)
+            return
+        }
+
         if let pending = worldState.pendingItemUseSlot {
             if pending == slot {
                 cancelItemUse()
