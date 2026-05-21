@@ -405,7 +405,7 @@ final class RSCGameEngine: ObservableObject {
                 let dz = obj.y - pz       // (worldState uses y for the world Z axis)
                 // Cull anything outside the terrain footprint (terrain is
                 // generated for ~half a sector around the player).
-                guard abs(dx) <= 24 && abs(dz) <= 24 else { continue }
+                guard World.isTileOffsetInsideGeneratedTerrain(dx: dx, dz: dz) else { continue }
 
                 let def = GameObjectDefinitions.get(obj.objectId)
                 let modelName = def?.modelID.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -446,7 +446,7 @@ final class RSCGameEngine: ObservableObject {
             for wall in worldState.wallObjects {
                 let dx = wall.x - px
                 let dz = wall.y - pz
-                guard abs(dx) <= 24 && abs(dz) <= 24 else { continue }
+                guard World.isTileOffsetInsideGeneratedTerrain(dx: dx, dz: dz) else { continue }
                 if let model = makeBoundaryWallModel(tileX: dx, tileZ: dz, direction: wall.direction, wallId: wall.wallId, world: world) {
                     scene.addModel(model)
                 }

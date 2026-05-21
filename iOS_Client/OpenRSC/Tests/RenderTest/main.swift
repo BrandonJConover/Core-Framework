@@ -618,6 +618,16 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertGreaterThan(onScreen, 0, "At least some terrain verts land on screen (if 0, projection or mesh is wrong)")
     }
 
+    func test_object_and_wall_render_cull_matches_generated_terrain_footprint() {
+        XCTAssertEqual(World.generatedTerrainViewSize, 32)
+        XCTAssertTrue(World.isTileOffsetInsideGeneratedTerrain(dx: -16, dz: -16))
+        XCTAssertTrue(World.isTileOffsetInsideGeneratedTerrain(dx: 15, dz: 15))
+        XCTAssertFalse(World.isTileOffsetInsideGeneratedTerrain(dx: 16, dz: 0))
+        XCTAssertFalse(World.isTileOffsetInsideGeneratedTerrain(dx: 0, dz: 16))
+        XCTAssertFalse(World.isTileOffsetInsideGeneratedTerrain(dx: -17, dz: 0))
+        XCTAssertFalse(World.isTileOffsetInsideGeneratedTerrain(dx: 0, dz: -17))
+    }
+
     // --- 5. SpriteLoader reads sprites_v2.dat when placed at a findable path ---
 
     func test_sprite_loader_parses_fixture_bytes_directly() throws {

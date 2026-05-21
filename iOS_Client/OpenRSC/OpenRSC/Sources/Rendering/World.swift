@@ -2,6 +2,14 @@
 import Foundation
 
 final class World {
+    static let generatedTerrainViewSize = 32
+    static let generatedTerrainHalfExtent = generatedTerrainViewSize / 2
+
+    static func isTileOffsetInsideGeneratedTerrain(dx: Int, dz: Int) -> Bool {
+        dx >= -generatedTerrainHalfExtent && dx < generatedTerrainHalfExtent
+            && dz >= -generatedTerrainHalfExtent && dz < generatedTerrainHalfExtent
+    }
+
     // Tile grids: [plane][tile_index] where each plane has 64 tiles (8x8)
     var modelLandscapeGrid: [RSModel?]
     var modelWallGrid: [[RSModel?]]
@@ -81,7 +89,7 @@ final class World {
 
         // Create landscape model for visible area around player
         // Render 32x32 tiles (1024 faces, 4096 verts) for performance
-        let viewSize = 32
+        let viewSize = Self.generatedTerrainViewSize
         let model = RSModel(vertexCount: Int32(viewSize * viewSize * 4 + 100), faceCount: Int32(viewSize * viewSize + 100))
 
         // Compute the absolute sector coordinates from the current position
