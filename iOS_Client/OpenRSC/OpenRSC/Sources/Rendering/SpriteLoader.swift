@@ -153,7 +153,7 @@ class SpriteLoader: @unchecked Sendable {
     func loadTerrainTextures(into scene: Scene, startID: Int = SpriteLoader.terrainTextureBaseID) -> Int {
         let buffers = terrainTextureBuffers(startID: startID)
         for texture in buffers {
-            scene.loadTexture(index: texture.index, pixels: texture.pixels, type: texture.type, data: texture.indices)
+            scene.loadTexture(index: texture.index, pixels: texture.palette, type: texture.type, data: texture.indices)
         }
 
         if let last = buffers.last {

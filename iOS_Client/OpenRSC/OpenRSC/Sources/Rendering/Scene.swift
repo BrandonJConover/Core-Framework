@@ -718,7 +718,13 @@ final class Scene {
         guard width > 0, height > 0, pixels.count >= width * height else {
             return [Int32](repeating: 0, count: 64 * 64)
         }
-        guard width != 64 || height != 64 else { return pixels }
+        if width == 64 && height == 64 {
+            // The Java-style transparent-normal shader addresses texture rows
+            // with `(v & 0x3F80) + (u >> 7)`, which can reach index 8127 for
+            // bottom-half V coordinates. Feed it two identical 64x64 halves so
+            // the adapter keeps skip-0 semantics without reading past the page.
+            return pixels + pixels
+        }
 
         // The transparent-normal Swift shader is currently the Java-compatible
         // path used by terrain faces. Larger texture pages still need the full
@@ -734,7 +740,7 @@ final class Scene {
                 normalized[y * 64 + x] = pixels[srcY * width + srcX]
             }
         }
-        return normalized
+        return normalized + normalized
     }
 
     private func polygonSpan(atY y: Int, screenPts: [(x: Int, y: Int)]) -> (x0: Int, x1: Int)? {

@@ -18,6 +18,7 @@ final class RSCPacketHandler {
 
         if panel != .bank {
             ws.bankOpen = false
+            ws.bankPinOpen = false
         }
         if panel != .shop {
             ws.shopOpen = false
@@ -590,7 +591,7 @@ final class RSCPacketHandler {
 
         case 6: // updateDuelDialog — opponent stake items
             let duelTheirCount = buf.getUnsignedByte()
-            let duelTheirItems = self.readItemStackMetadata(buf: buf, count: duelTheirCount, maxStored: RSCWorldState.maxDuelStakeSlots)
+            let duelTheirItems = self.readItemStackMetadata(buf: buf, count: duelTheirCount, maxStored: RSCWorldState.maxDuelStakeSlots, includesNotedByte: false)
             ws.duelTheirStakeMetadata = duelTheirItems
             ws.duelTheirStake = self.legacyStacks(duelTheirItems)
             ws.duelAccepted = false
@@ -602,12 +603,12 @@ final class RSCPacketHandler {
             ws.duelOpponentName = buf.getString()
             // Their stake
             let duelTheirCount = buf.getUnsignedByte()
-            let duelTheirItems = self.readItemStackMetadata(buf: buf, count: duelTheirCount, maxStored: RSCWorldState.maxDuelStakeSlots)
+            let duelTheirItems = self.readItemStackMetadata(buf: buf, count: duelTheirCount, maxStored: RSCWorldState.maxDuelStakeSlots, includesNotedByte: false)
             ws.duelTheirStakeMetadata = duelTheirItems
             ws.duelTheirStake = self.legacyStacks(duelTheirItems)
             // My stake
             let duelMyCount = buf.getUnsignedByte()
-            let duelMyItems = self.readItemStackMetadata(buf: buf, count: duelMyCount, maxStored: RSCWorldState.maxDuelStakeSlots)
+            let duelMyItems = self.readItemStackMetadata(buf: buf, count: duelMyCount, maxStored: RSCWorldState.maxDuelStakeSlots, includesNotedByte: false)
             ws.duelMyStakeMetadata = duelMyItems
             ws.duelMyStake = self.legacyStacks(duelMyItems)
             // Settings
@@ -615,6 +616,8 @@ final class RSCPacketHandler {
             ws.duelSettings[1] = buf.getUnsignedByte() == 1
             ws.duelSettings[2] = buf.getUnsignedByte() == 1
             ws.duelSettings[3] = buf.getUnsignedByte() == 1
+            ws.duelAccepted = false
+            ws.duelOpponentAccepted = false
 
         case 225: // closeDuelDialog
             ws.duelOpen = false
@@ -1761,9 +1764,9 @@ final class RSCPacketHandler {
     // opcode 97 — updateTradeDialog: opponent items, then our items
     private func handleUpdateTradeDialog(buf: ByteBuffer, ws: RSCWorldState) {
         let theirCount = buf.getUnsignedByte()
-        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: true)
+        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: false)
         let myCount = buf.bytesRemaining > 0 ? buf.getUnsignedByte() : 0
-        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: true)
+        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: false)
         ws.tradeTheirOfferMetadata = theirItems
         ws.tradeMyOfferMetadata = myItems
         ws.tradeTheirOffer = legacyStacks(theirItems)
@@ -1778,15 +1781,17 @@ final class RSCPacketHandler {
         let partnerName = buf.getString()
         ws.tradePartnerName = partnerName
         let theirCount = buf.getUnsignedByte()
-        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: true)
+        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: false)
         let myCount = buf.getUnsignedByte()
-        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: true)
+        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: false)
         ws.tradeTheirOfferMetadata = theirItems
         ws.tradeMyOfferMetadata = myItems
         ws.tradeTheirOffer = legacyStacks(theirItems)
         ws.tradeMyOffer = legacyStacks(myItems)
         ws.tradeOpen = false
         ws.tradeConfirmOpen = true
+        ws.tradeAccepted = false
+        ws.tradePartnerAccepted = false
         print("[Packet] Trade confirm with \(partnerName)")
     }
 

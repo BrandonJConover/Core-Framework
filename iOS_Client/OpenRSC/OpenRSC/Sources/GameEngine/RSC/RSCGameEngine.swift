@@ -647,22 +647,26 @@ final class RSCGameEngine: ObservableObject {
         return (height, width)
     }
 
-    private func makeBoundaryWallModel(tileX: Int, tileZ: Int, direction: Int, wallId: Int, world: World) -> RSModel? {
-        let tileSize = 128
-        let baseX = tileX * tileSize
-        let baseZ = tileZ * tileSize
-        let endpoints: ((Int, Int), (Int, Int))
-
+    static func boundaryWallTileEndpoints(tileX: Double, tileZ: Double, direction: Int) -> (start: (x: Double, z: Double), end: (x: Double, z: Double)) {
         switch direction & 3 {
         case 0:
-            endpoints = ((baseX, baseZ), (baseX + tileSize, baseZ))
+            return ((tileX, tileZ), (tileX + 1.0, tileZ))
         case 1:
-            endpoints = ((baseX, baseZ), (baseX, baseZ + tileSize))
+            return ((tileX, tileZ), (tileX, tileZ + 1.0))
         case 2:
-            endpoints = ((baseX + tileSize, baseZ), (baseX, baseZ + tileSize))
+            return ((tileX + 1.0, tileZ), (tileX, tileZ + 1.0))
         default:
-            endpoints = ((baseX, baseZ), (baseX + tileSize, baseZ + tileSize))
+            return ((tileX, tileZ), (tileX + 1.0, tileZ + 1.0))
         }
+    }
+
+    private func makeBoundaryWallModel(tileX: Int, tileZ: Int, direction: Int, wallId: Int, world: World) -> RSModel? {
+        let tileSize = 128
+        let tileEndpoints = Self.boundaryWallTileEndpoints(tileX: Double(tileX), tileZ: Double(tileZ), direction: direction)
+        let endpoints = (
+            (Int(tileEndpoints.start.x * Double(tileSize)), Int(tileEndpoints.start.z * Double(tileSize))),
+            (Int(tileEndpoints.end.x * Double(tileSize)), Int(tileEndpoints.end.z * Double(tileSize)))
+        )
 
         let y0 = -world.getElevation(x: endpoints.0.0, z: endpoints.0.1)
         let y1 = -world.getElevation(x: endpoints.1.0, z: endpoints.1.1)
@@ -2014,23 +2018,9 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func projectedWallSegment(for wall: RSCWallObject, yOffset: Int32 = 0) -> (a: (x: Double, y: Double, depth: Int32), b: (x: Double, y: Double, depth: Int32))? {
-        let tileX = Double(wall.x)
-        let tileZ = Double(wall.y)
-        let start: (x: Double, z: Double)
-        let end: (x: Double, z: Double)
-        switch wall.direction {
-        case 0:
-            start = (tileX, tileZ)
-            end = (tileX + 1.0, tileZ)
-        case 1:
-            start = (tileX, tileZ)
-            end = (tileX, tileZ + 1.0)
-        default:
-            start = (tileX, tileZ)
-            end = (tileX + 1.0, tileZ + 1.0)
-        }
-        guard let a = projectedScreenPoint(tileX: start.x - 0.5, tileZ: start.z - 0.5, yOffset: yOffset),
-              let b = projectedScreenPoint(tileX: end.x - 0.5, tileZ: end.z - 0.5, yOffset: yOffset) else {
+        let endpoints = Self.boundaryWallTileEndpoints(tileX: Double(wall.x), tileZ: Double(wall.y), direction: wall.direction)
+        guard let a = projectedScreenPoint(tileX: endpoints.start.x - 0.5, tileZ: endpoints.start.z - 0.5, yOffset: yOffset),
+              let b = projectedScreenPoint(tileX: endpoints.end.x - 0.5, tileZ: endpoints.end.z - 0.5, yOffset: yOffset) else {
             return nil
         }
         return (a, b)

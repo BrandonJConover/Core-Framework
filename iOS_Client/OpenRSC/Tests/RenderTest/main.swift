@@ -171,6 +171,8 @@ final class RenderPipelineTests: XCTestCase {
     func test_rsc_trade_confirm_uses_rsc_strings_and_int_amounts() {
         let ws = RSCWorldState()
         ws.tradeOpen = true
+        ws.tradeAccepted = true
+        ws.tradePartnerAccepted = true
         let handler = RSCPacketHandler()
         handler.worldState = ws
 
@@ -192,6 +194,8 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(ws.tradeMyOffer.count, 1)
         XCTAssertEqual(ws.tradeMyOffer[0].id, 400)
         XCTAssertEqual(ws.tradeMyOffer[0].amount, 70_000)
+        XCTAssertFalse(ws.tradeAccepted)
+        XCTAssertFalse(ws.tradePartnerAccepted)
     }
 
     @MainActor
@@ -209,6 +213,8 @@ final class RenderPipelineTests: XCTestCase {
     func test_rsc_duel_confirm_uses_rsc_strings_stakes_and_settings() {
         let ws = RSCWorldState()
         ws.duelOpen = true
+        ws.duelAccepted = true
+        ws.duelOpponentAccepted = true
         ws.duelSettings = [false, false, false, false]
         let handler = RSCPacketHandler()
         handler.worldState = ws
@@ -237,6 +243,32 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(ws.duelMyStake[1].id, 103)
         XCTAssertEqual(ws.duelMyStake[1].amount, 70_000)
         XCTAssertEqual(ws.duelSettings, [true, false, true, false])
+        XCTAssertFalse(ws.duelAccepted)
+        XCTAssertFalse(ws.duelOpponentAccepted)
+    }
+
+    @MainActor
+    func test_rsc_opening_transaction_panel_closes_bank_pin_overlay() {
+        let ws = RSCWorldState()
+        ws.bankOpen = true
+        ws.bankPinOpen = true
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 101, payload: Data([
+            0x01,                   // count
+            0x00,                   // shopType
+            0x64,                   // sell modifier
+            0x64,                   // buy modifier
+            0x01,                   // price multiplier
+            0x00, 0x64,             // item id 100
+            0x00, 0x0A,             // stock 10
+            0x00, 0x01              // price
+        ]))
+
+        XCTAssertFalse(ws.bankOpen)
+        XCTAssertFalse(ws.bankPinOpen)
+        XCTAssertTrue(ws.shopOpen)
     }
 
     @MainActor
@@ -430,6 +462,62 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(scene.m_Hb[2], 1)
     }
 
+    func test_sprite_loader_feeds_scene_palette_not_expanded_pixels_for_terrain_textures() throws {
+        let (_, scene) = buildEngine()
+        let loader = SpriteLoader()
+        let archive = makeSingleSpriteArchive(
+            id: SpriteLoader.terrainTextureBaseID,
+            width: 64,
+            height: 64,
+            authenticWidth: 64,
+            authenticHeight: 64,
+            pixels: [Int32](repeating: Int32(bitPattern: 0xFF11_2233), count: 64 * 64)
+        )
+        loader.parseBytes(archive)
+        let buffers = loader.terrainTextureBuffers()
+        XCTAssertEqual(buffers.count, 1)
+        XCTAssertEqual(buffers[0].palette.count, 256)
+        XCTAssertEqual(buffers[0].pixels.count, 64 * 64)
+
+        XCTAssertEqual(loader.loadTerrainTextures(into: scene), 1)
+
+        XCTAssertEqual(scene.m_L[0], buffers[0].palette)
+        XCTAssertNotEqual(scene.m_L[0].count, buffers[0].pixels.count)
+        XCTAssertEqual(scene.textureIndexData[0], buffers[0].indices)
+    }
+
+    func test_transparent_normal_shader_handles_bottom_half_texture_rows() {
+        let (graphics, _) = buildEngine()
+        var texture = [Int32](repeating: 0, count: 64 * 64 * 2)
+        texture[63 * 128 + 63] = 0x00ABCDEF
+        let shader = Shader()
+
+        graphics.pixelData.withUnsafeMutableBufferPointer { destBuffer in
+            texture.withUnsafeBufferPointer { textureBuffer in
+                shader.shadeScanlineTransparentNormal(
+                    var0: 0, var1: 0, var2: 0, var3: 0,
+                    dest: destBuffer.baseAddress!,
+                    var5: 1, var6: 0,
+                    var7: 63, var8: 63, var9: 0,
+                    var10: 0, var11: 0, var12: 0,
+                    var13: 0, texture: textureBuffer.baseAddress!,
+                    var15: 1
+                )
+            }
+        }
+
+        XCTAssertEqual(graphics.pixelData[0], 0x00ABCDEF)
+    }
+
+    @MainActor
+    func test_boundary_wall_direction_two_endpoint_matches_rendered_diagonal() {
+        let endpoints = RSCGameEngine.boundaryWallTileEndpoints(tileX: 10, tileZ: 20, direction: 2)
+        XCTAssertEqual(endpoints.start.x, 11.0)
+        XCTAssertEqual(endpoints.start.z, 20.0)
+        XCTAssertEqual(endpoints.end.x, 10.0)
+        XCTAssertEqual(endpoints.end.z, 21.0)
+    }
+
     // --- 2. AnimationDef number assignment ---
 
     func test_animation_number_assignment_matches_java() {
@@ -595,5 +683,34 @@ final class RenderPipelineTests: XCTestCase {
 
     private func rscStringBytes(_ string: String) -> [UInt8] {
         Array(string.utf8) + [0x0A]
+    }
+
+    private func makeSingleSpriteArchive(id: Int, width: Int, height: Int,
+                                         authenticWidth: Int, authenticHeight: Int,
+                                         pixels: [Int32]) -> [UInt8] {
+        var bytes: [UInt8] = [0x53, 0x50, 0x52, 0x32] // SPR2
+        appendBE32(1, to: &bytes)
+        appendBE32(id, to: &bytes)
+        appendBE32(0, to: &bytes) // pixel offset
+        appendBE32(width, to: &bytes)
+        appendBE32(height, to: &bytes)
+        bytes.append(0) // requiresShift
+        bytes.append(contentsOf: [0, 0, 0])
+        appendBE32(0, to: &bytes) // xShift
+        appendBE32(0, to: &bytes) // yShift
+        appendBE32(authenticWidth, to: &bytes)
+        appendBE32(authenticHeight, to: &bytes)
+        for pixel in pixels {
+            appendBE32(Int(UInt32(bitPattern: pixel)), to: &bytes)
+        }
+        return bytes
+    }
+
+    private func appendBE32(_ value: Int, to bytes: inout [UInt8]) {
+        let u = UInt32(truncatingIfNeeded: value)
+        bytes.append(UInt8((u >> 24) & 0xFF))
+        bytes.append(UInt8((u >> 16) & 0xFF))
+        bytes.append(UInt8((u >> 8) & 0xFF))
+        bytes.append(UInt8(u & 0xFF))
     }
 }
