@@ -410,6 +410,39 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(ws.npcs[0].direction, 4)
     }
 
+    @MainActor
+    func test_rsc_player_known_count_prunes_stale_players_and_appearances() {
+        let ws = RSCWorldState()
+        ws.playerServerIndex = 7
+        ws.players = [
+            RSCPlayer(id: 100, x: 10, y: 20, name: "Keep", moving: false, combatLevel: 3),
+            RSCPlayer(id: 200, x: 30, y: 40, name: "Drop", moving: false, combatLevel: 4),
+        ]
+        ws.playerAppearances = [
+            7: RSCPlayerAppearance(sprites: [], colourHair: 0, colourTop: 0, colourBottom: 0, colourSkin: 0),
+            100: RSCPlayerAppearance(sprites: [], colourHair: 1, colourTop: 1, colourBottom: 1, colourSkin: 1),
+            200: RSCPlayerAppearance(sprites: [], colourHair: 2, colourTop: 2, colourBottom: 2, colourSkin: 2),
+        ]
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        var bits = BitWriter()
+        bits.write(120, count: 11)  // local x
+        bits.write(240, count: 13)  // local z
+        bits.write(4, count: 4)     // local direction
+        bits.write(1, count: 8)     // only first known remote player remains
+        bits.write(0, count: 1)     // retained player has no update
+
+        handler.handlePacket(opcode: 191, payload: Data(bits.bytes))
+
+        XCTAssertEqual(ws.localPlayerX, 120)
+        XCTAssertEqual(ws.localPlayerY, 240)
+        XCTAssertEqual(ws.players.map(\.id), [100])
+        XCTAssertNotNil(ws.playerAppearances[7])
+        XCTAssertNotNil(ws.playerAppearances[100])
+        XCTAssertNil(ws.playerAppearances[200])
+    }
+
     // --- 1. Sprite archive format ---
 
     func test_sprite_archive_loads_with_expected_count_and_metadata() throws {
