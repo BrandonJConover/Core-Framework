@@ -435,6 +435,7 @@ final class RSCGameEngine: ObservableObject {
                     elevation: elevation,
                     scene: scene
                 )
+                Self.applyJavaObjectLighting(to: model)
                 // Java mudclient.java:14361 applies a special vertical offset
                 // to object id 74 after placement. Keep this outside
                 // ModelArchiveLoader so the avoid-owned loader remains a pure
@@ -645,6 +646,10 @@ final class RSCGameEngine: ObservableObject {
             return (width, height)
         }
         return (height, width)
+    }
+
+    static func applyJavaObjectLighting(to model: RSModel) {
+        model.setDiffuseLightAndColor(-50, -10, -50, 48, 48, true, 117)
     }
 
     static func boundaryWallTileEndpoints(tileX: Double, tileZ: Double, direction: Int) -> (start: (x: Double, z: Double), end: (x: Double, z: Double)) {

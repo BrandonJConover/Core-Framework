@@ -581,6 +581,20 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(endpoints.end.z, 21.0)
     }
 
+    @MainActor
+    func test_object_model_lighting_matches_java_post_placement_call() {
+        let model = RSModel(vertexCount: 4, faceCount: 1)
+        let v0 = model.insertVertex(x: 0, y: 0, z: 0)
+        let v1 = model.insertVertex(x: 128, y: 0, z: 0)
+        let v2 = model.insertVertex(x: 128, y: 0, z: 128)
+        let v3 = model.insertVertex(x: 0, y: 0, z: 128)
+        model.insertFace(count: 4, indices: [v0, v1, v2, v3], texFront: -1, texBack: -1)
+
+        RSCGameEngine.applyJavaObjectLighting(to: model)
+
+        XCTAssertEqual(model.faceDiffuseLight.first, 12_345_678)
+    }
+
     // --- 2. AnimationDef number assignment ---
 
     func test_animation_number_assignment_matches_java() {
