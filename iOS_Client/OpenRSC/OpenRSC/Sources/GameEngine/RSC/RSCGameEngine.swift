@@ -176,24 +176,29 @@ final class RSCGameEngine: ObservableObject {
         startTickLoop()
         print("[Engine] Render loop started")
 
-        // Load landscape + sprite data from archives in background
+        // Load cache/definition data before connecting. The server sends
+        // object/NPC/world packets immediately after login; if those packets
+        // race ahead of GameObjectDefinitions/NPCDefinitions, the first scene
+        // build can skip scenery until a later sector rebuild. Desktop
+        // mudclient completes this cache bootstrap before entering the world,
+        // so we do the same while the pre-login render loop is already alive.
         let loader = self.landscapeLoader
         let sprLoader = self.spriteLoader
         let sharedGraphics = graphics
         let sharedScene = scene
-        Task.detached(priority: .userInitiated) {
+        await Task.detached(priority: .userInitiated) {
             loader.loadArchive()
             sprLoader.loadArchive()
             NPCDefinitions.loadArchive()
             NPCDefinitions.assignAnimationNumbers()
             GameObjectDefinitions.loadArchive()
-            await MainActor.run {
-                // Bridge decoded sprites into GraphicsController atlas so Scene.drawEntity() can draw them
-                sprLoader.bridgeInto(sharedGraphics)
-                _ = sprLoader.loadTerrainTextures(into: sharedScene)
-                print("[Engine] Archives loaded: landscape=\(loader.isLoaded) sprites=\(sprLoader.isLoaded) npcDefs=\(NPCDefinitions.defs.count) objDefs=\(GameObjectDefinitions.defs.count)")
-            }
-        }
+        }.value
+        // Bridge decoded sprites into GraphicsController atlas so
+        // Scene.drawEntity() can draw them, and upload terrain texture pages
+        // before the first world scene can be generated.
+        sprLoader.bridgeInto(sharedGraphics)
+        _ = sprLoader.loadTerrainTextures(into: sharedScene)
+        print("[Engine] Archives loaded: landscape=\(loader.isLoaded) sprites=\(sprLoader.isLoaded) npcDefs=\(NPCDefinitions.defs.count) objDefs=\(GameObjectDefinitions.defs.count)")
 
         // Connect to server with timeout
         do {
