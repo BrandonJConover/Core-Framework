@@ -793,7 +793,15 @@ final class RSCPacketHandler {
         let combatSprite = buf.getUnsignedByte()
 
         let spritesToUse = spriteCount > 0 ? sprites : (existing?.sprites ?? sprites)
-        let combatLevel = (attack + strength + defense + hits) / 4
+        let combatLevel = RSCWorldState.rscCombatLevel(
+            attack: attack,
+            defense: defense,
+            strength: strength,
+            hits: hits,
+            magic: 1,
+            prayer: 1,
+            ranged: 1
+        )
         let def = NPCDefinition(
             id: id,
             name: name.isEmpty ? (existing?.name ?? "NPC \(id)") : name,

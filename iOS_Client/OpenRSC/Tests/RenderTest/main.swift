@@ -22,6 +22,33 @@ final class RenderPipelineTests: XCTestCase {
 
     // --- RSC packet parser smoke tests ---
 
+    func test_rsc_combat_level_matches_server_formula() {
+        XCTAssertEqual(
+            RSCWorldState.rscCombatLevel(
+                attack: 40,
+                defense: 35,
+                strength: 45,
+                hits: 42,
+                magic: 30,
+                prayer: 25,
+                ranged: 20
+            ),
+            47
+        )
+        XCTAssertEqual(
+            RSCWorldState.rscCombatLevel(
+                attack: 1,
+                defense: 20,
+                strength: 1,
+                hits: 30,
+                magic: 15,
+                prayer: 10,
+                ranged: 60
+            ),
+            38
+        )
+    }
+
     @MainActor
     func test_rsc_bank_open_uses_short_counts_and_int_amounts() {
         let ws = RSCWorldState()

@@ -840,7 +840,41 @@ final class RSCWorldState: ObservableObject {
         let def = skills.first(where: { $0.id == 1 })?.base ?? 1
         let str = skills.first(where: { $0.id == 2 })?.base ?? 1
         let hp  = skills.first(where: { $0.id == 3 })?.base ?? 10
-        return (atk + def + str + hp) / 4
+        let rng = skills.first(where: { $0.id == 4 })?.base ?? 1
+        let pray = skills.first(where: { $0.id == 5 })?.base ?? 1
+        let mag = skills.first(where: { $0.id == 6 })?.base ?? 1
+        return Self.rscCombatLevel(attack: atk, defense: def, strength: str, hits: hp, magic: mag, prayer: pray, ranged: rng)
+    }
+
+    static func rscCombatLevel(
+        attack: Int,
+        defense: Int,
+        strength: Int,
+        hits: Int,
+        magic: Int,
+        prayer: Int,
+        ranged: Int,
+        isSpecial: Bool = false
+    ) -> Int {
+        // Server Formulae.getCombatLevel(): melee uses attack+strength,
+        // defense is defense+hits, ranged can dominate when 1.5x melee,
+        // and prayer+magic is always an additive /8 term.
+        let multiplier = isSpecial ? 2.0 : 1.0
+        let attackScore = multiplier * Double(attack + strength)
+        let defenseScore = multiplier * Double(defense) + Double(hits)
+        let magicPrayer = Double(prayer + magic) / 8.0
+        let rangedScore = multiplier * Double(ranged)
+        let level: Double
+        if attackScore < rangedScore * 1.5 {
+            level = (isSpecial ? (2.0 * defenseScore + 3.0 * rangedScore) / 14.0
+                               : (2.0 * defenseScore + 3.0 * rangedScore) / 8.0)
+                + magicPrayer
+        } else {
+            level = (isSpecial ? (attackScore + defenseScore) / 7.0
+                               : (attackScore + defenseScore) / 4.0)
+                + magicPrayer
+        }
+        return Int(floor(level))
     }
 
     func addChat(sender: String, text: String, isLocal: Bool = false, isPrivate: Bool = false, isKill: Bool = false, channel: ChatChannel? = nil) {
