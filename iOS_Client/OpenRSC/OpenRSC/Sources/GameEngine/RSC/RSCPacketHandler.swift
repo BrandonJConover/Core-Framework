@@ -1099,7 +1099,11 @@ final class RSCPacketHandler {
         // active list, advance kept entries via the update bits, then fold
         // genuinely-new players from the tail. We mirror that so the
         // players array doesn't blink empty between announcements.
-        var kept: [RSCPlayer] = ws.players
+        // The server sends updates for exactly the first `knownCount` remote
+        // players from the previous tick. Java resets playerCount to zero and
+        // re-adds only those entries, so any previous players beyond
+        // knownCount have left view and must be dropped immediately.
+        var kept: [RSCPlayer] = Array(ws.players.prefix(knownCount))
         var keep = Array(repeating: true, count: kept.count)
 
         for i in 0..<knownCount {
@@ -1174,6 +1178,8 @@ final class RSCPacketHandler {
         buf.endBitAccess()
 
         ws.players = kept
+        let activePlayerIds = Set(kept.map(\.id) + [ws.playerServerIndex])
+        ws.playerAppearances = ws.playerAppearances.filter { activePlayerIds.contains($0.key) }
 
         if knownCount > 0 || kept.count > 0 {
             print("[PLY] len=\(length) known=\(knownCount) total=\(kept.count) localPos=(\(localX),\(localZ))")
