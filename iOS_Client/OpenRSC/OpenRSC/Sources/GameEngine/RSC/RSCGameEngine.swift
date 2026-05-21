@@ -199,13 +199,17 @@ final class RSCGameEngine: ObservableObject {
         do {
             print("[Engine] Connecting to \(server.host):\(server.port)...")
 
-            // 10-second connection timeout
+            // Device launches can take a little longer to leave Network.framework's
+            // setup path when the server is reachable only over VPN/bridge
+            // routing. Keep the timeout finite, but long enough that a slightly
+            // delayed `.ready` state does not race with our timeout task and
+            // leave a half-connected socket delivering bytes after failure UI.
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
                     try await self.connection.connect(host: server.host, port: UInt16(server.port))
                 }
                 group.addTask {
-                    try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+                    try await Task.sleep(nanoseconds: 20_000_000_000)
                     throw NSError(domain: "OpenRSC", code: -1, userInfo: [NSLocalizedDescriptionKey: "Connection timed out"])
                 }
                 // Wait for whichever finishes first
@@ -228,6 +232,7 @@ final class RSCGameEngine: ObservableObject {
             startPingLoop()
         } catch {
             print("[Engine] Connection failed: \(error)")
+            connection.disconnect()
             worldState.addChat(sender: "[System]", text: "Connection failed: \(error.localizedDescription)")
             presentConnectionClosed("Connection failed: \(error.localizedDescription)")
         }

@@ -1,6 +1,19 @@
 import Foundation
 import Network
 
+private final class ResumeGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didResume = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !didResume else { return false }
+        didResume = true
+        return true
+    }
+}
+
 // Raw TCP connection using Network.framework NWConnection.
 // Matches Java client Network_Base.java / Network_Socket.java:
 //   Incoming: [2-byte BE frameSize][opcode][payload] where frameSize includes the 2 header bytes
@@ -21,32 +34,33 @@ final class TCPConnection: @unchecked Sendable {
         let nwPort = NWEndpoint.Port(rawValue: port)!
         let conn = NWConnection(host: nwHost, port: nwPort, using: .tcp)
         self.connection = conn
+        let resumeGate = ResumeGate()
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            var resumed = false
-            conn.stateUpdateHandler = { [weak self] state in
-                switch state {
-                case .ready:
-                    guard !resumed else { return }
-                    resumed = true
-                    continuation.resume()
-                    self?.scheduleReceive()
-                case .failed(let err):
-                    guard !resumed else { return }
-                    resumed = true
-                    continuation.resume(throwing: err)
-                case .cancelled:
-                    if !resumed {
-                        resumed = true
-                        continuation.resume(throwing: POSIXError(.ECONNABORTED))
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                conn.stateUpdateHandler = { [weak self] state in
+                    switch state {
+                    case .ready:
+                        guard resumeGate.claim() else { return }
+                        self?.scheduleReceive()
+                        continuation.resume()
+                    case .failed(let err):
+                        guard resumeGate.claim() else { return }
+                        continuation.resume(throwing: err)
+                    case .cancelled:
+                        if resumeGate.claim() {
+                            continuation.resume(throwing: POSIXError(.ECONNABORTED))
+                        }
+                        let cb = self?.onDisconnect
+                        Task { @MainActor in cb?() }
+                    default:
+                        break
                     }
-                    let cb = self?.onDisconnect
-                    Task { @MainActor in cb?() }
-                default:
-                    break
                 }
+                conn.start(queue: queue)
             }
-            conn.start(queue: queue)
+        } onCancel: {
+            conn.cancel()
         }
     }
 
