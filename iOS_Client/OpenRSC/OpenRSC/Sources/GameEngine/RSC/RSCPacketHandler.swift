@@ -1265,7 +1265,17 @@ final class RSCPacketHandler {
             var npc = RSCNPC(id: serverIndex, x: npcTileX, y: npcTileZ,
                              npcId: npcTypeId, name: npcName)
             npc.direction = dir & 7
-            keptNPCs.append(npc)
+            if let existing = keptNPCs.firstIndex(where: { $0.id == serverIndex }) {
+                npc.previousX = keptNPCs[existing].x
+                npc.previousY = keptNPCs[existing].y
+                npc.interpolationTicksRemaining =
+                    (npc.previousX == npcTileX && npc.previousY == npcTileZ)
+                    ? 0
+                    : RSCCharacterInterpolationTicks
+                keptNPCs[existing] = npc
+            } else {
+                keptNPCs.append(npc)
+            }
             newCount += 1
         }
 

@@ -380,6 +380,36 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(ws.wallObjects[0].direction, 1)
     }
 
+    @MainActor
+    func test_rsc_npc_reannounce_replaces_existing_server_index() {
+        let ws = RSCWorldState()
+        ws.localPlayerX = 100
+        ws.localPlayerY = 200
+        ws.npcs = [
+            RSCNPC(id: 42, x: 100, y: 200, npcId: 1, name: "Old"),
+        ]
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        var bits = BitWriter()
+        bits.write(1, count: 8)   // one known NPC retained
+        bits.write(0, count: 1)   // retained NPC has no movement update
+        bits.write(42, count: 12) // reannounce same server index
+        bits.write(2, count: 6)   // relX
+        bits.write(3, count: 6)   // relZ
+        bits.write(4, count: 4)   // direction
+        bits.write(5, count: 10)  // npc type id
+
+        handler.handlePacket(opcode: 79, payload: Data(bits.bytes))
+
+        XCTAssertEqual(ws.npcs.count, 1)
+        XCTAssertEqual(ws.npcs[0].id, 42)
+        XCTAssertEqual(ws.npcs[0].x, 102)
+        XCTAssertEqual(ws.npcs[0].y, 203)
+        XCTAssertEqual(ws.npcs[0].npcId, 5)
+        XCTAssertEqual(ws.npcs[0].direction, 4)
+    }
+
     // --- 1. Sprite archive format ---
 
     func test_sprite_archive_loads_with_expected_count_and_metadata() throws {
@@ -712,5 +742,25 @@ final class RenderPipelineTests: XCTestCase {
         bytes.append(UInt8((u >> 16) & 0xFF))
         bytes.append(UInt8((u >> 8) & 0xFF))
         bytes.append(UInt8(u & 0xFF))
+    }
+
+    private struct BitWriter {
+        private(set) var bytes: [UInt8] = []
+        private var bitCount: Int = 0
+
+        mutating func write(_ value: Int, count: Int) {
+            guard count > 0 else { return }
+            for bit in stride(from: count - 1, through: 0, by: -1) {
+                if bitCount % 8 == 0 {
+                    bytes.append(0)
+                }
+                let byteIndex = bitCount / 8
+                let bitOffset = 7 - (bitCount % 8)
+                if ((value >> bit) & 1) != 0 {
+                    bytes[byteIndex] |= UInt8(1 << bitOffset)
+                }
+                bitCount += 1
+            }
+        }
     }
 }
