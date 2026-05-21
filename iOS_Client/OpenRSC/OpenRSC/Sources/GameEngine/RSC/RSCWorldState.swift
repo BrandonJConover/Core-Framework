@@ -666,9 +666,67 @@ final class RSCWorldState: ObservableObject {
     var worldOffsetZ: Int = 0
     var requestedPlane: Int = 0
     var loadingArea: Bool = false
-    // midRegionBase computed from player position
-    var midRegionBaseX: Int { ((localPlayerX + 24) / 48) * 48 - 48 }
-    var midRegionBaseZ: Int { ((localPlayerY + 24) / 48) * 48 - 48 }
+    /// Java mudclient keeps player/NPC/object tiles in a region-local 96x96
+    /// frame and stores the absolute-region origin separately as
+    /// midRegionBaseX/Z. Opcode 191 sends packed player coords in the
+    /// server/world-offset frame; RSCPacketHandler recenters those into this
+    /// base so terrain, NPCs, and outgoing action packets all agree.
+    var midRegionBaseX: Int = 0
+    var midRegionBaseZ: Int = 0
+
+    func absoluteWorldX(_ localX: Int) -> Int {
+        worldOffsetX + midRegionBaseX + localX
+    }
+
+    func absoluteWorldZ(_ localZ: Int) -> Int {
+        worldOffsetZ + midRegionBaseZ + localZ
+    }
+
+    @discardableResult
+    func recenterRegion(packedPlayerX: Int, packedPlayerZ: Int) -> (localX: Int, localZ: Int, changed: Bool) {
+        let wantX = packedPlayerX + worldOffsetX
+        let wantZ = packedPlayerZ + worldOffsetZ
+        let nextBaseX = ((wantX + 24) / 48) * 48 - 48 - worldOffsetX
+        let nextBaseZ = ((wantZ + 24) / 48) * 48 - 48 - worldOffsetZ
+        let deltaX = nextBaseX - midRegionBaseX
+        let deltaZ = nextBaseZ - midRegionBaseZ
+        let changed = deltaX != 0 || deltaZ != 0
+
+        if changed {
+            for i in players.indices {
+                players[i].x -= deltaX
+                players[i].previousX -= deltaX
+                players[i].y -= deltaZ
+                players[i].previousY -= deltaZ
+            }
+            for i in npcs.indices {
+                npcs[i].x -= deltaX
+                npcs[i].previousX -= deltaX
+                npcs[i].y -= deltaZ
+                npcs[i].previousY -= deltaZ
+            }
+            for i in gameObjects.indices {
+                gameObjects[i].x -= deltaX
+                gameObjects[i].y -= deltaZ
+            }
+            for i in wallObjects.indices {
+                wallObjects[i].x -= deltaX
+                wallObjects[i].y -= deltaZ
+            }
+            for i in groundItems.indices {
+                groundItems[i].x -= deltaX
+                groundItems[i].y -= deltaZ
+            }
+            if walkTargetTimeout > 0 {
+                walkTargetX -= deltaX
+                walkTargetY -= deltaZ
+            }
+            midRegionBaseX = nextBaseX
+            midRegionBaseZ = nextBaseZ
+        }
+
+        return (packedPlayerX - midRegionBaseX, packedPlayerZ - midRegionBaseZ, changed)
+    }
 
     // Combat state
     @Published var inCombat: Bool = false

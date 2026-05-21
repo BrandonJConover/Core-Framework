@@ -602,8 +602,8 @@ private struct MapPanelView: View {
     ]
 
     var body: some View {
-        let absX = worldState.worldOffsetX + worldState.localPlayerX
-        let absZ = worldState.worldOffsetZ + worldState.localPlayerY
+        let absX = worldState.absoluteWorldX(worldState.localPlayerX)
+        let absZ = worldState.absoluteWorldZ(worldState.localPlayerY)
 
         VStack(spacing: 6) {
             HStack {

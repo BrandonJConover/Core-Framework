@@ -27,7 +27,7 @@ struct MinimapPanel: View {
                 Text("Minimap")
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Text("(\(worldState.worldOffsetX + worldState.localPlayerX), \(worldState.worldOffsetZ + worldState.localPlayerY))")
+                Text("(\(worldState.absoluteWorldX(worldState.localPlayerX)), \(worldState.absoluteWorldZ(worldState.localPlayerY)))")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(Color(hex: "#888888"))
             }
@@ -68,8 +68,8 @@ struct MinimapPanel: View {
         let halfTiles = tilesAcross / 2
         let px = worldState.localPlayerX
         let pz = worldState.localPlayerY
-        let absX = worldState.worldOffsetX + px
-        let absZ = worldState.worldOffsetZ + pz
+        let absX = worldState.absoluteWorldX(px)
+        let absZ = worldState.absoluteWorldZ(pz)
         let landscapeReady = engine.landscapeLoader.isLoaded
 
         // Terrain — sample per tile from the loaded landscape archive when

@@ -1087,9 +1087,12 @@ final class RSCPacketHandler {
         buf.startBitAccess()
 
         // Local player absolute position (11-bit X, 13-bit Z, 4-bit direction)
-        let localX = buf.getBitMask(11)
-        let localZ = buf.getBitMask(13)
+        let packedX = buf.getBitMask(11)
+        let packedZ = buf.getBitMask(13)
         let localDir = buf.getBitMask(4)
+        let region = ws.recenterRegion(packedPlayerX: packedX, packedPlayerZ: packedZ)
+        let localX = region.localX
+        let localZ = region.localZ
 
         ws.localPlayerX = localX
         ws.localPlayerY = localZ
@@ -1185,7 +1188,7 @@ final class RSCPacketHandler {
         ws.playerAppearances = ws.playerAppearances.filter { activePlayerIds.contains($0.key) }
 
         if knownCount > 0 || kept.count > 0 {
-            print("[PLY] len=\(length) known=\(knownCount) total=\(kept.count) localPos=(\(localX),\(localZ))")
+            print("[PLY] len=\(length) known=\(knownCount) total=\(kept.count) localPos=(\(localX),\(localZ)) base=(\(ws.midRegionBaseX),\(ws.midRegionBaseZ)) raw=(\(packedX),\(packedZ))")
         }
     }
 

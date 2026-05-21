@@ -159,6 +159,8 @@ final class RSCGameEngine: ObservableObject {
         worldState.groundItems = []
         worldState.gameObjects = []
         worldState.wallObjects = []
+        worldState.midRegionBaseX = 0
+        worldState.midRegionBaseZ = 0
 
         // Initialize 3D rendering pipeline
         let graphics = GraphicsController(width: Int32(MetalRenderer.gameWidth), height: Int32(MetalRenderer.gameHeight), spriteCount: 5000)
@@ -345,7 +347,7 @@ final class RSCGameEngine: ObservableObject {
         // wilderness level scales every 6 tiles. Fire the once-per-session
         // warning when the player approaches the ditch (-10 .. 0 window).
         if worldState.localPlayerX != 0 || worldState.localPlayerY != 0 {
-            let absZ = worldState.worldOffsetZ + worldState.localPlayerY
+            let absZ = worldState.absoluteWorldZ(worldState.localPlayerY)
             let centerX = 2203 - absZ
             worldState.inWilderness = centerX > 0
             worldState.wildernessLevel = worldState.inWilderness ? max(1, centerX / 6 + 1) : 0
@@ -380,13 +382,16 @@ final class RSCGameEngine: ObservableObject {
         let landscapeReady = landscapeLoader.isLoaded
 
         if havePos && landscapeReady, let scene = self.scene, let graphics = self.graphics, let world = self.world {
-            // Rebuild terrain mesh when the player moves into a new sector (each sector = 48 tiles)
-            let secX = px / 48
-            let secZ = pz / 48
+            // Rebuild terrain mesh when the Java-style region base shifts
+            // (each mid-region is 48 tiles, with the player kept local to
+            // that region). `px/pz` are region-local, so sectoring them
+            // directly would rebuild around the wrong origin after recenter.
+            let secX = worldState.midRegionBaseX / 48
+            let secZ = worldState.midRegionBaseZ / 48
             if !terrainBuilt || terrainBuiltAtSector != (secX, secZ) {
                 world.landscapeLoader = landscapeLoader
-                let absX = worldState.worldOffsetX + px
-                let absZ = worldState.worldOffsetZ + pz
+                let absX = worldState.absoluteWorldX(px)
+                let absZ = worldState.absoluteWorldZ(pz)
                 // Clear previously-added landscape models so we don't accumulate
                 for i in 0..<scene.modelCount { scene.models[i] = nil }
                 scene.modelCount = 0
@@ -739,8 +744,8 @@ final class RSCGameEngine: ObservableObject {
         let h = MetalRenderer.gameHeight
         let px = worldState.localPlayerX
         let pz = worldState.localPlayerY
-        let absX = worldState.worldOffsetX + px
-        let absZ = worldState.worldOffsetZ + pz
+        let absX = worldState.absoluteWorldX(px)
+        let absZ = worldState.absoluteWorldZ(pz)
 
         // Top info bar
         for y in 0..<12 {
@@ -1603,8 +1608,8 @@ final class RSCGameEngine: ObservableObject {
         let pz = worldState.localPlayerY
 
         // Absolute world position for sector lookups
-        let absX = worldState.worldOffsetX + px
-        let absZ = worldState.worldOffsetZ + pz
+        let absX = worldState.absoluteWorldX(px)
+        let absZ = worldState.absoluteWorldZ(pz)
 
         // Tile size in pixels — scales with zoom
         let tp = max(2, min(16, Int(6.0 * zoomLevel)))
@@ -2314,15 +2319,11 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func absoluteWorldX(_ localX: Int) -> Int {
-        // `localPlayerX/Y` and all entity tiles retained by RSCPacketHandler
-        // are already absolute server tiles. `worldOffsetX/Z` is only used by
-        // the terrain/cache loader, so adding it here double-offsets action
-        // packets and makes server-side object/wall/item lookups miss.
-        localX
+        worldState.absoluteWorldX(localX)
     }
 
     private func absoluteWorldZ(_ localZ: Int) -> Int {
-        localZ
+        worldState.absoluteWorldZ(localZ)
     }
 
     @discardableResult
