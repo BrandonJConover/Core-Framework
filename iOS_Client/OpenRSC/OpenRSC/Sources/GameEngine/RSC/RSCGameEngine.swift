@@ -2460,6 +2460,11 @@ final class RSCGameEngine: ObservableObject {
         return await queueApproach(toX: destX, z: destZ, action: action)
     }
 
+    private func actionTargetUnavailable(_ action: String) {
+        print("[Action] blocked action=\"\(action)\" reason=stale-target")
+        worldState.addChat(sender: "[Action]", text: "That target is no longer available.")
+    }
+
     static func makeWalkPacket(serverPath: [(x: Int, z: Int)], walkToEntity: Bool) -> Data {
         let buf = ByteBuffer()
         buf.newPacket(opcode: Int(walkToEntity ? RSCOutOpcode.walkToEntity.rawValue : RSCOutOpcode.walkToPoint.rawValue))
@@ -2939,8 +2944,14 @@ final class RSCGameEngine: ObservableObject {
 
     func attackNPC(serverIndex: Int) {
         Task {
-            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-attack") else { return }
+            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("npc-attack")
+                return
+            }
+            guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-attack") else { return }
+            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("npc-attack")
+                return
             }
             let data = Self.makeNpcTargetPacket(opcode: .npcAttack, serverIndex: serverIndex)
             logAction("npc-attack", opcode: RSCOutOpcode.npcAttack, payload: data, details: "serverIndex=\(serverIndex)")
@@ -2950,8 +2961,14 @@ final class RSCGameEngine: ObservableObject {
 
     func attackPlayer(serverIndex: Int) {
         Task {
-            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-attack") else { return }
+            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("player-attack")
+                return
+            }
+            guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-attack") else { return }
+            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("player-attack")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerAttack.rawValue))
@@ -2987,8 +3004,14 @@ final class RSCGameEngine: ObservableObject {
 
     func talkToNPC(serverIndex: Int) {
         Task {
-            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-talk") else { return }
+            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("npc-talk")
+                return
+            }
+            guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-talk") else { return }
+            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("npc-talk")
+                return
             }
             let data = Self.makeNpcTargetPacket(opcode: .npcTalkTo, serverIndex: serverIndex)
             logAction("npc-talk", opcode: RSCOutOpcode.npcTalkTo, payload: data, details: "serverIndex=\(serverIndex)")
@@ -3270,8 +3293,14 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnNPC(slot: Int, serverIndex: Int) {
         Task {
-            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "item-on-npc") else { return }
+            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("item-on-npc")
+                return
+            }
+            guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "item-on-npc") else { return }
+            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("item-on-npc")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnNpc.rawValue))
@@ -3284,8 +3313,14 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnPlayer(slot: Int, serverIndex: Int) {
         Task {
-            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: player.x, z: player.y, action: "item-on-player") else { return }
+            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("item-on-player")
+                return
+            }
+            guard await queueEntityApproach(toX: player.x, z: player.y, action: "item-on-player") else { return }
+            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("item-on-player")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerUseItem.rawValue))
@@ -3298,8 +3333,16 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnGroundItem(slot: Int, x: Int, z: Int, itemId: Int) {
         Task {
+            guard worldState.groundItems.contains(where: { $0.x == x && $0.y == z && $0.itemId == itemId }) else {
+                actionTargetUnavailable("item-on-ground")
+                return
+            }
             let approach = approachTileForGroundItem(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "item-on-ground") else { return }
+            guard worldState.groundItems.contains(where: { $0.x == x && $0.y == z && $0.itemId == itemId }) else {
+                actionTargetUnavailable("item-on-ground")
+                return
+            }
             try? await connection.send(Self.makeItemUseOnGroundPacket(
                 x: serverTileX(x),
                 z: serverTileZ(z),
@@ -3312,8 +3355,16 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnObject(slot: Int, x: Int, z: Int) {
         Task {
+            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
+                actionTargetUnavailable("item-on-object")
+                return
+            }
             let approach = approachTileForObject(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "item-on-object") else { return }
+            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
+                actionTargetUnavailable("item-on-object")
+                return
+            }
             try? await connection.send(Self.makeItemUseOnObjectPacket(
                 x: serverTileX(x),
                 z: serverTileZ(z),
@@ -3325,8 +3376,16 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnWall(slot: Int, x: Int, z: Int, direction: Int) {
         Task {
+            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
+                actionTargetUnavailable("item-on-wall")
+                return
+            }
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "item-on-wall") else { return }
+            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
+                actionTargetUnavailable("item-on-wall")
+                return
+            }
             try? await connection.send(Self.makeItemUseOnWallPacket(
                 x: serverTileX(x),
                 z: serverTileZ(z),
@@ -3339,8 +3398,16 @@ final class RSCGameEngine: ObservableObject {
 
     func pickupGroundItem(x: Int, y: Int, itemId: Int) {
         Task {
+            guard worldState.groundItems.contains(where: { $0.x == x && $0.y == y && $0.itemId == itemId }) else {
+                actionTargetUnavailable("ground-take")
+                return
+            }
             let approach = approachTileForGroundItem(x: x, z: y)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "ground-take") else { return }
+            guard worldState.groundItems.contains(where: { $0.x == x && $0.y == y && $0.itemId == itemId }) else {
+                actionTargetUnavailable("ground-take")
+                return
+            }
             let packet = Self.makeGroundItemTakePacket(x: serverTileX(x), z: serverTileZ(y), itemId: itemId)
             logAction("ground-take", opcode: RSCOutOpcode.groundItemTake, payload: packet, details: "item=\(itemId) tile=(\(x),\(y)) server=(\(serverTileX(x)),\(serverTileZ(y)))")
             try? await connection.send(packet)
@@ -3557,8 +3624,16 @@ final class RSCGameEngine: ObservableObject {
 
     func objectAction1(x: Int, z: Int) {
         Task {
+            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
+                actionTargetUnavailable("object-1")
+                return
+            }
             let approach = approachTileForObject(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "object-1") else { return }
+            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
+                actionTargetUnavailable("object-1")
+                return
+            }
             let packet = Self.makeObjectActionPacket(opcode: .objectCommand1, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-1", opcode: RSCOutOpcode.objectCommand1, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
@@ -3567,8 +3642,16 @@ final class RSCGameEngine: ObservableObject {
 
     func objectAction2(x: Int, z: Int) {
         Task {
+            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
+                actionTargetUnavailable("object-2")
+                return
+            }
             let approach = approachTileForObject(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "object-2") else { return }
+            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
+                actionTargetUnavailable("object-2")
+                return
+            }
             let packet = Self.makeObjectActionPacket(opcode: .objectCommand2, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-2", opcode: RSCOutOpcode.objectCommand2, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
@@ -3577,8 +3660,16 @@ final class RSCGameEngine: ObservableObject {
 
     func wallAction1(x: Int, z: Int, direction: Int) {
         Task {
+            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
+                actionTargetUnavailable("wall-1")
+                return
+            }
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "wall-1") else { return }
+            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
+                actionTargetUnavailable("wall-1")
+                return
+            }
             let packet = Self.makeWallActionPacket(opcode: .wallCommand1, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-1", opcode: RSCOutOpcode.wallCommand1, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
@@ -3587,8 +3678,16 @@ final class RSCGameEngine: ObservableObject {
 
     func wallAction2(x: Int, z: Int, direction: Int) {
         Task {
+            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
+                actionTargetUnavailable("wall-2")
+                return
+            }
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "wall-2") else { return }
+            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
+                actionTargetUnavailable("wall-2")
+                return
+            }
             let packet = Self.makeWallActionPacket(opcode: .wallCommand2, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-2", opcode: RSCOutOpcode.wallCommand2, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
@@ -3609,8 +3708,14 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnNPC(spellId: Int, npcServerIndex: Int) {
         Task {
-            if let npc = worldState.npcs.first(where: { $0.id == npcServerIndex }) {
-                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "spell-on-npc") else { return }
+            guard let npc = worldState.npcs.first(where: { $0.id == npcServerIndex }) else {
+                actionTargetUnavailable("spell-on-npc")
+                return
+            }
+            guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "spell-on-npc") else { return }
+            guard worldState.npcs.contains(where: { $0.id == npcServerIndex }) else {
+                actionTargetUnavailable("spell-on-npc")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnNpc.rawValue))
@@ -3623,8 +3728,14 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnPlayer(spellId: Int, playerServerIndex: Int) {
         Task {
-            if let player = worldState.players.first(where: { $0.id == playerServerIndex }) {
-                guard await queueEntityApproach(toX: player.x, z: player.y, action: "spell-on-player") else { return }
+            guard let player = worldState.players.first(where: { $0.id == playerServerIndex }) else {
+                actionTargetUnavailable("spell-on-player")
+                return
+            }
+            guard await queueEntityApproach(toX: player.x, z: player.y, action: "spell-on-player") else { return }
+            guard worldState.players.contains(where: { $0.id == playerServerIndex }) else {
+                actionTargetUnavailable("spell-on-player")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnPlayer.rawValue))
@@ -3637,8 +3748,16 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnGroundItem(spellId: Int, x: Int, z: Int, itemId: Int) {
         Task {
+            guard worldState.groundItems.contains(where: { $0.x == x && $0.y == z && $0.itemId == itemId }) else {
+                actionTargetUnavailable("spell-on-ground")
+                return
+            }
             let approach = approachTileForGroundItem(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "spell-on-ground") else { return }
+            guard worldState.groundItems.contains(where: { $0.x == x && $0.y == z && $0.itemId == itemId }) else {
+                actionTargetUnavailable("spell-on-ground")
+                return
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnGroundItem.rawValue))
             buf.putShort(spellId)
@@ -3652,8 +3771,16 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnObject(spellId: Int, x: Int, z: Int) {
         Task {
+            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
+                actionTargetUnavailable("spell-on-object")
+                return
+            }
             let approach = approachTileForObject(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "spell-on-object") else { return }
+            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
+                actionTargetUnavailable("spell-on-object")
+                return
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnObject.rawValue))
             buf.putShort(spellId)
@@ -3666,8 +3793,16 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnWall(spellId: Int, x: Int, z: Int, direction: Int) {
         Task {
+            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
+                actionTargetUnavailable("spell-on-wall")
+                return
+            }
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "spell-on-wall") else { return }
+            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
+                actionTargetUnavailable("spell-on-wall")
+                return
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnWall.rawValue))
             // The native login targets the custom 10009 protocol branch, whose
@@ -3883,8 +4018,14 @@ final class RSCGameEngine: ObservableObject {
 
     func followPlayer(serverIndex: Int) {
         Task {
-            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-follow") else { return }
+            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("player-follow")
+                return
+            }
+            guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-follow") else { return }
+            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("player-follow")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerFollow.rawValue))
@@ -3898,8 +4039,14 @@ final class RSCGameEngine: ObservableObject {
     /// accepts (TradePanel opens) or declines.
     func requestTrade(serverIndex: Int) {
         Task {
-            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-trade") else { return }
+            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("player-trade")
+                return
+            }
+            guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-trade") else { return }
+            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("player-trade")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerTrade.rawValue))
@@ -3912,8 +4059,14 @@ final class RSCGameEngine: ObservableObject {
     /// confirms, the DuelPanel opens for both sides.
     func requestDuel(serverIndex: Int) {
         Task {
-            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-duel") else { return }
+            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("player-duel")
+                return
+            }
+            guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-duel") else { return }
+            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("player-duel")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerDuel.rawValue))
@@ -3924,8 +4077,14 @@ final class RSCGameEngine: ObservableObject {
 
     func npcCommand(serverIndex: Int) {
         Task {
-            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-1") else { return }
+            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("npc-command-1")
+                return
+            }
+            guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-1") else { return }
+            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("npc-command-1")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand.rawValue))
@@ -3936,8 +4095,14 @@ final class RSCGameEngine: ObservableObject {
 
     func npcCommand2(serverIndex: Int) {
         Task {
-            if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-2") else { return }
+            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("npc-command-2")
+                return
+            }
+            guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-2") else { return }
+            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+                actionTargetUnavailable("npc-command-2")
+                return
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand2.rawValue))
