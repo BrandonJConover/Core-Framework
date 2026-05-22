@@ -586,6 +586,9 @@ final class RSCGameEngine: ObservableObject {
             // is in combat with a tracked target, render in the combatB pose so
             // the player faces the NPC mid-fight.
             let localCombatRole: CharacterBillboards.CombatRole = worldState.inCombat ? .combatB : .none
+            if worldState.localAppearanceAwaitingRefresh && renderLogCount % 120 == 0 {
+                print("[Appearance] waiting for local opcode 234 case 5 after equipment/inventory change")
+            }
             if let localApp = worldState.playerAppearances[worldState.playerServerIndex] {
                 let localSprites = localApp.layerSprites.map(Self.appearanceAnimationIndex)
                 CharacterBillboards.register(

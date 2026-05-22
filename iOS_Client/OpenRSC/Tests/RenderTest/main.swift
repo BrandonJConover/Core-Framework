@@ -59,6 +59,46 @@ final class RenderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func test_rsc_update_players_case5_stores_raw_appearance_and_clears_local_refresh_flag() {
+        let ws = RSCWorldState()
+        ws.playerServerIndex = 7
+        ws.localAppearanceAwaitingRefresh = true
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        let rawLayers = [1, 2, 3, 98, 137, 12, 0, 0, 0, 0, 0, 0]
+        var payload: [UInt8] = []
+        payload += [0x00, 0x01]       // one player appearance update
+        payload += [0x00, 0x07]       // local player server index
+        payload += [0x05]             // full appearance update
+        payload += rscStringBytes("testplayer")
+        payload += [UInt8(rawLayers.count)]
+        for layer in rawLayers {
+            payload += be16Bytes(layer)
+        }
+        payload += [1, 2, 3, 4]       // hair/top/bottom/skin palette indexes
+        payload += [42, 1]            // combat level, skull visible
+        payload += [0]                // no clan tag
+        payload += [0, 0, 0]          // invisible, invulnerable, group id
+        payload += be32Bytes(0x01020304)
+
+        handler.handlePacket(opcode: 234, payload: Data(payload))
+
+        let app = try XCTUnwrap(ws.playerAppearances[7])
+        XCTAssertEqual(app.layerSprites, rawLayers)
+        XCTAssertEqual(app.layerSprites.map(RSCGameEngine.appearanceAnimationIndex), [0, 1, 2, 97, 136, 11, -1, -1, -1, -1, -1, -1])
+        XCTAssertEqual(app.colourHair, 1)
+        XCTAssertEqual(app.colourTop, 2)
+        XCTAssertEqual(app.colourBottom, 3)
+        XCTAssertEqual(app.colourSkin, 4)
+        XCTAssertEqual(app.combatLevel, 42)
+        XCTAssertTrue(app.skulled)
+        XCTAssertEqual(app.icon, 0x01020304)
+        XCTAssertEqual(ws.localPlayerName, "testplayer")
+        XCTAssertFalse(ws.localAppearanceAwaitingRefresh)
+    }
+
+    @MainActor
     func test_rsc_load_stats_preserves_current_base_and_experience_arrays() {
         let ws = RSCWorldState()
         let handler = RSCPacketHandler()
@@ -503,9 +543,9 @@ final class RenderPipelineTests: XCTestCase {
             RSCPlayer(id: 200, x: 30, y: 40, name: "Drop", moving: false, combatLevel: 4),
         ]
         ws.playerAppearances = [
-            7: RSCPlayerAppearance(sprites: [], colourHair: 0, colourTop: 0, colourBottom: 0, colourSkin: 0),
-            100: RSCPlayerAppearance(sprites: [], colourHair: 1, colourTop: 1, colourBottom: 1, colourSkin: 1),
-            200: RSCPlayerAppearance(sprites: [], colourHair: 2, colourTop: 2, colourBottom: 2, colourSkin: 2),
+            7: RSCPlayerAppearance(layerSprites: [], colourHair: 0, colourTop: 0, colourBottom: 0, colourSkin: 0, combatLevel: 0, skulled: false, clanTag: nil),
+            100: RSCPlayerAppearance(layerSprites: [], colourHair: 1, colourTop: 1, colourBottom: 1, colourSkin: 1, combatLevel: 0, skulled: false, clanTag: nil),
+            200: RSCPlayerAppearance(layerSprites: [], colourHair: 2, colourTop: 2, colourBottom: 2, colourSkin: 2, combatLevel: 0, skulled: false, clanTag: nil),
         ]
         let handler = RSCPacketHandler()
         handler.worldState = ws
@@ -668,6 +708,14 @@ final class RenderPipelineTests: XCTestCase {
         return [
             UInt8((v >> 24) & 0xFF),
             UInt8((v >> 16) & 0xFF),
+            UInt8((v >> 8) & 0xFF),
+            UInt8(v & 0xFF)
+        ]
+    }
+
+    private func be16Bytes(_ value: Int) -> [UInt8] {
+        let v = UInt16(truncatingIfNeeded: value)
+        return [
             UInt8((v >> 8) & 0xFF),
             UInt8(v & 0xFF)
         ]

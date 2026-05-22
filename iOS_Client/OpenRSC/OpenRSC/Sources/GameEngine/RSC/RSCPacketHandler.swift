@@ -1302,6 +1302,7 @@ final class RSCPacketHandler {
     // Format: BYTE count, then per item: SHORT itemID-with-equipped-bit, [ushort/int amount if stackable]
     private func handleUpdateInventory(buf: ByteBuffer, ws: RSCWorldState) {
         let count = buf.getUnsignedByte()
+        let previousEquipped = ws.inventory.map { ($0.itemId, $0.equipped) }
         var items: [RSCInventoryItem] = []
         for i in 0..<count {
             let rawItemId = buf.getUnsignedShort()
@@ -1315,11 +1316,17 @@ final class RSCPacketHandler {
            pendingSlot >= items.count || items[pendingSlot].itemId == 0 {
             ws.clearPendingTargetMode()
         }
+        if previousEquipped != items.map({ ($0.itemId, $0.equipped) }) {
+            ws.localAppearanceAwaitingRefresh = true
+        }
         print("[Packet] Inventory: \(count) items")
     }
 
     private func handleUpdateEquipment(buf: ByteBuffer, ws: RSCWorldState) {
         let count = buf.getUnsignedByte()
+        let previousEquipment = ws.equipment
+            .sorted { $0.id < $1.id }
+            .map { ($0.id, $0.itemId, $0.amount) }
         var slots: [RSCEquipmentSlot] = []
         for _ in 0..<count {
             guard buf.bytesRemaining >= 3 else { break }
@@ -1330,6 +1337,9 @@ final class RSCPacketHandler {
             slots.append(RSCEquipmentSlot(id: slot, itemId: itemId, amount: amount))
         }
         ws.equipment = slots.sorted { $0.id < $1.id }
+        if previousEquipment != ws.equipment.map({ ($0.id, $0.itemId, $0.amount) }) {
+            ws.localAppearanceAwaitingRefresh = true
+        }
         print("[Packet] Equipment: \(ws.equipment.count) items")
     }
 
@@ -1341,16 +1351,21 @@ final class RSCPacketHandler {
 
         if rawItemId == 0xFFFF {
             ws.equipment.removeAll { $0.id == slot }
+            ws.localAppearanceAwaitingRefresh = true
             return
         }
 
         let amount = ItemDefinitions.isStackable(rawItemId) && buf.bytesRemaining >= 4 ? buf.get32() : 1
         let nextSlot = RSCEquipmentSlot(id: slot, itemId: rawItemId, amount: amount)
         if let existing = ws.equipment.firstIndex(where: { $0.id == slot }) {
+            if ws.equipment[existing].itemId != nextSlot.itemId || ws.equipment[existing].amount != nextSlot.amount {
+                ws.localAppearanceAwaitingRefresh = true
+            }
             ws.equipment[existing] = nextSlot
         } else {
             ws.equipment.append(nextSlot)
             ws.equipment.sort { $0.id < $1.id }
+            ws.localAppearanceAwaitingRefresh = true
         }
     }
 
@@ -1650,6 +1665,9 @@ final class RSCPacketHandler {
                 }
                 if serverIndex == ws.playerServerIndex {
                     ws.localPlayerName = playerName
+                    ws.localAppearanceAwaitingRefresh = false
+                    let rendered = sprites.map { max(-1, $0 - 1) }
+                    print("[Appearance] local raw=\(sprites) render=\(rendered)")
                 }
 
             case 8: // Heal

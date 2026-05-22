@@ -384,6 +384,10 @@ final class RSCWorldState: ObservableObject {
     /// rebuild of `players`; the renderer looks up this map for each
     /// drawn player and falls back to a starter avatar when missing.
     @Published var playerAppearances: [Int: RSCPlayerAppearance] = [:]
+    /// Set when inventory/equipment state changes before the matching opcode
+    /// 234 case-5 appearance refresh arrives. Equipment stats and inventory can
+    /// be correct while this sidecar still shows the previous visual outfit.
+    @Published var localAppearanceAwaitingRefresh: Bool = false
     @Published var npcs: [RSCNPC] = []
     @Published var groundItems: [RSCGroundItem] = []
     @Published var gameObjects: [RSCGameObject] = []
