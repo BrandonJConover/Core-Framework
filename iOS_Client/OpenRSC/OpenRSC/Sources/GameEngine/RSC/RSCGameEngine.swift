@@ -2318,12 +2318,12 @@ final class RSCGameEngine: ObservableObject {
         return (x, z)
     }
 
-    private func absoluteWorldX(_ localX: Int) -> Int {
-        worldState.absoluteWorldX(localX)
+    private func serverTileX(_ localX: Int) -> Int {
+        worldState.serverTileX(localX)
     }
 
-    private func absoluteWorldZ(_ localZ: Int) -> Int {
-        worldState.absoluteWorldZ(localZ)
+    private func serverTileZ(_ localZ: Int) -> Int {
+        worldState.serverTileZ(localZ)
     }
 
     @discardableResult
@@ -2359,11 +2359,12 @@ final class RSCGameEngine: ObservableObject {
         // up to 25 signed waypoint deltas relative to that anchor. The server
         // adds the anchor itself as step zero, so using the current player tile
         // here makes movement/action paths collapse or lag behind the tap.
-        // The anchor is transmitted in absolute world coordinates; waypoint
-        // deltas remain local-relative because the region offset cancels out.
+        // The anchor is transmitted in Java/server tile coordinates
+        // (midRegionBase + local). worldOffset is only for local terrain
+        // archive addressing and must not be sent back to the server.
         let firstStep = encodedPath[0]
-        buf.putShort(absoluteWorldX(firstStep.x))
-        buf.putShort(absoluteWorldZ(firstStep.z))
+        buf.putShort(serverTileX(firstStep.x))
+        buf.putShort(serverTileZ(firstStep.z))
         for wp in encodedPath.dropFirst().prefix(25) {
             let dx = max(-128, min(127, wp.x - firstStep.x))
             let dz = max(-128, min(127, wp.z - firstStep.z))
@@ -2378,8 +2379,8 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.blink.rawValue))
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -3041,8 +3042,8 @@ final class RSCGameEngine: ObservableObject {
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnGround.rawValue))
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             buf.putShort(slot)
             buf.putShort(itemId)
             try? await connection.send(buf.finishPacket())
@@ -3056,8 +3057,8 @@ final class RSCGameEngine: ObservableObject {
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnObject.rawValue))
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             buf.putShort(slot)
             try? await connection.send(buf.finishPacket())
             clearPendingItemUse()
@@ -3070,8 +3071,8 @@ final class RSCGameEngine: ObservableObject {
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.wallUseItem.rawValue))
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             buf.putByte(direction)
             buf.putShort(slot)
             try? await connection.send(buf.finishPacket())
@@ -3085,8 +3086,8 @@ final class RSCGameEngine: ObservableObject {
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.groundItemTake.rawValue))
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(y))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(y))
             buf.putShort(itemId)
             try? await connection.send(buf.finishPacket())
         }
@@ -3297,8 +3298,8 @@ final class RSCGameEngine: ObservableObject {
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand1.rawValue))
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -3309,8 +3310,8 @@ final class RSCGameEngine: ObservableObject {
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand2.rawValue))
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -3321,8 +3322,8 @@ final class RSCGameEngine: ObservableObject {
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand1.rawValue))
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             buf.putByte(direction)
             try? await connection.send(buf.finishPacket())
         }
@@ -3334,8 +3335,8 @@ final class RSCGameEngine: ObservableObject {
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand2.rawValue))
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             buf.putByte(direction)
             try? await connection.send(buf.finishPacket())
         }
@@ -3389,8 +3390,8 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnGroundItem.rawValue))
             buf.putShort(spellId)
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             buf.putShort(itemId)
             try? await connection.send(buf.finishPacket())
         }
@@ -3404,8 +3405,8 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnObject.rawValue))
             buf.putShort(spellId)
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             try? await connection.send(buf.finishPacket())
         }
     }
@@ -3421,8 +3422,8 @@ final class RSCGameEngine: ObservableObject {
             // spell structs read spell first, then target coordinate + boundary
             // direction.
             buf.putShort(spellId)
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             buf.putByte(direction)
             try? await connection.send(buf.finishPacket())
         }
@@ -3479,8 +3480,8 @@ final class RSCGameEngine: ObservableObject {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnLand.rawValue))
             buf.putShort(spellId)
-            buf.putShort(absoluteWorldX(x))
-            buf.putShort(absoluteWorldZ(z))
+            buf.putShort(serverTileX(x))
+            buf.putShort(serverTileZ(z))
             try? await connection.send(buf.finishPacket())
         }
     }

@@ -510,8 +510,24 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(ws.wallObjects[0].y, -54)
         XCTAssertEqual(ws.groundItems[0].x, -15)
         XCTAssertEqual(ws.walkTargetX, -14)
+        XCTAssertEqual(ws.serverTileX(recentered.localX), 180)
+        XCTAssertEqual(ws.serverTileZ(recentered.localZ), 260)
         XCTAssertEqual(ws.absoluteWorldX(recentered.localX), 2484)
         XCTAssertEqual(ws.absoluteWorldZ(recentered.localZ), 2036)
+    }
+
+    @MainActor
+    func test_rsc_server_tile_helpers_exclude_world_offset_for_action_packets() {
+        let ws = RSCWorldState()
+        ws.worldOffsetX = 2304
+        ws.worldOffsetZ = 1776
+        ws.midRegionBaseX = 144
+        ws.midRegionBaseZ = 240
+
+        XCTAssertEqual(ws.serverTileX(36), 180)
+        XCTAssertEqual(ws.serverTileZ(20), 260)
+        XCTAssertEqual(ws.absoluteWorldX(36), 2484)
+        XCTAssertEqual(ws.absoluteWorldZ(20), 2036)
     }
 
     // --- 1. Sprite archive format ---

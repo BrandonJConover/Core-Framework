@@ -670,16 +670,30 @@ final class RSCWorldState: ObservableObject {
     /// frame and stores the absolute-region origin separately as
     /// midRegionBaseX/Z. Opcode 191 sends packed player coords in the
     /// server/world-offset frame; RSCPacketHandler recenters those into this
-    /// base so terrain, NPCs, and outgoing action packets all agree.
+    /// base so terrain, NPCs, and server-tile action packets all agree.
     var midRegionBaseX: Int = 0
     var midRegionBaseZ: Int = 0
 
+    /// True terrain/archive world coordinate. Use this for LandscapeLoader,
+    /// wilderness checks, debug labels, and anything else that needs the
+    /// worldOffset-inclusive map frame.
     func absoluteWorldX(_ localX: Int) -> Int {
         worldOffsetX + midRegionBaseX + localX
     }
 
     func absoluteWorldZ(_ localZ: Int) -> Int {
         worldOffsetZ + midRegionBaseZ + localZ
+    }
+
+    /// Java/server tile coordinate used in outbound walk/object/item packets.
+    /// The worldOffset is only for local terrain archive addressing; sending
+    /// it back to the server makes clicks target the wrong part of the world.
+    func serverTileX(_ localX: Int) -> Int {
+        midRegionBaseX + localX
+    }
+
+    func serverTileZ(_ localZ: Int) -> Int {
+        midRegionBaseZ + localZ
     }
 
     @discardableResult

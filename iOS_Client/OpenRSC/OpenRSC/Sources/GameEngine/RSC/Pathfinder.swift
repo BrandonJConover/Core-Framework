@@ -25,10 +25,9 @@ final class Pathfinder {
         self.worldState = worldState
     }
 
-    /// Find a path from (startX, startZ) to (destX, destZ) in absolute server
-    /// tile coordinates. RSCPacketHandler stores player/entity positions in
-    /// this same coordinate space; worldOffset is only for terrain/archive
-    /// loading and must not be added here.
+    /// Find a path from (startX, startZ) to (destX, destZ) in Java's
+    /// region-local coordinate frame. RSCPacketHandler keeps player/entity
+    /// positions in this frame after opcode 191 recenters the active region.
     /// Returns array of waypoints (excluding start), or empty if no path found
     func findPath(fromX: Int, fromZ: Int, toX: Int, toZ: Int, maxSteps: Int = 200) -> [(x: Int, z: Int)] {
         guard fromX != toX || fromZ != toZ else { return [] }
@@ -99,7 +98,7 @@ final class Pathfinder {
     }
 
     private func isStepAllowed(fromX: Int, fromZ: Int, toX: Int, toZ: Int) -> Bool {
-        guard isWalkable(absX: toX, absZ: toZ) else { return false }
+        guard isWalkable(localX: toX, localZ: toZ) else { return false }
         guard !isBlockedByObject(x: toX, z: toZ) else { return false }
         guard !isBlockedByWall(fromX: fromX, fromZ: fromZ, toX: toX, toZ: toZ) else { return false }
 
@@ -173,11 +172,15 @@ final class Pathfinder {
         return false
     }
 
-    /// Check if a tile is walkable using landscape data
-    private func isWalkable(absX: Int, absZ: Int) -> Bool {
+    /// Check if a tile is walkable using landscape data. The pathfinder walks
+    /// region-local tiles, while LandscapeLoader indexes true archive/world
+    /// coordinates, so convert through RSCWorldState's absolute helpers here.
+    private func isWalkable(localX: Int, localZ: Int) -> Bool {
         guard landscapeLoader.isLoaded else { return true }  // Allow all if no data
 
-        guard let tile = landscapeLoader.getTile(worldX: absX, worldZ: absZ, plane: 0) else {
+        let worldX = worldState.absoluteWorldX(localX)
+        let worldZ = worldState.absoluteWorldZ(localZ)
+        guard let tile = landscapeLoader.getTile(worldX: worldX, worldZ: worldZ, plane: 0) else {
             return true  // Unknown tiles are walkable
         }
 
