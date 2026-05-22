@@ -321,9 +321,21 @@ private struct InventoryPanelView: View {
             } else {
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 5), spacing: 4) {
-                    ForEach(worldState.inventory) { item in
+                    ForEach(worldState.inventory.filter { $0.itemId != 0 }) { item in
                         InventorySlotView(item: item, isSelected: selectedSlot == item.id) {
-                            selectedSlot = selectedSlot == item.id ? nil : item.id
+                            if let pendingSpellId = worldState.pendingSpellId {
+                                engine.castSpellOnItem(spellId: pendingSpellId, slot: item.id)
+                                selectedSlot = nil
+                            } else if let sourceSlot = worldState.pendingItemUseSlot {
+                                if sourceSlot != item.id {
+                                    engine.useItemOnItem(slot1: sourceSlot, slot2: item.id)
+                                } else {
+                                    engine.cancelItemUse()
+                                }
+                                selectedSlot = nil
+                            } else {
+                                selectedSlot = selectedSlot == item.id ? nil : item.id
+                            }
                         }
                     }
                 }
@@ -332,11 +344,18 @@ private struct InventoryPanelView: View {
 
             // Action bar for selected item
             if let slot = selectedSlot, let item = worldState.inventory.first(where: { $0.id == slot }) {
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     Text(ItemNames.name(for: item.itemId))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(Color(hex: "#c8a951"))
                     Spacer()
+                    ForEach(engine.itemCommandOptions(for: item.itemId)) { option in
+                        Button(option.label) {
+                            engine.itemCommand(slot: slot, commandIndex: option.index)
+                            selectedSlot = nil
+                        }
+                        .buttonStyle(ActionButtonStyle(color: .orange))
+                    }
                     Button("Use") { engine.useItem(slot: slot); selectedSlot = nil }
                         .buttonStyle(ActionButtonStyle(color: .blue))
                     Button(item.equipped ? "Unequip" : "Equip") {
@@ -1596,10 +1615,10 @@ struct ContextMenuOverlay: View {
                 ForEach(Array(worldState.contextMenuActions.enumerated()), id: \.offset) { idx, action in
                     Button(action: {
                         let doAction = action.action
+                        print("[Action] context-menu selected=\"\(action.label)\" index=\(idx)")
+                        doAction()
                         worldState.contextMenuOpen = false
                         worldState.contextMenuActions = []
-                        // Execute action after menu dismisses
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { doAction() }
                     }) {
                         HStack(spacing: 8) {
                             Image(systemName: action.icon)

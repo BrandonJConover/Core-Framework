@@ -929,7 +929,7 @@ private struct InventoryPanelCompact: View {
 
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 4), spacing: 2) {
-                    ForEach(worldState.inventory) { item in
+                    ForEach(worldState.inventory.filter { $0.itemId != 0 }) { item in
                         Button(action: {
                             if let pendingSpellId = worldState.pendingSpellId {
                                 engine.castSpellOnItem(spellId: pendingSpellId, slot: item.id)
@@ -985,6 +985,14 @@ private struct InventoryPanelCompact: View {
                 HStack(spacing: 6) {
                     Text(ItemNames.name(for: item.itemId)).font(.system(size: 9, weight: .medium)).foregroundColor(Color(hex: "#c8a951")).lineLimit(1)
                     Spacer()
+                    ForEach(engine.itemCommandOptions(for: item.itemId)) { option in
+                        Button(option.label) {
+                            engine.itemCommand(slot: slot, commandIndex: option.index)
+                            selectedSlot = nil
+                        }
+                        .font(.system(size: 9))
+                        .foregroundColor(.orange)
+                    }
                     Button(worldState.pendingSpellId == nil
                            ? (worldState.pendingItemUseSlot == nil ? "Use" : "Use with")
                            : "Cast") { engine.useItem(slot: slot); selectedSlot = nil }

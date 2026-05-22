@@ -1,5 +1,12 @@
 import Foundation
 
+struct ItemCommandOption: Identifiable, Equatable {
+    let index: Int
+    let label: String
+
+    var id: Int { index }
+}
+
 enum ItemDefinitions {
     private struct ItemMeta {
         let stackable: Bool
@@ -52,5 +59,13 @@ enum ItemDefinitions {
 
     static func commands(for id: Int) -> [String] {
         itemsById[id]?.commands ?? []
+    }
+
+    static func commandOptions(for id: Int) -> [ItemCommandOption] {
+        (itemsById[id]?.commands ?? []).enumerated().compactMap { index, command in
+            let label = command.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !label.isEmpty, label.lowercased() != "null" else { return nil }
+            return ItemCommandOption(index: index, label: label)
+        }
     }
 }

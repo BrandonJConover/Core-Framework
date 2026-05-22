@@ -2435,7 +2435,14 @@ final class RSCGameEngine: ObservableObject {
             buf.putByte(dx)
             buf.putByte(dz)
         }
-        try? await connection.send(buf.finishPacket())
+        let packet = buf.finishPacket()
+        logAction(
+            walkToEntity ? "walk-entity" : "walk",
+            opcode: walkToEntity ? Int(RSCOutOpcode.walkToEntity.rawValue) : Int(RSCOutOpcode.walkToPoint.rawValue),
+            payload: packet,
+            details: "dest=(\(destX),\(destZ)) first=(\(firstStep.x),\(firstStep.z)) steps=\(encodedPath.count)"
+        )
+        try? await connection.send(packet)
         return encodedPath
     }
 
@@ -2871,6 +2878,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.npcAttack.rawValue))
             buf.putShort(serverIndex)
             let data = buf.finishPacket()
+            logAction("npc-attack", opcode: RSCOutOpcode.npcAttack, payload: data, details: "serverIndex=\(serverIndex)")
             try? await connection.send(data)
         }
     }
@@ -2921,6 +2929,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.npcTalkTo.rawValue))
             buf.putShort(serverIndex)
             let data = buf.finishPacket()
+            logAction("npc-talk", opcode: RSCOutOpcode.npcTalkTo, payload: data, details: "serverIndex=\(serverIndex)")
             try? await connection.send(data)
         }
     }
@@ -3002,12 +3011,23 @@ final class RSCGameEngine: ObservableObject {
 
     // MARK: - Inventory actions
 
+    private func logAction(_ name: String, opcode: RSCOutOpcode, payload: Data, details: String = "") {
+        let suffix = details.isEmpty ? "" : " \(details)"
+        print("[Action] \(name) opcode=\(opcode.rawValue) bytes=\(payload.count)\(suffix)")
+    }
+
+    private func logAction(_ name: String, opcode: Int, payload: Data, details: String = "") {
+        let suffix = details.isEmpty ? "" : " \(details)"
+        print("[Action] \(name) opcode=\(opcode) bytes=\(payload.count)\(suffix)")
+    }
+
     func equipItem(slot: Int) {
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemEquip.rawValue))
             buf.putShort(slot)
             let data = buf.finishPacket()
+            logAction("equip", opcode: RSCOutOpcode.itemEquip, payload: data, details: "slot=\(slot)")
             try? await connection.send(data)
         }
     }
@@ -3018,6 +3038,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUnequip.rawValue))
             buf.putShort(slot)
             let data = buf.finishPacket()
+            logAction("unequip", opcode: RSCOutOpcode.itemUnequip, payload: data, details: "slot=\(slot)")
             try? await connection.send(data)
         }
     }
@@ -3062,24 +3083,29 @@ final class RSCGameEngine: ObservableObject {
     func dropItem(slot: Int) {
         Task {
             let amount = worldState.inventory.indices.contains(slot) ? worldState.inventory[slot].amount : 1
-            try? await connection.send(Self.makeItemDropPacket(slot: slot, amount: amount))
+            let packet = Self.makeItemDropPacket(slot: slot, amount: amount)
+            logAction("drop", opcode: RSCOutOpcode.itemDrop, payload: packet, details: "slot=\(slot) amount=\(max(1, amount))")
+            try? await connection.send(packet)
         }
     }
 
     func itemCommands(for itemId: Int) -> [String] {
-        ItemDefinitions.commands(for: itemId).filter { command in
-            let lowered = command.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            return !lowered.isEmpty && lowered != "null"
-        }
+        ItemDefinitions.commandOptions(for: itemId).map(\.label)
+    }
+
+    func itemCommandOptions(for itemId: Int) -> [ItemCommandOption] {
+        ItemDefinitions.commandOptions(for: itemId)
     }
 
     func itemCommand(slot: Int, commandIndex: Int, amount: Int = 1) {
         Task {
-            try? await connection.send(Self.makeItemCommandPacket(
+            let packet = Self.makeItemCommandPacket(
                 slot: slot,
                 commandIndex: commandIndex,
                 amount: amount
-            ))
+            )
+            logAction("item-command", opcode: RSCOutOpcode.itemCommand, payload: packet, details: "slot=\(slot) command=\(commandIndex) amount=\(max(1, amount))")
+            try? await connection.send(packet)
         }
     }
 
@@ -3106,6 +3132,7 @@ final class RSCGameEngine: ObservableObject {
         worldState.pendingSpellId = nil
         worldState.pendingItemUseSlot = slot
         if let item = worldState.inventory.first(where: { $0.id == slot }) {
+            print("[Action] use-arm slot=\(slot) item=\(item.itemId)")
             worldState.addChat(sender: "[Use]", text: "Select a target for \(ItemNames.name(for: item.itemId))")
         }
     }
@@ -3207,7 +3234,9 @@ final class RSCGameEngine: ObservableObject {
             buf.putShort(serverTileX(x))
             buf.putShort(serverTileZ(y))
             buf.putShort(itemId)
-            try? await connection.send(buf.finishPacket())
+            let packet = buf.finishPacket()
+            logAction("ground-take", opcode: RSCOutOpcode.groundItemTake, payload: packet, details: "item=\(itemId) tile=(\(x),\(y)) server=(\(serverTileX(x)),\(serverTileZ(y)))")
+            try? await connection.send(packet)
         }
     }
 
@@ -3426,7 +3455,9 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand1.rawValue))
             buf.putShort(serverTileX(x))
             buf.putShort(serverTileZ(z))
-            try? await connection.send(buf.finishPacket())
+            let packet = buf.finishPacket()
+            logAction("object-1", opcode: RSCOutOpcode.objectCommand1, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
+            try? await connection.send(packet)
         }
     }
 
@@ -3438,7 +3469,9 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand2.rawValue))
             buf.putShort(serverTileX(x))
             buf.putShort(serverTileZ(z))
-            try? await connection.send(buf.finishPacket())
+            let packet = buf.finishPacket()
+            logAction("object-2", opcode: RSCOutOpcode.objectCommand2, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
+            try? await connection.send(packet)
         }
     }
 
@@ -3451,7 +3484,9 @@ final class RSCGameEngine: ObservableObject {
             buf.putShort(serverTileX(x))
             buf.putShort(serverTileZ(z))
             buf.putByte(direction)
-            try? await connection.send(buf.finishPacket())
+            let packet = buf.finishPacket()
+            logAction("wall-1", opcode: RSCOutOpcode.wallCommand1, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
+            try? await connection.send(packet)
         }
     }
 
@@ -3464,7 +3499,9 @@ final class RSCGameEngine: ObservableObject {
             buf.putShort(serverTileX(x))
             buf.putShort(serverTileZ(z))
             buf.putByte(direction)
-            try? await connection.send(buf.finishPacket())
+            let packet = buf.finishPacket()
+            logAction("wall-2", opcode: RSCOutOpcode.wallCommand2, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
+            try? await connection.send(packet)
         }
     }
 
