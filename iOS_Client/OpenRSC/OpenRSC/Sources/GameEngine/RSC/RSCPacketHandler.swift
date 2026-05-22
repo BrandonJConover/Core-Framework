@@ -1497,12 +1497,19 @@ final class RSCPacketHandler {
     }
 
     // Port of PacketHandler.java loadStats() + loadExperience() + loadQuestPoints() — opcode 156
-    // Format: 18x BYTE currentLevel, 18x BYTE baseLevel, 18x INT experience, BYTE questPoints
+    // Format: Nx BYTE currentLevel, Nx BYTE baseLevel, Nx INT experience, BYTE questPoints
     private func handleLoadStats(buf: ByteBuffer, ws: RSCWorldState) {
         let remaining = buf.bytesRemaining
-        let inferredCount = remaining > 1 && (remaining - 1) % 6 == 0 ? (remaining - 1) / 6 : 18
-        let skillCount = inferredCount >= 18 ? inferredCount : max(18, ws.serverSkillCount)
-        guard remaining >= skillCount * 6 else { return }
+        guard remaining > 1, (remaining - 1) % 6 == 0 else {
+            print("[Packet] Stats ignored: malformed length \(remaining)")
+            return
+        }
+        let inferredCount = (remaining - 1) / 6
+        guard inferredCount >= 18 else {
+            print("[Packet] Stats ignored: length \(remaining) implies only \(inferredCount) skills")
+            return
+        }
+        let skillCount = inferredCount
 
         // Read all current levels first
         var currentLevels = [Int]()

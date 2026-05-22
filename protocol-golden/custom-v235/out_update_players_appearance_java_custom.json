@@ -23,7 +23,7 @@
         "invisible": false,
         "invulnerable": false,
         "group_id": 10,
-        "icon": ""
+        "icon": 0
       }
     ]
   },
@@ -50,8 +50,8 @@
       "Byte(invisible)",
       "Byte(invulnerable)",
       "Byte(group_id)",
-      "String(icon)"
+      "Int(icon)"
     ]
   },
-  "notes": "Payload only, without transport framing. This Java custom-client SEND_UPDATE_PLAYERS type-5 fixture covers a player appearance/identity entry with no equipment, no clan, PLAYER group id 10, and LF-terminated username/icon strings."
+  "notes": "Payload only, without transport framing. This Java custom-client SEND_UPDATE_PLAYERS type-5 fixture covers a player appearance/identity entry with no equipment, no clan, PLAYER group id 10, LF-terminated username, and a 32-bit icon integer."
 }

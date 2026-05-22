@@ -371,6 +371,24 @@ final class RSCWorldState: ObservableObject {
     static let maxTradeOfferSlots = 12
     static let maxDuelStakeSlots = 8
     static let maxShopSlots = 40
+    static let skillNames = [
+        "Attack", "Defense", "Strength", "Hits", "Ranged",
+        "Prayer", "Magic", "Cooking", "Woodcut", "Fletching",
+        "Fishing", "Firemaking", "Crafting", "Smithing", "Mining",
+        "Herblaw", "Agility", "Thieving", "Runecraft", "Harvesting"
+    ]
+    static let skillShortNames = [
+        "Atk", "Def", "Str", "HP", "Rng", "Pray", "Mag", "Cook", "WC", "Fletch",
+        "Fish", "FM", "Craft", "Smith", "Mine", "Herb", "Agil", "Thief", "RC", "Harvest"
+    ]
+
+    static func skillName(for id: Int) -> String {
+        id >= 0 && id < skillNames.count ? skillNames[id] : "Skill \(id)"
+    }
+
+    static func skillShortName(for id: Int) -> String {
+        id >= 0 && id < skillShortNames.count ? skillShortNames[id] : "?\(id)"
+    }
 
     @Published var localPlayerX: Int = 0
     @Published var localPlayerY: Int = 0
@@ -615,11 +633,7 @@ final class RSCWorldState: ObservableObject {
     @Published var xpDrops: [XPDrop] = []
 
     func addXPDrop(skillId: Int, amount: Int) {
-        let names = ["Attack","Defense","Strength","Hits","Ranged","Prayer","Magic","Cooking",
-                     "Woodcut","Fletching","Fishing","Firemaking","Crafting","Smithing","Mining",
-                     "Herblaw","Agility","Thieving","Runecraft","Harvesting"]
-        let name = skillId < names.count ? names[skillId] : "Skill"
-        xpDrops.append(XPDrop(skill: name, amount: amount, timestamp: Date()))
+        xpDrops.append(XPDrop(skill: Self.skillName(for: skillId), amount: amount, timestamp: Date()))
         pruneExpiredXPDrops()
     }
 

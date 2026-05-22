@@ -1007,7 +1007,6 @@ private struct InventoryPanelCompact: View {
 
 private struct StatsPanelView_Internal: View {
     @ObservedObject var worldState: RSCWorldState
-    private let skillNames = ["Atk","Def","Str","HP","Rng","Pray","Mag","Cook","WC","Fletch","Fish","FM","Craft","Smith","Mine","Herb","Agil","Thief"]
 
     var body: some View {
         ScrollView {
@@ -1016,7 +1015,7 @@ private struct StatsPanelView_Internal: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.white)
                 Spacer()
-                Text("Cur/Base")
+                Text("Current/Base")
                     .font(.system(size: 9))
                     .foregroundColor(Color(hex: "#c8a951"))
             }
@@ -1026,7 +1025,7 @@ private struct StatsPanelView_Internal: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 2) {
                 ForEach(worldState.skills) { skill in
                     HStack {
-                        Text(skill.id < skillNames.count ? skillNames[skill.id] : "?\(skill.id)")
+                        Text(RSCWorldState.skillShortName(for: skill.id))
                             .font(.system(size: 9)).foregroundColor(Color(hex: "#aaa"))
                         Spacer()
                         Text("\(skill.current)/\(skill.base)")

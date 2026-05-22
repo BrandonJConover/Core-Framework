@@ -399,20 +399,13 @@ private struct InventorySlotView: View {
 private struct StatsPanelView: View {
     @ObservedObject var worldState: RSCWorldState
 
-    private let skillNames = [
-        "Attack", "Defense", "Strength", "Hits", "Ranged",
-        "Prayer", "Magic", "Cooking", "Woodcut", "Fletching",
-        "Fishing", "Firemaking", "Crafting", "Smithing", "Mining",
-        "Herblaw", "Agility", "Thieving"
-    ]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Skills")
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Text("Cur/Base  Combat Lvl \(worldState.combatLevel)")
+                Text("Current/Base  Combat Lvl \(worldState.combatLevel)")
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: "#c8a951"))
             }
@@ -423,7 +416,7 @@ private struct StatsPanelView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 3) {
                     ForEach(worldState.skills) { skill in
                         HStack {
-                            Text(skill.id < skillNames.count ? skillNames[skill.id] : "Skill \(skill.id)")
+                            Text(RSCWorldState.skillName(for: skill.id))
                                 .font(.system(size: 11))
                                 .foregroundColor(Color(hex: "#aaaaaa"))
                             Spacer()
