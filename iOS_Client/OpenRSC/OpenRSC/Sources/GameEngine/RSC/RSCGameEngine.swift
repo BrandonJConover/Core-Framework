@@ -2538,14 +2538,19 @@ final class RSCGameEngine: ObservableObject {
             return
         }
 
-        if let npc = screenNPC {
+        let targetNPC = screenNPC ?? exactNPC
+        let targetGroundItem = screenGroundItem ?? exactGroundItem
+        let targetObject = screenObject ?? exactObject
+        let targetWall = screenWall ?? exactWall
+
+        if let npc = targetNPC {
             performPrimaryNPCAction(npc)
-        } else if let item = screenGroundItem {
+        } else if let item = targetGroundItem {
             // PC left-click priority takes ground items when the click lands on
             // the item marker. Keep plain terrain taps as walking.
             print("[Input] Take ground item \(item.itemId) at (\(item.x),\(item.y))")
             pickupGroundItem(x: item.x, y: item.y, itemId: item.itemId)
-        } else if let object = screenObject,
+        } else if let object = targetObject,
                   let action = primaryObjectAction(for: object) {
             print("[Input] \(action.command) object \(object.objectId) at (\(object.x),\(object.y))")
             if action.useFirstAction {
@@ -2553,7 +2558,7 @@ final class RSCGameEngine: ObservableObject {
             } else {
                 objectAction2(x: object.x, z: object.y)
             }
-        } else if let wall = screenWall {
+        } else if let wall = targetWall {
             let action = primaryWallAction(for: wall)
             print("[Input] \(action?.command ?? "Use") wall \(wall.wallId) at (\(wall.x),\(wall.y)) dir=\(wall.direction)")
             if action?.useFirstAction == false {
@@ -2620,6 +2625,11 @@ final class RSCGameEngine: ObservableObject {
         let screenItem = nearestGroundItemOnScreen(gameX: gx, gameY: gy)
         let screenObject = nearestGameObjectOnScreen(gameX: gx, gameY: gy)
         let screenWall = nearestWallObjectOnScreen(gameX: gx, gameY: gy)
+        let targetNPC = screenNPC ?? npc(atX: worldX, z: worldZ)
+        let targetPlayer = screenPlayer ?? player(atX: worldX, z: worldZ)
+        let targetItem = screenItem ?? groundItem(atX: worldX, z: worldZ)
+        let targetObject = screenObject ?? gameObject(containingX: worldX, z: worldZ)
+        let targetWall = screenWall ?? wallObject(atX: worldX, z: worldZ)
 
         var actions: [(label: String, icon: String, action: () -> Void)] = []
         var title = "(\(worldX), \(worldZ))"
@@ -2628,6 +2638,12 @@ final class RSCGameEngine: ObservableObject {
             .flatMap { slot in worldState.inventory.first(where: { $0.id == slot })?.itemId }
             .map { ItemNames.name(for: $0) } ?? "item"
         let pendingSpellId = worldState.pendingSpellId
+        let normalAction: (@escaping () -> Void) -> () -> Void = { [weak self] action in
+            {
+                self?.worldState.clearPendingTargetMode()
+                action()
+            }
+        }
 
         if pendingItemSlot != nil || pendingSpellId != nil {
             actions.append(("Cancel target selection", "xmark.circle", { [weak self] in
@@ -2644,10 +2660,10 @@ final class RSCGameEngine: ObservableObject {
 
         // Check NPCs (within 2 tiles). Always offer Examine; offer Attack only
         // for combat-eligible NPCs (NPCDef.attackable == true).
-        for npc in screenNPC.map({ [$0] }) ?? worldState.npcs {
+        for npc in targetNPC.map({ [$0] }) ?? worldState.npcs {
             let dx: Int = npc.x - worldX; let dz: Int = npc.y - worldZ
             let distSq: Int = dx * dx + dz * dz
-            if screenNPC?.id == npc.id || (screenNPC == nil && distSq <= 1) {
+            if targetNPC?.id == npc.id || (targetNPC == nil && distSq <= 1) {
                 title = npc.name
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(npc.name)", "hand.point.up.left", { [weak self] in
@@ -2659,29 +2675,29 @@ final class RSCGameEngine: ObservableObject {
                         self?.castSpellOnNPC(spellId: pendingSpellId, npcServerIndex: npc.id)
                     }))
                 }
-                actions.append(("Talk to \(npc.name)", "bubble.left", { [weak self] in
+                actions.append(("Talk to \(npc.name)", "bubble.left", normalAction { [weak self] in
                     self?.talkToNPC(serverIndex: npc.id)
                 }))
                 if let def = NPCDefinitions.get(npc.npcId) {
                     let command1 = def.command.trimmingCharacters(in: .whitespacesAndNewlines)
                     let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
                     if def.attackable {
-                        actions.append(("Attack \(npc.name) (lvl \(def.combatLevel))", "bolt.fill", { [weak self] in
+                        actions.append(("Attack \(npc.name) (lvl \(def.combatLevel))", "bolt.fill", normalAction { [weak self] in
                             self?.attackNPC(serverIndex: npc.id)
                         }))
                     }
                     if isActionableCommand(command1) {
-                        actions.append(("\(command1) \(npc.name)", "hand.raised", { [weak self] in
+                        actions.append(("\(command1) \(npc.name)", "hand.raised", normalAction { [weak self] in
                             self?.npcCommand(serverIndex: npc.id)
                         }))
                     }
                     if isActionableCommand(command2) {
-                        actions.append(("\(command2) \(npc.name)", "ellipsis.circle", { [weak self] in
+                        actions.append(("\(command2) \(npc.name)", "ellipsis.circle", normalAction { [weak self] in
                             self?.npcCommand2(serverIndex: npc.id)
                         }))
                     }
                 }
-                actions.append(("Examine \(npc.name)", "eye", { [weak self] in
+                actions.append(("Examine \(npc.name)", "eye", normalAction { [weak self] in
                     let descr = NPCDefinitions.get(npc.npcId)?.description ?? npc.name
                     self?.worldState.addChat(sender: "[Examine]", text: descr)
                 }))
@@ -2690,9 +2706,9 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Check players (within 2 tiles). Add Trade + Duel + Follow + Examine.
-        for player in screenPlayer.map({ [$0] }) ?? worldState.players {
+        for player in targetPlayer.map({ [$0] }) ?? worldState.players {
             let pdx: Int = player.x - worldX; let pdz: Int = player.y - worldZ
-            if screenPlayer?.id == player.id || (screenPlayer == nil && pdx * pdx + pdz * pdz <= 1) {
+            if targetPlayer?.id == player.id || (targetPlayer == nil && pdx * pdx + pdz * pdz <= 1) {
                 title = player.name
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(player.name)", "hand.point.up.left", { [weak self] in
@@ -2704,19 +2720,19 @@ final class RSCGameEngine: ObservableObject {
                         self?.castSpellOnPlayer(spellId: pendingSpellId, playerServerIndex: player.id)
                     }))
                 }
-                actions.append(("Attack \(player.name)", "bolt.fill", { [weak self] in
+                actions.append(("Attack \(player.name)", "bolt.fill", normalAction { [weak self] in
                     self?.attackPlayer(serverIndex: player.id)
                 }))
-                actions.append(("Trade with \(player.name)", "arrow.left.arrow.right", { [weak self] in
+                actions.append(("Trade with \(player.name)", "arrow.left.arrow.right", normalAction { [weak self] in
                     self?.requestTrade(serverIndex: player.id)
                 }))
-                actions.append(("Duel \(player.name)", "shield.lefthalf.filled", { [weak self] in
+                actions.append(("Duel \(player.name)", "shield.lefthalf.filled", normalAction { [weak self] in
                     self?.requestDuel(serverIndex: player.id)
                 }))
-                actions.append(("Follow \(player.name)", "figure.walk", { [weak self] in
+                actions.append(("Follow \(player.name)", "figure.walk", normalAction { [weak self] in
                     self?.followPlayer(serverIndex: player.id)
                 }))
-                actions.append(("Examine \(player.name)", "eye", { [weak self] in
+                actions.append(("Examine \(player.name)", "eye", normalAction { [weak self] in
                     self?.worldState.addChat(sender: "[Examine]", text: "\(player.name) (combat level \(player.combatLevel))")
                 }))
                 break
@@ -2724,10 +2740,10 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Check ground items (within 2 tiles)
-        for item in screenItem.map({ [$0] }) ?? worldState.groundItems {
+        for item in targetItem.map({ [$0] }) ?? worldState.groundItems {
             let idx: Int = item.x - worldX; let idz: Int = item.y - worldZ
-            if (screenItem?.x == item.x && screenItem?.y == item.y && screenItem?.itemId == item.itemId)
-                || (screenItem == nil && idx * idx + idz * idz <= 1) {
+            if (targetItem?.x == item.x && targetItem?.y == item.y && targetItem?.itemId == item.itemId)
+                || (targetItem == nil && idx * idx + idz * idz <= 1) {
                 let itemName = ItemNames.name(for: item.itemId)
                 title = itemName
                 if let pendingItemSlot {
@@ -2740,7 +2756,7 @@ final class RSCGameEngine: ObservableObject {
                         self?.castSpellOnGroundItem(spellId: pendingSpellId, x: item.x, z: item.y, itemId: item.itemId)
                     }))
                 }
-                actions.append(("Take \(itemName)", "arrow.down.circle", { [weak self] in
+                actions.append(("Take \(itemName)", "arrow.down.circle", normalAction { [weak self] in
                     self?.pickupGroundItem(x: item.x, y: item.y, itemId: item.itemId)
                 }))
                 break
@@ -2748,9 +2764,9 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Check game objects (within 2 tiles)
-        for obj in screenObject.map({ [$0] }) ?? worldState.gameObjects {
+        for obj in targetObject.map({ [$0] }) ?? worldState.gameObjects {
             let odx: Int = obj.x - worldX; let odz: Int = obj.y - worldZ
-            if screenObject?.id == obj.id || (screenObject == nil && odx * odx + odz * odz <= 1) {
+            if targetObject?.id == obj.id || (targetObject == nil && odx * odx + odz * odz <= 1) {
                 let def = GameObjectDefinitions.get(obj.objectId)
                 let objName = def?.name.isEmpty == false ? def!.name : ObjectNames.name(for: obj.objectId)
                 title = objName
@@ -2767,16 +2783,16 @@ final class RSCGameEngine: ObservableObject {
                     }))
                 }
                 if isActionableCommand(command1) {
-                    actions.append(("\(command1) \(objName)", "hand.tap", { [weak self] in
+                    actions.append(("\(command1) \(objName)", "hand.tap", normalAction { [weak self] in
                         self?.objectAction1(x: obj.x, z: obj.y)
                     }))
                 }
                 if isActionableCommand(command2) {
-                    actions.append(("\(command2) \(objName)", "ellipsis.circle", { [weak self] in
+                    actions.append(("\(command2) \(objName)", "ellipsis.circle", normalAction { [weak self] in
                         self?.objectAction2(x: obj.x, z: obj.y)
                     }))
                 }
-                actions.append(("Examine \(objName)", "eye", { [weak self] in
+                actions.append(("Examine \(objName)", "eye", normalAction { [weak self] in
                     self?.worldState.addChat(sender: "[Examine]", text: def?.description.isEmpty == false ? def!.description : objName)
                 }))
                 break
@@ -2786,10 +2802,10 @@ final class RSCGameEngine: ObservableObject {
         // Check boundary/wall objects (doors, gates, fences). Java keeps these
         // separate from scenery and sends boundary-specific opcodes that include
         // direction, so route them through their own actions.
-        for wall in screenWall.map({ [$0] }) ?? worldState.wallObjects {
+        for wall in targetWall.map({ [$0] }) ?? worldState.wallObjects {
             let wdx = wall.x - worldX
             let wdz = wall.y - worldZ
-            if screenWall?.id == wall.id || (screenWall == nil && wdx * wdx + wdz * wdz <= 1) {
+            if targetWall?.id == wall.id || (targetWall == nil && wdx * wdx + wdz * wdz <= 1) {
                 let wallName = EntityDefinitions.getDoorDef(wall.wallId)?.name ?? "Door"
                 title = wallName
                 if let pendingItemSlot {
@@ -2806,24 +2822,24 @@ final class RSCGameEngine: ObservableObject {
                     let command1 = def.command1.trimmingCharacters(in: .whitespacesAndNewlines)
                     let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
                     if isActionableCommand(command1) {
-                        actions.append(("\(command1) \(wallName)", "door.left.hand.open", { [weak self] in
+                        actions.append(("\(command1) \(wallName)", "door.left.hand.open", normalAction { [weak self] in
                             self?.wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
                         }))
                     }
                     if isActionableCommand(command2) {
-                        actions.append(("\(command2) \(wallName)", "door.left.hand.closed", { [weak self] in
+                        actions.append(("\(command2) \(wallName)", "door.left.hand.closed", normalAction { [weak self] in
                             self?.wallAction2(x: wall.x, z: wall.y, direction: wall.direction)
                         }))
                     }
                 } else {
-                    actions.append(("Open \(wallName)", "door.left.hand.open", { [weak self] in
+                    actions.append(("Open \(wallName)", "door.left.hand.open", normalAction { [weak self] in
                         self?.wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
                     }))
-                    actions.append(("Close \(wallName)", "door.left.hand.closed", { [weak self] in
+                    actions.append(("Close \(wallName)", "door.left.hand.closed", normalAction { [weak self] in
                         self?.wallAction2(x: wall.x, z: wall.y, direction: wall.direction)
                     }))
                 }
-                actions.append(("Examine \(wallName)", "eye", { [weak self] in
+                actions.append(("Examine \(wallName)", "eye", normalAction { [weak self] in
                     self?.worldState.addChat(sender: "[Examine]", text: wallName)
                 }))
                 break
@@ -2831,7 +2847,7 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Always add walk option
-        actions.append(("Walk here", "figure.walk", { [weak self] in
+        actions.append(("Walk here", "figure.walk", normalAction { [weak self] in
             Task {
                 await self?.sendWalkPath(toX: worldX, toZ: worldZ, walkToEntity: false)
             }
