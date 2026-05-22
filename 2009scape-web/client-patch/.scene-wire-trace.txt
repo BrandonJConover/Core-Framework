@@ -1,0 +1,6 @@
+[SceneWire530] landscape attached planes=3 verts=184 tris=92
+[SceneWire530] npc id=42 appearance attached, prior reset=1
+[SceneWire530] player id=1 avatar attached verts=10
+[SceneWire530] animators tracked=1 after dropActor
+[SceneWire530] loc id=50 composed shape=10 verts=16
+[SceneWire530] bridge.created total=7

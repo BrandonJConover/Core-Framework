@@ -133,7 +133,10 @@ pub fn calculate_catch_chance(fishing_level: u8, fish_difficulty: u8) -> f64 {
 }
 
 /// Select which fish to catch based on level.
-pub fn select_fish<'a>(fishing_level: u8, available_fish: &'a [&'a FishDef]) -> Option<&'a FishDef> {
+pub fn select_fish<'a>(
+    fishing_level: u8,
+    available_fish: &'a [&'a FishDef],
+) -> Option<&'a FishDef> {
     // Filter fish the player can catch
     let catchable: Vec<_> = available_fish
         .iter()
@@ -201,32 +204,130 @@ impl FishingManager {
     /// Load default fish definitions.
     pub fn load_defaults(&mut self) {
         // Net fishing
-        self.register_fish(FishDef::new(350, "Shrimp", 1, 40, FishingEquipment::SmallNet, 1));
-        self.register_fish(FishDef::new(351, "Anchovies", 15, 160, FishingEquipment::SmallNet, 15));
+        self.register_fish(FishDef::new(
+            350,
+            "Shrimp",
+            1,
+            40,
+            FishingEquipment::SmallNet,
+            1,
+        ));
+        self.register_fish(FishDef::new(
+            351,
+            "Anchovies",
+            15,
+            160,
+            FishingEquipment::SmallNet,
+            15,
+        ));
 
         // Bait fishing
-        self.register_fish(FishDef::new(352, "Sardine", 5, 80, FishingEquipment::FishingRod, 5));
-        self.register_fish(FishDef::new(353, "Herring", 10, 120, FishingEquipment::FishingRod, 10));
-        self.register_fish(FishDef::new(354, "Pike", 25, 240, FishingEquipment::FishingRod, 25));
+        self.register_fish(FishDef::new(
+            352,
+            "Sardine",
+            5,
+            80,
+            FishingEquipment::FishingRod,
+            5,
+        ));
+        self.register_fish(FishDef::new(
+            353,
+            "Herring",
+            10,
+            120,
+            FishingEquipment::FishingRod,
+            10,
+        ));
+        self.register_fish(FishDef::new(
+            354,
+            "Pike",
+            25,
+            240,
+            FishingEquipment::FishingRod,
+            25,
+        ));
 
         // Fly fishing
-        self.register_fish(FishDef::new(358, "Trout", 20, 200, FishingEquipment::FlyFishingRod, 20));
-        self.register_fish(FishDef::new(359, "Salmon", 30, 280, FishingEquipment::FlyFishingRod, 30));
+        self.register_fish(FishDef::new(
+            358,
+            "Trout",
+            20,
+            200,
+            FishingEquipment::FlyFishingRod,
+            20,
+        ));
+        self.register_fish(FishDef::new(
+            359,
+            "Salmon",
+            30,
+            280,
+            FishingEquipment::FlyFishingRod,
+            30,
+        ));
 
         // Harpoon fishing
-        self.register_fish(FishDef::new(361, "Tuna", 35, 320, FishingEquipment::Harpoon, 35));
-        self.register_fish(FishDef::new(363, "Swordfish", 50, 400, FishingEquipment::Harpoon, 50));
-        self.register_fish(FishDef::new(545, "Shark", 76, 440, FishingEquipment::Harpoon, 76));
+        self.register_fish(FishDef::new(
+            361,
+            "Tuna",
+            35,
+            320,
+            FishingEquipment::Harpoon,
+            35,
+        ));
+        self.register_fish(FishDef::new(
+            363,
+            "Swordfish",
+            50,
+            400,
+            FishingEquipment::Harpoon,
+            50,
+        ));
+        self.register_fish(FishDef::new(
+            545,
+            "Shark",
+            76,
+            440,
+            FishingEquipment::Harpoon,
+            76,
+        ));
 
         // Lobster pot
-        self.register_fish(FishDef::new(372, "Lobster", 40, 360, FishingEquipment::LobsterPot, 40));
+        self.register_fish(FishDef::new(
+            372,
+            "Lobster",
+            40,
+            360,
+            FishingEquipment::LobsterPot,
+            40,
+        ));
 
         // Big net
-        self.register_fish(FishDef::new(545, "Bass", 46, 400, FishingEquipment::BigNet, 46));
-        self.register_fish(FishDef::new(622, "Mackerel", 16, 80, FishingEquipment::BigNet, 16));
+        self.register_fish(FishDef::new(
+            545,
+            "Bass",
+            46,
+            400,
+            FishingEquipment::BigNet,
+            46,
+        ));
+        self.register_fish(FishDef::new(
+            622,
+            "Mackerel",
+            16,
+            80,
+            FishingEquipment::BigNet,
+            16,
+        ));
 
         // Lava eel
-        self.register_fish(FishDef::new(590, "Lava eel", 53, 300, FishingEquipment::OilyFishingRod, 53));
+        self.register_fish(FishDef::new(
+            590,
+            "Lava eel",
+            53,
+            300,
+            FishingEquipment::OilyFishingRod,
+            53,
+        ));
 
         info!("Loaded {} fish definitions", self.fish_defs.len());
     }

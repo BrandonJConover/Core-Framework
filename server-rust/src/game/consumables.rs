@@ -3,8 +3,8 @@
 //! Defines all RSC food items with healing values, potion definitions with
 //! dose-based stat effects, and the consume/drink logic including tick delays.
 
-use std::collections::HashMap;
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 use super::player::{Item, Player, SkillId};
 use super::status_effect::{StatusEffect, StatusEffectManager, StatusType};
@@ -37,44 +37,167 @@ pub struct FoodDef {
 /// Static table of every RSC food.
 static FOOD_DEFS: Lazy<Vec<FoodDef>> = Lazy::new(|| {
     vec![
-        FoodDef { item_id: 319, name: "Shrimp",             heal_amount: 3  },
-        FoodDef { item_id: 320, name: "Anchovies",          heal_amount: 1  },
-        FoodDef { item_id: 132, name: "Bread",              heal_amount: 4  },
-        FoodDef { item_id: 140, name: "Cooked Meat",        heal_amount: 3  },
-        FoodDef { item_id: 141, name: "Cooked Chicken",     heal_amount: 3  },
-        FoodDef { item_id: 346, name: "Sardine",            heal_amount: 4  },
-        FoodDef { item_id: 350, name: "Herring",            heal_amount: 5  },
-        FoodDef { item_id: 355, name: "Mackerel",           heal_amount: 6  },
-        FoodDef { item_id: 351, name: "Trout",              heal_amount: 7  },
-        FoodDef { item_id: 362, name: "Cod",                heal_amount: 7  },
-        FoodDef { item_id: 364, name: "Pike",               heal_amount: 8  },
-        FoodDef { item_id: 352, name: "Salmon",             heal_amount: 9  },
-        FoodDef { item_id: 354, name: "Tuna",               heal_amount: 10 },
-        FoodDef { item_id: 316, name: "Lobster",            heal_amount: 12 },
-        FoodDef { item_id: 367, name: "Bass",               heal_amount: 13 },
-        FoodDef { item_id: 373, name: "Swordfish",          heal_amount: 14 },
-        FoodDef { item_id: 546, name: "Shark",              heal_amount: 20 },
-        FoodDef { item_id: 370, name: "Manta Ray",          heal_amount: 22 },
-        FoodDef { item_id: 369, name: "Sea Turtle",         heal_amount: 21 },
-        FoodDef { item_id: 325, name: "Cake",               heal_amount: 4  },
-        FoodDef { item_id: 326, name: "2/3 Cake",           heal_amount: 4  },
-        FoodDef { item_id: 327, name: "Slice of Cake",      heal_amount: 4  },
-        FoodDef { item_id: 330, name: "Chocolate Cake",     heal_amount: 5  },
-        FoodDef { item_id: 333, name: "Meat Pie",           heal_amount: 6  },
-        FoodDef { item_id: 750, name: "Apple Pie",          heal_amount: 7  },
-        FoodDef { item_id: 257, name: "Redberry Pie",       heal_amount: 5  },
-        FoodDef { item_id: 335, name: "Meat Pizza",         heal_amount: 7  },
-        FoodDef { item_id: 336, name: "Anchovy Pizza",      heal_amount: 9  },
-        FoodDef { item_id: 337, name: "Pineapple Pizza",    heal_amount: 11 },
-        FoodDef { item_id: 228, name: "Cabbage",            heal_amount: 1  },
-        FoodDef { item_id: 18,  name: "Potato",             heal_amount: 1  },
+        FoodDef {
+            item_id: 319,
+            name: "Shrimp",
+            heal_amount: 3,
+        },
+        FoodDef {
+            item_id: 320,
+            name: "Anchovies",
+            heal_amount: 1,
+        },
+        FoodDef {
+            item_id: 132,
+            name: "Bread",
+            heal_amount: 4,
+        },
+        FoodDef {
+            item_id: 140,
+            name: "Cooked Meat",
+            heal_amount: 3,
+        },
+        FoodDef {
+            item_id: 141,
+            name: "Cooked Chicken",
+            heal_amount: 3,
+        },
+        FoodDef {
+            item_id: 346,
+            name: "Sardine",
+            heal_amount: 4,
+        },
+        FoodDef {
+            item_id: 350,
+            name: "Herring",
+            heal_amount: 5,
+        },
+        FoodDef {
+            item_id: 355,
+            name: "Mackerel",
+            heal_amount: 6,
+        },
+        FoodDef {
+            item_id: 351,
+            name: "Trout",
+            heal_amount: 7,
+        },
+        FoodDef {
+            item_id: 362,
+            name: "Cod",
+            heal_amount: 7,
+        },
+        FoodDef {
+            item_id: 364,
+            name: "Pike",
+            heal_amount: 8,
+        },
+        FoodDef {
+            item_id: 352,
+            name: "Salmon",
+            heal_amount: 9,
+        },
+        FoodDef {
+            item_id: 354,
+            name: "Tuna",
+            heal_amount: 10,
+        },
+        FoodDef {
+            item_id: 316,
+            name: "Lobster",
+            heal_amount: 12,
+        },
+        FoodDef {
+            item_id: 367,
+            name: "Bass",
+            heal_amount: 13,
+        },
+        FoodDef {
+            item_id: 373,
+            name: "Swordfish",
+            heal_amount: 14,
+        },
+        FoodDef {
+            item_id: 546,
+            name: "Shark",
+            heal_amount: 20,
+        },
+        FoodDef {
+            item_id: 370,
+            name: "Manta Ray",
+            heal_amount: 22,
+        },
+        FoodDef {
+            item_id: 369,
+            name: "Sea Turtle",
+            heal_amount: 21,
+        },
+        FoodDef {
+            item_id: 325,
+            name: "Cake",
+            heal_amount: 4,
+        },
+        FoodDef {
+            item_id: 326,
+            name: "2/3 Cake",
+            heal_amount: 4,
+        },
+        FoodDef {
+            item_id: 327,
+            name: "Slice of Cake",
+            heal_amount: 4,
+        },
+        FoodDef {
+            item_id: 330,
+            name: "Chocolate Cake",
+            heal_amount: 5,
+        },
+        FoodDef {
+            item_id: 333,
+            name: "Meat Pie",
+            heal_amount: 6,
+        },
+        FoodDef {
+            item_id: 750,
+            name: "Apple Pie",
+            heal_amount: 7,
+        },
+        FoodDef {
+            item_id: 257,
+            name: "Redberry Pie",
+            heal_amount: 5,
+        },
+        FoodDef {
+            item_id: 335,
+            name: "Meat Pizza",
+            heal_amount: 7,
+        },
+        FoodDef {
+            item_id: 336,
+            name: "Anchovy Pizza",
+            heal_amount: 9,
+        },
+        FoodDef {
+            item_id: 337,
+            name: "Pineapple Pizza",
+            heal_amount: 11,
+        },
+        FoodDef {
+            item_id: 228,
+            name: "Cabbage",
+            heal_amount: 1,
+        },
+        FoodDef {
+            item_id: 18,
+            name: "Potato",
+            heal_amount: 1,
+        },
     ]
 });
 
 /// Lookup map keyed by item ID for O(1) food resolution.
-static FOOD_MAP: Lazy<HashMap<u32, &'static FoodDef>> = Lazy::new(|| {
-    FOOD_DEFS.iter().map(|f| (f.item_id, f)).collect()
-});
+static FOOD_MAP: Lazy<HashMap<u32, &'static FoodDef>> =
+    Lazy::new(|| FOOD_DEFS.iter().map(|f| (f.item_id, f)).collect());
 
 /// Return the food definition for `item_id`, if it exists.
 pub fn get_food_def(item_id: u32) -> Option<&'static FoodDef> {
@@ -95,16 +218,11 @@ pub enum PotionEffect {
         flat: u32,
     },
     /// Restore prayer points: `level * percent / 100 + flat`.
-    RestorePrayer {
-        percent: u32,
-        flat: u32,
-    },
+    RestorePrayer { percent: u32, flat: u32 },
     /// Cure any active poison.
     CurePoison,
     /// Grant temporary anti-dragonfire protection (duration in ticks).
-    Antifire {
-        duration_ticks: u32,
-    },
+    Antifire { duration_ticks: u32 },
 }
 
 /// A potion definition.  Each physical potion has four dose variants (4/3/2/1)
@@ -147,29 +265,36 @@ static POTION_DEFS: Lazy<Vec<PotionDef>> = Lazy::new(|| {
             name: "Attack Potion",
             dose_item_ids: [474, 475, 476, 477],
             effects: vec![PotionEffect::BoostSkill {
-                skill: SkillId::Attack, percent: 10, flat: 3,
+                skill: SkillId::Attack,
+                percent: 10,
+                flat: 3,
             }],
         },
         PotionDef {
             name: "Strength Potion",
             dose_item_ids: [478, 479, 480, 481],
             effects: vec![PotionEffect::BoostSkill {
-                skill: SkillId::Strength, percent: 10, flat: 3,
+                skill: SkillId::Strength,
+                percent: 10,
+                flat: 3,
             }],
         },
         PotionDef {
             name: "Defense Potion",
             dose_item_ids: [482, 483, 484, 485],
             effects: vec![PotionEffect::BoostSkill {
-                skill: SkillId::Defence, percent: 10, flat: 3,
+                skill: SkillId::Defence,
+                percent: 10,
+                flat: 3,
             }],
         },
         // --- Prayer restore (25% + 7) ---
         PotionDef {
             name: "Prayer Potion",
-            dose_item_ids: [483, 484, 485, 486],  // RSC restore prayer
+            dose_item_ids: [483, 484, 485, 486], // RSC restore prayer
             effects: vec![PotionEffect::RestorePrayer {
-                percent: 25, flat: 7,
+                percent: 25,
+                flat: 7,
             }],
         },
         // --- Antipoison ---
@@ -183,21 +308,27 @@ static POTION_DEFS: Lazy<Vec<PotionDef>> = Lazy::new(|| {
             name: "Super Attack Potion",
             dose_item_ids: [491, 492, 493, 494],
             effects: vec![PotionEffect::BoostSkill {
-                skill: SkillId::Attack, percent: 15, flat: 5,
+                skill: SkillId::Attack,
+                percent: 15,
+                flat: 5,
             }],
         },
         PotionDef {
             name: "Super Strength Potion",
             dose_item_ids: [495, 496, 497, 498],
             effects: vec![PotionEffect::BoostSkill {
-                skill: SkillId::Strength, percent: 15, flat: 5,
+                skill: SkillId::Strength,
+                percent: 15,
+                flat: 5,
             }],
         },
         PotionDef {
             name: "Super Defense Potion",
             dose_item_ids: [499, 500, 501, 502],
             effects: vec![PotionEffect::BoostSkill {
-                skill: SkillId::Defence, percent: 15, flat: 5,
+                skill: SkillId::Defence,
+                percent: 15,
+                flat: 5,
             }],
         },
         // --- Ranging potion (10% + 3) ---
@@ -205,7 +336,9 @@ static POTION_DEFS: Lazy<Vec<PotionDef>> = Lazy::new(|| {
             name: "Ranging Potion",
             dose_item_ids: [503, 504, 505, 506],
             effects: vec![PotionEffect::BoostSkill {
-                skill: SkillId::Ranged, percent: 10, flat: 3,
+                skill: SkillId::Ranged,
+                percent: 10,
+                flat: 3,
             }],
         },
         // --- Magic potion (flat +3) ---
@@ -213,14 +346,18 @@ static POTION_DEFS: Lazy<Vec<PotionDef>> = Lazy::new(|| {
             name: "Magic Potion",
             dose_item_ids: [507, 508, 509, 510],
             effects: vec![PotionEffect::BoostSkill {
-                skill: SkillId::Magic, percent: 0, flat: 3,
+                skill: SkillId::Magic,
+                percent: 0,
+                flat: 3,
             }],
         },
         // --- Antifire ---
         PotionDef {
             name: "Antifire Potion",
             dose_item_ids: [511, 512, 513, 514],
-            effects: vec![PotionEffect::Antifire { duration_ticks: 500 }],
+            effects: vec![PotionEffect::Antifire {
+                duration_ticks: 500,
+            }],
         },
     ]
 });
@@ -328,9 +465,7 @@ pub fn drink_potion(
     }
 
     // Replace with next dose or empty vial.
-    let replacement_id = potion
-        .next_dose_item_id(item_id)
-        .unwrap_or(EMPTY_VIAL_ID);
+    let replacement_id = potion.next_dose_item_id(item_id).unwrap_or(EMPTY_VIAL_ID);
     player.inventory.add(Item::new(replacement_id, 1));
 
     let dose = potion.dose_for_item(item_id).unwrap_or(0);
@@ -351,20 +486,28 @@ fn apply_potion_effect(
     status_effects: &mut StatusEffectManager,
 ) {
     match effect {
-        PotionEffect::BoostSkill { skill, percent, flat } => {
+        PotionEffect::BoostSkill {
+            skill,
+            percent,
+            flat,
+        } => {
             let base = player.skills.level(*skill) as u32;
             let boost = (base * percent / 100) + flat;
             let max_boosted = base + boost;
             let current = player.skills.current_level(*skill) as u32;
             let new_level = current.saturating_add(boost).min(max_boosted);
-            player.skills.set_current_level(*skill, new_level.min(118) as u8);
+            player
+                .skills
+                .set_current_level(*skill, new_level.min(118) as u8);
         }
         PotionEffect::RestorePrayer { percent, flat } => {
             let base = player.skills.level(SkillId::Prayer) as u32;
             let restore = (base * percent / 100) + flat;
             let current = player.skills.current_level(SkillId::Prayer) as u32;
             let new_level = current.saturating_add(restore).min(base);
-            player.skills.set_current_level(SkillId::Prayer, new_level as u8);
+            player
+                .skills
+                .set_current_level(SkillId::Prayer, new_level as u8);
         }
         PotionEffect::CurePoison => {
             status_effects.remove_effect(StatusType::Poison);
@@ -412,11 +555,12 @@ mod tests {
     #[test]
     fn test_consume_food_heals() {
         let mut player = Player::new(1, "test".into());
-        // Damage the player: set current HP below base
+        player.inventory.add(Item::new(316, 1)); // lobster — required by consume_food
+                                                 // Damage the player: set current HP below base
         player.skills.set_current_level(SkillId::Hits, 5);
 
         let mut last_eat: u64 = 0;
-        let result = consume_food(&mut player, 316, 10, &mut last_eat); // lobster
+        let result = consume_food(&mut player, 316, 10, &mut last_eat);
 
         assert!(matches!(result, ConsumeResult::Success(_)));
         // 5 + 12 = 17, but max is 10 for a new character

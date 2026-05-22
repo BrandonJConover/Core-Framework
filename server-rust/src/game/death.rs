@@ -18,7 +18,11 @@ use super::protocol::{Packet, ServerOpcode};
 // ---------------------------------------------------------------------------
 
 /// Default respawn location (Lumbridge).
-pub const LUMBRIDGE_RESPAWN: Position = Position { x: 122, y: 647, plane: 0 };
+pub const LUMBRIDGE_RESPAWN: Position = Position {
+    x: 122,
+    y: 647,
+    plane: 0,
+};
 
 /// Duration of a player-kill skull in game ticks (~20 minutes at 640ms/tick).
 pub const SKULL_DURATION_TICKS: u64 = 1875;
@@ -95,7 +99,9 @@ pub struct SkullManager {
 impl SkullManager {
     /// Create a new manager with no skull.
     pub fn new() -> Self {
-        Self { skull_expires: None }
+        Self {
+            skull_expires: None,
+        }
     }
 
     /// Apply a skull to the player (e.g. after attacking another player).
@@ -179,7 +185,11 @@ impl DeathProcessor {
         // Determine how many items to keep.
         let items_to_keep = if is_skulled {
             // Skulled: lose everything, unless Protect Items saves 1.
-            if has_protect { 1 } else { 0 }
+            if has_protect {
+                1
+            } else {
+                0
+            }
         } else {
             // Normal: keep 3 (or 4 with Protect Items).
             BASE_ITEMS_KEPT + if has_protect { PROTECT_ITEMS_BONUS } else { 0 }
@@ -373,10 +383,7 @@ impl NpcDeathProcessor {
     ///
     /// Call this after `process_npc_death` to split the generic `Attack` XP
     /// into the correct skill(s) for the player's active style.
-    pub fn distribute_style_xp(
-        result: &mut NpcDeathResult,
-        style_skill: SkillId,
-    ) {
+    pub fn distribute_style_xp(result: &mut NpcDeathResult, style_skill: SkillId) {
         if let Some(attack_xp) = result.xp_reward.remove(&SkillId::Attack) {
             // If the style is "Controlled" the caller should split manually;
             // here we just reassign the full chunk to the requested skill.
@@ -416,19 +423,19 @@ pub fn build_respawn_teleport_packet(position: &Position) -> Packet {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::player::Player;
     use super::super::prayer::PrayerState;
+    use super::*;
 
     /// Helper: create a test player with some inventory items.
     fn make_test_player() -> Player {
         let mut p = Player::new(1, "testplayer".into());
         // Add items with varying "value" (we'll use item id as a proxy).
-        p.inventory.add(Item::new(71, 1));   // Rune sword  (high value)
-        p.inventory.add(Item::new(70, 1));   // Adamant sword
-        p.inventory.add(Item::new(69, 1));   // Mithril sword
-        p.inventory.add(Item::new(68, 1));   // Steel sword
-        p.inventory.add(Item::new(67, 1));   // Iron sword
+        p.inventory.add(Item::new(71, 1)); // Rune sword  (high value)
+        p.inventory.add(Item::new(70, 1)); // Adamant sword
+        p.inventory.add(Item::new(69, 1)); // Mithril sword
+        p.inventory.add(Item::new(68, 1)); // Steel sword
+        p.inventory.add(Item::new(67, 1)); // Iron sword
         p.inventory.add(Item::stackable(10, 500)); // 500 coins
         p
     }
@@ -466,7 +473,7 @@ mod tests {
     fn test_skull_extend_not_shorten() {
         let mut sm = SkullManager::new();
         sm.apply_skull(100); // expires at 1975
-        sm.apply_skull(50);  // would expire at 1925 -- should NOT shorten
+        sm.apply_skull(50); // would expire at 1925 -- should NOT shorten
         assert_eq!(sm.skull_expires, Some(100 + SKULL_DURATION_TICKS));
     }
 
@@ -512,7 +519,9 @@ mod tests {
         let mut player = make_test_player();
         let skull = SkullManager::new();
         let mut prayer = PrayerState::new(30);
-        prayer.activate(super::super::prayer::PrayerId::ProtectItems, 30).unwrap();
+        prayer
+            .activate(super::super::prayer::PrayerId::ProtectItems, 30)
+            .unwrap();
 
         let result = DeathProcessor::process_player_death(
             &mut player,
@@ -555,7 +564,9 @@ mod tests {
         let mut skull = SkullManager::new();
         skull.apply_skull(0);
         let mut prayer = PrayerState::new(30);
-        prayer.activate(super::super::prayer::PrayerId::ProtectItems, 30).unwrap();
+        prayer
+            .activate(super::super::prayer::PrayerId::ProtectItems, 30)
+            .unwrap();
         player.last_tick = 0;
 
         let result = DeathProcessor::process_player_death(
@@ -638,8 +649,8 @@ mod tests {
             EntityId(100),
             62, // goblin def id
             EntityId(1),
-            15, // hp
-            100, // respawn time
+            15,                     // hp
+            100,                    // respawn time
             vec![(20, 1), (10, 5)], // bones + 5 coins
         );
 
@@ -655,14 +666,8 @@ mod tests {
 
     #[test]
     fn test_npc_death_style_xp_redistribution() {
-        let mut result = NpcDeathProcessor::process_npc_death(
-            EntityId(200),
-            184,
-            EntityId(1),
-            90,
-            150,
-            vec![],
-        );
+        let mut result =
+            NpcDeathProcessor::process_npc_death(EntityId(200), 184, EntityId(1), 90, 150, vec![]);
 
         // Redistribute to Strength.
         NpcDeathProcessor::distribute_style_xp(&mut result, SkillId::Strength);

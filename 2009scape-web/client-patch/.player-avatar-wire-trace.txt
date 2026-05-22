@@ -1,4 +1,4 @@
-# Captured by .player-avatar-wire-test.mjs at 2026-05-02T11:00:26.503Z
+# Captured by .player-avatar-wire-test.mjs at 2026-05-18T05:04:26.219Z
 # Gates: idempotent bridge attach, prior-reset, empty-mesh no-op, vert delta
 # Mesh A: 32 verts (starter kit)
 # Mesh B: 36 verts (+bronze-sword equip)

@@ -1,4 +1,4 @@
-# Captured by .loc-mesh-test.mjs at 2026-05-02T10:49:51.432Z
+# Captured by .loc-mesh-test.mjs at 2026-05-09T07:17:57.480Z
 # All assertions passed: resolveLocModels (shapes!=null and shapes==null routes),
 # composeLocMesh (shape variant + flat-multi merge), applyLocOrientation (0..3),
 # resize+translate, out-of-range fallback.

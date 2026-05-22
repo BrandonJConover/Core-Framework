@@ -10,7 +10,7 @@
 // existing files; this adapter is pure-data + pure-attach.
 
 import type { TerrainTileSource, TerrainMeshBuildOptions } from "./TerrainMesh530";
-import { buildTerrainMesh } from "./TerrainMesh530";
+import { buildTerrainMesh, chunkTerrainMesh530 } from "./TerrainMesh530";
 import type { FloType530Data } from "../cache/def/FloType530";
 import type { RawModel530Data } from "../cache/def/RawModel530";
 
@@ -28,6 +28,8 @@ export interface TerrainHostGame {
     floorUnderlayIds?: number[][][] | null;
     /** FloType530 record cache (id → data). */
     floTypeCache?: Map<number, FloType530Data> | null;
+    /** Legacy floor cache populated from 530 Flu/Flo definitions. Terrain ids are 1-based. */
+    floorDefinitionCache?: any[] | null;
 }
 
 const DEFAULT_SIZE_X = 104;
@@ -95,7 +97,26 @@ export function tileSourceForPlane(
 export function floLookupFor(game: TerrainHostGame): (id: number) => FloType530Data | null {
     return (id: number) => {
         if (id < 0) return null;
-        return game.floTypeCache?.get(id) ?? null;
+        const flo = game.floTypeCache?.get(id) ?? game.floTypeCache?.get(id - 1);
+        if (flo) return flo;
+        const floor = game.floorDefinitionCache?.[id - 1] ?? game.floorDefinitionCache?.[id];
+        if (!floor || !floor.name) return null;
+        return {
+            id,
+            baseColorRgb: floor.rgbColor ?? 0,
+            secondaryColorRgb: -1,
+            baseColor: floor.hslColor2 ?? 0,
+            secondaryColor: -1,
+            texture: floor.textureId ?? -1,
+            occludeUnderlay: floor.occlude ?? true,
+            markerId: -1,
+            anInt5885: 128,
+            aBoolean311: true,
+            textureBrightness: 8,
+            blendTexture: false,
+            waterColor: 1190717,
+            waterOpacity: 16,
+        };
     };
 }
 
@@ -140,11 +161,19 @@ export function attachLandscape530(
 ): BridgedAppearanceModel | null {
     if (!mesh || mesh.vertexCount === 0) return null;
     if (plane < 0 || plane > 3) return null;
-    const bridged = bridge.attachModel(mesh);
-    if (!bridged) return null;
     if (!scene.landscape530) scene.landscape530 = [null, null, null, null];
     const prior = scene.landscape530[plane];
     if (prior && typeof prior.reset === "function") prior.reset();
+
+    if (mesh.vertexCount > 12000) {
+        const chunks = chunkTerrainMesh530(mesh);
+        const lightweight = { rawModel: mesh, chunks, ready: true, reset() {} };
+        scene.landscape530[plane] = lightweight;
+        return lightweight;
+    }
+
+    const bridged = bridge.attachModel(mesh);
+    if (!bridged) return null;
     scene.landscape530[plane] = bridged;
     return bridged;
 }

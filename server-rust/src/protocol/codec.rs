@@ -217,7 +217,10 @@ mod tests {
         for opcode in 0u8..=255 {
             let on_wire = server.encode_opcode(opcode);
             let recovered = client.decode_opcode(on_wire);
-            assert_eq!(recovered, opcode, "ISAAC roundtrip failed at opcode {opcode}");
+            assert_eq!(
+                recovered, opcode,
+                "ISAAC roundtrip failed at opcode {opcode}"
+            );
         }
     }
 
@@ -235,7 +238,10 @@ mod tests {
         server.encode(packet, &mut buf).unwrap();
 
         // The opcode byte on the wire should NOT be 99 (extremely unlikely).
-        assert_ne!(buf[0], 99, "ISAAC didn't shuffle the opcode (or got unlucky)");
+        assert_ne!(
+            buf[0], 99,
+            "ISAAC didn't shuffle the opcode (or got unlucky)"
+        );
 
         let decoded = client.decode(&mut buf).unwrap().unwrap();
         assert_eq!(decoded.opcode, 99);

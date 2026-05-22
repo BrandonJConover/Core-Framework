@@ -111,6 +111,10 @@ export interface RawModel530Data {
     triangleTextureIndex: number[] | null;
     /** Per-triangle base color (HSL16). length = triangleCount. */
     triangleColors: number[];
+    /** Optional terrain-only per-corner HSL/lightness values. */
+    triangleColorA?: number[] | null;
+    triangleColorB?: number[] | null;
+    triangleColorC?: number[] | null;
 
     /** Default render priority when triangle priorities aren't per-face. */
     priority: number;

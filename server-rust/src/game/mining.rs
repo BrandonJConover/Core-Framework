@@ -213,11 +213,7 @@ impl Rock {
 }
 
 /// Calculate mining success chance.
-pub fn calculate_mining_chance(
-    mining_level: u8,
-    ore_level: u8,
-    pickaxe: Pickaxe,
-) -> f64 {
+pub fn calculate_mining_chance(mining_level: u8, ore_level: u8, pickaxe: Pickaxe) -> f64 {
     let level_diff = mining_level.saturating_sub(ore_level) as f64;
     let pick_bonus = pickaxe.speed_bonus() as f64 * 0.05;
     let base_chance = 0.3 + (level_diff * 0.01) + pick_bonus;
@@ -326,7 +322,11 @@ mod tests {
 
     #[test]
     fn test_rock_respawn() {
-        let pos = Position { x: 100, y: 100, plane: 0 };
+        let pos = Position {
+            x: 100,
+            y: 100,
+            plane: 0,
+        };
         let mut rock = Rock::new(pos, OreType::IronOre, 100, 101);
 
         assert!(rock.is_available());

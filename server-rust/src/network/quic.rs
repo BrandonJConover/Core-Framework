@@ -26,7 +26,11 @@ impl QuicClient {
     }
 
     /// Send a packet and receive response.
-    pub async fn send_packet(&self, _connection: &quinn::Connection, _packet: &Packet) -> Result<Packet> {
+    pub async fn send_packet(
+        &self,
+        _connection: &quinn::Connection,
+        _packet: &Packet,
+    ) -> Result<Packet> {
         Err(anyhow::anyhow!("QUIC client not yet implemented"))
     }
 }

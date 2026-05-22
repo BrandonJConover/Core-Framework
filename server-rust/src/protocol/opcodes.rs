@@ -117,14 +117,14 @@ pub enum OpcodeIn {
     SLEEPWORD_ENTERED,
 
     SKIP_TUTORIAL,
-    ON_BLACK_HOLE,           // custom
-    NPC_DEFINITION_REQUEST,  // custom
+    ON_BLACK_HOLE,          // custom
+    NPC_DEFINITION_REQUEST, // custom
 
     LOGIN,
-    RELOGIN,           // retro rsc
-    REGISTER_ACCOUNT,  // part of rsc era protocol
-    FORGOT_PASSWORD,   // part of rsc era protocol
-    RECOVERY_ATTEMPT,  // part of rsc era protocol
+    RELOGIN,          // retro rsc
+    REGISTER_ACCOUNT, // part of rsc era protocol
+    FORGOT_PASSWORD,  // part of rsc era protocol
+    RECOVERY_ATTEMPT, // part of rsc era protocol
 
     CHANGE_RECOVERY_REQUEST, // part of rsc era protocol
     CHANGE_DETAILS_REQUEST,  // part of rsc era protocol
@@ -199,11 +199,11 @@ pub enum OpcodeOut {
     SEND_TRADE_CLOSE,
     SEND_COMBAT_STYLE, // custom
     SEND_SERVER_MESSAGE,
-    SEND_AUCTION_PROGRESS,     // custom
-    SEND_FISHING_TRAWLER,      // custom
-    SEND_STATUS_PROGRESS_BAR,  // custom
-    SEND_BANK_PIN_INTERFACE,   // custom
-    SEND_ONLINE_LIST,          // custom
+    SEND_AUCTION_PROGRESS,    // custom
+    SEND_FISHING_TRAWLER,     // custom
+    SEND_STATUS_PROGRESS_BAR, // custom
+    SEND_BANK_PIN_INTERFACE,  // custom
+    SEND_ONLINE_LIST,         // custom
     SEND_SHOP_CLOSE,
     SEND_OPENPK_POINTS_TO_GP_RATIO, // custom
     SEND_NPC_KILLS,                 // custom
@@ -242,11 +242,11 @@ pub enum OpcodeOut {
     SEND_BANK_UPDATE,
     SEND_OPTIONS_MENU_CLOSE,
     SEND_DUEL_OTHER_ACCEPTED,
-    SEND_EQUIPMENT,        // custom
-    SEND_EQUIPMENT_UPDATE, // custom
-    SEND_REMOVE_WORLD_NPC,    // retro rsc protocol
-    SEND_REMOVE_WORLD_PLAYER, // retro rsc protocol
-    RUNESCAPE_UPDATED,        // rsc era protocol
+    SEND_EQUIPMENT,            // custom
+    SEND_EQUIPMENT_UPDATE,     // custom
+    SEND_REMOVE_WORLD_NPC,     // retro rsc protocol
+    SEND_REMOVE_WORLD_PLAYER,  // retro rsc protocol
+    RUNESCAPE_UPDATED,         // rsc era protocol
     SEND_YOPTIN, // added by mudclient 61 (or earlier, but post 40) and missing by 93 (present in mudclient 75)
     SEND_INVENTORY_SIZE, // known to be in mudclient69 to 75
     SEND_UNLOCKED_APPEARANCES, // custom
@@ -403,17 +403,127 @@ impl From<u8> for OpcodeIn {
             OpcodeIn::SEND_DEBUG_INFO,
             OpcodeIn::KNOWN_PLAYERS,
         ];
-        TABLE.get(byte as usize).copied().unwrap_or(OpcodeIn::HEARTBEAT)
+        TABLE
+            .get(byte as usize)
+            .copied()
+            .unwrap_or(OpcodeIn::HEARTBEAT)
     }
 }
 
-/// Truncate `OpcodeOut` to a wire byte. All current variants fit in `u8`; the
-/// `#[repr(u16)]` is a forward-compat hedge for retro/custom formatters that
-/// may add variants past 255 in future. If/when that happens, the codec will
-/// need to widen to two bytes and this impl should be removed in favour of an
-/// explicit wire-byte table.
+impl OpcodeOut {
+    /// Return the on-wire byte for this opcode as used by the OpenRSC custom /
+    /// iOS client (mirrors PayloadCustomGenerator.java's opcodeMap).  Opcodes
+    /// that exist only in the retro (pre-177) generators and are not present in
+    /// the custom generator fall back to their enum ordinal so that any
+    /// accidental use at least produces a stable, identifiable byte rather than
+    /// silently colliding with a valid opcode.
+    pub const fn wire(self) -> u8 {
+        match self {
+            Self::SEND_LOGOUT_REQUEST_CONFIRM => 4,
+            Self::SEND_QUESTS => 5,
+            Self::SEND_DUEL_OPPONENTS_ITEMS => 6,
+            Self::SEND_TRADE_ACCEPTED => 15,
+            Self::SEND_SERVER_CONFIGS => 19,
+            Self::SEND_TRADE_OPEN_CONFIRM => 20,
+            Self::SEND_WORLD_INFO => 25,
+            Self::SEND_DUEL_SETTINGS => 30,
+            Self::SEND_EXPERIENCE => 33,
+            Self::SEND_EXPERIENCE_TOGGLE => 34,
+            Self::SEND_BUBBLE => 36,
+            Self::SEND_BANK_OPEN => 42,
+            Self::SEND_SCENERY_HANDLER => 48,
+            Self::SEND_PRIVACY_SETTINGS => 51,
+            Self::SEND_SYSTEM_UPDATE => 52,
+            Self::SEND_INVENTORY => 53,
+            Self::SEND_ELIXIR => 54,
+            Self::SEND_APPEARANCE_SCREEN => 59,
+            Self::SEND_NPC_COORDS => 79,
+            Self::SEND_DEATH => 83,
+            Self::SEND_STOPSLEEP => 84,
+            Self::SEND_PRIVATE_MESSAGE_SENT => 87,
+            Self::SEND_BOX2 => 89,
+            Self::SEND_INVENTORY_UPDATEITEM => 90,
+            Self::SEND_BOUNDARY_HANDLER => 91,
+            Self::SEND_TRADE_WINDOW => 92,
+            Self::SEND_TRADE_OTHER_ITEMS => 97,
+            Self::SEND_EXPSHARED => 98,
+            Self::SEND_GROUND_ITEM_HANDLER => 99,
+            Self::SEND_SHOP_OPEN => 101,
+            Self::SEND_UPDATE_NPC => 104,
+            Self::SEND_IGNORE_LIST => 109,
+            Self::SEND_INPUT_BOX => 110,
+            Self::SEND_ON_TUTORIAL => 111,
+            Self::SEND_CLAN => 112,
+            Self::SEND_CLAN_LIST => 112,
+            Self::SEND_CLAN_SETTINGS => 112,
+            Self::SEND_IRONMAN => 113,
+            Self::SEND_FATIGUE => 114,
+            Self::SEND_ON_BLACK_HOLE => 115,
+            Self::SEND_PARTY => 116,
+            Self::SEND_PARTY_LIST => 116,
+            Self::SEND_PARTY_SETTINGS => 116,
+            Self::SEND_SLEEPSCREEN => 117,
+            Self::SEND_KILL_ANNOUNCEMENT => 118,
+            Self::SEND_PRIVATE_MESSAGE => 120,
+            Self::SEND_INVENTORY_REMOVE_ITEM => 123,
+            Self::SEND_TRADE_CLOSE => 128,
+            Self::SEND_COMBAT_STYLE => 129,
+            Self::SEND_SERVER_MESSAGE => 131,
+            Self::SEND_AUCTION_PROGRESS => 132,
+            Self::SEND_FISHING_TRAWLER => 133,
+            Self::SEND_STATUS_PROGRESS_BAR => 134,
+            Self::SEND_BANK_PIN_INTERFACE => 135,
+            Self::SEND_ONLINE_LIST => 136,
+            Self::SEND_SHOP_CLOSE => 137,
+            Self::SEND_OPENPK_POINTS_TO_GP_RATIO => 144,
+            Self::SEND_NPC_KILLS => 147,
+            Self::SEND_OPENPK_POINTS => 148,
+            Self::SEND_FRIEND_UPDATE => 149,
+            Self::SEND_BANK_PRESET => 150,
+            Self::SEND_EQUIPMENT_STATS => 153,
+            Self::SEND_STATS => 156,
+            Self::SEND_STAT => 159,
+            Self::SEND_TRADE_OTHER_ACCEPTED => 162,
+            Self::SEND_LOGOUT => 165,
+            Self::SEND_DUEL_CONFIRMWINDOW => 172,
+            Self::SEND_DUEL_WINDOW => 176,
+            Self::SEND_WELCOME_INFO => 182,
+            Self::SEND_CANT_LOGOUT => 183,
+            Self::SEND_28_BYTES_UNUSED => 189,
+            Self::SEND_PLAYER_COORDS => 191,
+            Self::SEND_SLEEPWORD_INCORRECT => 194,
+            Self::SEND_BANK_CLOSE => 203,
+            Self::SEND_PLAY_SOUND => 204,
+            Self::SEND_PRAYERS_ACTIVE => 206,
+            Self::SEND_DUEL_ACCEPTED => 210,
+            Self::SEND_REMOVE_WORLD_ENTITY => 211,
+            Self::SEND_APPEARANCE_KEEPALIVE => 213,
+            Self::SEND_BOX => 222,
+            Self::SEND_OPEN_RECOVERY => 224,
+            Self::SEND_DUEL_CLOSE => 225,
+            Self::SEND_OPEN_DETAILS => 232,
+            Self::SEND_UPDATE_PLAYERS => 234,
+            Self::SEND_UPDATE_IGNORE_LIST_BECAUSE_NAME_CHANGE => 237,
+            Self::SEND_GAME_SETTINGS => 240,
+            Self::SEND_SLEEP_FATIGUE => 244,
+            Self::SEND_OPTIONS_MENU_OPEN => 245,
+            Self::SEND_BANK_UPDATE => 249,
+            Self::SEND_UNLOCKED_APPEARANCES => 250,
+            Self::SEND_OPTIONS_MENU_CLOSE => 252,
+            Self::SEND_DUEL_OTHER_ACCEPTED => 253,
+            Self::SEND_EQUIPMENT => 254,
+            Self::SEND_EQUIPMENT_UPDATE => 255,
+            // Retro / unmapped — fall back to enum ordinal so accidental use
+            // produces a stable, identifiable byte rather than aliasing 0.
+            other => other as u16 as u8,
+        }
+    }
+}
+
+/// Map `OpcodeOut` to its on-wire byte via the PayloadCustomGenerator table
+/// (the superset used by the iOS and custom Java clients).
 impl From<OpcodeOut> for u8 {
     fn from(op: OpcodeOut) -> Self {
-        op as u16 as u8
+        op.wire()
     }
 }

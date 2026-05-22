@@ -1,4 +1,4 @@
-# Captured by .player-appearance-test.mjs at 2026-05-02T10:21:29.927Z
+# Captured by .player-appearance-test.mjs at 2026-05-09T07:17:57.412Z
 # All assertions passed: parseAppearanceMask, resolveSlot, mergeRawModels, applyAppearanceMask, equip-swap delta
 # Composite1 (bronze sword 1042): 32 verts / 16 tris
 # Composite2 (mithril sword 1044): 36 verts / 18 tris

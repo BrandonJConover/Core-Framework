@@ -1,0 +1,20 @@
+{
+  "id": "out_update_players_chat",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_UPDATE_PLAYERS",
+  "wire_opcode": 234,
+  "payload_hex": "0001002a010a68656c6c6f0a",
+  "fields": {
+    "count": 1,
+    "entries": [
+      {
+        "player_index": 42,
+        "update_type": 1,
+        "icon": "",
+        "message": "hello"
+      }
+    ]
+  },
+  "notes": "Payload only, without transport framing. This fixture uses the Java custom-client SEND_UPDATE_PLAYERS type-1 public-chat layout: both icon and message strings are LF-terminated like Java PacketBuilder.writeString."
+}

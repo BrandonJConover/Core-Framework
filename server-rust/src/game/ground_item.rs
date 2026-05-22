@@ -235,10 +235,7 @@ impl GroundItemManager {
             respawn_delay,
             self.current_tick,
         );
-        info!(
-            "Registered respawning item {} at {:?}",
-            item_id.0, position
-        );
+        info!("Registered respawning item {} at {:?}", item_id.0, position);
         self.add_item(item);
         id
     }
@@ -371,7 +368,11 @@ mod tests {
             EntityId(1),
             ItemId(10),
             100,
-            Position { x: 100, y: 100, plane: 0 },
+            Position {
+                x: 100,
+                y: 100,
+                plane: 0,
+            },
             42, // owner_id
             0,  // current_tick
         );
@@ -394,7 +395,11 @@ mod tests {
         let id = manager.spawn(
             ItemId(10),
             100,
-            Position { x: 100, y: 100, plane: 0 },
+            Position {
+                x: 100,
+                y: 100,
+                plane: 0,
+            },
         );
 
         assert_eq!(manager.count(), 1);
@@ -418,7 +423,11 @@ mod tests {
         let id = manager.register_spawn(
             ItemId(10),
             1,
-            Position { x: 100, y: 100, plane: 0 },
+            Position {
+                x: 100,
+                y: 100,
+                plane: 0,
+            },
             10, // respawn after 10 ticks
         );
 

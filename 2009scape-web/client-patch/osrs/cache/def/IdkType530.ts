@@ -124,11 +124,21 @@ function decode(data: Uint8Array, id: number): IdkType530Data {
 export class IdkType530 {
     public static readonly INDEX = 2;
     public static readonly GROUP = 3;
+    /** Per-id record cache. Populated lazily by load(); flat-filled by
+     *  Game.preloadDefs530 for the bootstrap range so the player-avatar
+     *  composer can resolve every wardrobe slot synchronously. */
+    public static cache530: Map<number, IdkType530Data> | null = null;
     static decode(data: Uint8Array, id: number): IdkType530Data { return decode(data, id); }
     static async load(js5Cache: Js5Cache, id: number): Promise<IdkType530Data | null> {
         if (id < 0) return null;
+        if (IdkType530.cache530) {
+            const hit = IdkType530.cache530.get(id);
+            if (hit !== undefined) return hit;
+        }
         const data = await js5Cache.getFileBytes(IdkType530.INDEX, IdkType530.GROUP, id);
         if (!data || data.byteLength === 0) return null;
-        return decode(data, id);
+        const decoded = decode(data, id);
+        if (IdkType530.cache530) IdkType530.cache530.set(id, decoded);
+        return decoded;
     }
 }

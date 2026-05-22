@@ -117,11 +117,13 @@ def replace_function(target_js: str, name: str, replacement: str) -> tuple[str, 
 
 def apply_patches(rsc_c_dir: Path, source_web_client: Path) -> None:
     source_html = source_web_client / "mudclient.html"
+    source_login_html = source_web_client / "mudclient-new-login.html"
     source_js = source_web_client / "mudclient.js"
     target_html = rsc_c_dir / "mudclient.html"
+    target_login_html = rsc_c_dir / "mudclient-new-login.html"
     target_js = rsc_c_dir / "mudclient.js"
 
-    for path in (source_html, source_js, target_html, target_js):
+    for path in (source_html, source_login_html, source_js, target_html, target_js):
         if not path.is_file():
             raise FileNotFoundError(path)
 
@@ -130,6 +132,12 @@ def apply_patches(rsc_c_dir: Path, source_web_client: Path) -> None:
         print(f"Copied mobile mudclient.html to {target_html}")
     else:
         print(f"Keeping existing mobile mudclient.html at {target_html}")
+
+    if source_login_html.resolve() != target_login_html.resolve():
+        shutil.copyfile(source_login_html, target_login_html)
+        print(f"Copied launcher login HTML to {target_login_html}")
+    else:
+        print(f"Keeping existing launcher login HTML at {target_login_html}")
 
     source_js_text = source_js.read_text()
     target_js_text = target_js.read_text()

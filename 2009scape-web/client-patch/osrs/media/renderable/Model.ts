@@ -3145,6 +3145,19 @@ export class Model extends Renderable {
     }
 
     public applyLighting(i: number, j: number, k: number, l: number, i1: number, flag: boolean) {
+        if (this.triangleColorValues == null) {
+            if (this.anIntArray1656 == null) {
+                this.anIntArray1656 = Array(this.triangleCount).fill(0);
+                this.anIntArray1657 = Array(this.triangleCount).fill(0);
+                this.anIntArray1658 = Array(this.triangleCount).fill(0);
+            }
+            if (flag) {
+                this.calculateDiagonals();
+            } else {
+                this.method583(426);
+            }
+            return;
+        }
         const j1: number = (Math.sqrt(k * k + l * l + i1 * i1) as number) | 0;
         const k1: number = (j * j1) >> 8;
         if (this.anIntArray1656 == null) {

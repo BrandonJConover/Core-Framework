@@ -204,7 +204,11 @@ mod tests {
 
     #[test]
     fn test_fire_lifecycle() {
-        let pos = Position { x: 100, y: 100, plane: 0 };
+        let pos = Position {
+            x: 100,
+            y: 100,
+            plane: 0,
+        };
         let mut fire = Fire::new(pos, LogType::NormalLogs);
 
         assert!(fire.is_burning());

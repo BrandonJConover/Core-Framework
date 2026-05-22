@@ -1,0 +1,12 @@
+{
+  "id": "in_prayer_deactivated",
+  "protocol": "custom-v235",
+  "direction": "client_to_server",
+  "opcode_enum": "PRAYER_DEACTIVATED",
+  "wire_opcode": 254,
+  "payload_hex": "04",
+  "fields": {
+    "prayerID": 4
+  },
+  "notes": "Payload only. Java Payload235Parser reads PRAYER_DEACTIVATED as one BYTE prayerID."
+}

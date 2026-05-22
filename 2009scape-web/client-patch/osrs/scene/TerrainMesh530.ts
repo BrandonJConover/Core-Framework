@@ -116,17 +116,40 @@ function resolveFloor(
     underlay: number,
     floLookup: (id: number) => FloType530Data | null,
 ): { color: number; texture: number } | null {
-    // FloType ids in rt4 are 1-based per FloType.java (client subtracts 1 for cache lookup).
-    // Here we treat -1 / 0 as "no floor" — caller should pre-shift if their data uses 1-based ids.
-    if (overlay !== -1 && overlay !== 0) {
-        const f = floLookup(overlay);
-        if (f) return { color: f.baseColor, texture: f.texture };
-    }
     if (underlay !== -1 && underlay !== 0) {
         const f = floLookup(underlay);
         if (f) return { color: f.baseColor, texture: f.texture };
     }
+    if (overlay !== -1 && overlay !== 0) {
+        const f = floLookup(overlay);
+        if (f) return { color: f.baseColor, texture: f.texture };
+    }
     return null;
+}
+
+function trimHslLightness(hsl: number, lightness: number): number {
+    if (hsl === -1) return 12345678;
+    lightness = ((lightness * (hsl & 127)) / 128) | 0;
+    if (lightness < 2) lightness = 2;
+    else if (lightness > 126) lightness = 126;
+    return (hsl & 65408) + lightness;
+}
+
+function cornerLight(src: TerrainTileSource, x: number, z: number): number {
+    const lx = -50;
+    const ly = -60;
+    const lz = -50;
+    const dx = heightAt(src, x + 1, z) - heightAt(src, x - 1, z);
+    const dz = heightAt(src, x, z + 1) - heightAt(src, x, z - 1);
+    const len = Math.sqrt(dx * dx + dz * dz + 65536);
+    const nx = ((dx << 8) / len) | 0;
+    const ny = ((-65536) / len) | 0;
+    const nz = ((dz << 8) / len) | 0;
+    const denom = ((Math.sqrt(lx * lx + ly * ly + lz * lz) * 1024) / 256) | 0;
+    let light = 96 + (((lx * nx + ly * ny + lz * nz) / denom) | 0);
+    if (light < 48) light = 48;
+    else if (light > 126) light = 126;
+    return light;
 }
 
 /**
@@ -151,6 +174,9 @@ export function buildTerrainMesh(
     const triB: number[] = [];
     const triC: number[] = [];
     const triColors: number[] = [];
+    const triColorA: number[] = [];
+    const triColorB: number[] = [];
+    const triColorC: number[] = [];
     const triTextures: number[] = emitTextures ? [] : [];
 
     let tilesEmitted = 0;
@@ -166,6 +192,10 @@ export function buildTerrainMesh(
             const hB = heightAt(src, x + 1, z);     // (x+1, z)   — corner B
             const hC = heightAt(src, x + 1, z + 1); // (x+1, z+1) — corner C
             const hD = heightAt(src, x,     z + 1); // (x,   z+1) — corner D
+            const cA = trimHslLightness(floor.color, cornerLight(src, x, z));
+            const cB = trimHslLightness(floor.color, cornerLight(src, x + 1, z));
+            const cC = trimHslLightness(floor.color, cornerLight(src, x + 1, z + 1));
+            const cD = trimHslLightness(floor.color, cornerLight(src, x, z + 1));
 
             // World-space vertex base index (every tile owns its own 4 verts;
             // not shared with neighbors — keeps per-tile color tinting clean).
@@ -186,6 +216,9 @@ export function buildTerrainMesh(
             triB.push(v + 3, v + 1);
             triC.push(v + 1, v + 3);
             triColors.push(floor.color, floor.color);
+            triColorA.push(cC, cA);
+            triColorB.push(cD, cB);
+            triColorC.push(cB, cD);
             if (emitTextures) {
                 triTextures.push(floor.texture, floor.texture);
             }
@@ -210,6 +243,9 @@ export function buildTerrainMesh(
         triangleTextures: emitTextures ? triTextures : null,
         triangleTextureIndex: null,
         triangleColors: triColors,
+        triangleColorA: triColorA,
+        triangleColorB: triColorB,
+        triangleColorC: triColorC,
         priority: 0,
         textureTypes: null,
         textureFacesP: null,
@@ -240,4 +276,111 @@ export function countEmittableTiles(
         }
     }
     return n;
+}
+
+export interface TerrainMeshChunk530 {
+    rawModel: RawModel530Data;
+    minTileX: number;
+    maxTileX: number;
+    minTileZ: number;
+    maxTileZ: number;
+}
+
+export function chunkTerrainMesh530(mesh: RawModel530Data, chunkTiles: number = 16, tileSizeUnits: number = 128): TerrainMeshChunk530[] {
+    const buckets = new Map<string, {
+        minTileX: number; maxTileX: number; minTileZ: number; maxTileZ: number;
+        vertexX: number[]; vertexY: number[]; vertexZ: number[];
+        triA: number[]; triB: number[]; triC: number[]; triColors: number[]; triColorA: number[]; triColorB: number[]; triColorC: number[];
+    }>();
+    const getBucket = (tileX: number, tileZ: number) => {
+        const chunkX = Math.floor(tileX / chunkTiles);
+        const chunkZ = Math.floor(tileZ / chunkTiles);
+        const key = chunkX + ":" + chunkZ;
+        let bucket = buckets.get(key);
+        if (!bucket) {
+            bucket = {
+                minTileX: chunkX * chunkTiles,
+                maxTileX: chunkX * chunkTiles + chunkTiles,
+                minTileZ: chunkZ * chunkTiles,
+                maxTileZ: chunkZ * chunkTiles + chunkTiles,
+                vertexX: [], vertexY: [], vertexZ: [],
+                triA: [], triB: [], triC: [], triColors: [], triColorA: [], triColorB: [], triColorC: [],
+            };
+            buckets.set(key, bucket);
+        }
+        return bucket;
+    };
+
+    for (let i = 0; i < mesh.triangleCount; i += 2) {
+        const a = mesh.triangleVertexA[i];
+        const b = mesh.triangleVertexB[i];
+        const c = mesh.triangleVertexC[i];
+        const tileX = Math.floor(Math.min(mesh.vertexX[a], mesh.vertexX[b], mesh.vertexX[c]) / tileSizeUnits);
+        const tileZ = Math.floor(Math.min(mesh.vertexZ[a], mesh.vertexZ[b], mesh.vertexZ[c]) / tileSizeUnits);
+        const bucket = getBucket(tileX, tileZ);
+        const remap = new Map<number, number>();
+        const copyVertex = (src: number): number => {
+            const hit = remap.get(src);
+            if (hit !== undefined) return hit;
+            const dst = bucket.vertexX.length;
+            bucket.vertexX.push(mesh.vertexX[src]);
+            bucket.vertexY.push(mesh.vertexY[src]);
+            bucket.vertexZ.push(mesh.vertexZ[src]);
+            remap.set(src, dst);
+            return dst;
+        };
+        const end = Math.min(i + 2, mesh.triangleCount);
+        for (let tri = i; tri < end; tri++) {
+            bucket.triA.push(copyVertex(mesh.triangleVertexA[tri]));
+            bucket.triB.push(copyVertex(mesh.triangleVertexB[tri]));
+            bucket.triC.push(copyVertex(mesh.triangleVertexC[tri]));
+            bucket.triColors.push(mesh.triangleColors[tri]);
+            bucket.triColorA.push(mesh.triangleColorA?.[tri] ?? mesh.triangleColors[tri]);
+            bucket.triColorB.push(mesh.triangleColorB?.[tri] ?? mesh.triangleColors[tri]);
+            bucket.triColorC.push(mesh.triangleColorC?.[tri] ?? mesh.triangleColors[tri]);
+        }
+    }
+
+    return Array.from(buckets.values()).map((bucket) => ({
+        minTileX: bucket.minTileX,
+        maxTileX: bucket.maxTileX,
+        minTileZ: bucket.minTileZ,
+        maxTileZ: bucket.maxTileZ,
+        rawModel: {
+            id: -1,
+            vertexCount: bucket.vertexX.length,
+            triangleCount: bucket.triA.length,
+            texturedCount: 0,
+            vertexX: bucket.vertexX,
+            vertexY: bucket.vertexY,
+            vertexZ: bucket.vertexZ,
+            vertexBones: null,
+            triangleVertexA: bucket.triA,
+            triangleVertexB: bucket.triB,
+            triangleVertexC: bucket.triC,
+            triangleInfo: null,
+            trianglePriorities: null,
+            triangleAlpha: null,
+            triangleBones: null,
+            triangleTextures: null,
+            triangleTextureIndex: null,
+            triangleColors: bucket.triColors,
+            triangleColorA: bucket.triColorA,
+            triangleColorB: bucket.triColorB,
+            triangleColorC: bucket.triColorC,
+            priority: 0,
+            textureTypes: null,
+            textureFacesP: null,
+            textureFacesM: null,
+            textureFacesN: null,
+            texturesScaleX: null,
+            texturesScaleY: null,
+            texturesScaleZ: null,
+            textureRotationY: null,
+            textureExtraA: null,
+            textureExtraB: null,
+            cubeExtraA: null,
+            cubeExtraB: null,
+        },
+    }));
 }

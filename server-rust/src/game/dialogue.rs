@@ -13,14 +13,9 @@ pub enum DialogueNode {
         next: Option<String>,
     },
     /// Player says something.
-    PlayerSay {
-        text: String,
-        next: Option<String>,
-    },
+    PlayerSay { text: String, next: Option<String> },
     /// Player chooses from options.
-    Choice {
-        options: Vec<DialogueOption>,
-    },
+    Choice { options: Vec<DialogueOption> },
     /// Execute an action.
     Action {
         action: DialogueAction,
@@ -166,12 +161,7 @@ impl Dialogue {
     }
 
     /// Builder method to add an NPC say node.
-    pub fn npc_say(
-        mut self,
-        name: impl Into<String>,
-        text: Vec<&str>,
-        next: Option<&str>,
-    ) -> Self {
+    pub fn npc_say(mut self, name: impl Into<String>, text: Vec<&str>, next: Option<&str>) -> Self {
         self.add_node(
             name,
             DialogueNode::NpcSay {
@@ -183,12 +173,7 @@ impl Dialogue {
     }
 
     /// Builder method to add a player say node.
-    pub fn player_say(
-        mut self,
-        name: impl Into<String>,
-        text: &str,
-        next: Option<&str>,
-    ) -> Self {
+    pub fn player_say(mut self, name: impl Into<String>, text: &str, next: Option<&str>) -> Self {
         self.add_node(
             name,
             DialogueNode::PlayerSay {
@@ -392,11 +377,7 @@ impl DialogueManager {
 
         // Example: Shop keeper dialogue
         let shopkeeper_dialogue = Dialogue::new(2, 51, "start")
-            .npc_say(
-                "start",
-                vec!["Welcome to my shop!"],
-                Some("shop_choice"),
-            )
+            .npc_say("start", vec!["Welcome to my shop!"], Some("shop_choice"))
             .choice(
                 "shop_choice",
                 vec![
@@ -404,11 +385,7 @@ impl DialogueManager {
                     DialogueOption::new("No thanks.", "goodbye"),
                 ],
             )
-            .action(
-                "open_shop",
-                DialogueAction::OpenShop(1),
-                None,
-            )
+            .action("open_shop", DialogueAction::OpenShop(1), None)
             .npc_say("goodbye", vec!["Come back soon!"], None)
             .end("end");
 
@@ -505,9 +482,7 @@ impl DialogueManager {
                 let option_texts: Vec<String> = options.iter().map(|o| o.text.clone()).collect();
                 DialogueResult::ShowOptions(option_texts)
             }
-            DialogueNode::Action { action, next } => {
-                DialogueResult::ExecuteAction(action.clone())
-            }
+            DialogueNode::Action { action, next } => DialogueResult::ExecuteAction(action.clone()),
             DialogueNode::Condition { .. } => {
                 // Conditions should be evaluated externally
                 DialogueResult::Error("Condition needs external evaluation".to_string())
@@ -517,7 +492,12 @@ impl DialogueManager {
     }
 
     /// Get the next node after selecting an option.
-    pub fn select_option(&self, dialogue_id: u32, node_name: &str, option_index: usize) -> Option<String> {
+    pub fn select_option(
+        &self,
+        dialogue_id: u32,
+        node_name: &str,
+        option_index: usize,
+    ) -> Option<String> {
         let dialogue = self.get(dialogue_id)?;
         let node = dialogue.get_node(node_name)?;
 
@@ -575,7 +555,10 @@ mod tests {
         let mut state = DialogueState::new(1, 0, "start".to_string());
 
         state.set_variable("test_key", "test_value");
-        assert_eq!(state.get_variable("test_key"), Some(&"test_value".to_string()));
+        assert_eq!(
+            state.get_variable("test_key"),
+            Some(&"test_value".to_string())
+        );
 
         state.pending_messages.push("Hello".to_string());
         state.clear_pending();

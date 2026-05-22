@@ -1,4 +1,4 @@
-# Captured by .first-light-test.mjs at 2026-05-02T10:04:44.356Z
+# Captured by .first-light-test.mjs at 2026-05-09T07:17:57.339Z
 # All assertions passed: createBones, createPose, applyAnimFrame, Model530Bridge.draw
 # Arm vertex Y translated 100 -> 110 (delta=10) via applyAnimFrame
 

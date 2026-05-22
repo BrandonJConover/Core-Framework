@@ -79,7 +79,9 @@ export class GameObjectDefinition {
         def.sizeY = d.length;
         def.modelIds = d.models ?? null;
         def.modelTypes = d.shapes ?? null;
-        def.options = (d.ops?.filter((o) => o != null) as string[]) ?? null;
+        def.options = d.ops
+            ? d.ops.slice(0, 5).map((option) => option != null && option.toLowerCase() !== "hidden" ? option : null) as string[]
+            : null;
         def.modifiedModelColors = d.recol_s ?? null;
         def.anIntArray792 = d.recol_d ?? null;
         def.modelSizeX = d.resizex || 128;
@@ -98,6 +100,7 @@ export class GameObjectDefinition {
         def.icon = d.mapfunction;
         def.walkable = d.blockwalk === 0;
         def.solid = !!d.members;
+        def.actionsBoolean = d.interactable === 1 || !!def.options?.some((option) => option != null);
     }
 
     public static load(archive: Archive) {

@@ -1,0 +1,40 @@
+{
+  "id": "out_update_npc_damage_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_UPDATE_NPC",
+  "wire_opcode": 104,
+  "payload_hex": "000200250203070a0fff0200010c",
+  "fields": {
+    "count": 2,
+    "entries": [
+      {
+        "npc_index": 37,
+        "update_type": 2,
+        "damage": 3,
+        "current_hits": 7,
+        "maximum_hits": 10
+      },
+      {
+        "npc_index": 4095,
+        "update_type": 2,
+        "damage": 0,
+        "current_hits": 1,
+        "maximum_hits": 12
+      }
+    ]
+  },
+  "java_reference": {
+    "generator": "server-java-modern/src/com/openrsc/server/net/rsc/generators/impl/PayloadCustomGenerator.java",
+    "source_struct": "server-java-modern/src/com/openrsc/server/net/rsc/struct/outgoing/AppearanceUpdateStruct.java",
+    "info_sequence": [
+      "Short(count)",
+      "Short(npc_index)",
+      "Byte(update_type)",
+      "Byte(damage)",
+      "Byte(current_hits)",
+      "Byte(maximum_hits)"
+    ]
+  },
+  "notes": "Payload only, without transport framing. This multi-entry Java custom/v235 fixture covers SEND_UPDATE_NPC type-2 hit updates emitted in AppearanceUpdateStruct order."
+}

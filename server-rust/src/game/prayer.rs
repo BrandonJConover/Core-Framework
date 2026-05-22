@@ -25,7 +25,7 @@ pub enum PrayerId {
     UltimateStrength = 10,
     IncredibleReflexes = 11,
     Paralyze = 12,
-    Redemption = 13, // Custom prayer
+    ProtectFromMissiles = 13,
 }
 
 impl PrayerId {
@@ -45,7 +45,7 @@ impl PrayerId {
             PrayerId::UltimateStrength,
             PrayerId::IncredibleReflexes,
             PrayerId::Paralyze,
-            PrayerId::Redemption,
+            PrayerId::ProtectFromMissiles,
         ]
     }
 
@@ -65,7 +65,7 @@ impl PrayerId {
             10 => Some(PrayerId::UltimateStrength),
             11 => Some(PrayerId::IncredibleReflexes),
             12 => Some(PrayerId::Paralyze),
-            13 => Some(PrayerId::Redemption),
+            13 => Some(PrayerId::ProtectFromMissiles),
             _ => None,
         }
     }
@@ -101,7 +101,7 @@ impl PrayerDef {
             PrayerId::UltimateStrength => &ULTIMATE_STRENGTH,
             PrayerId::IncredibleReflexes => &INCREDIBLE_REFLEXES,
             PrayerId::Paralyze => &PARALYZE,
-            PrayerId::Redemption => &REDEMPTION,
+            PrayerId::ProtectFromMissiles => &PROTECT_FROM_MISSILES,
         }
     }
 }
@@ -250,11 +250,11 @@ static PARALYZE: PrayerDef = PrayerDef {
     conflicts_with: &[],
 };
 
-static REDEMPTION: PrayerDef = PrayerDef {
-    id: PrayerId::Redemption,
-    name: "Redemption",
-    level_required: 45,
-    drain_rate: 6,
+static PROTECT_FROM_MISSILES: PrayerDef = PrayerDef {
+    id: PrayerId::ProtectFromMissiles,
+    name: "Protect from Missiles",
+    level_required: 40,
+    drain_rate: 12,
     defense_bonus: 0,
     strength_bonus: 0,
     attack_bonus: 0,
@@ -327,9 +327,12 @@ impl PrayerState {
     }
 
     /// Deactivate a prayer.
-    pub fn deactivate(&mut self, prayer: PrayerId) {
-        self.active_prayers.remove(&prayer);
-        debug!("Deactivated prayer: {:?}", prayer);
+    pub fn deactivate(&mut self, prayer: PrayerId) -> bool {
+        let removed = self.active_prayers.remove(&prayer);
+        if removed {
+            debug!("Deactivated prayer: {:?}", prayer);
+        }
+        removed
     }
 
     /// Deactivate all prayers.
@@ -346,21 +349,24 @@ impl PrayerState {
 
     /// Get total defense bonus from active prayers.
     pub fn defense_bonus(&self) -> i32 {
-        self.active_prayers.iter()
+        self.active_prayers
+            .iter()
             .map(|&p| PrayerDef::get(p).defense_bonus)
             .sum()
     }
 
     /// Get total strength bonus from active prayers.
     pub fn strength_bonus(&self) -> i32 {
-        self.active_prayers.iter()
+        self.active_prayers
+            .iter()
             .map(|&p| PrayerDef::get(p).strength_bonus)
             .sum()
     }
 
     /// Get total attack bonus from active prayers.
     pub fn attack_bonus(&self) -> i32 {
-        self.active_prayers.iter()
+        self.active_prayers
+            .iter()
             .map(|&p| PrayerDef::get(p).attack_bonus)
             .sum()
     }
@@ -391,7 +397,9 @@ impl PrayerState {
 
         // Drain is calculated per minute (100 ticks at 600ms = 60 seconds)
         // Accumulate drain and apply when >= 1
-        let total_drain_per_minute: u32 = self.active_prayers.iter()
+        let total_drain_per_minute: u32 = self
+            .active_prayers
+            .iter()
             .map(|&p| PrayerDef::get(p).drain_rate)
             .sum();
 
@@ -457,7 +465,11 @@ impl std::fmt::Display for PrayerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::LevelTooLow { required, current } => {
-                write!(f, "Prayer requires level {} (you have {})", required, current)
+                write!(
+                    f,
+                    "Prayer requires level {} (you have {})",
+                    required, current
+                )
             }
             Self::NoPrayerPoints => write!(f, "You have no prayer points"),
             Self::PrayerNotFound => write!(f, "Unknown prayer"),

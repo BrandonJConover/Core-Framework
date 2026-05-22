@@ -88,6 +88,10 @@ export class Component {
     inventoryOptions: string[] = [];
     invMarginX: number = 0;
     invMarginY: number = 0;
+    itemSwapable: boolean = false;
+    isInventory: boolean = false;
+    itemUsable: boolean = false;
+    itemDeletesDragged: boolean = false;
     invSprite: number[] = [];
     invOffsetX: number[] = [];
     invOffsetY: number[] = [];
@@ -107,6 +111,9 @@ export class Component {
     switchSource: number = -1;
     rotatePitchStep: number = 0;
     rotateYawStep: number = 0;
+    serverActiveProperties: number = 0;
+    serverActiveStartSlot: number = -1;
+    serverActiveEndSlot: number = -1;
 
     static decode(id: number, bytes: Uint8Array): Component {
         const c = new Component();
@@ -184,6 +191,10 @@ export class Component {
             if (c.ops.length === 0) c.ops = data.inventory.options.slice();
             c.invMarginX = data.inventory.invMarginX;
             c.invMarginY = data.inventory.invMarginY;
+            c.itemSwapable = data.inventory.itemSwapable;
+            c.isInventory = data.inventory.isInventory;
+            c.itemUsable = data.inventory.itemUsable;
+            c.itemDeletesDragged = data.inventory.itemDeletesDragged;
             c.invSprite = data.inventory.invSprite.slice();
             c.invOffsetX = data.inventory.invOffsetX.slice();
             c.invOffsetY = data.inventory.invOffsetY.slice();

@@ -1,0 +1,33 @@
+{
+  "id": "out_update_npc_damage",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_UPDATE_NPC",
+  "wire_opcode": 104,
+  "payload_hex": "000100250203070a",
+  "fields": {
+    "count": 1,
+    "entries": [
+      {
+        "npc_index": 37,
+        "update_type": 2,
+        "damage": 3,
+        "current_hits": 7,
+        "maximum_hits": 10
+      }
+    ]
+  },
+  "java_reference": {
+    "generator": "server-java-modern/src/com/openrsc/server/net/rsc/generators/impl/PayloadCustomGenerator.java",
+    "source_struct": "server-java-modern/src/com/openrsc/server/net/rsc/struct/outgoing/AppearanceUpdateStruct.java",
+    "info_sequence": [
+      "Short(count)",
+      "Short(npc_index)",
+      "Byte(update_type)",
+      "Byte(damage)",
+      "Byte(current_hits)",
+      "Byte(maximum_hits)"
+    ]
+  },
+  "notes": "Payload only, without transport framing. This byte-oriented fixture matches the Java custom/v235 AppearanceUpdateStruct generator order for SEND_UPDATE_NPC type-2 hit updates."
+}

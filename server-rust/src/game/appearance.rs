@@ -263,7 +263,13 @@ impl AppearanceScreen {
     pub const SKIN_COLOR_COUNT: u8 = 5;
 
     /// Build a default appearance from character creation selections.
-    pub fn create(male: bool, hair_color: u8, top_color: u8, trouser_color: u8, skin_color: u8) -> PlayerAppearance {
+    pub fn create(
+        male: bool,
+        hair_color: u8,
+        top_color: u8,
+        trouser_color: u8,
+        skin_color: u8,
+    ) -> PlayerAppearance {
         let mut appearance = if male {
             PlayerAppearance::new_male()
         } else {
@@ -301,15 +307,24 @@ mod tests {
     fn test_validation_rejects_out_of_range() {
         let mut a = PlayerAppearance::default();
         a.hair_color = 20;
-        assert!(matches!(a.validate(), Err(AppearanceError::InvalidHairColor(20))));
+        assert!(matches!(
+            a.validate(),
+            Err(AppearanceError::InvalidHairColor(20))
+        ));
 
         let mut a = PlayerAppearance::default();
         a.skin_color = 10;
-        assert!(matches!(a.validate(), Err(AppearanceError::InvalidSkinColor(10))));
+        assert!(matches!(
+            a.validate(),
+            Err(AppearanceError::InvalidSkinColor(10))
+        ));
 
         let mut a = PlayerAppearance::default();
         a.head_sprite = 99;
-        assert!(matches!(a.validate(), Err(AppearanceError::InvalidHeadSprite(99))));
+        assert!(matches!(
+            a.validate(),
+            Err(AppearanceError::InvalidHeadSprite(99))
+        ));
     }
 
     #[test]
@@ -320,13 +335,13 @@ mod tests {
 
         // Username "testuser" + null terminator = 9 bytes
         assert_eq!(data[8], 0); // null terminator
-        // 0 equipped items
+                                // 0 equipped items
         assert_eq!(data[9], 0);
         // Colors at offset 10..14
-        assert_eq!(data[10], 2);  // hair_color
-        assert_eq!(data[11], 8);  // top_color
+        assert_eq!(data[10], 2); // hair_color
+        assert_eq!(data[11], 8); // top_color
         assert_eq!(data[12], 14); // trouser_color
-        assert_eq!(data[13], 0);  // skin_color
+        assert_eq!(data[13], 0); // skin_color
     }
 
     #[test]

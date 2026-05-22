@@ -37,8 +37,10 @@ impl TracingConfig {
 
         // Set up subscriber with both fmt and OpenTelemetry layers
         tracing_subscriber::registry()
-            .with(tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "openrsc_server=debug".into()))
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "openrsc_server=debug".into()),
+            )
             .with(tracing_subscriber::fmt::layer())
             .with(telemetry)
             .init();

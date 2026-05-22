@@ -154,63 +154,29 @@ impl CookingManager {
     /// Load default cooking definitions.
     pub fn load_defaults(&mut self) {
         // Fish
-        self.register_cookable(CookableDef::new(
-            350, 352, 353, "Shrimp", 1, 120, 34,
-        ));
-        self.register_cookable(CookableDef::new(
-            351, 354, 355, "Anchovies", 1, 120, 34,
-        ));
-        self.register_cookable(CookableDef::new(
-            356, 358, 359, "Sardine", 1, 160, 38,
-        ));
-        self.register_cookable(CookableDef::new(
-            360, 362, 363, "Herring", 5, 200, 41,
-        ));
-        self.register_cookable(CookableDef::new(
-            364, 366, 367, "Trout", 15, 280, 50,
-        ));
-        self.register_cookable(CookableDef::new(
-            368, 370, 371, "Pike", 20, 320, 53,
-        ));
-        self.register_cookable(CookableDef::new(
-            372, 374, 375, "Salmon", 25, 360, 58,
-        ));
-        self.register_cookable(CookableDef::new(
-            376, 378, 379, "Tuna", 30, 400, 63,
-        ));
-        self.register_cookable(CookableDef::new(
-            380, 382, 383, "Lobster", 40, 480, 74,
-        ));
-        self.register_cookable(CookableDef::new(
-            384, 386, 387, "Swordfish", 45, 560, 86,
-        ));
-        self.register_cookable(CookableDef::new(
-            388, 390, 391, "Shark", 80, 840, 99,
-        ));
+        self.register_cookable(CookableDef::new(350, 352, 353, "Shrimp", 1, 120, 34));
+        self.register_cookable(CookableDef::new(351, 354, 355, "Anchovies", 1, 120, 34));
+        self.register_cookable(CookableDef::new(356, 358, 359, "Sardine", 1, 160, 38));
+        self.register_cookable(CookableDef::new(360, 362, 363, "Herring", 5, 200, 41));
+        self.register_cookable(CookableDef::new(364, 366, 367, "Trout", 15, 280, 50));
+        self.register_cookable(CookableDef::new(368, 370, 371, "Pike", 20, 320, 53));
+        self.register_cookable(CookableDef::new(372, 374, 375, "Salmon", 25, 360, 58));
+        self.register_cookable(CookableDef::new(376, 378, 379, "Tuna", 30, 400, 63));
+        self.register_cookable(CookableDef::new(380, 382, 383, "Lobster", 40, 480, 74));
+        self.register_cookable(CookableDef::new(384, 386, 387, "Swordfish", 45, 560, 86));
+        self.register_cookable(CookableDef::new(388, 390, 391, "Shark", 80, 840, 99));
 
         // Meat
-        self.register_cookable(CookableDef::new(
-            132, 133, 134, "Meat", 1, 120, 31,
-        ));
-        self.register_cookable(CookableDef::new(
-            135, 136, 137, "Chicken", 1, 120, 31,
-        ));
+        self.register_cookable(CookableDef::new(132, 133, 134, "Meat", 1, 120, 31));
+        self.register_cookable(CookableDef::new(135, 136, 137, "Chicken", 1, 120, 31));
 
         // Bread
-        self.register_cookable(CookableDef::new(
-            136, 138, 139, "Bread", 1, 160, 34,
-        ));
+        self.register_cookable(CookableDef::new(136, 138, 139, "Bread", 1, 160, 34));
 
         // Pies
-        self.register_cookable(CookableDef::new(
-            250, 252, 253, "Redberry pie", 10, 312, 45,
-        ));
-        self.register_cookable(CookableDef::new(
-            254, 256, 257, "Meat pie", 20, 440, 55,
-        ));
-        self.register_cookable(CookableDef::new(
-            258, 260, 261, "Apple pie", 30, 520, 65,
-        ));
+        self.register_cookable(CookableDef::new(250, 252, 253, "Redberry pie", 10, 312, 45));
+        self.register_cookable(CookableDef::new(254, 256, 257, "Meat pie", 20, 440, 55));
+        self.register_cookable(CookableDef::new(258, 260, 261, "Apple pie", 30, 520, 65));
 
         // Food healing values
         self.register_food(FoodDef::new(352, "Shrimp", 3));

@@ -63,15 +63,13 @@ impl HandlerAction {
                     stage: *stage,
                 })
             }
-            DialogueAction::GiveExperience { skill_id, amount } => {
-                Some(HandlerAction::GiveXp {
-                    skill_id: *skill_id,
-                    amount: *amount,
-                })
+            DialogueAction::GiveExperience { skill_id, amount } => Some(HandlerAction::GiveXp {
+                skill_id: *skill_id,
+                amount: *amount,
+            }),
+            DialogueAction::Teleport { x, y } => {
+                Some(HandlerAction::Teleport(Position::new(*x as i32, *y as i32)))
             }
-            DialogueAction::Teleport { x, y } => Some(HandlerAction::Teleport(Position::new(
-                *x as i32, *y as i32,
-            ))),
             DialogueAction::OpenBank => Some(HandlerAction::OpenBank),
             DialogueAction::CompleteQuest(id) => Some(HandlerAction::StartQuest(*id)),
             _ => None,
@@ -290,6 +288,10 @@ impl DialogueHandler {
             return Err("Player is already in a dialogue".to_string());
         }
 
+        // `advance()` looks up nodes via `self.manager.process_node(dialogue_id, ...)`,
+        // so the custom tree has to be registered with the manager — not just
+        // stashed on the session — or the lookup returns `Error("Dialogue not found")`.
+        self.manager.register(tree.clone());
         let session = DialogueSession::new(npc_id, npc_name, tree);
         self.sessions.insert(player_id, session);
 
@@ -447,7 +449,8 @@ impl DialogueHandler {
                     // The process_node helper returned a "continue" because the
                     // NpcSay/PlayerSay node *has* a `next`.  We need to send
                     // the current node's text and then move on.
-                    let text_packets = self.build_text_packets(dialogue_id, &current_node, &npc_name);
+                    let text_packets =
+                        self.build_text_packets(dialogue_id, &current_node, &npc_name);
                     output.packets.extend(text_packets);
 
                     let session = self.sessions.get_mut(&player_id).unwrap();
@@ -477,12 +480,7 @@ impl DialogueHandler {
 
     /// Helper: given a node that is NpcSay or PlayerSay, build the
     /// corresponding text packet(s).
-    fn build_text_packets(
-        &self,
-        dialogue_id: u32,
-        node_name: &str,
-        npc_name: &str,
-    ) -> Vec<Packet> {
+    fn build_text_packets(&self, dialogue_id: u32, node_name: &str, npc_name: &str) -> Vec<Packet> {
         let dialogue = match self.manager.get(dialogue_id) {
             Some(d) => d,
             None => return Vec::new(),

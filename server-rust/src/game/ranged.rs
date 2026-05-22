@@ -381,12 +381,32 @@ mod tests {
 
     #[test]
     fn test_range_check() {
-        let source = Position { x: 100, y: 100, plane: 0 };
-        let in_range = Position { x: 103, y: 100, plane: 0 };
-        let out_of_range = Position { x: 110, y: 100, plane: 0 };
+        let source = Position {
+            x: 100,
+            y: 100,
+            plane: 0,
+        };
+        let in_range = Position {
+            x: 103,
+            y: 100,
+            plane: 0,
+        };
+        let out_of_range = Position {
+            x: 110,
+            y: 100,
+            plane: 0,
+        };
 
-        assert!(RangedManager::in_range(source, in_range, RangedWeaponType::Bow));
-        assert!(!RangedManager::in_range(source, out_of_range, RangedWeaponType::Bow));
+        assert!(RangedManager::in_range(
+            source,
+            in_range,
+            RangedWeaponType::Bow
+        ));
+        assert!(!RangedManager::in_range(
+            source,
+            out_of_range,
+            RangedWeaponType::Bow
+        ));
     }
 
     #[test]

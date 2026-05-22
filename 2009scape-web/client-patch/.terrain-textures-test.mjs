@@ -77,6 +77,88 @@ function runOpGraph(bytes) {
     return canvas;
 }
 
+function rgb24ToArgb(rgb24) {
+    return packArgb(0xff, (rgb24 >>> 16) & 0xff, (rgb24 >>> 8) & 0xff, rgb24 & 0xff);
+}
+
+function grayscale12ToArgb(value12) {
+    const v = Math.max(0, Math.min(255, value12 >> 4));
+    return packArgb(0xff, v, v, v);
+}
+
+function fillHorizontalGrayGradient() {
+    const canvas = new Uint32Array(TEXTURE_PIXELS);
+    const denom = Math.max(1, TEXTURE_SIZE - 1);
+    for (let x = 0; x < TEXTURE_SIZE; x++) {
+        const v = ((x * 255) / denom) | 0;
+        const argb = packArgb(0xff, v, v, v);
+        for (let y = 0; y < TEXTURE_SIZE; y++) {
+            canvas[y * TEXTURE_SIZE + x] = argb;
+        }
+    }
+    return canvas;
+}
+
+function fillVerticalGrayGradient() {
+    const canvas = new Uint32Array(TEXTURE_PIXELS);
+    fillVerticalGradient(canvas, packArgb(0xff, 0, 0, 0), packArgb(0xff, 0xff, 0xff, 0xff));
+    return canvas;
+}
+
+function invertArgbPixels(src) {
+    const canvas = new Uint32Array(TEXTURE_PIXELS);
+    for (let i = 0; i < src.length; i++) {
+        const argb = src[i];
+        canvas[i] = packArgb(
+            (argb >>> 24) & 0xff,
+            0xff - ((argb >>> 16) & 0xff),
+            0xff - ((argb >>> 8) & 0xff),
+            0xff - (argb & 0xff),
+        );
+    }
+    return canvas;
+}
+
+function renderMaterialOp530(material, opIndex, visiting) {
+    if (visiting.has(opIndex)) return null;
+    const op = material.ops[opIndex];
+    if (!op) return null;
+    if (op.inputs.length === 0) return renderLeafOp(op);
+    if (op.fields.kind !== 22 || op.inputs.length !== 1) return null;
+
+    visiting.add(opIndex);
+    const child = renderMaterialOp530(material, op.inputs[0], visiting);
+    visiting.delete(opIndex);
+    return child ? invertArgbPixels(child) : null;
+}
+
+function renderLeafOp(op) {
+    if (op.inputs.length !== 0) return null;
+    switch (op.fields.kind) {
+        case 0: {
+            const canvas = new Uint32Array(TEXTURE_PIXELS);
+            fillSolid(canvas, grayscale12ToArgb(op.fields.v));
+            return canvas;
+        }
+        case 1: {
+            const canvas = new Uint32Array(TEXTURE_PIXELS);
+            fillSolid(canvas, rgb24ToArgb(op.fields.rgb24));
+            return canvas;
+        }
+        case 2:
+            return fillHorizontalGrayGradient();
+        case 3:
+            return fillVerticalGrayGradient();
+        default:
+            return null;
+    }
+}
+
+function renderMaterialLeaf530(material) {
+    if (!material) return null;
+    return renderMaterialOp530(material, material.mainOpIndex, new Set());
+}
+
 // ── fixtures ────────────────────────────────────────────────────────
 
 // ColorFill solid red 0xFFFF0000.
@@ -132,6 +214,132 @@ if (distinctRows.size < 50) {
     throw new Error(`Gradient not monotonic: ${distinctRows.size} distinct row values (expected ≥50)`);
 }
 
+const materialColorFill = {
+    id: 77,
+    mainOpIndex: 0,
+    alphaOpIndex: 0,
+    spriteIds: [],
+    textureIds: [],
+    ops: [{
+        kind: 1,
+        inputs: [],
+        cache: 255,
+        monochrome: false,
+        fields: { kind: 1, rgb24: 0x3366CC },
+    }],
+};
+const materialCf = renderMaterialLeaf530(materialColorFill);
+if (!materialCf || materialCf.length !== TEXTURE_PIXELS) {
+    throw new Error(`Material ColorFill did not produce ${TEXTURE_PIXELS} pixels`);
+}
+if (materialCf[0] !== 0xFF3366CC || materialCf[TEXTURE_PIXELS - 1] !== 0xFF3366CC) {
+    throw new Error(`Material ColorFill expected 0xFF3366CC got first=0x${materialCf[0].toString(16)}`);
+}
+
+const materialVerticalGradient = {
+    id: 78,
+    mainOpIndex: 0,
+    alphaOpIndex: 0,
+    spriteIds: [],
+    textureIds: [],
+    ops: [{
+        kind: 3,
+        inputs: [],
+        cache: 255,
+        monochrome: true,
+        fields: { kind: 3 },
+    }],
+};
+const materialVg = renderMaterialLeaf530(materialVerticalGradient);
+if (!materialVg || materialVg[0] !== 0xFF000000) {
+    throw new Error(`Material VerticalGradient expected black top got 0x${materialVg?.[0]?.toString(16)}`);
+}
+const materialVgBottom = materialVg[(TEXTURE_SIZE - 1) * TEXTURE_SIZE];
+if (materialVgBottom !== 0xFFFFFFFF) {
+    throw new Error(`Material VerticalGradient expected white bottom got 0x${materialVgBottom.toString(16)}`);
+}
+
+const materialHorizontalGradient = {
+    id: 79,
+    mainOpIndex: 0,
+    alphaOpIndex: 0,
+    spriteIds: [],
+    textureIds: [],
+    ops: [{
+        kind: 2,
+        inputs: [],
+        cache: 255,
+        monochrome: true,
+        fields: { kind: 2 },
+    }],
+};
+const materialHg = renderMaterialLeaf530(materialHorizontalGradient);
+if (!materialHg || materialHg[0] !== 0xFF000000 || materialHg[TEXTURE_SIZE - 1] !== 0xFFFFFFFF) {
+    throw new Error(`Material HorizontalGradient endpoints invalid`);
+}
+
+const materialInvertColorFill = {
+    id: 80,
+    mainOpIndex: 0,
+    alphaOpIndex: 0,
+    spriteIds: [],
+    textureIds: [],
+    ops: [{
+        kind: 22,
+        inputs: [1],
+        cache: 255,
+        monochrome: false,
+        fields: { kind: 22 },
+    }, {
+        kind: 1,
+        inputs: [],
+        cache: 255,
+        monochrome: false,
+        fields: { kind: 1, rgb24: 0x3366CC },
+    }],
+};
+const materialInvertCf = renderMaterialLeaf530(materialInvertColorFill);
+if (!materialInvertCf || materialInvertCf[0] !== 0xFFCC9933 || materialInvertCf[TEXTURE_PIXELS - 1] !== 0xFFCC9933) {
+    throw new Error(`Material Invert(ColorFill) expected 0xFFCC9933 got first=0x${materialInvertCf?.[0]?.toString(16)}`);
+}
+
+const materialInvertVerticalGradient = {
+    id: 81,
+    mainOpIndex: 0,
+    alphaOpIndex: 0,
+    spriteIds: [],
+    textureIds: [],
+    ops: [{
+        kind: 22,
+        inputs: [1],
+        cache: 255,
+        monochrome: true,
+        fields: { kind: 22 },
+    }, {
+        kind: 3,
+        inputs: [],
+        cache: 255,
+        monochrome: true,
+        fields: { kind: 3 },
+    }],
+};
+const materialInvertVg = renderMaterialLeaf530(materialInvertVerticalGradient);
+if (!materialInvertVg || materialInvertVg[0] !== 0xFFFFFFFF) {
+    throw new Error(`Material Invert(VerticalGradient) expected white top got 0x${materialInvertVg?.[0]?.toString(16)}`);
+}
+const materialInvertVgBottom = materialInvertVg[(TEXTURE_SIZE - 1) * TEXTURE_SIZE];
+if (materialInvertVgBottom !== 0xFF000000) {
+    throw new Error(`Material Invert(VerticalGradient) expected black bottom got 0x${materialInvertVgBottom.toString(16)}`);
+}
+
+const unsupportedGraph = renderMaterialLeaf530({
+    ...materialColorFill,
+    ops: [{ ...materialColorFill.ops[0], inputs: [0] }],
+});
+if (unsupportedGraph !== null) {
+    throw new Error(`Material renderer must return null for non-leaf graph ops`);
+}
+
 // ── trace ──
 
 const trace = [
@@ -143,6 +351,10 @@ const trace = [
     `[TerrainTextureProvider] colorFill: every pixel = 0xFFFF0000 (solid red, ${cf.length} verified)`,
     `[TerrainTextureProvider] vGradient: top=0x${topRow.toString(16).padStart(8,'0')} bot=0x${botRow.toString(16).padStart(8,'0')} distinct-rows=${distinctRows.size}`,
     `[TerrainTextureProvider] vGradient mid-row interp ok: G=${midG} B=${midB} (expected ~127)`,
+    `[TerrainTextureProvider] TextureMaterial530 leaf ColorFill ok: 0x${materialCf[0].toString(16).padStart(8,'0')} pixels=${materialCf.length}`,
+    `[TerrainTextureProvider] TextureMaterial530 leaf gradients ok: vertical bottom=0x${materialVgBottom.toString(16).padStart(8,'0')} horizontal right=0x${materialHg[TEXTURE_SIZE - 1].toString(16).padStart(8,'0')}`,
+    `[TerrainTextureProvider] TextureMaterial530 unary Invert ok: color=0x${materialInvertCf[0].toString(16).padStart(8,'0')} vertical bottom=0x${materialInvertVgBottom.toString(16).padStart(8,'0')}`,
+    `[TerrainTextureProvider] TextureMaterial530 non-leaf graph returns null for fallback path`,
 ].join("\n") + "\n";
 
 const tracePath = join(__dirname, ".terrain-textures-trace.txt");

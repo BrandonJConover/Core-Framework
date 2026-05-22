@@ -51,7 +51,12 @@ impl RedisCache {
     }
 
     /// Sets a value in cache with specific TTL.
-    pub async fn set_with_ttl<T: Serialize>(&self, key: &str, value: &T, ttl_seconds: u64) -> Result<()> {
+    pub async fn set_with_ttl<T: Serialize>(
+        &self,
+        key: &str,
+        value: &T,
+        ttl_seconds: u64,
+    ) -> Result<()> {
         let mut conn = self.pool.get().await?;
         let full_key = self.prefix_key(key);
         let json = serde_json::to_string(value)?;
@@ -81,7 +86,12 @@ impl RedisCache {
     }
 
     /// Sets a key only if it doesn't exist (atomic).
-    pub async fn set_nx<T: Serialize>(&self, key: &str, value: &T, ttl_seconds: u64) -> Result<bool> {
+    pub async fn set_nx<T: Serialize>(
+        &self,
+        key: &str,
+        value: &T,
+        ttl_seconds: u64,
+    ) -> Result<bool> {
         let mut conn = self.pool.get().await?;
         let full_key = self.prefix_key(key);
         let json = serde_json::to_string(value)?;
@@ -111,7 +121,11 @@ impl RedisCache {
     }
 
     /// Gets top N entries from a leaderboard.
-    pub async fn leaderboard_top(&self, board: &str, count: isize) -> Result<Vec<LeaderboardEntry>> {
+    pub async fn leaderboard_top(
+        &self,
+        board: &str,
+        count: isize,
+    ) -> Result<Vec<LeaderboardEntry>> {
         let mut conn = self.pool.get().await?;
         let key = self.prefix_key(&format!("leaderboard:{}", board));
 
@@ -140,7 +154,12 @@ impl RedisCache {
     // ==================== RATE LIMITING ====================
 
     /// Checks rate limit. Returns true if under limit, false if exceeded.
-    pub async fn check_rate_limit(&self, key: &str, max_requests: u32, window_seconds: u64) -> Result<bool> {
+    pub async fn check_rate_limit(
+        &self,
+        key: &str,
+        max_requests: u32,
+        window_seconds: u64,
+    ) -> Result<bool> {
         let mut conn = self.pool.get().await?;
         let full_key = self.prefix_key(&format!("ratelimit:{}", key));
 

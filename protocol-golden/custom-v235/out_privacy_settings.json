@@ -1,0 +1,15 @@
+{
+  "id": "out_privacy_settings",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_PRIVACY_SETTINGS",
+  "wire_opcode": 51,
+  "payload_hex": "00010200",
+  "fields": {
+    "block_chat": false,
+    "block_private": true,
+    "block_trade": true,
+    "block_duel": false
+  },
+  "notes": "Payload only. Java PayloadCustomGenerator writes SEND_PRIVACY_SETTINGS as four bytes: block_chat, block_private, block_trade, block_duel."
+}

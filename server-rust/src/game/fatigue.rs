@@ -18,21 +18,18 @@ pub const MAX_FATIGUE: u32 = 150_000;
 /// In authentic RSC the server sends a distorted image of the word; here we
 /// keep a representative word list for the server-side answer generation.
 pub const SLEEP_WORDS: &[&str] = &[
-    "anchor", "apple", "arrow", "axe", "barrel", "basket", "battle", "bell",
-    "bird", "blade", "blanket", "bone", "book", "bottle", "bridge", "bucket",
-    "butter", "candle", "castle", "chain", "cheese", "chicken", "cloud",
-    "cobweb", "coffin", "coin", "comb", "copper", "cotton", "crown", "crystal",
-    "danger", "desert", "dragon", "eagle", "earth", "fence", "finger", "fire",
-    "flower", "forest", "fountain", "garden", "ghost", "goblin", "gold",
-    "grain", "hammer", "helmet", "horse", "island", "jewel", "jungle",
-    "king", "knight", "ladder", "leather", "legend", "lemon", "light",
-    "lizard", "magic", "market", "mirror", "monkey", "mountain", "mushroom",
-    "nature", "needle", "ocean", "onion", "orange", "palace", "pirate",
-    "poison", "prince", "pumpkin", "queen", "rabbit", "ranger", "river",
-    "rocket", "saddle", "shadow", "shield", "silver", "spider", "spirit",
-    "square", "stone", "storm", "stream", "summer", "sunset", "sword",
-    "temple", "throne", "tower", "travel", "turtle", "valley", "village",
-    "water", "window", "winter", "wizard",
+    "anchor", "apple", "arrow", "axe", "barrel", "basket", "battle", "bell", "bird", "blade",
+    "blanket", "bone", "book", "bottle", "bridge", "bucket", "butter", "candle", "castle", "chain",
+    "cheese", "chicken", "cloud", "cobweb", "coffin", "coin", "comb", "copper", "cotton", "crown",
+    "crystal", "danger", "desert", "dragon", "eagle", "earth", "fence", "finger", "fire", "flower",
+    "forest", "fountain", "garden", "ghost", "goblin", "gold", "grain", "hammer", "helmet",
+    "horse", "island", "jewel", "jungle", "king", "knight", "ladder", "leather", "legend", "lemon",
+    "light", "lizard", "magic", "market", "mirror", "monkey", "mountain", "mushroom", "nature",
+    "needle", "ocean", "onion", "orange", "palace", "pirate", "poison", "prince", "pumpkin",
+    "queen", "rabbit", "ranger", "river", "rocket", "saddle", "shadow", "shield", "silver",
+    "spider", "spirit", "square", "stone", "storm", "stream", "summer", "sunset", "sword",
+    "temple", "throne", "tower", "travel", "turtle", "valley", "village", "water", "window",
+    "winter", "wizard",
 ];
 
 // ---------------------------------------------------------------------------

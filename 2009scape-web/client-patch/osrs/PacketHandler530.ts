@@ -15,6 +15,9 @@ import { ClanState, PrivateMessage } from "./util/PrivateMessageQueue";
 import { SoundPlayer } from "./sound/SoundPlayer";
 import { MusicPlayer } from "./sound/MusicPlayer";
 import { InterfaceList } from "./InterfaceList";
+import { runClientScript, ClientScript530Data, Cs2Hooks } from "./script/ClientScript530";
+import { HuffmanCodec530, decodeQuickChatString } from "./util/HuffmanCodec530";
+import { applyAppearanceMask } from "./media/renderable/PlayerAppearance530";
 import Long from "long";
 
 export class PacketHandler530 {
@@ -23,12 +26,70 @@ export class PacketHandler530 {
 
     static handle(opcode530: number, buf: Buffer, size: number, game: any): boolean {
         const startPos = buf.currentPosition;
+        const handler = this.handlerName(opcode530);
         try {
-            return this.dispatch(opcode530, buf, size, game);
+            const ok = this.dispatch(opcode530, buf, size, game);
+            this.tracePacket(game, {
+                opcode: opcode530,
+                handler,
+                size,
+                consumed: buf.currentPosition - startPos,
+                ok,
+                error: null,
+            });
+            return ok;
         } catch (e) {
             // Any handler error: realign to the end of this packet and keep going.
             buf.currentPosition = startPos + (size > 0 ? size : 0);
+            this.tracePacket(game, {
+                opcode: opcode530,
+                handler,
+                size,
+                consumed: buf.currentPosition - startPos,
+                ok: true,
+                error: (e as Error)?.message || String(e),
+            });
             return true;
+        }
+    }
+
+    private static tracePacket(game: any, entry: any) {
+        if (!game) return;
+        const enabled = !!game.debugPackets530 || !!(globalThis as any).DEBUG_PACKETS_530;
+        if (!enabled) return;
+        if (!game.packetTrace530) game.packetTrace530 = [];
+        const trace = game.packetTrace530;
+        trace.push({ ...entry, cycle: game.pulseCycle ?? game.loopCycle ?? 0 });
+        if (trace.length > 200) trace.splice(0, trace.length - 200);
+        if (entry.error) {
+            console.log("[Packet530] handler error opcode=" + entry.opcode + " handler=" + entry.handler + " size=" + entry.size + " consumed=" + entry.consumed + " error=" + entry.error);
+        } else if (entry.consumed !== entry.size && entry.size >= 0) {
+            console.log("[Packet530] size mismatch opcode=" + entry.opcode + " handler=" + entry.handler + " size=" + entry.size + " consumed=" + entry.consumed);
+        }
+    }
+
+    private static traceContainer(game: any, entry: any) {
+        if (!game) return;
+        if (!game.containerTrace530) game.containerTrace530 = [];
+        const trace = game.containerTrace530;
+        trace.push({ ...entry, cycle: game.pulseCycle ?? game.loopCycle ?? 0 });
+        if (trace.length > 100) trace.splice(0, trace.length - 100);
+    }
+
+    private static handlerName(opcode530: number): string {
+        switch (opcode530) {
+            case 162: return "REBUILD_NORMAL";
+            case 110: return "INSTANCED_LOCATION_UPDATE";
+            case 112: return "CLEAR_REGION_CHUNK";
+            case 214: return "BUILD_DYNAMIC_SCENE";
+            case 230: return "UPDATE_AREA_POSITION_A";
+            case 26: return "UPDATE_AREA_POSITION_B";
+            case 225: return "PLAYER_INFO";
+            case 32: return "NPC_INFO";
+            case 115: return "RUN_CS2";
+            case 116: return "GRAND_EXCHANGE_OFFERS";
+            case 86: return "LOGOUT";
+            default: return "opcode_" + opcode530;
         }
     }
 
@@ -73,28 +134,28 @@ export class PacketHandler530 {
 
             // Interface packets (all fall through as "consumed")
             case 145: return this.handleWindowsPane(buf, size, game);   // WindowsPane (IF_OPENTOP)
-            case 149: return this.consumeKnown(buf, size);              // ResetInterface
-            case 155: return this.consumeKnown(buf, size);              // Interface (OpenTop)
-            case 21:  return this.consumeKnown(buf, size);              // InterfaceConfig
-            case 132: return this.consumeKnown(buf, size);              // InterfaceSetAngle
-            case 36:  return this.consumeKnown(buf, size);              // AnimateInterface
-            case 119: return this.consumeKnown(buf, size);              // RepositionChild
-            case 171: return this.consumeKnown(buf, size);              // IF_SETTEXT
-            case 165: return this.consumeKnown(buf, size);              // AccessMask
-            case 44:  return this.consumeKnown(buf, size);              // InteractionOption
-            case 217: return this.consumeKnown(buf, size);              // HintIcon
-            case 66:  return this.consumeKnown(buf, size);              // DisplayModel
-            case 73:  return this.consumeKnown(buf, size);              // DisplayModel
-            case 50:  return this.consumeKnown(buf, size);              // DisplayModel
-            case 130: return this.consumeKnown(buf, size);              // DisplayModel
-            case 144: return this.consumeKnown(buf, size);              // ContainerPacket clear (4)
-            case 22:  return this.consumeKnown(buf, size);              // ContainerPacket slot-based update (var-short)
-            case 105: return this.consumeKnown(buf, size);              // ContainerPacket full update (var-short)
-            case 55:  return this.consumeKnown(buf, size);              // UpdateClanChat
-            case 115: return this.consumeKnown(buf, size);              // CSConfigPacket
-            case 116: return this.consumeKnown(buf, size);              // CSConfigPacket (alt)
-            case 65:  return this.consumeKnown(buf, size);              // VarcUpdate / CSConfig
-            case 69:  return this.consumeKnown(buf, size);              // VarcUpdate
+            case 149: return this.handleIfCloseSub(buf, game);           // IF_CLOSESUB (6 bytes)
+            case 155: return this.handleIfOpenTop(buf, game);            // IF_OPENTOP (9 bytes)
+            case 21:  return this.handleIfSetHide(buf, game);            // IF_SETHIDE (7 bytes)
+            case 132: return this.handleIfSetAngle(buf, game);           // IF_SETANGLE (12 bytes)
+            case 36:  return this.handleIfSetAnim(buf, game);            // IF_SETANIM (8 bytes)
+            case 119: return this.handleIfSetPosition(buf, game);        // IF_SETPOSITION (10 bytes)
+            case 171: return this.handleIfSetText1(buf, size, game);     // IF_SETTEXT1 (var-byte)
+            case 165: return this.handleSetInterfaceSettings(buf, game); // SET_INTERFACE_SETTINGS (14 bytes)
+            case 44:  return this.handleSetInteraction(buf, size, game); // SET_INTERACTION (var-byte)
+            case 217: return this.handleHintArrow(buf, size, game);      // HINT_ARROW (var-byte)
+            case 66:  return this.handleIfSetPlayerHead(buf, game);      // IF_SETPLAYERHEAD (6 bytes)
+            case 73:  return this.handleIfSetNpcHead(buf, game);         // IF_SETNPCHEAD (8 bytes)
+            case 50:  return this.handleIfSetObject(buf, game);          // IF_SETOBJECT (12 bytes)
+            case 130: return this.handleIfSetModel(buf, game);           // IF_SETMODEL (8 bytes)
+            case 144: return this.handleUpdateInvClear(buf, game);       // UPDATE_INV_CLEAR (4)
+            case 22:  return this.handleUpdateInvPartial(buf, size, game); // UPDATE_INV_PARTIAL (var-short)
+            case 105: return this.handleUpdateInvFull(buf, size, game);    // UPDATE_INV_FULL (var-short)
+            case 55:  return this.handleJoinClanChat(buf, size, game);   // JOIN_CLAN_CHAT (var-byte)
+            case 115: return this.handleRunCs2(buf, size, game);         // RUN_CS2 (var-short)
+            case 116: return this.handleGrandExchangeOffers(buf, size, game); // GRAND_EXCHANGE_OFFERS
+            case 65:  return this.handleClientSetVarcSmall(buf, game);   // CLIENT_SETVARC_SMALL (5 bytes)
+            case 69:  return this.handleClientSetVarcLarge(buf, game);   // CLIENT_SETVARC_LARGE (8 bytes)
             case 2:   return this.handleIfSetColour(buf, game);          // IF_SETCOLOUR
             case 9:   return this.handleWidgetStructSetting(buf, size, game); // WIDGETSTRUCT_SETTING
             case 48:  return this.handleIfSetText2(buf, size, game);     // IF_SETTEXT2
@@ -138,14 +199,14 @@ export class PacketHandler530 {
             case 86:  return this.handleLogout(buf, game);              // 0 bytes
             case 85:  return this.handleSystemUpdate(buf, game);        // 2 bytes
             case 197: return this.handleContactStatus(buf, game);       // 1 byte
-            case 126: return this.consumeKnown(buf, size);              // Contact list update (var-short)
-            case 62:  return this.consumeKnown(buf, size);              // Contact ignore (var-byte)
-            case 84:  return this.handleVarbit(buf, game);              // 6 bytes
-            case 37:  return this.consumeKnown(buf, size);              // Varbit (3 bytes)
+            case 126: return this.handleUpdateIgnoreList(buf, size, game); // UPDATE_IGNORELIST (var-short)
+            case 62:  return this.handleUpdateFriendList(buf, size, game); // UPDATE_FRIENDLIST (var-byte)
+            case 84:  return this.handleVarbitLarge(buf, game);         // VARBIT_LARGE (6 bytes)
+            case 37:  return this.handleVarbitSmall(buf, game);         // VARBIT_SMALL (3 bytes)
             case 4:   return this.handleMidiSong(buf, game);            // MIDI_SONG (2 bytes)
             case 208: return this.handleMidiJingle(buf, game);          // MIDI_JINGLE (5 bytes)
-            case 211: return this.consumeKnown(buf, size);              // UpdateRandomFile (never sent)
-            case 10:  return this.consumeKnown(buf, size);              // SetWalkOption (TODO on server)
+            case 211: return this.handleUpdateRandomFile(buf, size, game); // UPDATE_RANDOM_FILE (never sent in practice)
+            case 10:  return this.handleSetWalkOption(buf, size, game);    // SET_WALK_OPTION (TODO on server)
 
             default:
                 // Unknown opcode - consume size bytes defensively to keep stream aligned
@@ -306,18 +367,28 @@ export class PacketHandler530 {
         return printable ? String.fromCharCode.apply(null, bytes) : "[message]";
     }
 
+    /** Set by Game.ts once idx10 (or wherever quickchat huffman bits live) loads. */
+    public static huffman: HuffmanCodec530 | null = null;
+
     static consumeQuickChatPayload(buf: Buffer, end: number): string {
-        // TODO Huffman decode (Tier 8). QuickChat phrase params are variable bytes.
+        // QuickChat bodies are length-prefixed huffman bytes. With a codec we decode
+        // the actual phrase text; without one, we still consume the right number of
+        // bytes so the stream stays aligned and return the legacy "[quickchat]" sentinel.
         const limit = Math.min(end, buf.buffer ? buf.buffer.length : end);
         if (buf.currentPosition >= limit) return "[quickchat]";
-        const remaining = limit - buf.currentPosition;
-        const declared = buf.buffer[buf.currentPosition] & 0xFF;
-        if (declared <= remaining - 1) {
-            buf.currentPosition += 1 + declared;
-        } else {
-            buf.currentPosition = limit;
+        const src = buf.buffer instanceof Uint8Array ? buf.buffer : new Uint8Array(buf.buffer);
+        try {
+            const { text, bytesConsumed } = decodeQuickChatString(src, buf.currentPosition, limit, this.huffman);
+            buf.currentPosition = Math.min(limit, buf.currentPosition + bytesConsumed);
+            return text || "[quickchat]";
+        } catch (_) {
+            // Fall back to the conservative skip on any decode error.
+            const remaining = limit - buf.currentPosition;
+            const declared = buf.buffer[buf.currentPosition] & 0xFF;
+            if (declared <= remaining - 1) buf.currentPosition += 1 + declared;
+            else buf.currentPosition = limit;
+            return "[quickchat]";
         }
-        return "[quickchat]";
     }
 
     static pushChat(game: any, name: string, message: string, type: number) {
@@ -329,6 +400,268 @@ export class PacketHandler530 {
     // Generic consumer for opcodes where we only need to keep the stream aligned
     static consumeKnown(buf: Buffer, size: number): boolean {
         if (size > 0) buf.currentPosition += size;
+        return true;
+    }
+
+    // ── gsmarts: variable-length smart int (rt4 Buffer.gsmarts) ────
+    // If first byte < 128: return that byte (1-byte form).
+    // Otherwise: read full g2() and mask off the high bit (2-byte form).
+    static gsmarts(buf: Buffer): number {
+        const b = buf.buffer[buf.currentPosition] & 0xFF;
+        if (b < 128) { buf.currentPosition++; return b; }
+        return this.g2(buf) & 0x7FFF;
+    }
+
+    // ── Inventory / container packet handlers ────────────────────────
+
+    private static signed32(value: number): number {
+        return value | 0;
+    }
+
+    private static inventoryContainerId(componentHash: number, containerId: number): number {
+        return this.signed32(componentHash) < -70000 ? containerId + 32768 : containerId;
+    }
+
+    private static getInventoryComponent(game: any, componentHash: number): any {
+        if (this.signed32(componentHash) < 0) return null;
+        const fromGame = game?.getComponent ? game.getComponent(componentHash) : null;
+        return fromGame || InterfaceList.get(componentHash >>> 16, componentHash & 0xFFFF);
+    }
+
+    private static ensureInventoryCapacity(comp: any, length: number): void {
+        if (!comp.inventoryItems) comp.inventoryItems = [];
+        if (!comp.inventoryItemAmounts) comp.inventoryItemAmounts = [];
+        while (comp.inventoryItems.length < length) comp.inventoryItems.push(-1);
+        while (comp.inventoryItemAmounts.length < length) comp.inventoryItemAmounts.push(0);
+    }
+
+    private static syncLegacyInventoryWidget(game: any, componentHash: number, comp: any): void {
+        if (!game?.syncLegacyInventoryWidget || this.signed32(componentHash) < 0) return;
+        try {
+            game.syncLegacyInventoryWidget(componentHash, comp);
+        } catch (_) {
+            // The 530 Component state is authoritative; legacy widget mirroring is best-effort.
+        }
+    }
+
+    private static syncLegacyInterfaceWidgets(game: any, interfaceId: number, rootWidgetId: number = interfaceId): void {
+        if (!game?.syncLegacyInterfaceWidgets || interfaceId < 0 || rootWidgetId < 0) return;
+        const js5 = game.js5Cache || (globalThis as any).js5Cache || null;
+        InterfaceList.loadInterface(js5, interfaceId).then(() => {
+            try {
+                game.syncLegacyInterfaceWidgets(interfaceId, rootWidgetId);
+            } catch (_) {
+                // The 530 Component state is authoritative; legacy widget synthesis is best-effort.
+            }
+        });
+    }
+
+    private static syncInventoryComponent(
+        game: any,
+        componentHash: number,
+        clearFirst: boolean,
+        updates: { slot: number; itemId: number; count: number }[],
+        minLength: number = 0,
+    ): void {
+        const apply = (): boolean => {
+            const comp = this.getInventoryComponent(game, componentHash);
+            if (!comp) return false;
+            let length = minLength | 0;
+            for (const u of updates) if (u.slot + 1 > length) length = u.slot + 1;
+            this.ensureInventoryCapacity(comp, length);
+            if (clearFirst) {
+                for (let i = 0; i < comp.inventoryItems.length; i++) {
+                    comp.inventoryItems[i] = -1;
+                    comp.inventoryItemAmounts[i] = 0;
+                }
+            }
+            for (const u of updates) {
+                if (u.slot < 0) continue;
+                this.ensureInventoryCapacity(comp, u.slot + 1);
+                comp.inventoryItems[u.slot] = u.itemId;
+                comp.inventoryItemAmounts[u.slot] = u.count;
+            }
+            this.syncLegacyInventoryWidget(game, componentHash, comp);
+            return true;
+        };
+        if (apply()) return;
+        const js5 = game ? (game.js5Cache || (globalThis as any).js5Cache || null) : null;
+        InterfaceList.loadInterface(js5, componentHash >>> 16).then(() => apply());
+    }
+
+    static handleUpdateInvClear(buf: Buffer, game: any): boolean {
+        // rt4 Protocol.java UPDATE_INV_CLEAR — reads g4() component hash, zeros all slots.
+        const componentHash = this.g4(buf);
+        this.syncInventoryComponent(game, componentHash, true, []);
+        // Also clear from per-container game map.
+        if (game) {
+            if (!game.containerItems) game.containerItems = {};
+            if (!game.containerAmounts) game.containerAmounts = {};
+            let clearedMappedContainer = false;
+            if (game.containerComponents) {
+                for (const key of Object.keys(game.containerComponents)) {
+                    if (game.containerComponents[key] !== componentHash) continue;
+                    game.containerItems[key] = [];
+                    game.containerAmounts[key] = [];
+                    clearedMappedContainer = true;
+                }
+            }
+            if (!clearedMappedContainer) {
+                game.containerItems[componentHash] = [];
+                game.containerAmounts[componentHash] = [];
+            }
+        }
+        return true;
+    }
+
+    static handleUpdateInvPartial(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java UPDATE_INV_PARTIAL — per-slot updates.
+        // Format: g4(componentHash) + g2(containerId) + loop: gsmarts(slot) + g2(itemId1based) + if != 0: g1/g4(count)
+        const start = buf.currentPosition;
+        const componentHash = this.g4(buf);
+        const rawContainerId = this.g2(buf);
+        const containerId = this.inventoryContainerId(componentHash, rawContainerId);
+        const end = start + size;
+        const updates: { slot: number; itemId: number; count: number }[] = [];
+        if (game) {
+            if (!game.containerItems) game.containerItems = {};
+            if (!game.containerAmounts) game.containerAmounts = {};
+            if (!game.containerComponents) game.containerComponents = {};
+            game.containerComponents[containerId] = componentHash;
+            if (!game.containerItems[containerId]) game.containerItems[containerId] = [];
+            if (!game.containerAmounts[containerId]) game.containerAmounts[containerId] = [];
+        }
+        while (buf.currentPosition < end && buf.currentPosition < buf.buffer.length) {
+            const slot = this.gsmarts(buf);
+            const itemId1based = this.g2(buf); // 1-based item id; 0 = empty slot
+            let count = 0;
+            if (itemId1based !== 0) {
+                const raw = this.g1(buf);
+                count = raw === 255 ? this.g4(buf) : raw;
+            }
+            const itemId = itemId1based - 1; // convert to 0-based (-1 when empty)
+            updates.push({ slot, itemId: itemId1based === 0 ? -1 : itemId, count });
+            if (game) {
+                game.containerItems[containerId][slot] = itemId1based === 0 ? -1 : itemId;
+                game.containerAmounts[containerId][slot] = count;
+            }
+        }
+        this.syncInventoryComponent(game, componentHash, false, updates);
+        this.traceContainer(game, {
+            opcode: 22,
+            componentHash,
+            rawContainerId,
+            containerId,
+            slots: updates.length,
+            sample: updates.slice(0, 8),
+        });
+        if (buf.currentPosition < end) buf.currentPosition = end;
+        return true;
+    }
+
+    static handleUpdateInvFull(buf: Buffer, size: number, game: any): boolean {
+        // rt4 Protocol.java UPDATE_INV_FULL — full container snapshot.
+        // Format: g4(componentHash) + g2(containerId) + g2(total) + loop: g1sub(count, 255→g4) + g2(itemId1based)
+        const start = buf.currentPosition;
+        const componentHash = this.g4(buf);
+        const rawContainerId = this.g2(buf);
+        const containerId = this.inventoryContainerId(componentHash, rawContainerId);
+        const total = this.g2(buf);
+        const updates: { slot: number; itemId: number; count: number }[] = [];
+        if (game) {
+            if (!game.containerItems) game.containerItems = {};
+            if (!game.containerAmounts) game.containerAmounts = {};
+            if (!game.containerComponents) game.containerComponents = {};
+            game.containerComponents[containerId] = componentHash;
+            game.containerItems[containerId] = new Array(total).fill(-1);
+            game.containerAmounts[containerId] = new Array(total).fill(0);
+        }
+        for (let slot = 0; slot < total; slot++) {
+            const rawCount = this.g1sub(buf);
+            const count = rawCount === 255 ? this.g4(buf) : rawCount;
+            const itemId1based = this.g2(buf);
+            const itemId = itemId1based - 1;
+            updates.push({ slot, itemId: itemId1based === 0 ? -1 : itemId, count });
+            if (game) {
+                game.containerItems[containerId][slot] = itemId1based === 0 ? -1 : itemId;
+                game.containerAmounts[containerId][slot] = count;
+            }
+        }
+        this.syncInventoryComponent(game, componentHash, true, updates, total);
+        this.traceContainer(game, {
+            opcode: 105,
+            componentHash,
+            rawContainerId,
+            containerId,
+            total,
+            sample: updates.filter((update) => update.itemId >= 0 || update.count > 0).slice(0, 8),
+        });
+        const end = start + size;
+        if (buf.currentPosition < end) buf.currentPosition = end;
+        return true;
+    }
+
+    // ── Varbit handlers ──────────────────────────────────────────────
+
+    static handleVarbitLarge(buf: Buffer, game: any): boolean {
+        // Opcode 84: VARBIT_LARGE — varbitId(g2) + value(g4) = 6 bytes.
+        const varbitId = this.g2(buf);
+        const value = this.g4(buf);
+        if (game) {
+            if (!game.varbitValues) game.varbitValues = {};
+            game.varbitValues[varbitId] = value;
+        }
+        return true;
+    }
+
+    static handleVarbitSmall(buf: Buffer, game: any): boolean {
+        // Opcode 37: VARBIT_SMALL — varbitId(g2) + value(g1) = 3 bytes.
+        const varbitId = this.g2(buf);
+        const value = this.g1(buf);
+        if (game) {
+            if (!game.varbitValues) game.varbitValues = {};
+            game.varbitValues[varbitId] = value;
+        }
+        return true;
+    }
+
+    // ── Interface visibility / VarC handlers ─────────────────────────
+
+    static handleIfSetHide(buf: Buffer, game: any): boolean {
+        // rt4 IF_SETHIDE: g1neg(parent) + g2(tracknum) + ig4(componentHash). 7 bytes total.
+        const parent = this.g1neg(buf);
+        const tracknum = this.g2(buf);
+        const componentHash = this.ig4(buf);
+        // 'parent' field actually carries the hidden flag (0 = visible, !0 = hidden) per rt4
+        // DelayedStateChange.method2905 semantics. We surface both for the renderer to pick from.
+        this.recordIfUpdate(game, "IF_SETHIDE", componentHash, { hidden: parent !== 0, parent, tracknum });
+        return true;
+    }
+
+    static handleClientSetVarcSmall(buf: Buffer, game: any): boolean {
+        // rt4 CLIENT_SETVARC_SMALL: ig2(tracknum) + g1neg(value) + ig2add(id). 5 bytes.
+        const tracknum = this.ig2(buf);
+        const rawValue = this.g1neg(buf);
+        const value = rawValue > 127 ? rawValue - 256 : rawValue;
+        const id = this.ig2add(buf);
+        if (game) {
+            if (!game.varcValues) game.varcValues = {};
+            game.varcValues[id] = value;
+        }
+        this.recordIfUpdate(game, "CLIENT_SETVARC", id, { value, tracknum });
+        return true;
+    }
+
+    static handleClientSetVarcLarge(buf: Buffer, game: any): boolean {
+        // rt4 CLIENT_SETVARC_LARGE: ig2add(tracknum) + g4(value) + g2add(id). 8 bytes.
+        const tracknum = this.ig2add(buf);
+        const value = this.g4(buf) | 0;
+        const id = this.g2add(buf);
+        if (game) {
+            if (!game.varcValues) game.varcValues = {};
+            game.varcValues[id] = value;
+        }
+        this.recordIfUpdate(game, "CLIENT_SETVARC", id, { value, tracknum });
         return true;
     }
 
@@ -653,7 +986,10 @@ export class PacketHandler530 {
         const volume = this.ig3(buf);
         let trackId = this.ig2(buf);
         if (trackId === 65535) trackId = -1;
-        game.previousSong = volume;
+        // Do not reuse Game.previousSong here. In the translated 377 client
+        // that field is a countdown which eventually re-enters the legacy
+        // on-demand MIDI requester; 530 music is handled by MusicPlayer.
+        game.lastJingleVolume530 = volume;
         MusicPlayer.playJingle(trackId, volume & 0xFF);
         return true;
     }
@@ -759,9 +1095,13 @@ export class PacketHandler530 {
         // region's map-file groupId with its XTEA key. Mirrors rt4-client
         // Protocol.java loop at line ~448.
         const regionBitPacked: number[] = new Array(regionCount);
+        const rxStart = ((regionX - 6) / 8) | 0;
+        const rxEnd = ((regionX + 6) / 8) | 0;
+        const rzStart = ((regionZ - 6) / 8) | 0;
+        const rzEnd = ((regionZ + 6) / 8) | 0;
         let slot = 0;
-        for (let rx = ((regionX - 6) / 8) | 0; rx <= ((regionX + 6) / 8) | 0; rx++) {
-            for (let rz = ((regionZ - 6) / 8) | 0; rz <= ((regionZ + 6) / 8) | 0; rz++) {
+        for (let rx = rxStart; rx <= rxEnd; rx++) {
+            for (let rz = rzStart; rz <= rzEnd; rz++) {
                 if (slot < regionCount) regionBitPacked[slot++] = (rx << 8) + rz;
             }
         }
@@ -786,6 +1126,33 @@ export class PacketHandler530 {
         game.nextTopRightTileY = (game.chunkY - 6) * 8;
         game.aBoolean1163 = false;
         if (game.plane === undefined || game.plane === null) game.plane = 0;
+        // Camera fallback: if the local player still has near-origin coords
+        // (PLAYER_INFO teleport hasn't arrived or parsed cleanly), seed the
+        // camera at scene-local centre tile (52, 52) so the visibility window
+        // covers the populated 64×64 region. PLAYER_INFO will overwrite this
+        // shortly with the real player position when it arrives.
+        const lp = this.ensureLocalPlayer(game);
+        if (lp && (lp.worldX === undefined || lp.worldX < 1024)) {
+            // Snap the player to scene-local centre so the camera follower
+            // (anInt1262/1263 = localPlayer.worldX + anInt853) lands inside
+            // the 64×64 populated region. PLAYER_INFO teleport overwrites
+            // this when it arrives with the real position.
+            const cx = 52, cy = 52;
+            if (lp.setPosition) {
+                lp.setPosition(cx, cy, true);
+            } else {
+                if (lp.pathX) lp.pathX[0] = cx;
+                if (lp.pathY) lp.pathY[0] = cy;
+                lp.worldX = cx * 128 + 64;
+                lp.worldY = cy * 128 + 64;
+            }
+            game.cameraX = lp.worldX;
+            game.cameraY = lp.worldY;
+            if (!(game as any).__cameraFallbackLogged) {
+                (game as any).__cameraFallbackLogged = true;
+                console.log("[Camera530] fallback: snapped player+cam to scene centre worldX=" + lp.worldX + " worldY=" + lp.worldY);
+            }
+        }
         // Mark loading-stage to "loading" so the existing 377 method144
         // pipeline picks up populated byte arrays + parses regions when
         // the async fetch below completes.
@@ -872,6 +1239,7 @@ export class PacketHandler530 {
         const plane = flag >> 1;
         const teleport = (flag & 1) !== 0;
         if (plane >= 0 && plane < 4) game.plane = plane;
+        if (game) game.instancedLocationUpdate530 = { plane, teleport, sceneX, sceneY };
         return true;
     }
 
@@ -879,12 +1247,21 @@ export class PacketHandler530 {
         // Opcode 112: ClearRegionChunk (2 bytes) - put(x) + putC(y)
         const x = this.g1(buf);
         const y = this.g1neg(buf);
+        if (game) game.clearRegionChunk530 = { x, y };
         return true;
     }
 
     static handleUpdateAreaPositionA(buf: Buffer, size: number, game: any): boolean {
         // Opcode 230: UpdateAreaPosition (var-short) - putA(y) + putS(x) + chunk data
-        if (size > 0) buf.currentPosition += size;
+        const start = buf.currentPosition;
+        let x = 0;
+        let y = 0;
+        if (size >= 2) {
+            y = this.g1add(buf);
+            x = this.g1sub(buf);
+        }
+        if (game) game.updateAreaPosition530 = { variant: "A", x, y, size };
+        if (buf.currentPosition - start < size) buf.currentPosition = start + size;
         return true;
     }
 
@@ -892,11 +1269,23 @@ export class PacketHandler530 {
         // Opcode 26: UpdateAreaPosition fixed variant (2 bytes) - putC(x) + put(y)
         const x = this.g1neg(buf);
         const y = this.g1(buf);
+        if (game) game.updateAreaPosition530 = { variant: "B", x, y, size };
         return true;
     }
 
     static handleBuildDynamicScene(buf: Buffer, size: number, game: any): boolean {
         // Opcode 214: BuildDynamicScene (var-short) - complex payload, consume
+        const start = buf.currentPosition;
+        const preview: number[] = [];
+        const previewLen = Math.min(size, 32);
+        for (let i = 0; i < previewLen; i++) preview.push(buf.buffer[start + i] & 0xFF);
+        if (game) {
+            game.dynamicScene530 = {
+                size,
+                rawPreview: preview,
+                receivedAtCycle: game.pulseCycle ?? game.loopCycle ?? 0,
+            };
+        }
         if (size > 0) buf.currentPosition += size;
         return true;
     }
@@ -1339,15 +1728,6 @@ export class PacketHandler530 {
         return true;
     }
 
-    static handleVarbit(buf: Buffer, game: any): boolean {
-        // Opcode 84: Varbit (6 bytes) - varbit id + value
-        if (buf.currentPosition + 6 > buf.buffer.length) {
-            return true;
-        }
-        buf.currentPosition += 6;
-        return true;
-    }
-
     static handleUpdateStat(buf: Buffer, game: any): boolean {
         // Opcode 38: UPDATE_STAT (6 bytes)
         // Server writes: putA(level), putIntA(xp), put(skillId)
@@ -1473,6 +1853,9 @@ export class PacketHandler530 {
             const z = buf.getBits(2);
             const maskRequired = buf.getBits(1);
             const sceneX = buf.getBits(7);
+            if (maskRequired === 1) {
+                game.updatedPlayers[game.updatedPlayerCount++] = game.thisPlayerId;
+            }
             game.plane = z & 3;
             if (localPlayer) {
                 if (localPlayer.setPosition) {
@@ -1483,10 +1866,15 @@ export class PacketHandler530 {
                     localPlayer.worldX = sceneX * 128 + 64;
                     localPlayer.worldY = sceneY * 128 + 64;
                 }
-                if (game.cameraX === 0 && game.cameraY === 0) {
-                    game.cameraX = localPlayer.worldX;
-                    game.cameraY = localPlayer.worldY;
+                if (!(game as any).__teleportLogged) {
+                    (game as any).__teleportLogged = true;
+                    console.log("[PlayerPos530] teleport sceneX=" + sceneX + " sceneY=" + sceneY + " z=" + z + " teleporting=" + teleporting + " worldX=" + localPlayer.worldX + " worldY=" + localPlayer.worldY);
                 }
+                // Always snap the camera to the new player position on teleport
+                // (377 only seeded the camera once on first arrival; for the 530
+                // path we want every teleport / region rebuild to recentre).
+                game.cameraX = localPlayer.worldX;
+                game.cameraY = localPlayer.worldY;
             }
         } else if (subOpcode === 2) {
             // rt4 readSelfPlayerInfo type 2:
@@ -1504,6 +1892,9 @@ export class PacketHandler530 {
                 }
             }
             const maskRequired = buf.getBits(1);
+            if (maskRequired === 1) {
+                game.updatedPlayers[game.updatedPlayerCount++] = game.thisPlayerId;
+            }
         } else if (subOpcode === 1) {
             // Walk: walkDir(3) + maskRequired(1)
             const walkDir = buf.getBits(3);
@@ -1511,9 +1902,15 @@ export class PacketHandler530 {
             if (localPlayer && localPlayer.move) {
                 localPlayer.move(walkDir, false);
             }
+            if (maskRequired === 1) {
+                game.updatedPlayers[game.updatedPlayerCount++] = game.thisPlayerId;
+            }
         } else {
             // subOpcode 0: maskRequired only — position unchanged.
-            buf.getBits(1);
+            const maskRequired = buf.getBits(1);
+            if (maskRequired === 1) {
+                game.updatedPlayers[game.updatedPlayerCount++] = game.thisPlayerId;
+            }
         }
     }
 
@@ -1700,6 +2097,14 @@ export class PacketHandler530 {
     static parseAppearanceMask(buf: Buffer, id: number, player: any, game: any): void {
         const length = buf.getByteAdded();
         const start = buf.currentPosition;
+        // Snapshot the raw 530 wire slice before we consume it. The 377-shape
+        // bytes assembled below feed the legacy avatar; the snapshot feeds
+        // applyAppearanceMask() so PlayerAppearance530.composeAppearanceModel
+        // can rebuild the rev-530 mesh on the next compose tick.
+        const raw530Bytes = new Uint8Array(length);
+        if (length > 0 && buf.buffer && start + length <= buf.buffer.length) {
+            for (let i = 0; i < length; i++) raw530Bytes[i] = buf.buffer[start + i] & 0xFF;
+        }
         const bytes: number[] = [];
         const pushByte = (value: number) => bytes.push(value & 0xFF);
         const pushShort = (value: number) => {
@@ -1774,6 +2179,16 @@ export class PacketHandler530 {
             const appearance = new Buffer(bytes);
             game.cachedAppearances[id] = appearance;
             player.updateAppearance(appearance);
+        }
+        // 530 path: parse the raw wire bytes into PlayerAppearance530Data and
+        // mark the player dirty. The compose poller in Game.ts picks this up
+        // and runs composeAppearanceModel asynchronously.
+        if (player && !npcTransform && raw530Bytes.length > 0) {
+            try {
+                applyAppearanceMask(player, raw530Bytes);
+            } catch (e) {
+                // Decode failures are silent — the legacy 377 avatar still renders.
+            }
         }
         buf.currentPosition = start + length;
     }
@@ -1927,8 +2342,13 @@ export class PacketHandler530 {
             } else if (type === 2) {
                 game.anIntArray1134[game.anInt1133++] = id;
                 npc.pulseCycle = game.constructor.pulseCycle;
-                npc.move(buf.getBits(3), true);
-                npc.move(buf.getBits(3), true);
+                const doubleStep = buf.getBits(1);
+                if (doubleStep === 1) {
+                    npc.move(buf.getBits(3), true);
+                    npc.move(buf.getBits(3), true);
+                } else {
+                    npc.move(buf.getBits(3), false);
+                }
                 if (buf.getBits(1) === 1) game.updatedPlayers[game.updatedPlayerCount++] = id;
             } else {
                 game.removePlayers[game.removePlayerCount++] = id;
@@ -2065,8 +2485,11 @@ export class PacketHandler530 {
             buf.getBits(3);
             buf.getBits(1);
         } else if (type === 2) {
+            const doubleStep = buf.getBits(1);
             buf.getBits(3);
-            buf.getBits(3);
+            if (doubleStep === 1) {
+                buf.getBits(3);
+            }
             buf.getBits(1);
         }
     }
@@ -2192,6 +2615,367 @@ export class PacketHandler530 {
             game.windowPanePacketCount = packetCount;
         }
         InterfaceList.openModal(windowId, windowId << 16);
+        this.syncLegacyInterfaceWidgets(game, windowId, windowId);
+        return true;
+    }
+
+    // ── Helpers for signed-short variants used below ─────────────────
+
+    /** LE signed 16-bit (rt4 Buffer.ig2b). */
+    static ig2b(buf: Buffer): number {
+        const v = this.ig2(buf);
+        return v > 32767 ? v - 0x10000 : v;
+    }
+
+    /** BE signed 16-bit with second byte add-128 (rt4 Buffer.g2badd). */
+    static g2badd(buf: Buffer): number {
+        const v = this.g2add(buf);
+        return v > 32767 ? v - 0x10000 : v;
+    }
+
+    // ── Misc UI / display-model handlers ─────────────────────────────
+
+    static handleIfSetAnim(buf: Buffer, game: any): boolean {
+        // rt4 IF_SETANIM: mg4(componentHash) + ig2b(seqId) + g2add(tracknum). 8 bytes.
+        const id = this.mg4(buf);
+        const seqId = this.ig2b(buf);
+        const tracknum = this.g2add(buf);
+        this.recordIfUpdate(game, "IF_SETANIM", id, { seqId, tracknum });
+        return true;
+    }
+
+    static handleIfSetPosition(buf: Buffer, game: any): boolean {
+        // rt4 IF_SETPOSITION: g2add(tracknum) + ig4(componentHash) + g2b(x) + g2badd(y). 10 bytes.
+        const tracknum = this.g2add(buf);
+        const id = this.ig4(buf);
+        const x = this.g2b(buf);
+        const y = this.g2badd(buf);
+        this.recordIfUpdate(game, "IF_SETPOSITION", id, { x, y, tracknum });
+        return true;
+    }
+
+    static handleIfSetText1(buf: Buffer, size: number, game: any): boolean {
+        // rt4 IF_SETTEXT1: mg4(componentHash) + gjstr(text) + g2add(tracknum). var-byte.
+        const start = buf.currentPosition;
+        const id = this.mg4(buf);
+        const text = this.gjstr(buf);
+        const tracknum = this.g2add(buf);
+        this.recordIfUpdate(game, "IF_SETTEXT2", id, { text, tracknum });
+        if (buf.currentPosition - start < size) buf.currentPosition = start + size;
+        return true;
+    }
+
+    static handleSetInterfaceSettings(buf: Buffer, game: any): boolean {
+        // rt4 SET_INTERFACE_SETTINGS: ig2(tracknum) + ig2(end) + g4(componentHash) + g2add(start) + img4(accessMask). 14 bytes.
+        const tracknum = this.ig2(buf);
+        const endRaw = this.ig2(buf);
+        const end = endRaw === 65535 ? -1 : endRaw;
+        const id = this.g4(buf);
+        const startRaw = this.g2add(buf);
+        const startSlot = startRaw === 65535 ? -1 : startRaw;
+        const accessMask = this.img4(buf);
+        this.recordIfUpdate(game, "SET_INTERFACE_SETTINGS", id, { tracknum, accessMask, startSlot, end });
+        return true;
+    }
+
+    static handleSetInteraction(buf: Buffer, size: number, game: any): boolean {
+        // rt4 SET_INTERACTION: ig2add(cursor) + g1(top) + g1(optId) + gjstr(option). var-byte.
+        const start = buf.currentPosition;
+        const cursor = this.ig2add(buf);
+        const top = this.g1(buf);
+        const optId = this.g1(buf);
+        const option = this.gjstr(buf);
+        if (game) {
+            if (!game.interactions) game.interactions = {};
+            game.interactions[optId] = { cursor, top, option };
+        }
+        if (buf.currentPosition - start < size) buf.currentPosition = start + size;
+        return true;
+    }
+
+    static handleHintArrow(buf: Buffer, size: number, game: any): boolean {
+        // rt4 HINT_ARROW: variable shape — first byte is the type/flags, payload depends on it.
+        // We capture the type and consume the rest verbatim; any future renderer pass can decode
+        // from the raw bytes. The wire format is documented in rt4 Protocol.java around opcode 217.
+        const start = buf.currentPosition;
+        if (size <= 0) return true;
+        const type = this.g1(buf);
+        const remaining = (start + size) - buf.currentPosition;
+        const raw: number[] = [];
+        for (let i = 0; i < remaining; i++) raw.push(this.g1(buf));
+        if (game) {
+            if (!game.hintArrows) game.hintArrows = [];
+            game.hintArrows.push({ type, payload: raw });
+        }
+        return true;
+    }
+
+    static handleIfSetPlayerHead(buf: Buffer, game: any): boolean {
+        // rt4 IF_SETPLAYERHEAD: ig2add(tracknum) + img4(componentHash). 6 bytes.
+        const tracknum = this.ig2add(buf);
+        const id = this.img4(buf);
+        this.recordIfUpdate(game, "IF_SETPLAYERHEAD", id, { tracknum });
+        return true;
+    }
+
+    static handleIfSetNpcHead(buf: Buffer, game: any): boolean {
+        // rt4 IF_SETNPCHEAD: g2add(npcId) + ig4(componentHash) + ig2(tracknum). 8 bytes.
+        const npcId = this.g2add(buf);
+        const id = this.ig4(buf);
+        const tracknum = this.ig2(buf);
+        this.recordIfUpdate(game, "IF_SETNPCHEAD", id, { npcId, tracknum });
+        return true;
+    }
+
+    static handleIfSetObject(buf: Buffer, game: any): boolean {
+        // rt4 IF_SETOBJECT: g4(slotIndex) + mg4(componentHash) + ig2add(itemId) + ig2(tracknum). 12 bytes.
+        const slotIndex = this.g4(buf);
+        const id = this.mg4(buf);
+        const itemId = this.ig2add(buf);
+        const tracknum = this.ig2(buf);
+        this.recordIfUpdate(game, "IF_SETOBJECT", id, { slotIndex, itemId, tracknum });
+        return true;
+    }
+
+    static handleIfSetModel(buf: Buffer, game: any): boolean {
+        // rt4 IF_SETMODEL: ig4(componentHash) + ig2add(tracknum) + g2add(modelId). 8 bytes.
+        const id = this.ig4(buf);
+        const tracknum = this.ig2add(buf);
+        const modelId = this.g2add(buf);
+        this.recordIfUpdate(game, "IF_SETMODEL", id, { modelId, tracknum });
+        return true;
+    }
+
+    // ── Friend/ignore lists ──────────────────────────────────────────
+
+    static handleUpdateFriendList(buf: Buffer, size: number, game: any): boolean {
+        // rt4 UPDATE_FRIENDLIST: g8(name37) + g2(worldId) + g1(rank) + (gjstr(worldName) if worldId > 0). var-byte.
+        const start = buf.currentPosition;
+        const name37 = this.g8(buf);
+        const worldId = this.g2(buf);
+        const rank = this.g1(buf);
+        let worldName = "";
+        if (worldId > 0 && (start + size) > buf.currentPosition) {
+            worldName = this.gjstr(buf);
+        }
+        if (game) {
+            if (!game.friendList) game.friendList = [];
+            game.friendList.push({
+                name: this.name37ToString(name37),
+                name37: name37.toString(),
+                worldId, rank, worldName,
+            });
+        }
+        if (buf.currentPosition - start < size) buf.currentPosition = start + size;
+        return true;
+    }
+
+    static handleUpdateIgnoreList(buf: Buffer, size: number, game: any): boolean {
+        // rt4 UPDATE_IGNORELIST: repeating g8(name37). var-short.
+        const start = buf.currentPosition;
+        const entries: string[] = [];
+        const limit = start + size;
+        while (buf.currentPosition + 8 <= limit) {
+            const n37 = this.g8(buf);
+            entries.push(this.name37ToString(n37));
+        }
+        if (game) {
+            if (!game.ignoreList) game.ignoreList = [];
+            for (const e of entries) game.ignoreList.push(e);
+        }
+        if (buf.currentPosition < limit) buf.currentPosition = limit;
+        return true;
+    }
+
+    // ── CS2 / GE handlers ────────────────────────────────────────────
+
+    static handleRunCs2(buf: Buffer, size: number, game: any): boolean {
+        // rt4 RUN_CS2: g2(tracknum) + gjstr(argTypes) + per-arg [g4 or gjstr by 's'] + g4(scriptId).
+        // Decoded args are queued onto game.cs2Pending. If game.cs2Hooks (Cs2Hooks) and
+        // game.cs2LoadScript (script-id → ClientScript530Data) are present, the VM runs
+        // the script immediately and the result is pushed to game.cs2Results.
+        const start = buf.currentPosition;
+        const tracknum = this.g2(buf);
+        const argTypes = this.gjstr(buf);
+        const args: any[] = new Array(argTypes.length + 1);
+        for (let i = argTypes.length - 1; i >= 0; i--) {
+            if (argTypes.charCodeAt(i) === 115) { // 's' = string
+                args[i + 1] = this.gjstr(buf);
+            } else {
+                args[i + 1] = this.g4(buf);
+            }
+        }
+        args[0] = this.g4(buf);
+        const scriptId = args[0];
+        const scriptArgs = args.slice(1);
+        if (game) {
+            if (!game.cs2Pending) game.cs2Pending = [];
+            game.cs2Pending.push({ scriptId, argTypes, args: scriptArgs, tracknum });
+            const loadScript: ((id: number) => ClientScript530Data | null) | undefined = game.cs2LoadScript;
+            if (loadScript) {
+                try {
+                    const script = loadScript(scriptId);
+                    if (script) {
+                        const gameHooks = (game.cs2Hooks || {}) as Cs2Hooks;
+                        const hooks: Cs2Hooks = {
+                            ...gameHooks,
+                            getVarp: gameHooks.getVarp ?? ((id) => game.widgetSettings?.[id] ?? 0),
+                            setVarp: gameHooks.setVarp ?? ((id, v) => { if (game.widgetSettings) game.widgetSettings[id] = v; }),
+                            getVarbit: gameHooks.getVarbit ?? ((id) => game.varbitValues?.[id] ?? 0),
+                            setVarbit: gameHooks.setVarbit ?? ((id, v) => { if (!game.varbitValues) game.varbitValues = {}; game.varbitValues[id] = v; }),
+                            getVarc: gameHooks.getVarc ?? ((id) => game.varcValues?.[id] ?? 0),
+                            setVarc: gameHooks.setVarc ?? ((id, v) => { if (!game.varcValues) game.varcValues = {}; game.varcValues[id] = v; }),
+                            loadScript: gameHooks.loadScript ?? loadScript,
+                        };
+                        const result = runClientScript(script, scriptArgs, hooks);
+                        if (!game.cs2Results) game.cs2Results = [];
+                        game.cs2Results.push({ scriptId, result, tracknum });
+                    }
+                } catch (_) {
+                    // Swallow VM errors so a single bad script doesn't tear down the packet stream.
+                }
+            }
+        }
+        if (buf.currentPosition - start < size) buf.currentPosition = start + size;
+        return true;
+    }
+
+    static handleIfCloseSub(buf: Buffer, game: any): boolean {
+        // rt4 IF_CLOSESUB: g2(tracknum) + g4(componentHash). 6 bytes.
+        const tracknum = this.g2(buf);
+        const id = this.g4(buf);
+        InterfaceList.closeSub(id);
+        this.recordIfUpdate(game, "IF_CLOSESUB", id, { tracknum });
+        return true;
+    }
+
+    static handleIfOpenTop(buf: Buffer, game: any): boolean {
+        // rt4 IF_OPENTOP: g1(type) + mg4(pointer) + g2add(tracknum) + g2(component). 9 bytes.
+        const type = this.g1(buf);
+        const pointer = this.mg4(buf);
+        const tracknum = this.g2add(buf);
+        const component = this.g2(buf);
+        if (game) {
+            game.topInterface = { type, pointer, component, tracknum };
+        }
+        InterfaceList.openModal(component, pointer);
+        this.syncLegacyInterfaceWidgets(game, component, component);
+        return true;
+    }
+
+    static handleIfSetAngle(buf: Buffer, game: any): boolean {
+        // rt4 IF_SETANGLE: g2(pitch) + g2add(tracknum) + ig2add(scale) + ig2add(yaw) + g4(componentHash). 12 bytes.
+        const pitch = this.g2(buf);
+        const tracknum = this.g2add(buf);
+        const scale = this.ig2add(buf);
+        const yaw = this.ig2add(buf);
+        const id = this.g4(buf);
+        this.recordIfUpdate(game, "IF_SETANGLE", id, { pitch, yaw, scale, tracknum });
+        return true;
+    }
+
+    static handleUpdateRandomFile(buf: Buffer, size: number, game: any): boolean {
+        // rt4 UPDATE_RANDOM_FILE: gjstr(filename) + g4(checksum). Triggers a forced
+        // download of an arbitrary file. The 2009scape server does not emit this in
+        // practice, but we decode it cleanly so the stream stays aligned if it ever does.
+        const start = buf.currentPosition;
+        const filename = this.gjstr(buf);
+        const checksum = (buf.currentPosition + 4 <= start + size) ? this.g4(buf) : 0;
+        if (game) {
+            if (!game.randomFileRequests) game.randomFileRequests = [];
+            game.randomFileRequests.push({ filename, checksum });
+        }
+        if (buf.currentPosition - start < size) buf.currentPosition = start + size;
+        return true;
+    }
+
+    static handleSetWalkOption(buf: Buffer, size: number, game: any): boolean {
+        // rt4 SET_WALK_OPTION: g1(walkOption). Single byte controlling default walk
+        // behavior (toggle run/walk). 2009scape doesn't currently emit this, but
+        // decoding it costs us nothing and unblocks future server work.
+        if (size > 0) {
+            const walkOption = this.g1(buf);
+            if (game) game.walkOption = walkOption;
+        }
+        return true;
+    }
+
+    static handleJoinClanChat(buf: Buffer, size: number, game: any): boolean {
+        // rt4 JOIN_CLAN_CHAT: g8(owner37). If 0L: leave. Else g8(name37) + g1b(minKick) + g1(clanSize)
+        // + clanSize x { g8(memberKey) + g2(world) + g1b(rank) + gjstr(worldName) }.
+        const start = buf.currentPosition;
+        const owner37 = this.g8(buf);
+        if (owner37.toString() === "0") {
+            // Leave clan chat.
+            if (game) game.clanState = null;
+            if (buf.currentPosition - start < size) buf.currentPosition = start + size;
+            return true;
+        }
+        const name37 = this.g8(buf);
+        const minKick = this.g1b(buf);
+        const clanSize = this.g1(buf);
+        const members: any[] = [];
+        for (let i = 0; i < clanSize && buf.currentPosition < start + size; i++) {
+            const memberKey = this.g8(buf);
+            const world = this.g2(buf);
+            const rank = this.g1b(buf);
+            const worldName = this.gjstr(buf);
+            members.push({
+                name: this.name37ToString(memberKey),
+                name37: memberKey.toString(),
+                world,
+                rank,
+                worldName,
+            });
+        }
+        if (game) {
+            game.clanState = {
+                owner: this.name37ToString(owner37),
+                name: this.name37ToString(name37),
+                minKick,
+                members,
+            };
+        }
+        if (buf.currentPosition - start < size) buf.currentPosition = start + size;
+        return true;
+    }
+
+    static handleGrandExchangeOffers(buf: Buffer, size: number, game: any): boolean {
+        // rt4 GRAND_EXCHANGE_OFFERS: g1(slot), then either g1(0) for an empty
+        // offer or StockMarketOffer(statusAndType, item, price, count,
+        // completedCount, completedGold). Keep a raw copy as a fallback for
+        // future UI work, but expose parsed fields to CS2 immediately.
+        const start = buf.currentPosition;
+        const limit = start + size;
+        if (game && !game.geOffers) game.geOffers = [];
+        while (buf.currentPosition < limit) {
+            const rawStart = buf.currentPosition;
+            const slot = this.g1(buf);
+            const marker = buf.currentPosition < limit ? this.g1(buf) : 0;
+            let offer: any;
+            if (marker === 0 || buf.currentPosition + 17 > limit) {
+                offer = { type: 0, status: 0, item: -1, price: 0, count: 0, completedCount: 0, completedGold: 0 };
+            } else {
+                buf.currentPosition--;
+                const statusAndType = this.g1(buf);
+                offer = {
+                    type: (statusAndType & 0x8) === 0x8 ? 1 : 0,
+                    status: statusAndType & 0x7,
+                    item: this.g2(buf),
+                    price: this.g4(buf) | 0,
+                    count: this.g4(buf) | 0,
+                    completedCount: this.g4(buf) | 0,
+                    completedGold: this.g4(buf) | 0,
+                };
+            }
+            const raw: number[] = [];
+            for (let i = rawStart; i < Math.min(buf.currentPosition, limit); i++) raw.push(buf.buffer[i] & 0xFF);
+            offer.raw = raw;
+            if (game && slot >= 0) {
+                game.geOffers[slot] = offer;
+            }
+        }
+        if (buf.currentPosition < limit) buf.currentPosition = limit;
         return true;
     }
 }

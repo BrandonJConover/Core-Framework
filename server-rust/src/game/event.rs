@@ -64,7 +64,13 @@ pub struct GameEvent {
 
 impl GameEvent {
     /// Create a new event.
-    pub fn new(id: u32, name: &str, event_type: EventType, start_tick: u64, duration_ticks: u64) -> Self {
+    pub fn new(
+        id: u32,
+        name: &str,
+        event_type: EventType,
+        start_tick: u64,
+        duration_ticks: u64,
+    ) -> Self {
         Self {
             id,
             name: name.to_string(),
@@ -173,10 +179,7 @@ pub enum EventData {
         health_multiplier: f32,
     },
     /// Custom event data.
-    Custom {
-        key: String,
-        value: String,
-    },
+    Custom { key: String, value: String },
 }
 
 /// Holiday drop configuration.
@@ -331,7 +334,11 @@ impl Minigame {
     pub fn begin(&mut self, current_tick: u64) {
         self.state = MinigameState::InProgress;
         self.start_tick = Some(current_tick);
-        info!("Minigame {} started with {} players", self.id, self.players.len());
+        info!(
+            "Minigame {} started with {} players",
+            self.id,
+            self.players.len()
+        );
     }
 
     /// Update a player's score.
@@ -446,7 +453,13 @@ impl EventManager {
     }
 
     /// Schedule a new event.
-    pub fn schedule_event(&mut self, name: &str, event_type: EventType, delay_ticks: u64, duration_ticks: u64) -> u32 {
+    pub fn schedule_event(
+        &mut self,
+        name: &str,
+        event_type: EventType,
+        delay_ticks: u64,
+        duration_ticks: u64,
+    ) -> u32 {
         self.next_event_id += 1;
         let id = self.next_event_id;
 
@@ -486,7 +499,12 @@ impl EventManager {
     }
 
     /// Create a new minigame instance.
-    pub fn create_minigame(&mut self, game_type: MinigameType, min_players: usize, max_players: usize) -> u32 {
+    pub fn create_minigame(
+        &mut self,
+        game_type: MinigameType,
+        min_players: usize,
+        max_players: usize,
+    ) -> u32 {
         self.next_minigame_id += 1;
         let id = self.next_minigame_id;
 
@@ -508,8 +526,11 @@ impl EventManager {
 
     /// Remove finished minigames.
     pub fn cleanup_finished(&mut self) {
-        self.minigames.retain(|_, game| game.state != MinigameState::Finished);
-        self.events.retain(|_, event| event.state != EventState::Ended && event.state != EventState::Cancelled);
+        self.minigames
+            .retain(|_, game| game.state != MinigameState::Finished);
+        self.events.retain(|_, event| {
+            event.state != EventState::Ended && event.state != EventState::Cancelled
+        });
     }
 
     /// Check if double XP is active.

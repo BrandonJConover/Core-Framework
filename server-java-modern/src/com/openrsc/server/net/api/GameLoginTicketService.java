@@ -1,7 +1,6 @@
 package com.openrsc.server.net.api;
 
 import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -16,8 +15,11 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class GameLoginTicketService {
 
-    public static final long DEFAULT_LIFETIME_MS = 60_000L;
-    public static final String PASSWORD_PREFIX = "ticket:";
+    public static final long DEFAULT_LIFETIME_MS = 10L * 60_000L;
+    public static final String PASSWORD_PREFIX = "t";
+    private static final char[] TOKEN_ALPHABET =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".toCharArray();
+    private static final int TOKEN_LENGTH = 16;
 
     private final SecureRandom secureRandom = new SecureRandom();
     private final ConcurrentHashMap<String, TicketRecord> tickets = new ConcurrentHashMap<>();
@@ -93,9 +95,11 @@ public final class GameLoginTicketService {
     }
 
     private String nextToken() {
-        byte[] bytes = new byte[24];
-        secureRandom.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        char[] token = new char[TOKEN_LENGTH];
+        for (int i = 0; i < token.length; i++) {
+            token[i] = TOKEN_ALPHABET[secureRandom.nextInt(TOKEN_ALPHABET.length)];
+        }
+        return new String(token);
     }
 
     private record TicketRecord(String username, long expiresAtMs) {}

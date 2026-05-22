@@ -212,13 +212,10 @@ impl Region {
 
     /// Iterate over all tiles with their local coordinates.
     pub fn iter_tiles(&self) -> impl Iterator<Item = (usize, usize, &TileValue)> {
-        self.tiles
-            .iter()
-            .enumerate()
-            .map(|(i, tile)| {
-                let (lx, ly) = Self::index_to_local(i);
-                (lx, ly, tile)
-            })
+        self.tiles.iter().enumerate().map(|(i, tile)| {
+            let (lx, ly) = Self::index_to_local(i);
+            (lx, ly, tile)
+        })
     }
 }
 
@@ -405,7 +402,11 @@ impl RegionManager {
             loaded += 1;
         }
 
-        info!("Loaded {} region file(s) from {}", loaded, data_path.display());
+        info!(
+            "Loaded {} region file(s) from {}",
+            loaded,
+            data_path.display()
+        );
         Ok(())
     }
 
@@ -539,12 +540,7 @@ pub struct ObjectSpawn {
 }
 
 impl ObjectSpawn {
-    pub fn new(
-        object_id: u32,
-        position: Position,
-        direction: u8,
-        object_type: ObjectType,
-    ) -> Self {
+    pub fn new(object_id: u32, position: Position, direction: u8, object_type: ObjectType) -> Self {
         Self {
             object_id,
             position,
@@ -965,11 +961,7 @@ mod tests {
 
     #[test]
     fn test_npc_spawn_with_bounds() {
-        let spawn = NpcSpawn::with_bounds(
-            1,
-            Position::new(100, 200),
-            95, 105, 195, 205,
-        );
+        let spawn = NpcSpawn::with_bounds(1, Position::new(100, 200), 95, 105, 195, 205);
         assert!(spawn.can_wander());
     }
 

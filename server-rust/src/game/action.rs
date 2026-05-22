@@ -3,14 +3,18 @@
 //! This module provides a framework for handling timed actions like
 //! mining, fishing, cooking, and other skill-based activities.
 
-use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 /// Result of an action execution.
 #[derive(Debug, Clone)]
 pub enum ActionResult {
     /// Action completed successfully with optional rewards.
-    Success { experience: u32, item_id: Option<u32>, amount: u32 },
+    Success {
+        experience: u32,
+        item_id: Option<u32>,
+        amount: u32,
+    },
     /// Action failed (e.g., rock depleted, fish escaped).
     Failed { reason: String },
     /// Action is still in progress.
@@ -117,7 +121,7 @@ pub enum ActionState {
     Starting,
     Running {
         started_tick: u64,
-        duration_ticks: u32
+        duration_ticks: u32,
     },
     Completing,
     Cancelled,
@@ -182,15 +186,19 @@ impl Action {
 
     /// Check if action is currently running.
     pub fn is_running(&self) -> bool {
-        matches!(self.state, ActionState::Running { .. } | ActionState::Starting)
+        matches!(
+            self.state,
+            ActionState::Running { .. } | ActionState::Starting
+        )
     }
 
     /// Check if action is complete based on current tick.
     pub fn is_complete(&self, current_tick: u64) -> bool {
         match self.state {
-            ActionState::Running { started_tick, duration_ticks } => {
-                current_tick >= started_tick + duration_ticks as u64
-            }
+            ActionState::Running {
+                started_tick,
+                duration_ticks,
+            } => current_tick >= started_tick + duration_ticks as u64,
             ActionState::Completing | ActionState::Cancelled => true,
             _ => false,
         }
@@ -199,7 +207,10 @@ impl Action {
     /// Get remaining ticks until completion.
     pub fn remaining_ticks(&self, current_tick: u64) -> u32 {
         match self.state {
-            ActionState::Running { started_tick, duration_ticks } => {
+            ActionState::Running {
+                started_tick,
+                duration_ticks,
+            } => {
                 let end_tick = started_tick + duration_ticks as u64;
                 if current_tick >= end_tick {
                     0
@@ -282,7 +293,11 @@ impl ActionQueue {
 
         // If action completed, advance queue
         if result.is_some() {
-            let repeat = self.current_action.as_ref().map(|a| a.repeat).unwrap_or(false);
+            let repeat = self
+                .current_action
+                .as_ref()
+                .map(|a| a.repeat)
+                .unwrap_or(false);
 
             if repeat {
                 // Restart the same action
@@ -306,7 +321,10 @@ impl ActionQueue {
 
     /// Check if any action is in progress.
     pub fn is_busy(&self) -> bool {
-        self.current_action.as_ref().map(|a| a.is_running()).unwrap_or(false)
+        self.current_action
+            .as_ref()
+            .map(|a| a.is_running())
+            .unwrap_or(false)
     }
 
     /// Clear all actions.
@@ -404,7 +422,9 @@ pub mod cooking {
         let burn_rate = if player_level >= burn_level {
             0.0
         } else {
-            0.5 - ((player_level as f32 - level_req as f32) / (burn_level as f32 - level_req as f32) * 0.5)
+            0.5 - ((player_level as f32 - level_req as f32)
+                / (burn_level as f32 - level_req as f32)
+                * 0.5)
         };
 
         let config = ActionConfig::new(ActionType::Cooking)

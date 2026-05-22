@@ -127,10 +127,7 @@ impl TradeHandler {
         self.manager.request_trade(requester_id, target_id)?;
         self.pending_requests.insert(target_id, requester_id);
 
-        info!(
-            "Trade request: {} -> {}",
-            requester_id, target_id
-        );
+        info!("Trade request: {} -> {}", requester_id, target_id);
 
         let mut packets = Vec::new();
         packets.push(build_server_message("Sending trade request..."));
@@ -221,7 +218,11 @@ impl TradeHandler {
             .active_trades
             .get_mut(&player_id)
             .ok_or(TradeError::NotInTrade)?;
-        if let Some(entry) = handler_session.offered_items.iter_mut().find(|(id, _)| *id == item_id) {
+        if let Some(entry) = handler_session
+            .offered_items
+            .iter_mut()
+            .find(|(id, _)| *id == item_id)
+        {
             entry.1 = entry.1.saturating_add(amount);
         } else {
             handler_session.offered_items.push((item_id, amount));
@@ -275,7 +276,11 @@ impl TradeHandler {
             .active_trades
             .get_mut(&player_id)
             .ok_or(TradeError::NotInTrade)?;
-        if let Some(pos) = handler_session.offered_items.iter().position(|(id, _)| *id == item_id) {
+        if let Some(pos) = handler_session
+            .offered_items
+            .iter()
+            .position(|(id, _)| *id == item_id)
+        {
             let entry = &mut handler_session.offered_items[pos];
             if amount >= entry.1 {
                 handler_session.offered_items.remove(pos);
@@ -332,8 +337,16 @@ impl TradeHandler {
                     let partner_offer = self.get_offer_list(partner_id);
 
                     let mut packets = Vec::new();
-                    packets.push(build_trade_confirm_packet(player_id, &my_offer, &partner_offer));
-                    packets.push(build_trade_confirm_packet(partner_id, &partner_offer, &my_offer));
+                    packets.push(build_trade_confirm_packet(
+                        player_id,
+                        &my_offer,
+                        &partner_offer,
+                    ));
+                    packets.push(build_trade_confirm_packet(
+                        partner_id,
+                        &partner_offer,
+                        &my_offer,
+                    ));
                     Ok(packets)
                 } else {
                     Ok(vec![build_server_message("Waiting for other player...")])
@@ -406,9 +419,7 @@ impl TradeHandler {
             .ok_or(TradeError::NotInTrade)?;
         let session_id = session.id;
 
-        if let Some((p1, p1_receives, p2, p2_receives)) =
-            self.manager.complete_trade(session_id)
-        {
+        if let Some((p1, p1_receives, p2, p2_receives)) = self.manager.complete_trade(session_id) {
             info!(
                 "Trade executed: {} receives {} items, {} receives {} items",
                 p1,
@@ -496,12 +507,9 @@ fn build_open_trade_packet(partner_id: u64) -> Packet {
 }
 
 /// Build a trade-update packet showing the player's own current offer.
-fn build_trade_update_packet(
-    _for_player: u64,
-    items: &[(ItemId, u32)],
-) -> Packet {
-    let mut builder = PacketBuilder::new(OpcodeOut::SEND_TRADE_WINDOW.into())
-        .write_byte(items.len() as u8);
+fn build_trade_update_packet(_for_player: u64, items: &[(ItemId, u32)]) -> Packet {
+    let mut builder =
+        PacketBuilder::new(OpcodeOut::SEND_TRADE_WINDOW.into()).write_byte(items.len() as u8);
 
     for (item_id, amount) in items {
         builder = builder.write_short(item_id.0 as u16).write_int(*amount);
@@ -511,12 +519,9 @@ fn build_trade_update_packet(
 }
 
 /// Build a packet showing the *other* player's current offer.
-fn build_trade_other_items_packet(
-    _for_player: u64,
-    items: &[(ItemId, u32)],
-) -> Packet {
-    let mut builder = PacketBuilder::new(OpcodeOut::SEND_TRADE_OTHER_ITEMS.into())
-        .write_byte(items.len() as u8);
+fn build_trade_other_items_packet(_for_player: u64, items: &[(ItemId, u32)]) -> Packet {
+    let mut builder =
+        PacketBuilder::new(OpcodeOut::SEND_TRADE_OTHER_ITEMS.into()).write_byte(items.len() as u8);
 
     for (item_id, amount) in items {
         builder = builder.write_short(item_id.0 as u16).write_int(*amount);

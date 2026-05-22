@@ -1,0 +1,5 @@
+[PacketTrace] fixed handler opcode=234 consumed=1/1
+[PacketTrace] unknown opcode=251 consumed=3/3
+[Packet530] handler error opcode=234 handler=opcode_234 size=4 consumed=4 error=trace boom
+[PacketTrace] handler error opcode=234 realigned=4/4
+[PacketTrace] all tests passed

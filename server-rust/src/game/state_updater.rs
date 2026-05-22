@@ -299,12 +299,8 @@ impl GameStateUpdater {
         let mut packets = Vec::with_capacity(6);
 
         // --- 1. Player position update ---
-        let (player_pos_pkt, players_needing_appearance) = Self::build_player_position_update(
-            player_id,
-            player_pos,
-            known_players,
-            all_players,
-        );
+        let (player_pos_pkt, players_needing_appearance) =
+            Self::build_player_position_update(player_id, player_pos, known_players, all_players);
         packets.push(player_pos_pkt);
 
         // --- 2. Player appearance update ---
@@ -323,8 +319,7 @@ impl GameStateUpdater {
 
         // --- 4. NPC appearance update ---
         if !npcs_needing_appearance.is_empty() {
-            if let Some(pkt) =
-                Self::build_npc_appearance_update(&npcs_needing_appearance, all_npcs)
+            if let Some(pkt) = Self::build_npc_appearance_update(&npcs_needing_appearance, all_npcs)
             {
                 packets.push(pkt);
             }
@@ -337,7 +332,10 @@ impl GameStateUpdater {
 
         // --- 6. Ground-items ---
         if !nearby_ground_items.is_empty() {
-            packets.push(Self::build_ground_items_update(player_pos, nearby_ground_items));
+            packets.push(Self::build_ground_items_update(
+                player_pos,
+                nearby_ground_items,
+            ));
         }
 
         packets
@@ -704,10 +702,7 @@ impl GameStateUpdater {
     /// For each NPC whose appearance the client does not yet know:
     ///   - 2 bytes: NPC server index
     ///   - 2 bytes: definition ID
-    fn build_npc_appearance_update(
-        needed: &[EntityId],
-        all: &[NpcSnapshot],
-    ) -> Option<Packet> {
+    fn build_npc_appearance_update(needed: &[EntityId], all: &[NpcSnapshot]) -> Option<Packet> {
         if needed.is_empty() {
             return None;
         }
@@ -781,10 +776,7 @@ impl GameStateUpdater {
     ///     - 2 bytes: item catalogue ID
     ///     - 2 bytes: X position
     ///     - 2 bytes: Y position
-    fn build_ground_items_update(
-        self_pos: Position,
-        items: &[GroundItemSnapshot],
-    ) -> Packet {
+    fn build_ground_items_update(self_pos: Position, items: &[GroundItemSnapshot]) -> Packet {
         let mut payload: Vec<u8> = Vec::with_capacity(items.len() * 6);
 
         for item in items {
@@ -817,6 +809,334 @@ fn in_view(origin: Position, target: Position) -> bool {
     let dx = (target.x - origin.x).abs();
     let dy = (target.y - origin.y).abs();
     dx <= VIEW_DISTANCE && dy <= VIEW_DISTANCE
+}
+
+/// Write the Java custom-client string form used inside entity update
+/// payloads. Unlike the shared Rust `PacketBuilder::write_string`, Java's
+/// `PacketBuilder.writeString` terminates strings with line feed (`0x0a`).
+pub fn write_java_custom_entity_string(payload: &mut Vec<u8>, value: &str) {
+    payload.extend_from_slice(value.as_bytes());
+    payload.push(b'\n');
+}
+
+/// Build a custom-v235 `SEND_UPDATE_PLAYERS` type-1 public-chat payload.
+///
+/// Each entry is `(player_index, icon, message)`. The icon and message fields
+/// deliberately use Java LF-terminated strings for real custom-client parity.
+pub fn build_custom_v235_player_chat_update_payload(entries: &[(u16, &str, &str)]) -> Vec<u8> {
+    let count = entries.len().min(u16::MAX as usize) as u16;
+    let mut payload = Vec::with_capacity(2 + entries.len() * 12);
+    payload.push((count >> 8) as u8);
+    payload.push(count as u8);
+
+    for (player_index, icon, message) in entries.iter().take(count as usize) {
+        payload.push((player_index >> 8) as u8);
+        payload.push(*player_index as u8);
+        payload.push(1);
+        write_java_custom_entity_string(&mut payload, icon);
+        write_java_custom_entity_string(&mut payload, message);
+    }
+
+    payload
+}
+
+/// Build a custom-v235 `SEND_UPDATE_PLAYERS` type-1 public-chat packet.
+pub fn build_custom_v235_player_chat_update_packet(
+    entries: &[(u16, &str, &str)],
+) -> crate::protocol::Packet {
+    crate::protocol::Packet::new(
+        crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_PLAYERS.wire(),
+        build_custom_v235_player_chat_update_payload(entries),
+    )
+}
+
+/// One custom-v235 `SEND_UPDATE_PLAYERS` type-5 player appearance entry.
+#[derive(Debug, Clone, Copy)]
+pub struct CustomV235PlayerAppearanceUpdate<'a> {
+    pub player_index: u16,
+    pub username: &'a str,
+    /// Custom clients receive worn item appearance ids as shorts.
+    pub equipment: &'a [u16],
+    pub hair_colour: u8,
+    pub top_colour: u8,
+    pub trouser_colour: u8,
+    pub skin_colour: u8,
+    pub combat_level: u8,
+    pub skull_type: u8,
+    pub clan_tag: Option<&'a str>,
+    pub invisible: bool,
+    pub invulnerable: bool,
+    pub group_id: u8,
+    pub icon: &'a str,
+}
+
+/// Build a custom-v235 `SEND_UPDATE_PLAYERS` type-5 appearance payload.
+pub fn build_custom_v235_player_appearance_update_payload(
+    entries: &[CustomV235PlayerAppearanceUpdate<'_>],
+) -> Vec<u8> {
+    let count = entries.len().min(u16::MAX as usize) as u16;
+    let mut payload = Vec::with_capacity(2 + entries.len() * 24);
+    payload.push((count >> 8) as u8);
+    payload.push(count as u8);
+
+    for entry in entries.iter().take(count as usize) {
+        payload.push((entry.player_index >> 8) as u8);
+        payload.push(entry.player_index as u8);
+        payload.push(5);
+        write_java_custom_entity_string(&mut payload, entry.username);
+
+        let equipment_count = entry.equipment.len().min(u8::MAX as usize) as u8;
+        payload.push(equipment_count);
+        for item_id in entry.equipment.iter().take(equipment_count as usize) {
+            payload.push((item_id >> 8) as u8);
+            payload.push(*item_id as u8);
+        }
+
+        payload.push(entry.hair_colour);
+        payload.push(entry.top_colour);
+        payload.push(entry.trouser_colour);
+        payload.push(entry.skin_colour);
+        payload.push(entry.combat_level);
+        payload.push(entry.skull_type);
+
+        match entry.clan_tag {
+            Some(clan_tag) => {
+                payload.push(1);
+                write_java_custom_entity_string(&mut payload, clan_tag);
+            }
+            None => payload.push(0),
+        }
+
+        payload.push(u8::from(entry.invisible));
+        payload.push(u8::from(entry.invulnerable));
+        payload.push(entry.group_id);
+        write_java_custom_entity_string(&mut payload, entry.icon);
+    }
+
+    payload
+}
+
+/// Build a custom-v235 `SEND_UPDATE_PLAYERS` type-5 appearance packet.
+pub fn build_custom_v235_player_appearance_update_packet(
+    entries: &[CustomV235PlayerAppearanceUpdate<'_>],
+) -> crate::protocol::Packet {
+    crate::protocol::Packet::new(
+        crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_PLAYERS.wire(),
+        build_custom_v235_player_appearance_update_payload(entries),
+    )
+}
+
+/// Target kind for a custom-v235 projectile entity update.
+#[derive(Debug, Clone, Copy)]
+pub enum CustomV235ProjectileTarget {
+    Npc(u16),
+    Player(u16),
+}
+
+/// One custom-v235 projectile update entry.
+#[derive(Debug, Clone, Copy)]
+pub struct CustomV235ProjectileUpdate {
+    pub caster_index: u16,
+    pub projectile_type: u16,
+    pub target: CustomV235ProjectileTarget,
+}
+
+/// Build a custom-v235 `SEND_UPDATE_PLAYERS` projectile payload.
+///
+/// Java emits projectile updates through `AppearanceUpdateStruct` as type 3
+/// when the victim is an NPC and type 4 when the victim is a player.
+pub fn build_custom_v235_player_projectile_update_payload(
+    entries: &[CustomV235ProjectileUpdate],
+) -> Vec<u8> {
+    let count = entries.len().min(u16::MAX as usize) as u16;
+    let mut payload = Vec::with_capacity(2 + entries.len() * 7);
+    payload.push((count >> 8) as u8);
+    payload.push(count as u8);
+
+    for entry in entries.iter().take(count as usize) {
+        let (update_type, target_index) = match entry.target {
+            CustomV235ProjectileTarget::Npc(index) => (3, index),
+            CustomV235ProjectileTarget::Player(index) => (4, index),
+        };
+
+        payload.push((entry.caster_index >> 8) as u8);
+        payload.push(entry.caster_index as u8);
+        payload.push(update_type);
+        payload.push((entry.projectile_type >> 8) as u8);
+        payload.push(entry.projectile_type as u8);
+        payload.push((target_index >> 8) as u8);
+        payload.push(target_index as u8);
+    }
+
+    payload
+}
+
+/// Build a custom-v235 `SEND_UPDATE_PLAYERS` projectile packet.
+pub fn build_custom_v235_player_projectile_update_packet(
+    entries: &[CustomV235ProjectileUpdate],
+) -> crate::protocol::Packet {
+    crate::protocol::Packet::new(
+        crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_PLAYERS.wire(),
+        build_custom_v235_player_projectile_update_payload(entries),
+    )
+}
+
+/// Build a custom-v235 `SEND_UPDATE_NPC` type-2 damage payload.
+///
+/// Each entry is `(npc_index, damage, current_hits, maximum_hits)`.
+pub fn build_custom_v235_npc_damage_update_payload(entries: &[(u16, u8, u8, u8)]) -> Vec<u8> {
+    let count = entries.len().min(u16::MAX as usize) as u16;
+    let mut payload = Vec::with_capacity(2 + entries.len() * 6);
+    payload.push((count >> 8) as u8);
+    payload.push(count as u8);
+
+    for (npc_index, damage, current_hits, maximum_hits) in entries.iter().take(count as usize) {
+        payload.push((npc_index >> 8) as u8);
+        payload.push(*npc_index as u8);
+        payload.push(2);
+        payload.push(*damage);
+        payload.push(*current_hits);
+        payload.push(*maximum_hits);
+    }
+
+    payload
+}
+
+/// Build a custom-v235 `SEND_UPDATE_NPC` type-2 damage packet.
+pub fn build_custom_v235_npc_damage_update_packet(
+    entries: &[(u16, u8, u8, u8)],
+) -> crate::protocol::Packet {
+    crate::protocol::Packet::new(
+        crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_NPC.wire(),
+        build_custom_v235_npc_damage_update_payload(entries),
+    )
+}
+
+/// One known-NPC entry in a custom-v235 `SEND_NPC_COORDS` payload.
+#[derive(Debug, Clone, Copy)]
+pub enum CustomV235KnownNpcCoordUpdate {
+    Unchanged,
+    Moved(Direction),
+    Removed,
+    SpriteChanged(u8),
+}
+
+/// Build the known-NPC portion of a custom-v235 `SEND_NPC_COORDS` payload.
+///
+/// Java writes the prior local-NPC count first, then emits update bits in that
+/// local-cache order. Movement/removal entries do not repeat the NPC index.
+pub fn build_custom_v235_npc_coords_known_update_payload(
+    updates: &[CustomV235KnownNpcCoordUpdate],
+) -> Vec<u8> {
+    let count = updates.len().min(u8::MAX as usize) as u8;
+    let mut bw = crate::protocol::BitWriter::new();
+    bw.write_bits(count as i32, 8);
+
+    for update in updates.iter().take(count as usize) {
+        match update {
+            CustomV235KnownNpcCoordUpdate::Unchanged => {
+                bw.write_bits(0, 1);
+            }
+            CustomV235KnownNpcCoordUpdate::Moved(direction) => {
+                bw.write_bits(1, 1);
+                bw.write_bits(0, 1);
+                bw.write_bits(direction_to_bits(*direction) as i32, 3);
+            }
+            CustomV235KnownNpcCoordUpdate::Removed => {
+                bw.write_bits(1, 1);
+                bw.write_bits(1, 1);
+                bw.write_bits(3, 2);
+            }
+            CustomV235KnownNpcCoordUpdate::SpriteChanged(sprite) => {
+                bw.write_bits(1, 1);
+                bw.write_bits(1, 1);
+                bw.write_bits((*sprite & 0x0f) as i32, 4);
+            }
+        }
+    }
+
+    bw.finish()
+}
+
+/// Build a custom-v235 `SEND_NPC_COORDS` packet for known-NPC updates.
+pub fn build_custom_v235_npc_coords_known_update_packet(
+    updates: &[CustomV235KnownNpcCoordUpdate],
+) -> crate::protocol::Packet {
+    crate::protocol::Packet::new(
+        crate::protocol::opcodes::OpcodeOut::SEND_NPC_COORDS.wire(),
+        build_custom_v235_npc_coords_known_update_payload(updates),
+    )
+}
+
+/// One known-player entry in a custom-v235 `SEND_PLAYER_COORDS` payload.
+#[derive(Debug, Clone, Copy)]
+pub enum CustomV235KnownPlayerCoordUpdate {
+    Unchanged,
+    Moved(Direction),
+    Removed,
+    SpriteChanged(u8),
+}
+
+/// Build a custom-v235 `SEND_PLAYER_COORDS` payload for known-player updates.
+///
+/// Java custom clients receive this player's absolute coordinates and sprite
+/// first, followed by prior local-player updates in local-cache order.
+/// Movement/removal entries do not repeat the player index.
+pub fn build_custom_v235_player_coords_known_update_payload(
+    self_x: u16,
+    self_y: u16,
+    self_direction: Direction,
+    updates: &[CustomV235KnownPlayerCoordUpdate],
+) -> Vec<u8> {
+    let count = updates.len().min(u8::MAX as usize) as u8;
+    let mut bw = crate::protocol::BitWriter::new();
+    bw.write_bits((self_x & 0x07ff) as i32, 11);
+    bw.write_bits((self_y & 0x1fff) as i32, 13);
+    bw.write_bits(direction_to_bits(self_direction) as i32, 4);
+    bw.write_bits(count as i32, 8);
+
+    for update in updates.iter().take(count as usize) {
+        match update {
+            CustomV235KnownPlayerCoordUpdate::Unchanged => {
+                bw.write_bits(0, 1);
+            }
+            CustomV235KnownPlayerCoordUpdate::Moved(direction) => {
+                bw.write_bits(1, 1);
+                bw.write_bits(0, 1);
+                bw.write_bits(direction_to_bits(*direction) as i32, 3);
+            }
+            CustomV235KnownPlayerCoordUpdate::Removed => {
+                bw.write_bits(1, 1);
+                bw.write_bits(1, 1);
+                bw.write_bits(3, 2);
+            }
+            CustomV235KnownPlayerCoordUpdate::SpriteChanged(sprite) => {
+                bw.write_bits(1, 1);
+                bw.write_bits(1, 1);
+                bw.write_bits((*sprite & 0x0f) as i32, 4);
+            }
+        }
+    }
+
+    bw.finish()
+}
+
+/// Build a custom-v235 `SEND_PLAYER_COORDS` packet for known-player updates.
+pub fn build_custom_v235_player_coords_known_update_packet(
+    self_x: u16,
+    self_y: u16,
+    self_direction: Direction,
+    updates: &[CustomV235KnownPlayerCoordUpdate],
+) -> crate::protocol::Packet {
+    crate::protocol::Packet::new(
+        crate::protocol::opcodes::OpcodeOut::SEND_PLAYER_COORDS.wire(),
+        build_custom_v235_player_coords_known_update_payload(
+            self_x,
+            self_y,
+            self_direction,
+            updates,
+        ),
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -886,6 +1206,201 @@ mod tests {
         assert_eq!(direction_to_bits(Direction::South), 4);
         assert_eq!(direction_to_bits(Direction::East), 6);
         assert_eq!(direction_to_bits(Direction::West), 2);
+    }
+
+    #[test]
+    fn java_custom_entity_strings_are_lf_terminated() {
+        let mut payload = Vec::new();
+        write_java_custom_entity_string(&mut payload, "");
+        write_java_custom_entity_string(&mut payload, "hello");
+
+        assert_eq!(payload, b"\nhello\n");
+    }
+
+    #[test]
+    fn custom_v235_public_chat_update_matches_java_string_layout() {
+        let payload = build_custom_v235_player_chat_update_payload(&[(42, "", "hello")]);
+
+        assert_eq!(
+            payload,
+            vec![
+                0x00, 0x01, // count
+                0x00, 0x2a, // player index
+                0x01, // update type: public chat
+                0x0a, // icon, LF-terminated empty string
+                b'h', b'e', b'l', b'l', b'o', 0x0a,
+            ]
+        );
+
+        let packet = build_custom_v235_player_chat_update_packet(&[(42, "", "hello")]);
+        assert_eq!(
+            packet.opcode,
+            crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_PLAYERS.wire()
+        );
+        assert_eq!(packet.payload.as_ref(), payload.as_slice());
+    }
+
+    #[test]
+    fn custom_v235_npc_damage_update_matches_java_entity_layout() {
+        let payload = build_custom_v235_npc_damage_update_payload(&[(37, 3, 7, 10)]);
+
+        assert_eq!(
+            payload,
+            vec![
+                0x00, 0x01, // count
+                0x00, 0x25, // npc index
+                0x02, // update type: damage
+                0x03, // damage
+                0x07, // current hits
+                0x0a, // maximum hits
+            ]
+        );
+
+        let packet = build_custom_v235_npc_damage_update_packet(&[(37, 3, 7, 10)]);
+        assert_eq!(
+            packet.opcode,
+            crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_NPC.wire()
+        );
+        assert_eq!(packet.payload.as_ref(), payload.as_slice());
+    }
+
+    #[test]
+    fn custom_v235_player_projectile_update_matches_java_entity_layout() {
+        let entry = CustomV235ProjectileUpdate {
+            caster_index: 42,
+            projectile_type: 2,
+            target: CustomV235ProjectileTarget::Npc(37),
+        };
+        let payload = build_custom_v235_player_projectile_update_payload(&[entry]);
+
+        assert_eq!(
+            payload,
+            vec![
+                0x00, 0x01, // count
+                0x00, 0x2a, // caster player index
+                0x03, // update type: projectile targeting NPC
+                0x00, 0x02, // projectile type: ranged
+                0x00, 0x25, // victim NPC index
+            ]
+        );
+
+        let packet = build_custom_v235_player_projectile_update_packet(&[entry]);
+        assert_eq!(
+            packet.opcode,
+            crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_PLAYERS.wire()
+        );
+        assert_eq!(packet.payload.as_ref(), payload.as_slice());
+    }
+
+    #[test]
+    fn custom_v235_npc_coords_known_movement_and_removal_match_java_bits() {
+        let payload = build_custom_v235_npc_coords_known_update_payload(&[
+            CustomV235KnownNpcCoordUpdate::Moved(Direction::East),
+            CustomV235KnownNpcCoordUpdate::Removed,
+        ]);
+
+        assert_eq!(
+            payload,
+            vec![
+                0x02, // prior local NPC count
+                0xb7, 0x80, // moved east, then removed; padded to byte boundary
+            ]
+        );
+
+        let packet = build_custom_v235_npc_coords_known_update_packet(&[
+            CustomV235KnownNpcCoordUpdate::Moved(Direction::East),
+            CustomV235KnownNpcCoordUpdate::Removed,
+        ]);
+        assert_eq!(
+            packet.opcode,
+            crate::protocol::opcodes::OpcodeOut::SEND_NPC_COORDS.wire()
+        );
+        assert_eq!(packet.payload.as_ref(), payload.as_slice());
+    }
+
+    #[test]
+    fn custom_v235_player_coords_known_movement_and_removal_match_java_bits() {
+        let payload = build_custom_v235_player_coords_known_update_payload(
+            122,
+            647,
+            Direction::South,
+            &[
+                CustomV235KnownPlayerCoordUpdate::Moved(Direction::East),
+                CustomV235KnownPlayerCoordUpdate::Removed,
+            ],
+        );
+
+        assert_eq!(
+            payload,
+            vec![
+                0x0f, 0x42, 0x87, 0x40, // self x=122, y=647, direction=south
+                0x2b, 0x78, // two known players: moved east, then removed
+            ]
+        );
+
+        let packet = build_custom_v235_player_coords_known_update_packet(
+            122,
+            647,
+            Direction::South,
+            &[
+                CustomV235KnownPlayerCoordUpdate::Moved(Direction::East),
+                CustomV235KnownPlayerCoordUpdate::Removed,
+            ],
+        );
+        assert_eq!(
+            packet.opcode,
+            crate::protocol::opcodes::OpcodeOut::SEND_PLAYER_COORDS.wire()
+        );
+        assert_eq!(packet.payload.as_ref(), payload.as_slice());
+    }
+
+    #[test]
+    fn custom_v235_player_appearance_update_matches_java_entity_layout() {
+        let entry = CustomV235PlayerAppearanceUpdate {
+            player_index: 42,
+            username: "alice",
+            equipment: &[],
+            hair_colour: 2,
+            top_colour: 8,
+            trouser_colour: 14,
+            skin_colour: 3,
+            combat_level: 12,
+            skull_type: 0,
+            clan_tag: None,
+            invisible: false,
+            invulnerable: false,
+            group_id: 10,
+            icon: "",
+        };
+        let payload = build_custom_v235_player_appearance_update_payload(&[entry]);
+
+        assert_eq!(
+            payload,
+            vec![
+                0x00, 0x01, // count
+                0x00, 0x2a, // player index
+                0x05, // update type: appearance
+                b'a', b'l', b'i', b'c', b'e', 0x0a, 0x00, // equipment count
+                0x02, // hair colour
+                0x08, // top colour
+                0x0e, // trouser colour
+                0x03, // skin colour
+                0x0c, // combat level
+                0x00, // skull
+                0x00, // no clan
+                0x00, // not invisible
+                0x00, // not invulnerable
+                0x0a, // group id: PLAYER
+                0x0a, // empty icon string
+            ]
+        );
+
+        let packet = build_custom_v235_player_appearance_update_packet(&[entry]);
+        assert_eq!(
+            packet.opcode,
+            crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_PLAYERS.wire()
+        );
+        assert_eq!(packet.payload.as_ref(), payload.as_slice());
     }
 
     #[test]
@@ -997,8 +1512,7 @@ mod tests {
             removed: false,
         };
 
-        let (pkt, _) =
-            GameStateUpdater::build_npc_position_update(self_pos, &mut known, &[npc]);
+        let (pkt, _) = GameStateUpdater::build_npc_position_update(self_pos, &mut known, &[npc]);
 
         assert_eq!(pkt.opcode, ServerOpcode::NpcUpdate as u8);
         // Should have been removed from known list

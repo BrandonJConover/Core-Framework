@@ -166,11 +166,7 @@ impl Tree {
 }
 
 /// Calculate woodcutting success chance.
-pub fn calculate_chop_chance(
-    woodcutting_level: u8,
-    tree_level: u8,
-    axe: Axe,
-) -> f64 {
+pub fn calculate_chop_chance(woodcutting_level: u8, tree_level: u8, axe: Axe) -> f64 {
     let level_diff = woodcutting_level.saturating_sub(tree_level) as f64;
     let axe_bonus = axe.speed_bonus() as f64 * 0.05;
     let base_chance = 0.25 + (level_diff * 0.01) + axe_bonus;
@@ -268,7 +264,8 @@ impl WoodcuttingManager {
         ];
 
         for axe in axes {
-            if woodcutting_level >= axe.required_level() && available_items.contains(&axe.item_id()) {
+            if woodcutting_level >= axe.required_level() && available_items.contains(&axe.item_id())
+            {
                 return Some(axe);
             }
         }
@@ -299,7 +296,11 @@ mod tests {
 
     #[test]
     fn test_tree_respawn() {
-        let pos = Position { x: 100, y: 100, plane: 0 };
+        let pos = Position {
+            x: 100,
+            y: 100,
+            plane: 0,
+        };
         let mut tree = Tree::new(pos, TreeType::Oak, 100, 101);
 
         assert!(tree.is_available());

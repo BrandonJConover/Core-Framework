@@ -382,8 +382,16 @@ mod tests {
     fn test_simple_path() {
         let collision = SimpleCollisionMap::new();
 
-        let start = Position { x: 0, y: 0, plane: 0 };
-        let end = Position { x: 5, y: 5, plane: 0 };
+        let start = Position {
+            x: 0,
+            y: 0,
+            plane: 0,
+        };
+        let end = Position {
+            x: 5,
+            y: 5,
+            plane: 0,
+        };
 
         if let PathResult::Found(path) = find_path(start, end, &collision, true) {
             assert!(!path.is_empty());
@@ -403,8 +411,16 @@ mod tests {
             collision.block(5, y, 0);
         }
 
-        let start = Position { x: 0, y: 5, plane: 0 };
-        let end = Position { x: 10, y: 5, plane: 0 };
+        let start = Position {
+            x: 0,
+            y: 5,
+            plane: 0,
+        };
+        let end = Position {
+            x: 10,
+            y: 5,
+            plane: 0,
+        };
 
         // Should still find a path around
         if let PathResult::Found(path) = find_path(start, end, &collision, true) {
@@ -422,9 +438,21 @@ mod tests {
         let mut queue = WalkingQueue::new();
 
         let path = vec![
-            Position { x: 1, y: 0, plane: 0 },
-            Position { x: 2, y: 0, plane: 0 },
-            Position { x: 3, y: 0, plane: 0 },
+            Position {
+                x: 1,
+                y: 0,
+                plane: 0,
+            },
+            Position {
+                x: 2,
+                y: 0,
+                plane: 0,
+            },
+            Position {
+                x: 3,
+                y: 0,
+                plane: 0,
+            },
         ];
 
         queue.set_path(path);
@@ -435,9 +463,11 @@ mod tests {
         let next = queue.next().unwrap();
         assert_eq!(next.x, 1);
 
-        // Test running (gets 2 waypoints)
+        // After the manual next() above, 2 waypoints remain. In running mode
+        // next_movement() pulls up to 2, so we should get both.
         queue.set_running(true);
         let movements = queue.next_movement();
-        assert_eq!(movements.len(), 1); // Only 1 left
+        assert_eq!(movements.len(), 2);
+        assert!(queue.is_empty());
     }
 }

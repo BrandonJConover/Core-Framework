@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
-use super::item::{CombatBonuses, EquipSlot, ItemDef, ItemId, ItemRepository, ItemRequirements};
 use super::inventory::{Inventory, InventoryItem};
+use super::item::{CombatBonuses, EquipSlot, ItemDef, ItemId, ItemRepository, ItemRequirements};
 use super::skills::Skills;
 
 /// Equipment slot mapping for RSC.
@@ -68,7 +68,7 @@ impl EquipmentSlot {
 #[derive(Debug, Clone)]
 pub struct EquippedItem {
     pub item_id: ItemId,
-    pub amount: u32,  // For stackable equipped items like ammo
+    pub amount: u32, // For stackable equipped items like ammo
 }
 
 impl EquippedItem {
@@ -120,11 +120,7 @@ impl Equipment {
 
     /// Equip an item to a slot.
     /// Returns the previously equipped item, if any.
-    pub fn equip(
-        &mut self,
-        slot: EquipmentSlot,
-        item: EquippedItem,
-    ) -> Option<EquippedItem> {
+    pub fn equip(&mut self, slot: EquipmentSlot, item: EquippedItem) -> Option<EquippedItem> {
         debug!("Equipping item {} to {:?}", item.item_id.0, slot);
         self.slots.insert(slot, item)
     }
@@ -187,10 +183,7 @@ pub struct EquipmentManager;
 
 impl EquipmentManager {
     /// Check if a player can equip an item.
-    pub fn can_equip(
-        item_def: &ItemDef,
-        skills: &Skills,
-    ) -> Result<(), EquipError> {
+    pub fn can_equip(item_def: &ItemDef, skills: &Skills) -> Result<(), EquipError> {
         // Check if item is equippable
         if item_def.equip_slot == EquipSlot::None {
             return Err(EquipError::NotEquippable);
@@ -254,8 +247,8 @@ impl EquipmentManager {
         // Validate equipment requirements
         Self::can_equip(item_def, skills)?;
 
-        let equip_slot = EquipmentSlot::from_equip_slot(item_def.equip_slot)
-            .ok_or(EquipError::NotEquippable)?;
+        let equip_slot =
+            EquipmentSlot::from_equip_slot(item_def.equip_slot).ok_or(EquipError::NotEquippable)?;
 
         // Remove from inventory
         let inv_item = inventory.remove_slot(slot).unwrap();
@@ -308,10 +301,7 @@ pub enum EquipError {
     /// Item cannot be equipped.
     NotEquippable,
     /// Insufficient skill level.
-    InsufficientLevel {
-        skill: &'static str,
-        required: u8,
-    },
+    InsufficientLevel { skill: &'static str, required: u8 },
     /// Invalid inventory slot.
     InvalidSlot,
     /// Invalid item ID.
@@ -407,7 +397,10 @@ mod tests {
 
         assert!(old.is_some());
         assert_eq!(old.unwrap().item_id, ItemId(1));
-        assert_eq!(equipment.get(EquipmentSlot::Weapon).unwrap().item_id, ItemId(2));
+        assert_eq!(
+            equipment.get(EquipmentSlot::Weapon).unwrap().item_id,
+            ItemId(2)
+        );
     }
 
     #[test]
@@ -415,8 +408,8 @@ mod tests {
         let repo = test_repo();
         let mut equipment = Equipment::new();
 
-        // Equip bronze sword (id 1)
-        equipment.equip(EquipmentSlot::Weapon, EquippedItem::new(ItemId(1)));
+        // Bronze sword is item id 66 in the seeded repo (see ItemRepository::new).
+        equipment.equip(EquipmentSlot::Weapon, EquippedItem::new(ItemId(66)));
 
         let bonuses = equipment.total_bonuses(&repo);
         // Bronze sword should have some attack bonus

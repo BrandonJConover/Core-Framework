@@ -91,11 +91,7 @@ impl WildernessManager {
     ///
     /// The rule: the absolute combat level difference must be **at most** the
     /// wilderness level.
-    pub fn can_attack(
-        attacker_combat: u32,
-        target_combat: u32,
-        wilderness_level: u32,
-    ) -> bool {
+    pub fn can_attack(attacker_combat: u32, target_combat: u32, wilderness_level: u32) -> bool {
         let diff = (attacker_combat as i64 - target_combat as i64).unsigned_abs() as u32;
         diff <= wilderness_level
     }
@@ -199,11 +195,7 @@ impl Default for SkullManager {
 ///
 /// `target_last_attacked` should be the value of
 /// `target_skull_manager.last_attacked()`.
-pub fn should_skull(
-    attacker_id: u64,
-    target_id: u64,
-    target_last_attacked: Option<u64>,
-) -> bool {
+pub fn should_skull(attacker_id: u64, target_id: u64, target_last_attacked: Option<u64>) -> bool {
     // If the target previously attacked the current attacker, the current
     // attacker is merely retaliating — no skull.
     if let Some(last) = target_last_attacked {

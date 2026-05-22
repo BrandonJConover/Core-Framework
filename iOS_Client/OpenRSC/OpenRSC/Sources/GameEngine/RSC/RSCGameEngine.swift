@@ -479,10 +479,11 @@ final class RSCGameEngine: ObservableObject {
             let desiredZoom = Int32(1200.0 / max(0.5, min(3.0, Double(zoomLevel))))
             cameraZoom = cameraZoomWithOcclusion(desiredZoom)
             let cameraY: Int32 = 180  // height above ground
+            let playerGroundY = Int32(world.getElevation(x: 64, z: 64))
             scene.fogLandscapeDistance = cameraZoom * 6
             scene.setCamera(
                 centerX: 64,
-                centerY: -cameraY,
+                centerY: -playerGroundY - cameraY,
                 centerZ: 64,
                 xRot: cameraPitch * 4,
                 yRot: cameraRotation * 4,
@@ -2157,6 +2158,47 @@ final class RSCGameEngine: ObservableObject {
         return nearest
     }
 
+    private func groundItem(atX x: Int, z: Int) -> RSCGroundItem? {
+        worldState.groundItems.first { $0.x == x && $0.y == z }
+    }
+
+    private func npc(atX x: Int, z: Int) -> RSCNPC? {
+        worldState.npcs.first { $0.x == x && $0.y == z }
+    }
+
+    private func player(atX x: Int, z: Int) -> RSCPlayer? {
+        worldState.players.first { $0.x == x && $0.y == z }
+    }
+
+    private func gameObject(containingX x: Int, z: Int) -> RSCGameObject? {
+        worldState.gameObjects.first { object in
+            let footprint = objectFootprint(for: object)
+            return x >= footprint.minX && x <= footprint.maxX
+                && z >= footprint.minZ && z <= footprint.maxZ
+        }
+    }
+
+    private func wallObject(atX x: Int, z: Int) -> RSCWallObject? {
+        worldState.wallObjects.first { $0.x == x && $0.y == z }
+    }
+
+    private var worldInputBlockedByModal: Bool {
+        worldState.welcomeOpen
+            || worldState.serverMessageDialogOpen
+            || worldState.inputPromptOpen
+            || worldState.connectionClosedOpen
+            || worldState.contactDetailsOpen
+            || worldState.recoveryQuestionsOpen
+            || worldState.bankPinOpen
+            || worldState.openPKPointsToGpPromptOpen
+            || worldState.ironmanInterfaceOpen
+            || worldState.statusProgressOpen
+            || worldState.fishingTrawlerOpen
+            || worldState.sleepCaptchaBytes != nil
+            || worldState.showAppearanceChange
+            || worldState.wildernessWarningOpen
+    }
+
     private func isActionableCommand(_ command: String) -> Bool {
         let lowered = command.lowercased()
         return !command.isEmpty && lowered != "walkto" && lowered != "null" && lowered != "examine"
@@ -2405,27 +2447,35 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func handleTap(x: Int, y: Int) {
+        guard !worldInputBlockedByModal else { return }
+
         let gameX = Double(x)
         let gameY = Double(y)
         let target = worldTileNearestScreenPoint(gameX: Double(x), gameY: Double(y))
         let destX = target.x
         let destZ = target.z
 
-        let targetNPC = nearestNPCOnScreen(gameX: gameX, gameY: gameY)
-            ?? nearestNPC(toX: destX, z: destZ)
-        let targetPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY)
-            ?? nearestPlayer(toX: destX, z: destZ)
-        let targetGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY)
-            ?? nearestGroundItem(toX: destX, z: destZ)
-        let targetObject = nearestGameObjectOnScreen(gameX: gameX, gameY: gameY)
-            ?? nearestGameObject(toX: destX, z: destZ)
-        let targetWall = nearestWallObjectOnScreen(gameX: gameX, gameY: gameY)
-            ?? nearestWallObject(toX: destX, z: destZ)
+        let screenNPC = nearestNPCOnScreen(gameX: gameX, gameY: gameY)
+        let screenPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY)
+        let screenGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY)
+        let screenObject = nearestGameObjectOnScreen(gameX: gameX, gameY: gameY)
+        let screenWall = nearestWallObjectOnScreen(gameX: gameX, gameY: gameY)
+
+        let exactNPC = npc(atX: destX, z: destZ)
+        let exactPlayer = player(atX: destX, z: destZ)
+        let exactGroundItem = groundItem(atX: destX, z: destZ)
+        let exactObject = gameObject(containingX: destX, z: destZ)
+        let exactWall = wallObject(atX: destX, z: destZ)
 
         // Item-use target mode — armed by inventory "Use". The next tap on a
         // world entity consumes the pending item instead of doing default walk
         // or talk behavior.
         if let itemSlot = worldState.pendingItemUseSlot {
+            let targetNPC = screenNPC ?? exactNPC
+            let targetPlayer = screenPlayer ?? exactPlayer
+            let targetGroundItem = screenGroundItem ?? exactGroundItem
+            let targetObject = screenObject ?? exactObject
+            let targetWall = screenWall ?? exactWall
             if let npc = targetNPC {
                 worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on NPC \(npc.id)")
@@ -2458,6 +2508,11 @@ final class RSCGameEngine: ObservableObject {
         // to a bare land cast.
         if let spellId = worldState.pendingSpellId {
             worldState.pendingSpellId = nil
+            let targetNPC = screenNPC ?? exactNPC
+            let targetPlayer = screenPlayer ?? exactPlayer
+            let targetGroundItem = screenGroundItem ?? exactGroundItem
+            let targetObject = screenObject ?? exactObject
+            let targetWall = screenWall ?? exactWall
             if let npc = targetNPC {
                 print("[Input] Cast spell \(spellId) on NPC \(npc.id)")
                 castSpellOnNPC(spellId: spellId, npcServerIndex: npc.id)
@@ -2480,14 +2535,14 @@ final class RSCGameEngine: ObservableObject {
             return
         }
 
-        if let npc = targetNPC {
+        if let npc = screenNPC {
             performPrimaryNPCAction(npc)
-        } else if let item = targetGroundItem {
+        } else if let item = screenGroundItem {
             // PC left-click priority takes ground items when the click lands on
             // the item marker. Keep plain terrain taps as walking.
             print("[Input] Take ground item \(item.itemId) at (\(item.x),\(item.y))")
             pickupGroundItem(x: item.x, y: item.y, itemId: item.itemId)
-        } else if let object = targetObject,
+        } else if let object = screenObject,
                   let action = primaryObjectAction(for: object) {
             print("[Input] \(action.command) object \(object.objectId) at (\(object.x),\(object.y))")
             if action.useFirstAction {
@@ -2495,7 +2550,7 @@ final class RSCGameEngine: ObservableObject {
             } else {
                 objectAction2(x: object.x, z: object.y)
             }
-        } else if let wall = targetWall {
+        } else if let wall = screenWall {
             let action = primaryWallAction(for: wall)
             print("[Input] \(action?.command ?? "Use") wall \(wall.wallId) at (\(wall.x),\(wall.y)) dir=\(wall.direction)")
             if action?.useFirstAction == false {
@@ -2545,6 +2600,8 @@ final class RSCGameEngine: ObservableObject {
     // MARK: - Context Menu
 
     func showContextMenu(at screenPoint: CGPoint) {
+        guard !worldInputBlockedByModal else { return }
+
         // Convert screen point to game pixel coordinates
         let viewSize = touchTranslator.viewSize
         let scaleX = CGFloat(MetalRenderer.gameWidth) / max(1, viewSize.width)

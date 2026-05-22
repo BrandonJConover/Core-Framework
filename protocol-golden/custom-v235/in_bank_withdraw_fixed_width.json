@@ -1,0 +1,13 @@
+{
+  "id": "in_bank_withdraw_fixed_width",
+  "protocol": "custom-v235",
+  "direction": "client_to_server",
+  "opcode_enum": "BANK_WITHDRAW",
+  "wire_opcode": 22,
+  "payload_hex": "000a00000005",
+  "fields": {
+    "catalogID": 10,
+    "amount": 5
+  },
+  "notes": "Payload only. Java PayloadCustomParser reads BANK_WITHDRAW as SHORT catalogID and INT amount; a trailing noted byte is present only when WANT_BANK_NOTES is enabled."
+}

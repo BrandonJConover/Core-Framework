@@ -1,0 +1,93 @@
+[MenuActionFlow] dialogue continue dispatch OK (575 && !this.aBoolean1239 -> Outgoing530.continueDialogue)
+[MenuActionFlow] dialogue continue bytes OK 84 34 12 78 56 02 01
+[MenuActionFlow] CS2 dialog action hook source OK (Outgoing530.dialogAction(game.outBuffer, actionId))
+[MenuActionFlow] CS2 dialog action bytes OK 6f 12 34
+[MenuActionFlow] settings toggle dispatch OK (Actions.TOGGLE_SETTING_WIDGET -> Outgoing530.ifCs2)
+[MenuActionFlow] settings reset dispatch OK (Actions.RESET_SETTING_WIDGET -> Outgoing530.ifCs2)
+[MenuActionFlow] settings component click bytes OK 0a 12 34 56 78
+[MenuActionFlow] inventory operate dispatch OK (225 -> Outgoing530.objOperate)
+[MenuActionFlow] inventory operate bytes OK ce 03 84 02 01 78 56 34 12
+[MenuActionFlow] bank component options source source OK (if (child.options != null))
+[MenuActionFlow] legacy inventory widget offset padding source OK (while (widget.imageX.length < 20) widget.imageX.push(0))
+[MenuActionFlow] legacy inventory widget y-offset padding source OK (while (widget.imageY.length < 20) widget.imageY.push(0))
+[MenuActionFlow] bank component option 1 menu action source OK (this.menuActionTypes[this.menuActionRow] = 9)
+[MenuActionFlow] bank component option 2 menu action source OK (this.menuActionTypes[this.menuActionRow] = 225)
+[MenuActionFlow] bank component option 3 menu action source OK (this.menuActionTypes[this.menuActionRow] = 444)
+[MenuActionFlow] bank component option 4 menu action source OK (this.menuActionTypes[this.menuActionRow] = 564)
+[MenuActionFlow] bank component option 5 menu action source OK (this.menuActionTypes[this.menuActionRow] = 894)
+[MenuActionFlow] bank component option 1 dispatch source OK (if (action === 9) {
+            Outgoing530.objInComponentAction1)
+[MenuActionFlow] bank component option 2 dispatch dispatch OK (225 -> Outgoing530.objOperate)
+[MenuActionFlow] bank component option 3 dispatch dispatch OK (444 -> Outgoing530.objInComponentAction2)
+[MenuActionFlow] bank component option 4 dispatch dispatch OK (564 -> Outgoing530.objInComponentAction3)
+[MenuActionFlow] bank component option 5 dispatch dispatch OK (894 -> Outgoing530.objInComponentAction5)
+[MenuActionFlow] bank component item option sequence bytes OK 51 01 82 03 04 34 12 78 56 ce 03 84 02 01 78 56 34 12 9a 02 01 34 12 78 56 84 03 55 34 12 78 56 01 02 03 84 06 12 34 56 78 01 82 04 03
+[MenuActionFlow] inventory equip dispatch OK (399 -> Outgoing530.objAction2)
+[MenuActionFlow] inventory equip bytes OK 37 04 03 01 82 34 12 78 56
+[MenuActionFlow] inventory drop dispatch OK (227 -> Outgoing530.objAction4)
+[MenuActionFlow] inventory drop bytes OK a1 78 56 34 12 84 03 82 01
+[MenuActionFlow] inventory use on item dispatch OK (903 -> Outgoing530.useOnItem)
+[MenuActionFlow] inventory use on item bytes OK 1b 05 06 78 56 34 12 02 01 88 77 66 55 88 07 84 03
+[MenuActionFlow] ground item option 1 dispatch OK (68 -> Outgoing530.objstackAction1)
+[MenuActionFlow] ground item option 2 dispatch OK (26 -> Outgoing530.objstackAction2)
+[MenuActionFlow] ground item option 3/take dispatch OK (684 -> Outgoing530.objstackAction1)
+[MenuActionFlow] ground item option 4 dispatch OK (930 -> Outgoing530.objstackAction2)
+[MenuActionFlow] ground item option 5 dispatch OK (270 -> Outgoing530.objstackAction5)
+[MenuActionFlow] inventory use on ground item dispatch OK (100 -> Outgoing530.useOnGroundItem)
+[MenuActionFlow] ground item action sequence bytes OK 42 8a 0c 07 89 14 0c 21 07 89 0c 8a 94 0c 30 0c 0a 09 07 94 0c 65 0a 0c 06 05 08 07 89 07 14 0c 77 88 55 66
+[MenuActionFlow] ground item option 5 bytes OK 30 0c 0a 09 07 94 0c
+[MenuActionFlow] npc action 1 dispatch OK (318 -> Outgoing530.npcAction1)
+[MenuActionFlow] npc action 2 dispatch OK (921 -> Outgoing530.npcAction2)
+[MenuActionFlow] npc action 3 dispatch OK (118 -> Outgoing530.npcAction3)
+[MenuActionFlow] npc action 4 dispatch OK (553 -> Outgoing530.npcAction4)
+[MenuActionFlow] npc action 5 dispatch OK (432 -> Outgoing530.npcAction5)
+[MenuActionFlow] npc action sequence bytes OK 4e 34 12 03 b4 12 94 12 b4 1e 12 34 da 34 12
+[MenuActionFlow] player action 1 dispatch OK (200 -> Outgoing530.playerAction1)
+[MenuActionFlow] player follow dispatch OK (876 -> Outgoing530.playerFollow)
+[MenuActionFlow] player trade dispatch OK (677 -> Outgoing530.playerTrade)
+[MenuActionFlow] player request assist dispatch OK (408 -> Outgoing530.playerRequestAssist)
+[MenuActionFlow] player action 5 dispatch OK (493 -> Outgoing530.playerAction5)
+[MenuActionFlow] player action sequence bytes OK 44 b4 12 47 b4 12 b4 b4 12 72 b4 12 af 12 b4
+[MenuActionFlow] loc action 1 dispatch OK (35 -> Outgoing530.locAction1)
+[MenuActionFlow] loc action 2 dispatch OK (389 -> Outgoing530.locAction2)
+[MenuActionFlow] loc action 3 dispatch OK (888 -> Outgoing530.locAction3)
+[MenuActionFlow] loc action 4 dispatch OK (892 -> Outgoing530.locAction4)
+[MenuActionFlow] loc action 5 dispatch OK (1280 -> Outgoing530.locAction5)
+[MenuActionFlow] loc action sequence bytes OK fe 8a 0c 07 09 0c 94 c2 14 0c 8a 0c 07 89 54 09 07 14 0c 8a 0c f7 94 0c 0a 0c 07 89 aa 09 07 0a 0c 14 0c
+[MenuActionFlow] component on npc dispatch OK (67 -> Outgoing530.componentNpcAction)
+[MenuActionFlow] component on item dispatch OK (361 -> Outgoing530.componentObjAction)
+[MenuActionFlow] component on loc dispatch OK (376 && this.method80(second, 0, first, clicked) -> Outgoing530.componentLocAction)
+[MenuActionFlow] component on player dispatch OK (918 -> Outgoing530.componentPlayerAction)
+[MenuActionFlow] component on ground item dispatch OK (199 -> Outgoing530.componentGroundItemAction)
+[MenuActionFlow] component target sequence bytes OK ef 88 77 66 55 05 86 b4 12 fd 88 77 66 55 82 01 78 56 34 12 03 84 06 05 e9 14 0c 0c 0a 86 05 66 55 88 77 07 09 c3 05 86 88 77 66 55 b4 12 49 66 55 88 77 0c 94 09 07 0a 0c 06 05
+[MenuActionFlow] close widgets menu action dispatch OK (Actions.CLOSE_WIDGETS -> this.closeWidgets)
+[MenuActionFlow] close widgets encoder source OK (Outgoing530.closeModal(this.outBuffer))
+[MenuActionFlow] close modal bytes OK b8
+[MenuActionFlow] logout button component action dispatch OK (352 -> Outgoing530.ifCs2)
+[MenuActionFlow] logout button content-type gate source OK (if (type === 205))
+[MenuActionFlow] logout button countdown source OK (this.anInt873 = 250)
+[MenuActionFlow] logout button component click bytes OK 0a 12 34 56 78
+[MenuActionFlow] social add/remove menu action source OK (action === Actions.ADD_FRIEND)
+[MenuActionFlow] social add/remove dispatch source OK (this.addFriend(l3))
+[MenuActionFlow] social add friend encoder source OK (Outgoing530.addFriend(this.outBuffer, name))
+[MenuActionFlow] social remove friend encoder source OK (Outgoing530.removeFriend(this.outBuffer, l))
+[MenuActionFlow] social add ignore encoder source OK (Outgoing530.addIgnore(this.outBuffer, name))
+[MenuActionFlow] social remove ignore encoder source OK (Outgoing530.removeIgnore(this.outBuffer, l))
+[MenuActionFlow] social list packets bytes OK 78 11 22 33 44 55 66 77 88 39 11 22 33 44 55 66 77 88 22 11 22 33 44 55 66 77 88 d5 11 22 33 44 55 66 77 88
+[MenuActionFlow] private-message menu prompt dispatch OK (984 -> this.friendsListAction = 3)
+[MenuActionFlow] private-message encoder source OK (Outgoing530.privateMessage(this.outBuffer, this.aLong1141, this.chatMessage, PacketHandler530.huffman))
+[MenuActionFlow] private message bytes OK c9 0b 11 22 33 44 55 66 77 88 02 68 69
+[MenuActionFlow] chat settings encoder source OK (Outgoing530.chatSettings(this.outBuffer, this.publicChatMode, this.privateChatMode, this.tradeMode))
+[MenuActionFlow] chat settings bytes OK 9d 01 02 00
+[MenuActionFlow] command encoder source OK (Outgoing530.command(this.outBuffer, this.chatboxInput))
+[MenuActionFlow] command bytes OK 2c 07 6e 6f 63 6c 69 70 00
+[MenuActionFlow] count-dialog resume encoder source OK (Outgoing530.resumeCountDialog(this.outBuffer, k))
+[MenuActionFlow] count-dialog resume bytes OK 17 12 34 56 78
+[MenuActionFlow] name-dialog resume encoder source OK (Outgoing530.resumeNameDialog(this.outBuffer, TextUtils.nameToLong(this.inputInputMessage)))
+[MenuActionFlow] name-dialog resume bytes OK f4 11 22 33 44 55 66 77 88
+[MenuActionFlow] string-dialog resume encoder source OK (Outgoing530.resumeStringDialog(this.outBuffer, this.inputInputMessage))
+[MenuActionFlow] string-dialog resume bytes OK 41 03 68 69 00
+[MenuActionFlow] report-abuse encoder source OK (Outgoing530.bugReport(this.outBuffer, TextUtils.nameToLong(this.reportedName), type - 600, this.reportMutePlayer))
+[MenuActionFlow] report-abuse bytes OK 63 11 22 33 44 55 66 77 88 02 01
+[MenuActionFlow] character-design legacy packet gate source OK (this.skipUnsupportedCharacterDesignPacket())
+[MenuActionFlow] character-design opcode note source OK (ReflectionCheck)

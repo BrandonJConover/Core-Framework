@@ -29,9 +29,9 @@ pub struct AuthConfig {
 impl Default for AuthConfig {
     fn default() -> Self {
         Self {
-            session_timeout: 3600,        // 1 hour
+            session_timeout: 3600, // 1 hour
             max_failed_attempts: 5,
-            lockout_duration: 900,         // 15 minutes
+            lockout_duration: 900, // 15 minutes
             min_password_length: 4,
             max_password_length: 20,
             require_email_verification: false,

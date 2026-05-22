@@ -1,0 +1,13 @@
+{
+  "id": "in_bank_deposit_fixed_width",
+  "protocol": "custom-v235",
+  "direction": "client_to_server",
+  "opcode_enum": "BANK_DEPOSIT",
+  "wire_opcode": 23,
+  "payload_hex": "000a00000005",
+  "fields": {
+    "catalogID": 10,
+    "amount": 5
+  },
+  "notes": "Payload only. Java PayloadCustomParser reads BANK_DEPOSIT as SHORT catalogID then INT amount."
+}

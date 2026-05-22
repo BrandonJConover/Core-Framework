@@ -130,6 +130,13 @@ export const ClientOpcode = {
 
     // Player actions
     PLAYER_ACTION_1:        68,
+    PLAYER_ACTION_FOLLOW:   71,
+    PLAYER_ACTION_TRADE:   180,
+    PLAYER_REQ_ASSIST:     114,
+    PLAYER_ACTION_5:       175,
+    PLAYER_ACTION_BLOCK:   109,
+    // Legacy aliases kept for existing call sites while the 530 action layer
+    // is wired into Game.processMenuActions.
     PLAYER_ACTION_3:        71,
     PLAYER_ACTION_4:       180,
 
@@ -146,10 +153,16 @@ export const ClientOpcode = {
     ITEM_ACTION_3:         153,
     ITEM_ACTION_4:         161,
     ITEM_ACTION_5:         135,
+    ITEM_OPERATE:          206,
+    ITEM_IN_COMPONENT_ACTION_1: 81,
+    ITEM_IN_COMPONENT_ACTION_2: 154,
+    ITEM_IN_COMPONENT_ACTION_3: 85,
+    ITEM_IN_COMPONENT_ACTION_5: 6,
 
     // Ground items
     GROUND_ITEM_ACTION_1:   66,
     GROUND_ITEM_ACTION_2:   33,
+    GROUND_ITEM_ACTION_5:   48,
 
     // Use-with
     USE_ON_NPC:            115,
@@ -157,6 +170,13 @@ export const ClientOpcode = {
     USE_ON_ITEM:            27,
     USE_ON_SCENERY:        134,
     USE_ON_GROUND_ITEM:    101,
+
+    // Selected component target actions
+    COMPONENT_NPC_ACTION:  239,
+    COMPONENT_ITEM_ACTION: 253,
+    COMPONENT_SCENERY_ACTION: 233,
+    COMPONENT_PLAYER_ACTION: 195,
+    COMPONENT_GROUND_ITEM_ACTION: 73,
 
     // Interface actions
     IF_ACTION_1:           155,
@@ -170,14 +190,19 @@ export const ClientOpcode = {
     IF_ACTION_9:            53,
     IF_ACTION_10:            9,
     IF_CS2:                 10,
+    DIALOG_ACTION:         111,
     CONTINUE_DIALOGUE:     132,
     CLOSE_IFACE:           184,
+    RESUME_COUNT_DIALOG:    23,
+    RESUME_NAME_DIALOG:    244,
+    RESUME_STRING_DIALOG:   65,
 
     // Chat
     CHAT_MESSAGE:          237,
     CHAT_SETTINGS:         157,
     COMMAND:                44,
     PRIVATE_MESSAGE:       201,
+    BUG_REPORT:             99,
 
     // Social
     ADD_FRIEND:            120,

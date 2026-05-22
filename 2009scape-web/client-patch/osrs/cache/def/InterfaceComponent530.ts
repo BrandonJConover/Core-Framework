@@ -121,6 +121,10 @@ export interface IfInventoryBlock {
     /** Per-slot icon padding inside the grid cell. */
     invMarginX: number;
     invMarginY: number;
+    itemSwapable: boolean;
+    isInventory: boolean;
+    itemUsable: boolean;
+    itemDeletesDragged: boolean;
     /** Up to 20 sprite-overlay positions. Index = -1 in invSprite means "no sprite". */
     invSprite: number[];
     invOffsetX: number[];
@@ -229,7 +233,10 @@ export function parseIF1Component(bytes: Uint8Array, id: number = 0): InterfaceC
     if (out.type === 2) {
         // IF1 inventory: invMarginX, invMarginY + 20 sprite slots + 5 options.
         // slotCount is implicit from width*height — IF1 uses the layout dims.
-        const flagBytes: number[] = [r.g1(), r.g1(), r.g1(), r.g1()];
+        const itemSwapable = r.g1() === 1;
+        const isInventory = r.g1() === 1;
+        const itemUsable = r.g1() === 1;
+        const itemDeletesDragged = r.g1() === 1;
         const invMarginX = r.g1();
         const invMarginY = r.g1();
         const invSprite: number[] = [];
@@ -256,11 +263,9 @@ export function parseIF1Component(bytes: Uint8Array, id: number = 0): InterfaceC
             itemAmounts: new Array(slotCount).fill(0),
             options,
             invMarginX, invMarginY,
+            itemSwapable, isInventory, itemUsable, itemDeletesDragged,
             invSprite, invOffsetX, invOffsetY,
         };
-        // flagBytes are kept on the typed shape via a side channel; production
-        // doesn't read them yet so we don't surface them.
-        void flagBytes;
     }
 
     if (out.type === 3) r.g1(); // filled
@@ -329,6 +334,10 @@ export function parseIF1Component(bytes: Uint8Array, id: number = 0): InterfaceC
         out.inventory = {
             slotCount: 1, items: [-1], itemAmounts: [0], options,
             invMarginX: 0, invMarginY: 0,
+            itemSwapable: false,
+            isInventory: false,
+            itemUsable: false,
+            itemDeletesDragged: false,
             invSprite: [], invOffsetX: [], invOffsetY: [],
         };
     }
@@ -389,6 +398,10 @@ export function parseIF3Component(bytes: Uint8Array, id: number = 0): InterfaceC
             itemAmounts: new Array(slotCount).fill(0),
             options: [],
             invMarginX: 0, invMarginY: 0,
+            itemSwapable: false,
+            isInventory: false,
+            itemUsable: false,
+            itemDeletesDragged: false,
             invSprite: [], invOffsetX: [], invOffsetY: [],
         };
     } else if (out.type === 5) {

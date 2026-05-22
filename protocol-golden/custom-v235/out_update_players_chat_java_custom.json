@@ -1,0 +1,32 @@
+{
+  "id": "out_update_players_chat_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_UPDATE_PLAYERS",
+  "wire_opcode": 234,
+  "payload_hex": "0001002a010a68656c6c6f0a",
+  "fields": {
+    "count": 1,
+    "entries": [
+      {
+        "player_index": 42,
+        "update_type": 1,
+        "icon": "",
+        "message": "hello"
+      }
+    ]
+  },
+  "java_reference": {
+    "generator": "server-java-modern/src/com/openrsc/server/net/rsc/generators/impl/PayloadCustomGenerator.java",
+    "source_struct": "server-java-modern/src/com/openrsc/server/net/rsc/struct/outgoing/AppearanceUpdateStruct.java",
+    "string_writer": "server-java-modern/src/com/openrsc/server/net/PacketBuilder.java#writeString",
+    "info_sequence": [
+      "Short(count)",
+      "Short(player_index)",
+      "Byte(update_type)",
+      "String(icon)",
+      "String(message)"
+    ]
+  },
+  "notes": "Payload only, without transport framing. This is the Java custom-client SEND_UPDATE_PLAYERS type-1 public-chat layout: PayloadCustomGenerator writes the AppearanceUpdateStruct info entries in order and PacketBuilder.writeString terminates both icon and message strings with LF (0a)."
+}

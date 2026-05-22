@@ -2,8 +2,8 @@
 //!
 //! Implements NPC spawning, combat AI, pathfinding, and drop tables.
 
-use super::entity::{Direction, EntityId, Position};
 use super::combat::CombatStyle;
+use super::entity::{Direction, EntityId, Position};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
@@ -68,10 +68,17 @@ impl NpcDef {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcCombatState {
     Idle,
-    InCombat { target_id: u64, last_attack_tick: u64 },
+    InCombat {
+        target_id: u64,
+        last_attack_tick: u64,
+    },
     Fleeing,
-    Dead { death_tick: u64 },
-    Respawning { respawn_tick: u64 },
+    Dead {
+        death_tick: u64,
+    },
+    Respawning {
+        respawn_tick: u64,
+    },
 }
 
 /// An NPC instance in the game world.
@@ -126,7 +133,10 @@ impl Npc {
             target_id: player_id,
             last_attack_tick: current_tick,
         };
-        debug!("NPC {} started combat with player {}", self.entity_id.0, player_id);
+        debug!(
+            "NPC {} started combat with player {}",
+            self.entity_id.0, player_id
+        );
     }
 
     /// End combat.
@@ -139,7 +149,9 @@ impl Npc {
     pub fn apply_damage(&mut self, damage: u32, current_tick: u64) -> bool {
         if damage >= self.current_hp {
             self.current_hp = 0;
-            self.combat_state = NpcCombatState::Dead { death_tick: current_tick };
+            self.combat_state = NpcCombatState::Dead {
+                death_tick: current_tick,
+            };
             debug!("NPC {} died", self.entity_id.0);
             return true;
         }
@@ -154,7 +166,10 @@ impl Npc {
         self.current_hp = self.max_hp;
         self.combat_state = NpcCombatState::Idle;
         self.removed = false;
-        debug!("NPC {} respawned at {:?}", self.entity_id.0, self.spawn_position);
+        debug!(
+            "NPC {} respawned at {:?}",
+            self.entity_id.0, self.spawn_position
+        );
     }
 
     /// Get distance to a position.
@@ -359,41 +374,49 @@ impl NpcManager {
 
     fn load_definitions(&mut self) {
         // Sample NPC definitions
-        self.add_definition(NpcDef::new(1, "Man")
-            .with_combat(2, 7, 1, 1, 1));
+        self.add_definition(NpcDef::new(1, "Man").with_combat(2, 7, 1, 1, 1));
 
-        self.add_definition(NpcDef::new(2, "Woman")
-            .with_combat(2, 7, 1, 1, 1));
+        self.add_definition(NpcDef::new(2, "Woman").with_combat(2, 7, 1, 1, 1));
 
-        self.add_definition(NpcDef::new(21, "Rat")
-            .with_combat(2, 5, 1, 1, 1));
+        self.add_definition(NpcDef::new(21, "Rat").with_combat(2, 5, 1, 1, 1));
 
-        self.add_definition(NpcDef::new(62, "Goblin")
-            .with_combat(7, 15, 5, 5, 5)
-            .aggressive());
+        self.add_definition(
+            NpcDef::new(62, "Goblin")
+                .with_combat(7, 15, 5, 5, 5)
+                .aggressive(),
+        );
 
-        self.add_definition(NpcDef::new(66, "Skeleton")
-            .with_combat(21, 25, 18, 18, 18)
-            .aggressive());
+        self.add_definition(
+            NpcDef::new(66, "Skeleton")
+                .with_combat(21, 25, 18, 18, 18)
+                .aggressive(),
+        );
 
-        self.add_definition(NpcDef::new(68, "Zombie")
-            .with_combat(24, 30, 20, 20, 20)
-            .aggressive());
+        self.add_definition(
+            NpcDef::new(68, "Zombie")
+                .with_combat(24, 30, 20, 20, 20)
+                .aggressive(),
+        );
 
-        self.add_definition(NpcDef::new(93, "Black Knight")
-            .with_combat(46, 55, 42, 42, 42)
-            .aggressive());
+        self.add_definition(
+            NpcDef::new(93, "Black Knight")
+                .with_combat(46, 55, 42, 42, 42)
+                .aggressive(),
+        );
 
-        self.add_definition(NpcDef::new(184, "Lesser Demon")
-            .with_combat(79, 90, 70, 70, 70)
-            .aggressive());
+        self.add_definition(
+            NpcDef::new(184, "Lesser Demon")
+                .with_combat(79, 90, 70, 70, 70)
+                .aggressive(),
+        );
 
-        self.add_definition(NpcDef::new(135, "Greater Demon")
-            .with_combat(87, 100, 80, 80, 80)
-            .aggressive());
+        self.add_definition(
+            NpcDef::new(135, "Greater Demon")
+                .with_combat(87, 100, 80, 80, 80)
+                .aggressive(),
+        );
 
-        self.add_definition(NpcDef::new(95, "Banker")
-            .non_attackable());
+        self.add_definition(NpcDef::new(95, "Banker").non_attackable());
     }
 
     /// Add an NPC definition.
@@ -457,7 +480,8 @@ impl NpcManager {
 
     /// Get NPCs near a position.
     pub fn near(&self, pos: Position, radius: u32) -> Vec<EntityId> {
-        self.npcs.iter()
+        self.npcs
+            .iter()
             .filter(|(_, npc)| npc.distance_to(pos) <= radius && !npc.is_dead())
             .map(|(id, _)| *id)
             .collect()
@@ -465,7 +489,9 @@ impl NpcManager {
 
     /// Process NPC tick.
     pub fn tick(&mut self, current_tick: u64) {
-        let respawn_npcs: Vec<EntityId> = self.npcs.iter()
+        let respawn_npcs: Vec<EntityId> = self
+            .npcs
+            .iter()
             .filter_map(|(id, npc)| {
                 if let NpcCombatState::Dead { death_tick } = npc.combat_state {
                     let def = self.npc_definitions.get(&npc.def_id)?;

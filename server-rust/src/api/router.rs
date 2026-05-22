@@ -22,6 +22,10 @@ pub fn build_router(state: ApiState) -> Router {
         .route("/api/auth/register", post(endpoints::auth::post_register))
         .route("/api/auth/refresh", post(endpoints::auth::post_refresh))
         .route("/api/auth/whoami", get(endpoints::auth::get_whoami))
+        .route(
+            "/api/auth/game-ticket",
+            post(endpoints::auth::post_game_ticket),
+        )
         // Players
         .route("/api/players/online", get(endpoints::players::get_online))
         // Character — axum 0.7 path-param syntax is `:name`, not `{name}`.

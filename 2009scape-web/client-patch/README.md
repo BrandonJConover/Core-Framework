@@ -85,6 +85,57 @@ with `00`. If this hangs, the `2009scape-server` container may still show as
 `OutOfMemoryError`). Restarting `server` and `websockify` in
 `/opt/2009scape-web` restores the WebSocket login path.
 
+## Docker-free local smoke path
+
+If Docker is unavailable, the current developer-friendly path reuses the local
+Java server and WebSocket bridge from `experiments/rt4-wrapper-spike`, then
+points this TypeScript client at that bridge.
+
+From the repo root, prepare/build once:
+
+```bash
+bash experiments/rt4-wrapper-spike/scripts/build-local-server.sh
+cd 2009scape-web
+scripts/use-530-cache.sh
+cd client && npm install && npm run build
+```
+
+Start the local server in one terminal:
+
+```bash
+bash experiments/rt4-wrapper-spike/scripts/start-local-server.sh
+```
+
+Start the local bridge in another terminal:
+
+```bash
+bash experiments/rt4-wrapper-spike/scripts/start-local-wrapper.sh
+```
+
+Serve the TypeScript client in a third terminal:
+
+```bash
+cd 2009scape-web/client
+npx serve dist -l tcp://127.0.0.1:8765
+```
+
+Before running a live smoke, validate the local pieces:
+
+```bash
+CHECK_LIVE=1 CLIENT_URL=http://127.0.0.1:8765/ CLIENT_SERVER_HOST=127.0.0.1 CLIENT_SERVER_PORT=43601 \
+  2009scape-web/scripts/check-local-rt4-smoke.sh
+```
+
+Then run the Playwright smoke from the repo root:
+
+```bash
+AUTO_LOGIN=1 CAPTURE_SCREENSHOTS=0 SEND_COMMAND=0 ASSERT_WALK=1 ASSERT_MINIMAP_WALK=1 ASSERT_ACTION_PROBES=1 ASSERT_RENDERED_ACTION_MENU=1 ASSERT_LOGOUT_RELOG=1 STABILITY_MS=0 CLIENT_SERVER_HOST=127.0.0.1 CLIENT_SERVER_PORT=43601 CLIENT_SERVER_DIALECT=openrsc235 CLIENT_URL=http://127.0.0.1:8765/ \
+  node 2009scape-web/e2e/smoke-test.js
+```
+
+This is still the OpenRSC bridge dialect test adapter documented in the parity
+plan, not final native 530 server-authoritative gameplay.
+
 ## What's deferred
 
 - Real fonts/sprites from idx8/idx13 — currently stubbed to blank

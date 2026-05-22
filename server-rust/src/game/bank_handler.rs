@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
 use crate::protocol::opcodes::OpcodeOut;
-use crate::protocol::{Packet, PacketBuilder};
+use crate::protocol::{Packet, PacketBuilder, PacketReader};
 
 use super::bank::{Bank, BankError};
 use super::item::ItemId;
@@ -109,7 +109,7 @@ pub struct BankPin {
 impl BankPin {
     /// Create a new bank PIN from raw digits (e.g. "1234").
     pub fn set_pin(pin: &str) -> Self {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
 
         let salt = generate_salt();
         let mut hasher = Sha256::new();
@@ -122,17 +122,14 @@ impl BankPin {
 
     /// Verify a candidate PIN against the stored hash.
     pub fn verify_pin(&self, candidate: &str) -> bool {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
 
         let mut hasher = Sha256::new();
         hasher.update(self.salt.as_bytes());
         hasher.update(candidate.as_bytes());
         let candidate_hash = hex::encode(hasher.finalize());
 
-        constant_time_eq::constant_time_eq(
-            self.hash.as_bytes(),
-            candidate_hash.as_bytes(),
-        )
+        constant_time_eq::constant_time_eq(self.hash.as_bytes(), candidate_hash.as_bytes())
     }
 }
 
@@ -178,6 +175,37 @@ pub struct BankHandler {
     sessions: HashMap<u64, BankSession>,
     /// Bank PINs keyed by player ID (only present if a PIN is set).
     pins: HashMap<u64, BankPin>,
+}
+
+/// Java bank deposit/withdraw request payload.
+///
+/// Custom v235 and v203 encode bank item movement as:
+/// `item_id(u16) | amount(u32)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BankItemAmountRequest {
+    pub item_id: ItemId,
+    pub amount: u32,
+}
+
+impl BankItemAmountRequest {
+    pub fn parse(packet: &Packet) -> Result<Self, BankHandlerError> {
+        let mut reader = PacketReader::new(packet);
+        let item_id = reader
+            .read_short()
+            .map_err(|_| BankHandlerError::MalformedPacket)?;
+        let amount = reader
+            .read_int()
+            .map_err(|_| BankHandlerError::MalformedPacket)?;
+
+        if reader.remaining() != 0 {
+            return Err(BankHandlerError::MalformedPacket);
+        }
+
+        Ok(Self {
+            item_id: ItemId(item_id as u32),
+            amount,
+        })
+    }
 }
 
 impl BankHandler {
@@ -236,7 +264,10 @@ impl BankHandler {
         player_bank: &PlayerBank,
     ) -> Result<Vec<Packet>, BankHandlerError> {
         // Ensure a session record exists
-        let session = self.sessions.entry(player_id).or_insert_with(BankSession::new);
+        let session = self
+            .sessions
+            .entry(player_id)
+            .or_insert_with(BankSession::new);
 
         // PIN gate
         if self.pins.contains_key(&player_id) && !session.pin_verified {
@@ -244,7 +275,11 @@ impl BankHandler {
         }
 
         session.is_open = true;
-        debug!("Player {} opened bank ({} items)", player_id, player_bank.bank.slot_count());
+        debug!(
+            "Player {} opened bank ({} items)",
+            player_id,
+            player_bank.bank.slot_count()
+        );
 
         Ok(vec![build_open_bank_packet(player_bank)])
     }
@@ -256,7 +291,9 @@ impl BankHandler {
         _item_id: ItemId,
         _amount: u32,
     ) -> Result<(), BankHandlerError> {
-        let session = self.sessions.get(&player_id)
+        let session = self
+            .sessions
+            .get(&player_id)
             .ok_or(BankHandlerError::BankClosed)?;
         if !session.is_open {
             return Err(BankHandlerError::BankClosed);
@@ -273,7 +310,9 @@ impl BankHandler {
         _item_id: ItemId,
         _amount: u32,
     ) -> Result<(), BankHandlerError> {
-        let session = self.sessions.get(&player_id)
+        let session = self
+            .sessions
+            .get(&player_id)
             .ok_or(BankHandlerError::BankClosed)?;
         if !session.is_open {
             return Err(BankHandlerError::BankClosed);
@@ -283,7 +322,9 @@ impl BankHandler {
 
     /// Handle a "deposit all inventory" request.
     pub fn handle_deposit_all(&self, player_id: u64) -> Result<(), BankHandlerError> {
-        let session = self.sessions.get(&player_id)
+        let session = self
+            .sessions
+            .get(&player_id)
             .ok_or(BankHandlerError::BankClosed)?;
         if !session.is_open {
             return Err(BankHandlerError::BankClosed);
@@ -308,9 +349,9 @@ impl BankHandler {
             .unwrap_or(false)
     }
 
-    /// Build a bank update packet for the given player bank.
-    pub fn build_update(&self, player_bank: &PlayerBank) -> Packet {
-        build_bank_update_packet(player_bank)
+    /// Build a bank update packet for one slot.
+    pub fn build_update(&self, slot: u8, item_id: ItemId, amount: u32) -> Packet {
+        build_bank_update_packet(slot, item_id, amount)
     }
 
     /// Clean up session state when a player logs out.
@@ -326,31 +367,34 @@ impl BankHandler {
 /// Build the packet that opens the bank interface on the client.
 ///
 /// Layout: opcode | slot_count(u8) | capacity(u8)
-///   then for each slot: item_id(u16) | amount(u32)
+///   then for each slot: item_id(u16) | amount(unsigned-short-int)
 pub fn build_open_bank_packet(player_bank: &PlayerBank) -> Packet {
     let items = player_bank.bank.items();
-    let mut builder = PacketBuilder::new(OpcodeOut::OpenBank as u8)
-        .write_byte(items.len() as u8)
-        .write_byte(player_bank.bank.capacity() as u8);
+    let mut builder = PacketBuilder::new(OpcodeOut::OpenBank.wire())
+        .write_byte(items.len().min(u8::MAX as usize) as u8)
+        .write_byte(player_bank.bank.capacity().min(u8::MAX as usize) as u8);
 
-    for item in items {
+    for item in items.iter().take(u8::MAX as usize) {
         builder = builder
             .write_short(item.item_id as u16)
-            .write_int(item.amount);
+            .write_unsigned_short_int(item.amount);
     }
 
     builder.build()
 }
 
-/// Build a bank-contents update packet (refreshes the client view).
-pub fn build_bank_update_packet(player_bank: &PlayerBank) -> Packet {
-    // Same layout as the open packet; client treats it as a full refresh.
-    build_open_bank_packet(player_bank)
+/// Build a bank-contents update packet for a single slot.
+pub fn build_bank_update_packet(slot: u8, item_id: ItemId, amount: u32) -> Packet {
+    PacketBuilder::new(OpcodeOut::SEND_BANK_UPDATE.wire())
+        .write_byte(slot)
+        .write_short(item_id.0 as u16)
+        .write_unsigned_short_int(amount)
+        .build()
 }
 
 /// Build the packet that closes the bank interface.
 pub fn build_close_bank_packet() -> Packet {
-    PacketBuilder::new(OpcodeOut::CloseInterface as u8).build()
+    PacketBuilder::new(OpcodeOut::CloseInterface.wire()).build()
 }
 
 // ---------------------------------------------------------------------------
@@ -366,6 +410,8 @@ pub enum BankHandlerError {
     PinRequired,
     /// Forwarded error from the underlying `Bank`.
     BankError(BankError),
+    /// The client packet did not match the Java bank payload shape.
+    MalformedPacket,
 }
 
 impl std::fmt::Display for BankHandlerError {
@@ -374,6 +420,7 @@ impl std::fmt::Display for BankHandlerError {
             Self::BankClosed => write!(f, "Bank is not open"),
             Self::PinRequired => write!(f, "Bank PIN verification required"),
             Self::BankError(e) => write!(f, "Bank error: {}", e),
+            Self::MalformedPacket => write!(f, "Malformed bank packet"),
         }
     }
 }
@@ -397,7 +444,7 @@ mod tests {
     fn make_player_bank() -> PlayerBank {
         let mut pb = PlayerBank::new(true);
         pb.deposit(ItemId(10), 1000).unwrap(); // 1000 coins
-        pb.deposit(ItemId(66), 5).unwrap();    // 5 bronze swords
+        pb.deposit(ItemId(66), 5).unwrap(); // 5 bronze swords
         pb
     }
 
@@ -457,6 +504,16 @@ mod tests {
         let handler = BankHandler::new();
         let result = handler.handle_withdraw(1, ItemId(10), 5);
         assert!(matches!(result, Err(BankHandlerError::BankClosed)));
+    }
+
+    #[test]
+    fn test_zero_amount_requests_are_valid_when_open() {
+        let mut handler = BankHandler::new();
+        let pb = make_player_bank();
+        handler.open_bank(1, &pb).unwrap();
+
+        assert_eq!(handler.handle_deposit(1, ItemId(10), 0), Ok(()));
+        assert_eq!(handler.handle_withdraw(1, ItemId(10), 0), Ok(()));
     }
 
     #[test]
@@ -548,12 +605,67 @@ mod tests {
         let pb = make_player_bank();
         let packet = build_open_bank_packet(&pb);
         assert!(!packet.is_empty());
-        assert_eq!(packet.opcode, OpcodeOut::OpenBank as u8);
+        assert_eq!(packet.opcode, OpcodeOut::OpenBank.wire());
+    }
+
+    #[test]
+    fn test_open_bank_packet_uses_java_amount_encoding() {
+        let mut pb = PlayerBank::new(true);
+        pb.deposit(ItemId(10), 32_767).unwrap();
+        pb.deposit(ItemId(66), 32_768).unwrap();
+
+        let packet = build_open_bank_packet(&pb);
+
+        assert_eq!(packet.opcode, OpcodeOut::SEND_BANK_OPEN.wire());
+        assert_eq!(
+            packet.payload,
+            vec![2, 192, 0, 10, 0x7f, 0xff, 0, 66, 0x80, 0x00, 0x80, 0x00,]
+        );
+    }
+
+    #[test]
+    fn test_bank_update_packet_is_single_slot_delta() {
+        let packet = build_bank_update_packet(3, ItemId(10), 5);
+
+        assert_eq!(packet.opcode, OpcodeOut::SEND_BANK_UPDATE.wire());
+        assert_eq!(packet.payload, vec![3, 0, 10, 0, 5]);
+    }
+
+    #[test]
+    fn test_bank_update_packet_uses_large_amount_encoding() {
+        let packet = build_bank_update_packet(3, ItemId(10), 32_768);
+
+        assert_eq!(packet.opcode, OpcodeOut::SEND_BANK_UPDATE.wire());
+        assert_eq!(packet.payload, vec![3, 0, 10, 0x80, 0x00, 0x80, 0x00]);
     }
 
     #[test]
     fn test_close_bank_packet() {
         let packet = build_close_bank_packet();
-        assert_eq!(packet.opcode, OpcodeOut::CloseInterface as u8);
+        assert_eq!(packet.opcode, OpcodeOut::CloseInterface.wire());
+    }
+
+    #[test]
+    fn test_parse_bank_item_amount_request() {
+        let packet = PacketBuilder::new(23).write_short(10).write_int(5).build();
+
+        let request = BankItemAmountRequest::parse(&packet).unwrap();
+        assert_eq!(request.item_id, ItemId(10));
+        assert_eq!(request.amount, 5);
+    }
+
+    #[test]
+    fn test_parse_bank_item_amount_rejects_short_or_extra_payload() {
+        let short_packet = Packet::new(23, vec![0, 10, 0]);
+        assert!(matches!(
+            BankItemAmountRequest::parse(&short_packet),
+            Err(BankHandlerError::MalformedPacket)
+        ));
+
+        let extra_packet = Packet::new(23, vec![0, 10, 0, 0, 0, 5, 99]);
+        assert!(matches!(
+            BankItemAmountRequest::parse(&extra_packet),
+            Err(BankHandlerError::MalformedPacket)
+        ));
     }
 }

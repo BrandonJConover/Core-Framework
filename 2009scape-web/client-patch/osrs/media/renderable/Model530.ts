@@ -67,6 +67,8 @@ export class Model530 {
         m.texturedTrianglePointsZ = d.textureFacesN;
 
         Model530.recomputeBounds(m);
+        m.applyLighting(64, 850, -30, -50, -30, true);
+        Model530.recomputeBounds(m);
         return m;
     }
 

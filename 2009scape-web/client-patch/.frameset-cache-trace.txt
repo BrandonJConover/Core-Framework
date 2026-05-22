@@ -1,0 +1,7 @@
+[FramesetCache530] preloaded size=2 (after clear+re-preload)
+[FramesetCache530] seqLoader calls=7 framesetLoader calls=4
+[FramesetCache530] seq=100 → frameset id=5 frames=3
+[FramesetCache530] seq=101 → frameset id=7 frames=2
+[FramesetCache530] missing-memo: 999=absent, post-clear cleared
+[FramesetCache530] animator idle frames advanced 0→1→2; switch-to-walk seqId=101
+[FramesetCache530] BAS collector: bas=1 ids=4 union=6 (100,101,102,103,200,201)

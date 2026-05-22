@@ -146,15 +146,25 @@ impl ItemRequirements {
     }
 
     pub fn melee(attack: u8, defence: u8) -> Self {
-        Self { attack, defence, ..Default::default() }
+        Self {
+            attack,
+            defence,
+            ..Default::default()
+        }
     }
 
     pub fn ranged(level: u8) -> Self {
-        Self { ranged: level, ..Default::default() }
+        Self {
+            ranged: level,
+            ..Default::default()
+        }
     }
 
     pub fn magic(level: u8) -> Self {
-        Self { magic: level, ..Default::default() }
+        Self {
+            magic: level,
+            ..Default::default()
+        }
     }
 }
 
@@ -262,17 +272,18 @@ impl ItemDef {
     pub fn can_use(&self, skills: &[(u8, u8)]) -> bool {
         // skills is a slice of (skill_id, level) pairs
         let get_level = |skill_id: u8| -> u8 {
-            skills.iter()
+            skills
+                .iter()
                 .find(|(id, _)| *id == skill_id)
                 .map(|(_, lvl)| *lvl)
                 .unwrap_or(1)
         };
 
-        get_level(0) >= self.requirements.attack &&
-        get_level(1) >= self.requirements.defence &&
-        get_level(2) >= self.requirements.strength &&
-        get_level(4) >= self.requirements.ranged &&
-        get_level(6) >= self.requirements.magic
+        get_level(0) >= self.requirements.attack
+            && get_level(1) >= self.requirements.defence
+            && get_level(2) >= self.requirements.strength
+            && get_level(4) >= self.requirements.ranged
+            && get_level(6) >= self.requirements.magic
     }
 }
 
@@ -291,186 +302,240 @@ impl ItemRepository {
 
     fn load_defaults(&mut self) {
         // Coins and currency
-        self.add(ItemDef::new(10, "Coins")
-            .with_description("Lovely money!")
-            .category(ItemCategory::Misc)
-            .stackable());
+        self.add(
+            ItemDef::new(10, "Coins")
+                .with_description("Lovely money!")
+                .category(ItemCategory::Misc)
+                .stackable(),
+        );
 
         // Basic weapons
-        self.add(ItemDef::new(66, "Bronze Sword")
-            .with_description("A bronze sword")
-            .category(ItemCategory::Weapon)
-            .equippable(EquipSlot::Weapon)
-            .bonuses(CombatBonuses::melee_weapon(4, 3))
-            .price(24, 14, 9));
+        self.add(
+            ItemDef::new(66, "Bronze Sword")
+                .with_description("A bronze sword")
+                .category(ItemCategory::Weapon)
+                .equippable(EquipSlot::Weapon)
+                .bonuses(CombatBonuses::melee_weapon(4, 3))
+                .price(24, 14, 9),
+        );
 
-        self.add(ItemDef::new(67, "Iron Sword")
-            .with_description("An iron sword")
-            .category(ItemCategory::Weapon)
-            .equippable(EquipSlot::Weapon)
-            .bonuses(CombatBonuses::melee_weapon(10, 8))
-            .requirements(ItemRequirements::melee(1, 0))
-            .price(56, 33, 22));
+        self.add(
+            ItemDef::new(67, "Iron Sword")
+                .with_description("An iron sword")
+                .category(ItemCategory::Weapon)
+                .equippable(EquipSlot::Weapon)
+                .bonuses(CombatBonuses::melee_weapon(10, 8))
+                .requirements(ItemRequirements::melee(1, 0))
+                .price(56, 33, 22),
+        );
 
-        self.add(ItemDef::new(68, "Steel Sword")
-            .with_description("A steel sword")
-            .category(ItemCategory::Weapon)
-            .equippable(EquipSlot::Weapon)
-            .bonuses(CombatBonuses::melee_weapon(16, 14))
-            .requirements(ItemRequirements::melee(5, 0))
-            .price(200, 120, 80));
+        self.add(
+            ItemDef::new(68, "Steel Sword")
+                .with_description("A steel sword")
+                .category(ItemCategory::Weapon)
+                .equippable(EquipSlot::Weapon)
+                .bonuses(CombatBonuses::melee_weapon(16, 14))
+                .requirements(ItemRequirements::melee(5, 0))
+                .price(200, 120, 80),
+        );
 
-        self.add(ItemDef::new(69, "Mithril Sword")
-            .with_description("A mithril sword")
-            .category(ItemCategory::Weapon)
-            .equippable(EquipSlot::Weapon)
-            .bonuses(CombatBonuses::melee_weapon(23, 21))
-            .requirements(ItemRequirements::melee(20, 0))
-            .price(520, 312, 208));
+        self.add(
+            ItemDef::new(69, "Mithril Sword")
+                .with_description("A mithril sword")
+                .category(ItemCategory::Weapon)
+                .equippable(EquipSlot::Weapon)
+                .bonuses(CombatBonuses::melee_weapon(23, 21))
+                .requirements(ItemRequirements::melee(20, 0))
+                .price(520, 312, 208),
+        );
 
-        self.add(ItemDef::new(70, "Adamant Sword")
-            .with_description("An adamant sword")
-            .category(ItemCategory::Weapon)
-            .equippable(EquipSlot::Weapon)
-            .bonuses(CombatBonuses::melee_weapon(33, 31))
-            .requirements(ItemRequirements::melee(30, 0))
-            .price(1280, 768, 512));
+        self.add(
+            ItemDef::new(70, "Adamant Sword")
+                .with_description("An adamant sword")
+                .category(ItemCategory::Weapon)
+                .equippable(EquipSlot::Weapon)
+                .bonuses(CombatBonuses::melee_weapon(33, 31))
+                .requirements(ItemRequirements::melee(30, 0))
+                .price(1280, 768, 512),
+        );
 
-        self.add(ItemDef::new(71, "Rune Sword")
-            .with_description("A rune sword")
-            .category(ItemCategory::Weapon)
-            .equippable(EquipSlot::Weapon)
-            .bonuses(CombatBonuses::melee_weapon(45, 44))
-            .requirements(ItemRequirements::melee(40, 0))
-            .price(12800, 7680, 5120));
+        self.add(
+            ItemDef::new(71, "Rune Sword")
+                .with_description("A rune sword")
+                .category(ItemCategory::Weapon)
+                .equippable(EquipSlot::Weapon)
+                .bonuses(CombatBonuses::melee_weapon(45, 44))
+                .requirements(ItemRequirements::melee(40, 0))
+                .price(12800, 7680, 5120),
+        );
 
         // Basic armor
-        self.add(ItemDef::new(117, "Bronze Platebody")
-            .with_description("Provides some protection")
-            .category(ItemCategory::Armor)
-            .equippable(EquipSlot::Body)
-            .bonuses(CombatBonuses::armor(15, 14, 12, -5, 0))
-            .price(160, 96, 64));
+        self.add(
+            ItemDef::new(117, "Bronze Platebody")
+                .with_description("Provides some protection")
+                .category(ItemCategory::Armor)
+                .equippable(EquipSlot::Body)
+                .bonuses(CombatBonuses::armor(15, 14, 12, -5, 0))
+                .price(160, 96, 64),
+        );
 
-        self.add(ItemDef::new(118, "Iron Platebody")
-            .with_description("Provides some protection")
-            .category(ItemCategory::Armor)
-            .equippable(EquipSlot::Body)
-            .bonuses(CombatBonuses::armor(22, 20, 17, -10, 0))
-            .requirements(ItemRequirements::melee(0, 1))
-            .price(560, 336, 224));
+        self.add(
+            ItemDef::new(118, "Iron Platebody")
+                .with_description("Provides some protection")
+                .category(ItemCategory::Armor)
+                .equippable(EquipSlot::Body)
+                .bonuses(CombatBonuses::armor(22, 20, 17, -10, 0))
+                .requirements(ItemRequirements::melee(0, 1))
+                .price(560, 336, 224),
+        );
 
         // Food
-        self.add(ItemDef::new(132, "Bread")
-            .with_description("Nice and crusty")
-            .category(ItemCategory::Food)
-            .price(12, 7, 4));
+        self.add(
+            ItemDef::new(132, "Bread")
+                .with_description("Nice and crusty")
+                .category(ItemCategory::Food)
+                .price(12, 7, 4),
+        );
 
-        self.add(ItemDef::new(316, "Lobster")
-            .with_description("Yum!")
-            .category(ItemCategory::Food)
-            .price(150, 90, 60));
+        self.add(
+            ItemDef::new(316, "Lobster")
+                .with_description("Yum!")
+                .category(ItemCategory::Food)
+                .price(150, 90, 60),
+        );
 
-        self.add(ItemDef::new(373, "Swordfish")
-            .with_description("Very tasty!")
-            .category(ItemCategory::Food)
-            .price(200, 120, 80));
+        self.add(
+            ItemDef::new(373, "Swordfish")
+                .with_description("Very tasty!")
+                .category(ItemCategory::Food)
+                .price(200, 120, 80),
+        );
 
-        self.add(ItemDef::new(546, "Shark")
-            .with_description("Very nutritious!")
-            .category(ItemCategory::Food)
-            .members()
-            .price(400, 240, 160));
+        self.add(
+            ItemDef::new(546, "Shark")
+                .with_description("Very nutritious!")
+                .category(ItemCategory::Food)
+                .members()
+                .price(400, 240, 160),
+        );
 
         // Bones
-        self.add(ItemDef::new(20, "Bones")
-            .with_description("Ew, it's a pile of bones")
-            .category(ItemCategory::Misc)
-            .price(1, 0, 0));
+        self.add(
+            ItemDef::new(20, "Bones")
+                .with_description("Ew, it's a pile of bones")
+                .category(ItemCategory::Misc)
+                .price(1, 0, 0),
+        );
 
-        self.add(ItemDef::new(604, "Big Bones")
-            .with_description("Some bones from a big creature")
-            .category(ItemCategory::Misc)
-            .price(25, 15, 10));
+        self.add(
+            ItemDef::new(604, "Big Bones")
+                .with_description("Some bones from a big creature")
+                .category(ItemCategory::Misc)
+                .price(25, 15, 10),
+        );
 
-        self.add(ItemDef::new(614, "Dragon Bones")
-            .with_description("Bones from a dragon")
-            .category(ItemCategory::Misc)
-            .price(400, 240, 160));
+        self.add(
+            ItemDef::new(614, "Dragon Bones")
+                .with_description("Bones from a dragon")
+                .category(ItemCategory::Misc)
+                .price(400, 240, 160),
+        );
 
         // Runes
-        self.add(ItemDef::new(33, "Air Rune")
-            .with_description("One of the 4 basic elemental runes")
-            .category(ItemCategory::Rune)
-            .stackable()
-            .price(4, 2, 1));
+        self.add(
+            ItemDef::new(33, "Air Rune")
+                .with_description("One of the 4 basic elemental runes")
+                .category(ItemCategory::Rune)
+                .stackable()
+                .price(4, 2, 1),
+        );
 
-        self.add(ItemDef::new(34, "Water Rune")
-            .with_description("One of the 4 basic elemental runes")
-            .category(ItemCategory::Rune)
-            .stackable()
-            .price(4, 2, 1));
+        self.add(
+            ItemDef::new(34, "Water Rune")
+                .with_description("One of the 4 basic elemental runes")
+                .category(ItemCategory::Rune)
+                .stackable()
+                .price(4, 2, 1),
+        );
 
-        self.add(ItemDef::new(35, "Fire Rune")
-            .with_description("One of the 4 basic elemental runes")
-            .category(ItemCategory::Rune)
-            .stackable()
-            .price(4, 2, 1));
+        self.add(
+            ItemDef::new(35, "Fire Rune")
+                .with_description("One of the 4 basic elemental runes")
+                .category(ItemCategory::Rune)
+                .stackable()
+                .price(4, 2, 1),
+        );
 
-        self.add(ItemDef::new(36, "Earth Rune")
-            .with_description("One of the 4 basic elemental runes")
-            .category(ItemCategory::Rune)
-            .stackable()
-            .price(4, 2, 1));
+        self.add(
+            ItemDef::new(36, "Earth Rune")
+                .with_description("One of the 4 basic elemental runes")
+                .category(ItemCategory::Rune)
+                .stackable()
+                .price(4, 2, 1),
+        );
 
-        self.add(ItemDef::new(31, "Mind Rune")
-            .with_description("Used for low level missile spells")
-            .category(ItemCategory::Rune)
-            .stackable()
-            .price(4, 2, 1));
+        self.add(
+            ItemDef::new(31, "Mind Rune")
+                .with_description("Used for low level missile spells")
+                .category(ItemCategory::Rune)
+                .stackable()
+                .price(4, 2, 1),
+        );
 
-        self.add(ItemDef::new(41, "Chaos Rune")
-            .with_description("Used for mid level missile spells")
-            .category(ItemCategory::Rune)
-            .stackable()
-            .price(80, 48, 32));
+        self.add(
+            ItemDef::new(41, "Chaos Rune")
+                .with_description("Used for mid level missile spells")
+                .category(ItemCategory::Rune)
+                .stackable()
+                .price(80, 48, 32),
+        );
 
-        self.add(ItemDef::new(38, "Death Rune")
-            .with_description("Used for high level missile spells")
-            .category(ItemCategory::Rune)
-            .stackable()
-            .price(180, 108, 72));
+        self.add(
+            ItemDef::new(38, "Death Rune")
+                .with_description("Used for high level missile spells")
+                .category(ItemCategory::Rune)
+                .stackable()
+                .price(180, 108, 72),
+        );
 
-        self.add(ItemDef::new(42, "Blood Rune")
-            .with_description("Used for the highest level spells")
-            .category(ItemCategory::Rune)
-            .stackable()
-            .members()
-            .price(300, 180, 120));
+        self.add(
+            ItemDef::new(42, "Blood Rune")
+                .with_description("Used for the highest level spells")
+                .category(ItemCategory::Rune)
+                .stackable()
+                .members()
+                .price(300, 180, 120),
+        );
 
         // Arrows
-        self.add(ItemDef::new(11, "Bronze Arrows")
-            .with_description("Bronze tipped arrows")
-            .category(ItemCategory::Ammunition)
-            .stackable()
-            .equippable(EquipSlot::Arrows)
-            .price(2, 1, 0));
+        self.add(
+            ItemDef::new(11, "Bronze Arrows")
+                .with_description("Bronze tipped arrows")
+                .category(ItemCategory::Ammunition)
+                .stackable()
+                .equippable(EquipSlot::Arrows)
+                .price(2, 1, 0),
+        );
 
-        self.add(ItemDef::new(12, "Iron Arrows")
-            .with_description("Iron tipped arrows")
-            .category(ItemCategory::Ammunition)
-            .stackable()
-            .equippable(EquipSlot::Arrows)
-            .requirements(ItemRequirements::ranged(1))
-            .price(7, 4, 2));
+        self.add(
+            ItemDef::new(12, "Iron Arrows")
+                .with_description("Iron tipped arrows")
+                .category(ItemCategory::Ammunition)
+                .stackable()
+                .equippable(EquipSlot::Arrows)
+                .requirements(ItemRequirements::ranged(1))
+                .price(7, 4, 2),
+        );
 
-        self.add(ItemDef::new(13, "Steel Arrows")
-            .with_description("Steel tipped arrows")
-            .category(ItemCategory::Ammunition)
-            .stackable()
-            .equippable(EquipSlot::Arrows)
-            .requirements(ItemRequirements::ranged(5))
-            .price(20, 12, 8));
+        self.add(
+            ItemDef::new(13, "Steel Arrows")
+                .with_description("Steel tipped arrows")
+                .category(ItemCategory::Ammunition)
+                .stackable()
+                .equippable(EquipSlot::Arrows)
+                .requirements(ItemRequirements::ranged(5))
+                .price(20, 12, 8),
+        );
     }
 
     /// Add an item definition.
@@ -486,21 +551,24 @@ impl ItemRepository {
     /// Search items by name (case-insensitive).
     pub fn search(&self, query: &str) -> Vec<&ItemDef> {
         let query_lower = query.to_lowercase();
-        self.items.values()
+        self.items
+            .values()
             .filter(|def| def.name.to_lowercase().contains(&query_lower))
             .collect()
     }
 
     /// Get all items in a category.
     pub fn by_category(&self, category: ItemCategory) -> Vec<&ItemDef> {
-        self.items.values()
+        self.items
+            .values()
             .filter(|def| def.category == category)
             .collect()
     }
 
     /// Get all equippable items for a slot.
     pub fn for_slot(&self, slot: EquipSlot) -> Vec<&ItemDef> {
-        self.items.values()
+        self.items
+            .values()
             .filter(|def| def.equip_slot == slot)
             .collect()
     }
@@ -509,14 +577,14 @@ impl ItemRepository {
 /// Food healing values.
 pub fn food_heals(item_id: u32) -> Option<u32> {
     match item_id {
-        132 => Some(4),   // Bread
-        140 => Some(3),   // Meat
-        316 => Some(12),  // Lobster
-        373 => Some(14),  // Swordfish
-        546 => Some(20),  // Shark
-        367 => Some(8),   // Bass
-        352 => Some(9),   // Salmon
-        351 => Some(7),   // Trout
+        132 => Some(4),  // Bread
+        140 => Some(3),  // Meat
+        316 => Some(12), // Lobster
+        373 => Some(14), // Swordfish
+        546 => Some(20), // Shark
+        367 => Some(8),  // Bass
+        352 => Some(9),  // Salmon
+        351 => Some(7),  // Trout
         _ => None,
     }
 }
@@ -529,7 +597,7 @@ mod tests {
     fn test_item_repository() {
         let repo = ItemRepository::new();
 
-        let coins = repo.get(10).unwrap();
+        let coins = repo.get(10u32).unwrap();
         assert_eq!(coins.name, "Coins");
         assert!(coins.stackable);
     }
@@ -540,14 +608,16 @@ mod tests {
 
         let swords = repo.search("sword");
         assert!(!swords.is_empty());
-        assert!(swords.iter().all(|i| i.name.to_lowercase().contains("sword")));
+        assert!(swords
+            .iter()
+            .all(|i| i.name.to_lowercase().contains("sword")));
     }
 
     #[test]
     fn test_item_requirements() {
         let repo = ItemRepository::new();
 
-        let rune_sword = repo.get(71).unwrap();
+        let rune_sword = repo.get(71u32).unwrap();
         assert_eq!(rune_sword.requirements.attack, 40);
 
         // Player with attack 50 can use it

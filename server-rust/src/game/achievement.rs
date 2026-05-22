@@ -528,7 +528,11 @@ impl AchievementManager {
     pub fn get_by_category(&self, category: AchievementCategory) -> Vec<&Achievement> {
         self.by_category
             .get(&category)
-            .map(|ids| ids.iter().filter_map(|id| self.achievements.get(id)).collect())
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| self.achievements.get(id))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 

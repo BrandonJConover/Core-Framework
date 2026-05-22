@@ -55,6 +55,38 @@ server {
         proxy_buffering off;
     }
 
+    location /rsc21-ws {
+        proxy_pass http://127.0.0.1:43496/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+        proxy_buffering off;
+    }
+
+    location = /rsc21/mudclient21.html {
+        alias ${RSC_C_DIR}/mudclient.html;
+        add_header Cache-Control "no-store";
+        add_header Cross-Origin-Opener-Policy   "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+    }
+
+    location ^~ /rsc21/ {
+        types {
+            text/html html;
+            application/javascript js;
+            application/wasm wasm;
+            application/octet-stream data;
+        }
+        add_header Cross-Origin-Opener-Policy   "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        rewrite ^/rsc21/(.*)$ /$1 break;
+        try_files $uri $uri/ =404;
+    }
+
     location / {
         try_files $uri $uri/ =404;
     }

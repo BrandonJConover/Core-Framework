@@ -225,8 +225,13 @@ export class Js5Compression {
                 const innerLen = compressedLen - headerLen - trailerLen;
                 if (innerLen <= 0) return null;
                 const rawDeflate = input.slice(9 + headerLen, 9 + headerLen + innerLen);
-                const inflated = pako.inflate(rawDeflate, { raw: true } as any);
-                return inflated instanceof Uint8Array ? inflated : new Uint8Array(inflated);
+                const inflated = pako.inflate(rawDeflate, { raw: true } as any) as Uint8Array | string;
+                if (typeof inflated === "string") {
+                    const out = new Uint8Array(inflated.length);
+                    for (let i = 0; i < inflated.length; i++) out[i] = inflated.charCodeAt(i) & 0xFF;
+                    return out;
+                }
+                return inflated;
             } catch (e) {
                 if ((globalThis as any).__decryptDebug) {
                     const msg = (e as any)?.message || String(e);

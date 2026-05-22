@@ -1,0 +1,40 @@
+{
+  "id": "out_npc_coords_known_move_remove_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_NPC_COORDS",
+  "wire_opcode": 79,
+  "payload_hex": "02b780",
+  "fields": {
+    "known_count": 2,
+    "entries": [
+      {
+        "local_cache_slot": 0,
+        "update_required": true,
+        "movement_update": true,
+        "direction": "east",
+        "direction_bits": 6
+      },
+      {
+        "local_cache_slot": 1,
+        "update_required": true,
+        "movement_update": false,
+        "remove": true,
+        "remove_bits": 3
+      }
+    ],
+    "padding_bits": 7
+  },
+  "java_reference": {
+    "generator": "server-java-modern/src/com/openrsc/server/net/rsc/generators/impl/PayloadCustomGenerator.java",
+    "source": "server-java-modern/src/com/openrsc/server/GameStateUpdater.java#updateNpcs",
+    "source_struct": "server-java-modern/src/com/openrsc/server/net/rsc/struct/outgoing/MobsUpdateStruct.java",
+    "info_sequence": [
+      "Bits(known_count, 8)",
+      "Known NPC 0: Bits(update_required=1, 1), Bits(movement_update=0, 1), Bits(direction=6, 3)",
+      "Known NPC 1: Bits(update_required=1, 1), Bits(not_moving=1, 1), Bits(remove=3, 2)",
+      "Zero padding to byte boundary"
+    ]
+  },
+  "notes": "Payload only, without transport framing. This Java custom-client SEND_NPC_COORDS fixture covers two already-known NPCs in local-cache order: one walking east and one removed from the viewer's local NPC cache. Known movement/removal updates do not include NPC indices."
+}

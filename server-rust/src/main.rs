@@ -1,3 +1,4 @@
+mod api;
 mod database;
 mod game;
 mod infrastructure;
@@ -13,6 +14,7 @@ use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use api::{ApiState, LoginTicketService};
 use database::player_repository::PlayerRepository;
 use database::{schema, DatabaseConfig, DatabasePool, DatabaseType};
 use game::server::{ServerState, TICK_DURATION_MS};
@@ -29,7 +31,10 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    info!("Starting OpenRSC Rust Server v{}", env!("CARGO_PKG_VERSION"));
+    info!(
+        "Starting OpenRSC Rust Server v{}",
+        env!("CARGO_PKG_VERSION")
+    );
 
     // Load configuration
     let config = infrastructure::config::ServerConfig::load()?;
@@ -48,7 +53,10 @@ async fn main() -> Result<()> {
             db_type: DatabaseType::from(config.database.kind.as_str()),
             host: config.database.host.clone(),
             port: config.database.port,
-            database: if matches!(DatabaseType::from(config.database.kind.as_str()), DatabaseType::Sqlite) {
+            database: if matches!(
+                DatabaseType::from(config.database.kind.as_str()),
+                DatabaseType::Sqlite
+            ) {
                 config.database.sqlite_path.clone()
             } else {
                 config.database.database.clone()
@@ -60,14 +68,20 @@ async fn main() -> Result<()> {
         match DatabasePool::new(&db_cfg).await {
             Ok(pool) => {
                 if let Err(e) = schema::init_schema(&pool).await {
-                    warn!("Schema init failed: {} — server will run without persistence", e);
+                    warn!(
+                        "Schema init failed: {} — server will run without persistence",
+                        e
+                    );
                     None
                 } else {
                     Some(Arc::new(PlayerRepository::new(pool)))
                 }
             }
             Err(e) => {
-                warn!("DB connect failed: {} — server will run without persistence", e);
+                warn!(
+                    "DB connect failed: {} — server will run without persistence",
+                    e
+                );
                 None
             }
         }
@@ -76,8 +90,14 @@ async fn main() -> Result<()> {
         None
     };
 
+    // One ticket service shared between the HTTP API (issues tickets) and
+    // ServerState (consumes them in the LOGIN packet handler).
+    let tickets = LoginTicketService::new();
+
     // Create shared server state, optionally with DB-backed auth + persistence.
-    let mut initial_state = ServerState::new();
+    let mut initial_state = ServerState::new()
+        .with_tickets(tickets.clone())
+        .with_max_sessions_per_ip(config.max_sessions_per_ip);
     if let Some(repo) = player_repo.clone() {
         initial_state = initial_state.with_players(repo);
         info!("ServerState wired with DB-backed PlayerRepository");
@@ -88,6 +108,29 @@ async fn main() -> Result<()> {
         state.initialize().await?;
     }
     info!("Game state initialized");
+
+    // Spawn HTTP API listener (login, register, game-ticket, status). The
+    // ApiState shares the same LoginTicketService instance as ServerState so
+    // tickets issued via /api/auth/game-ticket are consumable by the LOGIN
+    // packet handler.
+    let api_state = ApiState {
+        server: server_state.clone(),
+        db_pool: player_repo.as_ref().map(|r| r.pool().clone()),
+        jwt: Arc::new(api::JwtUtil::with_default_secret_path(
+            config.world_name.clone(),
+        )),
+        login_limiter: Arc::new(api::RateLimiter::new(60_000, 10)),
+        register_limiter: Arc::new(api::RateLimiter::new(60 * 60_000, 3)),
+        server_name: config.world_name.clone(),
+        player_limit: game::server::MAX_PLAYERS,
+        tickets: tickets.clone(),
+    };
+    let api_addr: std::net::SocketAddr = format!("0.0.0.0:{}", config.api_port).parse()?;
+    tokio::spawn(async move {
+        if let Err(e) = api::start_api_server_with_state(api_addr, api_state).await {
+            error!("HTTP API server error: {}", e);
+        }
+    });
 
     // Spawn game tick loop
     let tick_state = server_state.clone();
@@ -113,9 +156,8 @@ async fn main() -> Result<()> {
 
     // Start network listeners (blocks until shutdown)
     let network_state = server_state.clone();
-    let network_handle = tokio::spawn(async move {
-        network::start_server(&config, network_state).await
-    });
+    let network_handle =
+        tokio::spawn(async move { network::start_server(&config, network_state).await });
 
     // Wait for shutdown signal
     tokio::select! {

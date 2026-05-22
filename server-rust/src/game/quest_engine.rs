@@ -8,7 +8,10 @@ use tracing::{debug, info, warn};
 
 use super::entity::Position;
 use super::player::SkillId;
-use super::quest::{QuestDef, QuestProgress, QuestRepository, QuestRequirement, QuestReward, QUEST_COMPLETE, QUEST_NOT_STARTED};
+use super::quest::{
+    QuestDef, QuestProgress, QuestRepository, QuestRequirement, QuestReward, QUEST_COMPLETE,
+    QUEST_NOT_STARTED,
+};
 use crate::protocol::opcodes::OpcodeOut;
 use crate::protocol::{Packet, PacketBuilder};
 
@@ -35,15 +38,22 @@ impl QuestState {
     pub const COMPLETED: i32 = -1;
 
     pub fn not_started() -> Self {
-        Self { stage: Self::NOT_STARTED }
+        Self {
+            stage: Self::NOT_STARTED,
+        }
     }
 
     pub fn completed() -> Self {
-        Self { stage: Self::COMPLETED }
+        Self {
+            stage: Self::COMPLETED,
+        }
     }
 
     pub fn in_progress(stage: i32) -> Self {
-        assert!(stage >= 1 && stage <= 254, "in-progress stage must be 1..=254");
+        assert!(
+            stage >= 1 && stage <= 254,
+            "in-progress stage must be 1..=254"
+        );
         Self { stage }
     }
 
@@ -90,7 +100,10 @@ impl QuestDefinition {
         for req in &def.requirements {
             match req {
                 QuestRequirement::SkillLevel { skill, level } => {
-                    requirements.push(QuestRequirementEntry::SkillLevel(skill_type_to_id(*skill), *level));
+                    requirements.push(QuestRequirementEntry::SkillLevel(
+                        skill_type_to_id(*skill),
+                        *level,
+                    ));
                 }
                 QuestRequirement::QuestComplete { quest_id } => {
                     requirements.push(QuestRequirementEntry::QuestComplete(*quest_id));
@@ -255,7 +268,10 @@ impl QuestManager {
             let engine_def = QuestDefinition::from_quest_def(def);
             self.quest_definitions.insert(engine_def.id, engine_def);
         }
-        info!("Quest engine loaded {} quest definitions", self.quest_definitions.len());
+        info!(
+            "Quest engine loaded {} quest definitions",
+            self.quest_definitions.len()
+        );
     }
 
     /// Register a trigger handler: when `trigger` fires, check if
@@ -294,7 +310,10 @@ impl QuestManager {
         let state = QuestState { stage };
         quests.insert(quest_id, state);
 
-        debug!("Player {} quest {} set to stage {}", player_id, quest_id, stage);
+        debug!(
+            "Player {} quest {} set to stage {}",
+            player_id, quest_id, stage
+        );
 
         let mut packets = Vec::new();
         packets.push(build_quest_update_packet(quest_id, stage));
@@ -425,11 +444,7 @@ impl QuestManager {
     // -- Trigger dispatching --
 
     /// Fire a trigger and return packets for any quests that should advance.
-    pub fn dispatch_trigger(
-        &mut self,
-        player_id: u64,
-        trigger: &QuestTrigger,
-    ) -> Vec<Packet> {
+    pub fn dispatch_trigger(&mut self, player_id: u64, trigger: &QuestTrigger) -> Vec<Packet> {
         let handlers = match self.trigger_handlers.get(trigger) {
             Some(h) => h.clone(),
             None => return Vec::new(),
@@ -508,13 +523,11 @@ impl std::error::Error for QuestError {}
 ///
 /// Format: `[quest_count: u16] [quest_id: u32, stage: i16] ...`
 pub fn build_quest_list_packet(quests: &HashMap<u32, QuestState>) -> Packet {
-    let mut builder = PacketBuilder::new(OpcodeOut::QuestMessage as u8)
-        .write_short(quests.len() as u16);
+    let mut builder =
+        PacketBuilder::new(OpcodeOut::QuestMessage.wire()).write_short(quests.len() as u16);
 
     for (&quest_id, state) in quests {
-        builder = builder
-            .write_int(quest_id)
-            .write_sshort(state.stage as i16);
+        builder = builder.write_int(quest_id).write_sshort(state.stage as i16);
     }
 
     builder.build()
@@ -524,7 +537,7 @@ pub fn build_quest_list_packet(quests: &HashMap<u32, QuestState>) -> Packet {
 ///
 /// Format: `[quest_id: u32] [stage: i16]`
 pub fn build_quest_update_packet(quest_id: u32, stage: i32) -> Packet {
-    PacketBuilder::new(OpcodeOut::QuestMessage as u8)
+    PacketBuilder::new(OpcodeOut::QuestMessage.wire())
         .write_int(quest_id)
         .write_sshort(stage as i16)
         .build()
@@ -536,7 +549,7 @@ pub fn build_quest_update_packet(quest_id: u32, stage: i32) -> Packet {
 ///          [skill_id: u8, amount: u32] ... [item_count: u8]
 ///          [item_id: u32, amount: u32] ... [coins: u32]`
 pub fn build_quest_complete_packet(quest_name: &str, rewards: &QuestRewardInfo) -> Packet {
-    let mut builder = PacketBuilder::new(OpcodeOut::QuestMessage as u8)
+    let mut builder = PacketBuilder::new(OpcodeOut::QuestMessage.wire())
         .write_string(quest_name)
         .write_short(rewards.quest_points as u16)
         .write_byte(rewards.xp_rewards.len() as u8);
@@ -664,14 +677,17 @@ mod tests {
 
         // Add two quest definitions
         for id in 0..2u32 {
-            mgr.quest_definitions.insert(id, QuestDefinition {
+            mgr.quest_definitions.insert(
                 id,
-                name: format!("Quest {}", id),
-                description: String::new(),
-                requirements: Vec::new(),
-                rewards: QuestRewardInfo::default(),
-                quest_points: id + 1,
-            });
+                QuestDefinition {
+                    id,
+                    name: format!("Quest {}", id),
+                    description: String::new(),
+                    requirements: Vec::new(),
+                    rewards: QuestRewardInfo::default(),
+                    quest_points: id + 1,
+                },
+            );
         }
 
         assert_eq!(mgr.get_quest_points(1), 0);
@@ -686,14 +702,17 @@ mod tests {
     #[test]
     fn test_check_requirements_all_met() {
         let mut mgr = QuestManager::new();
-        mgr.quest_definitions.insert(0, QuestDefinition {
-            id: 0,
-            name: "Easy Quest".to_string(),
-            description: String::new(),
-            requirements: Vec::new(),
-            rewards: QuestRewardInfo::default(),
-            quest_points: 1,
-        });
+        mgr.quest_definitions.insert(
+            0,
+            QuestDefinition {
+                id: 0,
+                name: "Easy Quest".to_string(),
+                description: String::new(),
+                requirements: Vec::new(),
+                rewards: QuestRewardInfo::default(),
+                quest_points: 1,
+            },
+        );
 
         let skills = HashMap::new();
         let result = mgr.check_requirements(1, 0, &skills, 3);
@@ -704,17 +723,20 @@ mod tests {
     #[test]
     fn test_check_requirements_skill_not_met() {
         let mut mgr = QuestManager::new();
-        mgr.quest_definitions.insert(0, QuestDefinition {
-            id: 0,
-            name: "Hard Quest".to_string(),
-            description: String::new(),
-            requirements: vec![
-                QuestRequirementEntry::SkillLevel(SkillId::Mining, 50),
-                QuestRequirementEntry::CombatLevel(40),
-            ],
-            rewards: QuestRewardInfo::default(),
-            quest_points: 1,
-        });
+        mgr.quest_definitions.insert(
+            0,
+            QuestDefinition {
+                id: 0,
+                name: "Hard Quest".to_string(),
+                description: String::new(),
+                requirements: vec![
+                    QuestRequirementEntry::SkillLevel(SkillId::Mining, 50),
+                    QuestRequirementEntry::CombatLevel(40),
+                ],
+                rewards: QuestRewardInfo::default(),
+                quest_points: 1,
+            },
+        );
 
         let mut skills = HashMap::new();
         skills.insert(SkillId::Mining, 30u8);
@@ -728,23 +750,29 @@ mod tests {
     fn test_check_requirements_quest_prereq() {
         let mut mgr = QuestManager::new();
 
-        mgr.quest_definitions.insert(0, QuestDefinition {
-            id: 0,
-            name: "Prereq Quest".to_string(),
-            description: String::new(),
-            requirements: Vec::new(),
-            rewards: QuestRewardInfo::default(),
-            quest_points: 1,
-        });
+        mgr.quest_definitions.insert(
+            0,
+            QuestDefinition {
+                id: 0,
+                name: "Prereq Quest".to_string(),
+                description: String::new(),
+                requirements: Vec::new(),
+                rewards: QuestRewardInfo::default(),
+                quest_points: 1,
+            },
+        );
 
-        mgr.quest_definitions.insert(1, QuestDefinition {
-            id: 1,
-            name: "Sequel Quest".to_string(),
-            description: String::new(),
-            requirements: vec![QuestRequirementEntry::QuestComplete(0)],
-            rewards: QuestRewardInfo::default(),
-            quest_points: 1,
-        });
+        mgr.quest_definitions.insert(
+            1,
+            QuestDefinition {
+                id: 1,
+                name: "Sequel Quest".to_string(),
+                description: String::new(),
+                requirements: vec![QuestRequirementEntry::QuestComplete(0)],
+                rewards: QuestRewardInfo::default(),
+                quest_points: 1,
+            },
+        );
 
         let skills = HashMap::new();
 
@@ -762,14 +790,17 @@ mod tests {
     fn test_trigger_dispatch() {
         let mut mgr = QuestManager::new();
 
-        mgr.quest_definitions.insert(0, QuestDefinition {
-            id: 0,
-            name: "Trigger Quest".to_string(),
-            description: String::new(),
-            requirements: Vec::new(),
-            rewards: QuestRewardInfo::default(),
-            quest_points: 1,
-        });
+        mgr.quest_definitions.insert(
+            0,
+            QuestDefinition {
+                id: 0,
+                name: "Trigger Quest".to_string(),
+                description: String::new(),
+                requirements: Vec::new(),
+                rewards: QuestRewardInfo::default(),
+                quest_points: 1,
+            },
+        );
 
         // Register a trigger: talking to NPC 42 at stage 1 advances the quest
         mgr.register_trigger(QuestTrigger::TalkToNpc(42), 0, 1);
@@ -790,14 +821,17 @@ mod tests {
     fn test_trigger_dispatch_wrong_stage() {
         let mut mgr = QuestManager::new();
 
-        mgr.quest_definitions.insert(0, QuestDefinition {
-            id: 0,
-            name: "Trigger Quest".to_string(),
-            description: String::new(),
-            requirements: Vec::new(),
-            rewards: QuestRewardInfo::default(),
-            quest_points: 1,
-        });
+        mgr.quest_definitions.insert(
+            0,
+            QuestDefinition {
+                id: 0,
+                name: "Trigger Quest".to_string(),
+                description: String::new(),
+                requirements: Vec::new(),
+                rewards: QuestRewardInfo::default(),
+                quest_points: 1,
+            },
+        );
 
         mgr.register_trigger(QuestTrigger::KillNpc(10), 0, 3);
 

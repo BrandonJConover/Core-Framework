@@ -21,13 +21,13 @@
 
 use super::opcodes::OpcodeIn;
 
-pub mod v38;
-pub mod v69;
 pub mod v115;
 pub mod v177;
 pub mod v201;
 pub mod v203;
 pub mod v235;
+pub mod v38;
+pub mod v69;
 
 /// Authentic RSC client protocol revisions recognised by the server.
 ///
@@ -55,8 +55,8 @@ impl ProtocolVersion {
     /// Returns the integer revision number used in the login handshake.
     pub fn revision(self) -> u32 {
         match self {
-            Self::V38  => 38,
-            Self::V69  => 69,
+            Self::V38 => 38,
+            Self::V69 => 69,
             Self::V115 => 115,
             Self::V177 => 177,
             Self::V201 => 201,
@@ -68,14 +68,14 @@ impl ProtocolVersion {
     /// Attempt to construct a [`ProtocolVersion`] from a revision integer.
     pub fn from_revision(n: u32) -> Option<Self> {
         Some(match n {
-            38  => Self::V38,
-            69  => Self::V69,
+            38 => Self::V38,
+            69 => Self::V69,
             115 => Self::V115,
             177 => Self::V177,
             201 => Self::V201,
             203 | 204 => Self::V203,
             235 => Self::V235,
-            _   => return None,
+            _ => return None,
         })
     }
 }
@@ -91,8 +91,8 @@ impl ProtocolVersion {
 #[inline]
 pub fn decode_opcode(version: ProtocolVersion, byte: u8) -> Option<OpcodeIn> {
     match version {
-        ProtocolVersion::V38  => v38::decode(byte),
-        ProtocolVersion::V69  => v69::decode(byte),
+        ProtocolVersion::V38 => v38::decode(byte),
+        ProtocolVersion::V69 => v69::decode(byte),
         ProtocolVersion::V115 => v115::decode(byte),
         ProtocolVersion::V177 => v177::decode(byte),
         ProtocolVersion::V201 => v201::decode(byte),

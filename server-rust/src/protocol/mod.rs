@@ -2,10 +2,12 @@
 //! Defines packet structures, opcodes, and encoding/decoding.
 
 pub mod codec;
+pub mod golden;
 pub mod isaac;
 pub mod legacy;
 pub mod opcodes;
 pub mod packets;
+pub mod rsa;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::io::{self, Error, ErrorKind};
@@ -130,6 +132,20 @@ impl PacketBuilder {
     /// Write an int (4 bytes, big-endian).
     pub fn write_int(mut self, value: u32) -> Self {
         self.buffer.put_u32(value);
+        self
+    }
+
+    /// Write Java's compact unsigned short/int amount encoding.
+    ///
+    /// Values up to i16::MAX are written as a two-byte unsigned short.
+    /// Larger values are written as a signed int with the high bit set,
+    /// matching Java PacketBuilder.writeUnsignedShortInt.
+    pub fn write_unsigned_short_int(mut self, value: u32) -> Self {
+        if value <= i16::MAX as u32 {
+            self.buffer.put_u16(value as u16);
+        } else {
+            self.buffer.put_i32(i32::MIN.saturating_add(value as i32));
+        }
         self
     }
 
@@ -374,10 +390,8 @@ impl PacketReader {
         if self.remaining() < 2 {
             return Err(Error::new(ErrorKind::UnexpectedEof, "Not enough bytes"));
         }
-        let value = u16::from_be_bytes([
-            self.buffer[self.position],
-            self.buffer[self.position + 1],
-        ]);
+        let value =
+            u16::from_be_bytes([self.buffer[self.position], self.buffer[self.position + 1]]);
         self.position += 2;
         Ok(value)
     }
@@ -437,7 +451,10 @@ impl PacketReader {
             }
             self.position += 1;
         }
-        Err(Error::new(ErrorKind::UnexpectedEof, "String not terminated"))
+        Err(Error::new(
+            ErrorKind::UnexpectedEof,
+            "String not terminated",
+        ))
     }
 
     /// Read n bytes as a slice.
@@ -472,5 +489,70 @@ mod tests {
         assert_eq!(reader.read_byte().unwrap(), 42);
         assert_eq!(reader.read_short().unwrap(), 1000);
         assert_eq!(reader.read_string().unwrap(), "test");
+    }
+
+    #[test]
+    fn test_bitwriter_byte_aligned() {
+        let mut bw = BitWriter::new();
+        bw.write_bits(0xAB, 8);
+        bw.write_bits(0xCD, 8);
+        let bytes = bw.finish();
+        assert_eq!(bytes, vec![0xAB, 0xCD]);
+    }
+
+    #[test]
+    fn test_bitwriter_unaligned_packs_msb_first() {
+        // Write 11 bits for x, 13 bits for y, 4 bits for sprite, 8 bits count.
+        // This is the SEND_PLAYER_COORDS header layout. Verify the bytes match
+        // a hand-computed reference so a future BitWriter refactor can't
+        // silently corrupt the wire format.
+        let mut bw = BitWriter::new();
+        bw.write_bits(122, 11); // x = 122  ->  0000 0111 1010
+        bw.write_bits(647, 13); // y = 647  ->  0 0001 0100 0111
+        bw.write_bits(4, 4); // sprite = 4 (south)
+        bw.write_bits(0, 8); // 0 known players
+        let bytes = bw.finish();
+        // 11 + 13 + 4 + 8 = 36 bits = 5 bytes (4.5 → 5).
+        assert_eq!(bytes.len(), 5);
+        // Re-decode and verify we get the same values back via BitReader.
+        let mut br = BitReader::new(Bytes::copy_from_slice(&bytes));
+        assert_eq!(br.read_bits(11).unwrap(), 122);
+        assert_eq!(br.read_bits(13).unwrap(), 647);
+        assert_eq!(br.read_bits(4).unwrap(), 4);
+        assert_eq!(br.read_bits(8).unwrap(), 0);
+    }
+
+    #[test]
+    fn test_bitwriter_signed_relative_offsets() {
+        // SEND_PLAYER_COORDS new-player entries write rel_x and rel_y as
+        // 6-bit signed values. The wire format keeps the sign in the high bit
+        // (two's complement within the field width). Verify -3 and +5 round-trip.
+        let mut bw = BitWriter::new();
+        bw.write_bits(-3, 6); // -3 in 6 bits = 0b111101 = 0x3D
+        bw.write_bits(5, 6); // +5 in 6 bits = 0b000101 = 0x05
+        let bytes = bw.finish();
+        assert_eq!(bytes.len(), 2); // 12 bits → 2 bytes
+                                    //   byte 0 = -3's 6 low bits (0b111101) << 2 + 0's of +5's high 2 bits = 0b11110100 = 0xF4
+                                    //   byte 1 = +5's low 4 bits (0b0101) << 4 + zeros = 0b01010000 = 0x50
+        assert_eq!(bytes[0], 0xF4);
+        assert_eq!(bytes[1], 0x50);
+    }
+
+    #[test]
+    fn test_packet_reader_read_string_null_terminated() {
+        let packet = PacketBuilder::new(0)
+            .write_string("alice")
+            .write_string("")
+            .build();
+        let mut reader = PacketReader::new(&packet);
+        assert_eq!(reader.read_string().unwrap(), "alice");
+        assert_eq!(reader.read_string().unwrap(), "");
+    }
+
+    #[test]
+    fn test_packet_reader_int_big_endian() {
+        let packet = PacketBuilder::new(0).write_int(0x12345678).build();
+        let mut reader = PacketReader::new(&packet);
+        assert_eq!(reader.read_int().unwrap(), 0x12345678);
     }
 }

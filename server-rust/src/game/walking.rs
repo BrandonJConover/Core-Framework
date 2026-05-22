@@ -4,6 +4,8 @@
 use std::collections::{HashMap, VecDeque};
 
 use super::entity::{Direction, Position};
+use super::game_object::ObjectType;
+use super::region::ObjectSpawn;
 
 // ---------------------------------------------------------------------------
 // Collision flags (matching Java CollisionFlag values)
@@ -60,9 +62,59 @@ impl CollisionMap {
         *entry |= flags;
     }
 
+    /// Mark a tile as fully blocked for movement.
+    pub fn block_tile(&mut self, pos: Position) {
+        self.add_flags(pos.x, pos.y, pos.plane, FULL_BLOCK_A);
+    }
+
     /// Get the raw collision flags for a tile (0 if none stored).
     pub fn get_flags(&self, x: i32, y: i32, plane: i32) -> u32 {
         self.flags.get(&(x, y, plane)).copied().unwrap_or(0)
+    }
+
+    /// Apply Java/OpenRSC object-location collision for a single loaded loc.
+    ///
+    /// This first slice mirrors Java boundary registration. Scenery collision
+    /// needs object definitions for width/height/type, so it remains a later
+    /// data-loader step instead of guessing from loc coordinates alone.
+    pub fn apply_java_object_spawn(&mut self, spawn: &ObjectSpawn) {
+        if spawn.object_type != ObjectType::Boundary {
+            return;
+        }
+
+        self.apply_java_boundary(spawn.position, spawn.direction);
+    }
+
+    /// Apply Java/OpenRSC object-location collision for a batch of loaded locs.
+    pub fn apply_java_object_spawns<'a>(
+        &mut self,
+        spawns: impl IntoIterator<Item = &'a ObjectSpawn>,
+    ) {
+        for spawn in spawns {
+            self.apply_java_object_spawn(spawn);
+        }
+    }
+
+    /// Apply boundary-wall collision using Java `World.registerGameObject`
+    /// direction semantics for boundary objects.
+    pub fn apply_java_boundary(&mut self, position: Position, direction: u8) {
+        match direction {
+            0 => {
+                self.add_flags(position.x, position.y, position.plane, WALL_NORTH);
+                self.add_flags(position.x, position.y - 1, position.plane, WALL_SOUTH);
+            }
+            1 => {
+                self.add_flags(position.x, position.y, position.plane, WALL_EAST);
+                self.add_flags(position.x - 1, position.y, position.plane, WALL_WEST);
+            }
+            2 => {
+                self.add_flags(position.x, position.y, position.plane, FULL_BLOCK_A);
+            }
+            3 => {
+                self.add_flags(position.x, position.y, position.plane, FULL_BLOCK_B);
+            }
+            _ => {}
+        }
     }
 
     /// Returns `true` when the tile is fully blocked.
@@ -138,6 +190,17 @@ impl CollisionMap {
             (-1, 0) => from_flags & WALL_WEST == 0 && to_flags & WALL_EAST == 0,
             _ => true,
         }
+    }
+}
+
+impl crate::game::pathfinding::CollisionMap for CollisionMap {
+    fn is_walkable(&self, x: i32, y: i32, plane: i32) -> bool {
+        !self.is_blocked(Position::with_plane(x, y, plane))
+    }
+
+    fn can_traverse(&self, from: Position, dx: i16, dy: i16) -> bool {
+        let to = Position::with_plane(from.x + dx as i32, from.y + dy as i32, from.plane);
+        self.can_move(from, to)
     }
 }
 
@@ -278,6 +341,17 @@ mod tests {
     }
 
     #[test]
+    fn block_tile_marks_destination_unwalkable() {
+        let mut map = CollisionMap::new();
+        let blocked = Position::new(5, 5);
+
+        map.block_tile(blocked);
+
+        assert!(map.is_blocked(blocked));
+        assert!(!map.can_move(Position::new(4, 5), blocked));
+    }
+
+    #[test]
     fn test_wall_north_blocks_north() {
         let mut map = CollisionMap::new();
         map.add_flags(3, 3, 0, WALL_NORTH);
@@ -317,6 +391,66 @@ mod tests {
         let a = Position::with_plane(5, 5, 0);
         let b = Position::with_plane(6, 5, 1);
         assert!(!map.can_move(a, b));
+    }
+
+    #[test]
+    fn java_boundary_spawn_direction_zero_blocks_north_edge() {
+        let mut map = CollisionMap::new();
+        let spawn = ObjectSpawn::boundary(1, Position::new(10, 10), 0);
+
+        map.apply_java_object_spawn(&spawn);
+
+        assert_eq!(map.get_flags(10, 10, 0) & WALL_NORTH, WALL_NORTH);
+        assert_eq!(map.get_flags(10, 9, 0) & WALL_SOUTH, WALL_SOUTH);
+        assert!(!map.can_move(Position::new(10, 10), Position::new(10, 9)));
+        assert!(!map.can_move(Position::new(10, 9), Position::new(10, 10)));
+        assert!(map.can_move(Position::new(10, 10), Position::new(11, 10)));
+    }
+
+    #[test]
+    fn java_boundary_spawn_direction_one_blocks_east_edge_like_java() {
+        let mut map = CollisionMap::new();
+        let spawn = ObjectSpawn::boundary(1, Position::new(10, 10), 1);
+
+        map.apply_java_object_spawn(&spawn);
+
+        assert_eq!(map.get_flags(10, 10, 0) & WALL_EAST, WALL_EAST);
+        assert_eq!(map.get_flags(9, 10, 0) & WALL_WEST, WALL_WEST);
+        assert!(!map.can_move(Position::new(10, 10), Position::new(11, 10)));
+        assert!(map.can_move(Position::new(10, 10), Position::new(10, 11)));
+    }
+
+    #[test]
+    fn java_boundary_spawn_diagonal_directions_apply_full_blocks() {
+        let mut map = CollisionMap::new();
+        map.apply_java_object_spawn(&ObjectSpawn::boundary(1, Position::new(10, 10), 2));
+        map.apply_java_object_spawn(&ObjectSpawn::boundary(1, Position::new(12, 12), 3));
+
+        assert!(map.is_blocked(Position::new(10, 10)));
+        assert!(map.is_blocked(Position::new(12, 12)));
+        assert!(!map.can_move(Position::new(9, 10), Position::new(10, 10)));
+        assert!(!map.can_move(Position::new(11, 12), Position::new(12, 12)));
+    }
+
+    #[test]
+    fn java_object_spawn_collision_ignores_scenery_until_defs_are_loaded() {
+        let mut map = CollisionMap::new();
+        map.apply_java_object_spawns([ObjectSpawn::scenery(70, Position::new(10, 10), 0)].iter());
+
+        assert_eq!(map.get_flags(10, 10, 0), 0);
+        assert!(map.can_move(Position::new(9, 10), Position::new(10, 10)));
+    }
+
+    #[test]
+    fn walking_collision_map_feeds_pathfinding_trait() {
+        let mut map = CollisionMap::new();
+        map.apply_java_boundary(Position::new(10, 10), 0);
+
+        let collision: &dyn crate::game::pathfinding::CollisionMap = &map;
+
+        assert!(collision.is_walkable(10, 10, 0));
+        assert!(!collision.can_traverse(Position::new(10, 10), 0, -1));
+        assert!(collision.can_traverse(Position::new(10, 10), 1, 0));
     }
 
     // -- WalkingQueue ---------------------------------------------------------

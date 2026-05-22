@@ -94,6 +94,15 @@ public class ORSCApplet extends Applet implements ComponentListener, ImageObserv
 		return super.isDisplayable();
 	}
 
+	@Override
+	public String getParameter(String name) {
+		try {
+			return super.getParameter(name);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
 	private void drawLoadingScreen(String state, int percent, int var3) {
 		try {
 			try {

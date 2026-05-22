@@ -1,8 +1,8 @@
 //! Packet structures for RSC protocol.
 
-use super::{PacketBuilder, PacketReader, Packet};
+use super::{Packet, PacketBuilder, PacketReader};
 use crate::game::entity::Position;
-use std::io;
+use std::io::{self, Error, ErrorKind};
 
 /// Login request packet.
 #[derive(Debug, Clone)]
@@ -15,11 +15,31 @@ pub struct LoginRequest {
 
 impl LoginRequest {
     pub fn decode(packet: &Packet) -> io::Result<Self> {
-        let mut reader = PacketReader::new(packet);
-        let reconnecting = reader.read_byte()? == 1;
-        let client_version = reader.read_int()?;
-        let username = reader.read_string()?;
-        let password = reader.read_string()?;
+        let payload = packet.payload.as_ref();
+        if payload.len() < 5 {
+            return Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                "login payload too short",
+            ));
+        }
+
+        let mut offset = 0usize;
+        let reconnecting = payload[offset] == 1;
+        offset += 1;
+        let client_version = u32::from_be_bytes([
+            payload[offset],
+            payload[offset + 1],
+            payload[offset + 2],
+            payload[offset + 3],
+        ]);
+        offset += 4;
+
+        let username = read_login_string(payload, &mut offset)?;
+        let password = if client_version >= 10010 && client_version != 10069 {
+            read_custom_client_password(payload, &mut offset)?
+        } else {
+            read_login_string(payload, &mut offset)?
+        };
 
         Ok(Self {
             username,
@@ -28,6 +48,81 @@ impl LoginRequest {
             reconnecting,
         })
     }
+}
+
+fn read_login_string(payload: &[u8], offset: &mut usize) -> io::Result<String> {
+    let start = *offset;
+    while *offset < payload.len() {
+        let byte = payload[*offset];
+        if byte == 0 || byte == 10 {
+            let value = String::from_utf8_lossy(&payload[start..*offset]).to_string();
+            *offset += 1;
+            return Ok(value.trim().to_string());
+        }
+        *offset += 1;
+    }
+    Err(Error::new(
+        ErrorKind::UnexpectedEof,
+        "login string not terminated",
+    ))
+}
+
+fn read_custom_client_password(payload: &[u8], offset: &mut usize) -> io::Result<String> {
+    if payload.len() <= *offset {
+        return Err(Error::new(
+            ErrorKind::UnexpectedEof,
+            "missing login encryption version",
+        ));
+    }
+
+    let encryption_version = payload[*offset];
+    *offset += 1;
+    match encryption_version {
+        0 => read_login_string(payload, offset),
+        1 => {
+            let password_block = read_rsa_block(payload, offset)?;
+            let password_len = password_block.len().min(20);
+            let password = String::from_utf8_lossy(&password_block[..password_len])
+                .trim()
+                .to_string();
+
+            // The Java desktop client follows with an RSA-encrypted client
+            // details block. Rust does not use it yet, but consuming it keeps
+            // the read offset aligned with the Java LoginPacketHandler path.
+            if payload.len() >= *offset + 2 {
+                let _ = read_rsa_block(payload, offset)?;
+            }
+
+            Ok(password)
+        }
+        other => Err(Error::new(
+            ErrorKind::InvalidData,
+            format!("unsupported login encryption version {other}"),
+        )),
+    }
+}
+
+fn read_rsa_block(payload: &[u8], offset: &mut usize) -> io::Result<Vec<u8>> {
+    if payload.len() < *offset + 2 {
+        return Err(Error::new(
+            ErrorKind::UnexpectedEof,
+            "missing RSA block length",
+        ));
+    }
+    let len = u16::from_be_bytes([payload[*offset], payload[*offset + 1]]) as usize;
+    *offset += 2;
+    if len == 0 || payload.len() < *offset + len {
+        return Err(Error::new(
+            ErrorKind::UnexpectedEof,
+            "truncated RSA login block",
+        ));
+    }
+
+    let ciphertext = &payload[*offset..*offset + len];
+    *offset += len;
+    let pem = include_str!("../../../server-java-modern/server.pem");
+    crate::protocol::rsa::decrypt_rsa(ciphertext, pem)
+        .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))
 }
 
 /// Login response packet.
@@ -47,9 +142,7 @@ pub enum LoginResponse {
 
 impl LoginResponse {
     pub fn encode(self) -> Packet {
-        PacketBuilder::new(0)
-            .write_byte(self as u8)
-            .build()
+        PacketBuilder::new(0).write_byte(self as u8).build()
     }
 }
 
@@ -109,9 +202,7 @@ pub struct ServerMessage;
 
 impl ServerMessage {
     pub fn encode(message: &str) -> Packet {
-        PacketBuilder::new(32)
-            .write_string(message)
-            .build()
+        PacketBuilder::new(32).write_string(message).build()
     }
 }
 
@@ -156,8 +247,7 @@ pub struct InventoryItem {
 
 impl InventoryUpdate {
     pub fn encode(&self) -> Packet {
-        let mut builder = PacketBuilder::new(22)
-            .write_byte(self.items.len() as u8);
+        let mut builder = PacketBuilder::new(22).write_byte(self.items.len() as u8);
 
         for item in &self.items {
             let id_with_equip = if item.equipped {
@@ -272,5 +362,88 @@ impl SystemUpdate {
         PacketBuilder::new(101)
             .write_short(self.seconds_remaining)
             .build()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::{BufMut, BytesMut};
+    use rsa::BigUint;
+
+    #[test]
+    fn decodes_legacy_null_terminated_login() {
+        let mut payload = BytesMut::new();
+        payload.put_u8(0);
+        payload.put_u32(177);
+        payload.put_slice(b"alice");
+        payload.put_u8(0);
+        payload.put_slice(b"secret");
+        payload.put_u8(0);
+
+        let request = LoginRequest::decode(&Packet::new(0, payload.freeze())).unwrap();
+
+        assert!(!request.reconnecting);
+        assert_eq!(request.client_version, 177);
+        assert_eq!(request.username, "alice");
+        assert_eq!(request.password, "secret");
+    }
+
+    #[test]
+    fn decodes_java_custom_rsa_password_login() {
+        let mut payload = BytesMut::new();
+        payload.put_u8(1);
+        payload.put_u32(10010);
+        payload.put_slice(b"alice");
+        payload.put_u8(10);
+        payload.put_u8(1);
+
+        write_client_rsa_block(&mut payload, padded_login_password("secret").as_bytes());
+        write_client_rsa_block(&mut payload, b"workspace/client");
+        payload.put_u64(0x0102_0304_0506_0708);
+
+        let request = LoginRequest::decode(&Packet::new(0, payload.freeze())).unwrap();
+
+        assert!(request.reconnecting);
+        assert_eq!(request.client_version, 10010);
+        assert_eq!(request.username, "alice");
+        assert_eq!(request.password, "secret");
+    }
+
+    fn padded_login_password(password: &str) -> String {
+        let mut padded = String::with_capacity(20);
+        for index in 0..20 {
+            let Some(c) = password.chars().nth(index) else {
+                padded.push(' ');
+                continue;
+            };
+            padded.push(if c.is_ascii_alphanumeric() { c } else { '_' });
+        }
+        padded
+    }
+
+    fn write_client_rsa_block(payload: &mut BytesMut, plaintext: &[u8]) {
+        let pem = include_str!("../../../server-java-modern/server.pem");
+        let key = crate::protocol::rsa::RsaKey::from_pkcs8_pem(pem).unwrap();
+        let encrypted = encrypt_like_java_client(plaintext, key.modulus());
+        payload.put_u16(encrypted.len() as u16);
+        payload.put_slice(&encrypted);
+    }
+
+    fn encrypt_like_java_client(plaintext: &[u8], modulus: &BigUint) -> Vec<u8> {
+        let public_exponent = BigUint::from(65_537u32);
+        let encrypted = BigUint::from_bytes_be(plaintext).modpow(&public_exponent, modulus);
+        signed_positive_bytes(&encrypted)
+    }
+
+    fn signed_positive_bytes(value: &BigUint) -> Vec<u8> {
+        if *value == BigUint::from(0u32) {
+            return vec![0];
+        }
+        let mut bytes = value.to_bytes_be();
+        if bytes[0] & 0x80 != 0 {
+            bytes.insert(0, 0);
+        }
+        bytes
     }
 }

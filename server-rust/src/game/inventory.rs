@@ -118,9 +118,9 @@ impl Inventory {
 
     /// Check if inventory contains a specific item.
     pub fn contains(&self, item_id: ItemId) -> bool {
-        self.slots.iter().any(|s| {
-            s.as_ref().map(|i| i.item_id == item_id).unwrap_or(false)
-        })
+        self.slots
+            .iter()
+            .any(|s| s.as_ref().map(|i| i.item_id == item_id).unwrap_or(false))
     }
 
     /// Get total amount of a specific item in inventory.
@@ -135,9 +135,9 @@ impl Inventory {
 
     /// Find the first slot containing a specific item.
     pub fn find_slot(&self, item_id: ItemId) -> Option<usize> {
-        self.slots.iter().position(|s| {
-            s.as_ref().map(|i| i.item_id == item_id).unwrap_or(false)
-        })
+        self.slots
+            .iter()
+            .position(|s| s.as_ref().map(|i| i.item_id == item_id).unwrap_or(false))
     }
 
     /// Find the first empty slot.
@@ -151,7 +151,8 @@ impl Inventory {
         let is_stackable = item_repo
             .get(item.item_id)
             .map(|d| d.stackable)
-            .unwrap_or(false) || item.noted;
+            .unwrap_or(false)
+            || item.noted;
 
         if is_stackable {
             // Try to stack with existing items
@@ -169,7 +170,10 @@ impl Inventory {
         // Find empty slot
         if let Some(empty_idx) = self.find_empty_slot() {
             self.slots[empty_idx] = Some(item.clone());
-            debug!("Added {} x {} to inventory slot {}", item.amount, item.item_id.0, empty_idx);
+            debug!(
+                "Added {} x {} to inventory slot {}",
+                item.amount, item.item_id.0, empty_idx
+            );
             true
         } else {
             warn!("Inventory full, cannot add item {}", item.item_id.0);
@@ -186,10 +190,7 @@ impl Inventory {
     /// Returns the actual amount removed.
     pub fn remove(&mut self, item_id: ItemId, amount: u32, item_repo: &ItemRepository) -> u32 {
         let mut remaining = amount;
-        let is_stackable = item_repo
-            .get(item_id)
-            .map(|d| d.stackable)
-            .unwrap_or(false);
+        let is_stackable = item_repo.get(item_id).map(|d| d.stackable).unwrap_or(false);
 
         for slot in &mut self.slots {
             if remaining == 0 {

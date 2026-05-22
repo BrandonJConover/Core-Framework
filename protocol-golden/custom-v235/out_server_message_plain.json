@@ -1,0 +1,15 @@
+{
+  "id": "out_server_message_plain",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_SERVER_MESSAGE",
+  "wire_opcode": 131,
+  "payload_hex": "00000000000057656c636f6d650a",
+  "fields": {
+    "iconSprite": 0,
+    "messageTypeRsId": 0,
+    "infoContained": 0,
+    "message": "Welcome"
+  },
+  "notes": "Payload only. Java PacketBuilder.writeString terminates strings with LF, so this fixture intentionally ends in 0a."
+}

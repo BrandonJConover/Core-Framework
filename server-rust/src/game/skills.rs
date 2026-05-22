@@ -6,16 +6,14 @@ use std::collections::HashMap;
 
 /// Experience table for levels 1-99.
 const EXPERIENCE_TABLE: [u32; 99] = [
-    0, 83, 174, 276, 388, 512, 650, 801, 969, 1154,
-    1358, 1584, 1833, 2107, 2411, 2746, 3115, 3523, 3973, 4470,
-    5018, 5624, 6291, 7028, 7842, 8740, 9730, 10824, 12031, 13363,
-    14833, 16456, 18247, 20224, 22406, 24815, 27473, 30408, 33648, 37224,
-    41171, 45529, 50339, 55649, 61512, 67983, 75127, 83014, 91721, 101333,
-    111945, 123660, 136594, 150872, 166636, 184040, 203254, 224466, 247886, 273742,
-    302288, 333804, 368599, 407015, 449428, 496254, 547953, 605032, 668051, 737627,
-    814445, 899257, 992895, 1096278, 1210421, 1336443, 1475581, 1629200, 1798808, 1986068,
-    2192818, 2421087, 2673114, 2951373, 3258594, 3597792, 3972294, 4385776, 4842295, 5346332,
-    5902831, 6517253, 7195629, 7944614, 8771558, 9684577, 10692629, 11805606, 13034431,
+    0, 83, 174, 276, 388, 512, 650, 801, 969, 1154, 1358, 1584, 1833, 2107, 2411, 2746, 3115, 3523,
+    3973, 4470, 5018, 5624, 6291, 7028, 7842, 8740, 9730, 10824, 12031, 13363, 14833, 16456, 18247,
+    20224, 22406, 24815, 27473, 30408, 33648, 37224, 41171, 45529, 50339, 55649, 61512, 67983,
+    75127, 83014, 91721, 101333, 111945, 123660, 136594, 150872, 166636, 184040, 203254, 224466,
+    247886, 273742, 302288, 333804, 368599, 407015, 449428, 496254, 547953, 605032, 668051, 737627,
+    814445, 899257, 992895, 1096278, 1210421, 1336443, 1475581, 1629200, 1798808, 1986068, 2192818,
+    2421087, 2673114, 2951373, 3258594, 3597792, 3972294, 4385776, 4842295, 5346332, 5902831,
+    6517253, 7195629, 7944614, 8771558, 9684577, 10692629, 11805606, 13034431,
 ];
 
 /// Player skills container.
@@ -102,6 +100,23 @@ impl Skills {
     /// Set current level (for boosts/drains).
     pub fn set_current_level(&mut self, skill: SkillId, level: u8) {
         self.current_levels.insert(skill, level.min(118)); // Cap at 118 (boosted max)
+    }
+
+    /// Set a skill's experience and explicit current level (DB rehydration for combat skills).
+    pub fn set_skill_raw(&mut self, skill: SkillId, xp: u32, current: u8) {
+        let base = level_for_experience(xp).max(1);
+        self.experience.insert(skill, xp);
+        self.levels.insert(skill, base);
+        self.current_levels.insert(skill, current);
+    }
+
+    /// Set a skill from XP only, deriving both base and current level.
+    /// For non-combat skills where current always equals base.
+    pub fn set_skill_xp(&mut self, skill: SkillId, xp: u32) {
+        let base = level_for_experience(xp).max(1);
+        self.experience.insert(skill, xp);
+        self.levels.insert(skill, base);
+        self.current_levels.insert(skill, base);
     }
 
     /// Restore current level to base level.
@@ -206,9 +221,10 @@ mod tests {
     #[test]
     fn test_add_experience() {
         let mut skills = Skills::new();
+        // RSC table: L2=83 xp, L3=174 xp, L4=276 xp. 200 xp puts us at L3.
         let leveled = skills.add_experience(SkillId::Attack, 200);
         assert!(leveled);
-        assert_eq!(skills.level(SkillId::Attack), 2);
+        assert_eq!(skills.level(SkillId::Attack), 3);
     }
 
     #[test]

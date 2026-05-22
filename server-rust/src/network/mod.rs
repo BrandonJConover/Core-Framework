@@ -1,5 +1,6 @@
 pub mod quic;
 pub mod tcp;
+pub mod ws;
 
 use anyhow::Result;
 use std::net::SocketAddr;
@@ -29,6 +30,19 @@ pub async fn start_server(
             error!("QUIC server error: {}", e);
         }
     });
+
+    // Start WebSocket listener (web client transport via Caddy reverse proxy).
+    // ws_port = 0 is the explicit "disabled" sentinel; useful for benches that
+    // want the raw TCP path only.
+    if config.ws_port != 0 {
+        let ws_addr: SocketAddr = format!("0.0.0.0:{}", config.ws_port).parse()?;
+        let ws_state = server_state.clone();
+        tokio::spawn(async move {
+            if let Err(e) = ws::start_ws_server(ws_addr, ws_state).await {
+                error!("WebSocket server error: {}", e);
+            }
+        });
+    }
 
     // Accept TCP connections
     loop {

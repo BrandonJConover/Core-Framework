@@ -77,7 +77,8 @@ impl Bank {
 
     /// Get the amount of a specific item.
     pub fn get_amount(&self, item_id: u32) -> u32 {
-        self.items.iter()
+        self.items
+            .iter()
             .find(|i| i.item_id == item_id)
             .map(|i| i.amount)
             .unwrap_or(0)
@@ -106,7 +107,10 @@ impl Bank {
                 return Err(BankError::StackOverflow);
             }
             existing.amount = new_amount;
-            debug!("Deposited {} of item {} (now {})", amount, item_id, new_amount);
+            debug!(
+                "Deposited {} of item {} (now {})",
+                amount, item_id, new_amount
+            );
             return Ok(());
         }
 
@@ -126,7 +130,9 @@ impl Bank {
             return Err(BankError::InvalidAmount);
         }
 
-        let pos = self.items.iter()
+        let pos = self
+            .items
+            .iter()
             .position(|i| i.item_id == item_id)
             .ok_or(BankError::ItemNotFound)?;
 
@@ -140,7 +146,12 @@ impl Bank {
             item.amount -= withdrawn;
         }
 
-        debug!("Withdrew {} of item {} (had {})", withdrawn, item_id, withdrawn + self.get_amount(item_id));
+        debug!(
+            "Withdrew {} of item {} (had {})",
+            withdrawn,
+            item_id,
+            withdrawn + self.get_amount(item_id)
+        );
         Ok(withdrawn)
     }
 
@@ -164,7 +175,9 @@ impl Bank {
 
     /// Insert an item at a specific slot (shift others down).
     pub fn insert_at(&mut self, slot: usize, item_id: u32) -> Result<(), BankError> {
-        let current_pos = self.items.iter()
+        let current_pos = self
+            .items
+            .iter()
             .position(|i| i.item_id == item_id)
             .ok_or(BankError::ItemNotFound)?;
 
@@ -184,7 +197,8 @@ impl Bank {
 
     /// Search for items by ID prefix or name pattern.
     pub fn search(&self, item_ids: &[u32]) -> Vec<&BankItem> {
-        self.items.iter()
+        self.items
+            .iter()
             .filter(|i| item_ids.contains(&i.item_id))
             .collect()
     }
@@ -314,8 +328,8 @@ impl BankManager {
 
         // Bank booths/chests
         self.bank_objects = vec![
-            64,   // Bank booth
-            942,  // Bank chest
+            64,  // Bank booth
+            942, // Bank chest
         ];
     }
 
@@ -397,13 +411,19 @@ mod tests {
         let mut session = BankSession::new(1, bank);
 
         // Can't deposit when closed
-        assert!(matches!(session.deposit(100, 5), Err(BankError::BankClosed)));
+        assert!(matches!(
+            session.deposit(100, 5),
+            Err(BankError::BankClosed)
+        ));
 
         session.open().unwrap();
         session.deposit(100, 5).unwrap();
         assert_eq!(session.bank.get_amount(100), 5);
 
         session.close();
-        assert!(matches!(session.withdraw(100, 1), Err(BankError::BankClosed)));
+        assert!(matches!(
+            session.withdraw(100, 1),
+            Err(BankError::BankClosed)
+        ));
     }
 }

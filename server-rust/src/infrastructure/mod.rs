@@ -137,7 +137,11 @@ impl InfrastructureManager {
 
     pub fn is_healthy(&self) -> bool {
         self.initialized
-            && self.redis.as_ref().map(|r| r.is_connected()).unwrap_or(true)
+            && self
+                .redis
+                .as_ref()
+                .map(|r| r.is_connected())
+                .unwrap_or(true)
     }
 
     /// Get health status for all components.
@@ -147,18 +151,41 @@ impl InfrastructureManager {
             components: vec![
                 ComponentHealth {
                     name: "redis".to_string(),
-                    healthy: self.redis.as_ref().map(|r| r.is_connected()).unwrap_or(true),
-                    status: if self.redis.is_some() { "connected" } else { "disabled" }.to_string(),
+                    healthy: self
+                        .redis
+                        .as_ref()
+                        .map(|r| r.is_connected())
+                        .unwrap_or(true),
+                    status: if self.redis.is_some() {
+                        "connected"
+                    } else {
+                        "disabled"
+                    }
+                    .to_string(),
                 },
                 ComponentHealth {
                     name: "metrics".to_string(),
                     healthy: self.metrics.is_some(),
-                    status: if self.metrics.is_some() { "enabled" } else { "disabled" }.to_string(),
+                    status: if self.metrics.is_some() {
+                        "enabled"
+                    } else {
+                        "disabled"
+                    }
+                    .to_string(),
                 },
                 ComponentHealth {
                     name: "discovery".to_string(),
-                    healthy: self.discovery.as_ref().map(|d| d.is_registered()).unwrap_or(true),
-                    status: if self.discovery.is_some() { "registered" } else { "disabled" }.to_string(),
+                    healthy: self
+                        .discovery
+                        .as_ref()
+                        .map(|d| d.is_registered())
+                        .unwrap_or(true),
+                    status: if self.discovery.is_some() {
+                        "registered"
+                    } else {
+                        "disabled"
+                    }
+                    .to_string(),
                 },
             ],
             timestamp: chrono::Utc::now(),

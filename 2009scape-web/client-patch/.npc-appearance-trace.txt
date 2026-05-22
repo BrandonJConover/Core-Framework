@@ -1,4 +1,4 @@
-# Captured by .npc-appearance-test.mjs at 2026-05-02T10:56:42.791Z
+# Captured by .npc-appearance-test.mjs at 2026-05-18T04:56:06.790Z
 # All assertions passed: composeNpcModel, mergeRawModels, applyRecolor, applyRetex, attachNpcAppearance530
 # Fixture A: 1 modelIndex (id=100). Fixture B: 2 modelIndices (100+200) + recolor + retex.
 

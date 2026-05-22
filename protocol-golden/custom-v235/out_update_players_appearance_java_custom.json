@@ -1,0 +1,57 @@
+{
+  "id": "out_update_players_appearance_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_UPDATE_PLAYERS",
+  "wire_opcode": 234,
+  "payload_hex": "0001002a05616c6963650a0002080e030c000000000a0a",
+  "fields": {
+    "count": 1,
+    "entries": [
+      {
+        "player_index": 42,
+        "update_type": 5,
+        "username": "alice",
+        "equipment": [],
+        "hair_colour": 2,
+        "top_colour": 8,
+        "trouser_colour": 14,
+        "skin_colour": 3,
+        "combat_level": 12,
+        "skull_type": 0,
+        "clan_tag": null,
+        "invisible": false,
+        "invulnerable": false,
+        "group_id": 10,
+        "icon": ""
+      }
+    ]
+  },
+  "java_reference": {
+    "generator": "server-java-modern/src/com/openrsc/server/net/rsc/generators/impl/PayloadCustomGenerator.java",
+    "source": "server-java-modern/src/com/openrsc/server/GameStateUpdater.java#issuePlayerAppearanceUpdatePacket",
+    "source_struct": "server-java-modern/src/com/openrsc/server/net/rsc/struct/outgoing/AppearanceUpdateStruct.java",
+    "string_writer": "server-java-modern/src/com/openrsc/server/net/PacketBuilder.java#writeString",
+    "info_sequence": [
+      "Short(count)",
+      "Short(player_index)",
+      "Byte(update_type)",
+      "String(username)",
+      "Byte(equipment_count)",
+      "Short(equipment_id) repeated",
+      "AppearanceByte(hair_colour)",
+      "AppearanceByte(top_colour)",
+      "AppearanceByte(trouser_colour)",
+      "AppearanceByte(skin_colour)",
+      "Byte(combat_level)",
+      "Byte(skull_type)",
+      "Byte(has_clan)",
+      "String(clan_tag) when present",
+      "Byte(invisible)",
+      "Byte(invulnerable)",
+      "Byte(group_id)",
+      "String(icon)"
+    ]
+  },
+  "notes": "Payload only, without transport framing. This Java custom-client SEND_UPDATE_PLAYERS type-5 fixture covers a player appearance/identity entry with no equipment, no clan, PLAYER group id 10, and LF-terminated username/icon strings."
+}

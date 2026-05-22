@@ -1560,6 +1560,7 @@ export class Scene {
             Scene.anInt467 = this.anInt454;
         }
         this.method286();
+        this.drawLandscape530(j);
         Scene.anInt461 = 0;
         for (let l1: number = this.anInt457; l1 < this.anInt452; l1++) {
             {
@@ -1700,6 +1701,94 @@ export class Scene {
         Scene.aBoolean482 = false;
     }
 
+    public drawLandscape530(plane: number) {
+        const sidecar = (this as any).landscape530?.[plane];
+        const chunks = sidecar?.chunks;
+        if (!chunks || chunks.length === 0) return;
+        const minTileX = Scene.screenCenterX - 28;
+        const maxTileX = Scene.screenCenterX + 28;
+        const minTileZ = Scene.screenCenterZ - 28;
+        const maxTileZ = Scene.screenCenterZ + 28;
+        let drawn = 0;
+        let triangles = 0;
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            if (chunk.maxTileX < minTileX || chunk.minTileX > maxTileX || chunk.maxTileZ < minTileZ || chunk.minTileZ > maxTileZ) continue;
+            const raw = chunk.rawModel;
+            if (!raw) continue;
+            triangles += this.drawRawLandscape530(raw);
+            drawn++;
+        }
+        if (!(globalThis as any).__landscape530DrawLogged) {
+            (globalThis as any).__landscape530DrawLogged = true;
+            console.log("[SceneWire530] drew landscape chunks=" + drawn + "/" + chunks.length + " tris=" + triangles);
+        }
+    }
+
+    private hasLandscape530(plane: number): boolean {
+        const chunks = (this as any).landscape530?.[plane]?.chunks;
+        return !!chunks && chunks.length > 0;
+    }
+
+    private drawRawLandscape530(raw: any): number {
+        let drawn = 0;
+        Rasterizer3D.anInt1531 = 0;
+        for (let tri = 0; tri < raw.triangleCount; tri++) {
+            const a = raw.triangleVertexA[tri];
+            const b = raw.triangleVertexB[tri];
+            const c = raw.triangleVertexC[tri];
+            const pa = this.projectLandscapeVertex530(raw, a);
+            if (!pa) continue;
+            const pb = this.projectLandscapeVertex530(raw, b);
+            if (!pb) continue;
+            const pc = this.projectLandscapeVertex530(raw, c);
+            if (!pc) continue;
+            if ((pa.x - pb.x) * (pc.y - pb.y) - (pa.y - pb.y) * (pc.x - pb.x) <= 0) continue;
+            Rasterizer3D.aBoolean1528 = false;
+            if (
+                pa.x < 0 || pb.x < 0 || pc.x < 0 ||
+                pa.x > Rasterizer.virtualBottomX || pb.x > Rasterizer.virtualBottomX || pc.x > Rasterizer.virtualBottomX
+            ) {
+                Rasterizer3D.aBoolean1528 = true;
+            }
+            const color = raw.triangleColors[tri] ?? 0;
+            if (color === 12345678 || color < 0) continue;
+            if (Scene.aBoolean482 && this.method285(Scene.anInt483, Scene.anInt484, pa.y, pb.y, pc.y, pa.x, pb.x, pc.x)) {
+                Scene.clickedTileX = Math.floor(Math.min(raw.vertexX[a], raw.vertexX[b], raw.vertexX[c]) / 128);
+                Scene.anInt486 = Math.floor(Math.min(raw.vertexZ[a], raw.vertexZ[b], raw.vertexZ[c]) / 128);
+            }
+            Rasterizer3D.method503(
+                pa.y,
+                pb.y,
+                pc.y,
+                pa.x,
+                pb.x,
+                pc.x,
+                raw.triangleColorA?.[tri] ?? color,
+                raw.triangleColorB?.[tri] ?? color,
+                raw.triangleColorC?.[tri] ?? color
+            );
+            drawn++;
+        }
+        return drawn;
+    }
+
+    private projectLandscapeVertex530(raw: any, vertex: number): { x: number; y: number } | null {
+        let x = raw.vertexX[vertex] - Scene.cameraX2;
+        let y = raw.vertexY[vertex] - Scene.cameraY2;
+        let z = raw.vertexZ[vertex] - Scene.cameraZ2;
+        const yawX = (z * Scene.yawSin + x * Scene.yawCos) >> 16;
+        z = (z * Scene.yawCos - x * Scene.yawSin) >> 16;
+        x = yawX;
+        const pitchY = (y * Scene.pitchCos - z * Scene.pitchSin) >> 16;
+        z = (y * Scene.pitchSin + z * Scene.pitchCos) >> 16;
+        if (z < 50) return null;
+        return {
+            x: Rasterizer3D.centerX + (((x << 9) / z) | 0),
+            y: Rasterizer3D.centerY + (((pitchY << 9) / z) | 0),
+        };
+    }
+
     public drawTile(tile: SceneTile, flag: boolean) {
         Scene.tileList.insertBack(tile);
         do {
@@ -1774,18 +1863,20 @@ export class Scene {
                         const class50_sub3_7: SceneTile = tileFromList.bridge;
                         if (class50_sub3_7.paint != null) {
                             if (!this.isTileOccluded(0, i, j)) {
-                                this.drawTileUnderlay(
-                                    class50_sub3_7.paint,
-                                    0,
-                                    Scene.pitchSin,
-                                    Scene.pitchCos,
-                                    Scene.yawSin,
-                                    Scene.yawCos,
-                                    i,
-                                    j
-                                );
+                                if (!this.hasLandscape530(k)) {
+                                    this.drawTileUnderlay(
+                                        class50_sub3_7.paint,
+                                        0,
+                                        Scene.pitchSin,
+                                        Scene.pitchCos,
+                                        Scene.yawSin,
+                                        Scene.yawCos,
+                                        i,
+                                        j
+                                    );
+                                }
                             }
-                        } else if (class50_sub3_7.complexTile != null && !this.isTileOccluded(0, i, j)) {
+                        } else if (class50_sub3_7.complexTile != null && !this.hasLandscape530(k) && !this.isTileOccluded(0, i, j)) {
                             this.drawTileOverlay(
                                 Scene.pitchCos,
                                 Scene.yawCos,
@@ -1834,9 +1925,11 @@ export class Scene {
                     if (tileFromList.paint != null) {
                         if (!this.isTileOccluded(l, i, j)) {
                             flag1 = true;
-                            this.drawTileUnderlay(tileFromList.paint, l, Scene.pitchSin, Scene.pitchCos, Scene.yawSin, Scene.yawCos, i, j);
+                            if (!this.hasLandscape530(k)) {
+                                this.drawTileUnderlay(tileFromList.paint, l, Scene.pitchSin, Scene.pitchCos, Scene.yawSin, Scene.yawCos, i, j);
+                            }
                         }
-                    } else if (tileFromList.complexTile != null && !this.isTileOccluded(l, i, j)) {
+                    } else if (tileFromList.complexTile != null && !this.hasLandscape530(k) && !this.isTileOccluded(l, i, j)) {
                         flag1 = true;
                         this.drawTileOverlay(
                             Scene.pitchCos,

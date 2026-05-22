@@ -17,7 +17,7 @@
  */
 
 import { Buffer } from "./Buffer";
-import { Configuration } from "./Configuration";
+import { Configuration } from "../Configuration";
 import { ISAACCipher } from "./ISAACCipher";
 
 // ── Auth response codes from 2009scape AuthResponse enum ──
@@ -51,11 +51,11 @@ export const AuthResponse = {
  * This is the standard RS2 username encoding (base-37).
  */
 export function usernameToLong(username: string): bigint {
-    let encoded = 0n;
+    let encoded = BigInt(0);
     const clean = username.toLowerCase().trim();
     for (let i = 0; i < Math.min(clean.length, 12); i++) {
         const c = clean.charCodeAt(i);
-        encoded *= 37n;
+        encoded *= BigInt(37);
         if (c >= 97 && c <= 122) {       // a-z
             encoded += BigInt(c - 96);
         } else if (c >= 48 && c <= 57) {  // 0-9
@@ -73,8 +73,8 @@ export function usernameToLong(username: string): bigint {
  * so we write it manually.
  */
 function writeLong(buf: Buffer, value: bigint): void {
-    const high = Number((value >> 32n) & 0xFFFFFFFFn);
-    const low = Number(value & 0xFFFFFFFFn);
+    const high = Number((value >> BigInt(32)) & BigInt(0xFFFFFFFF));
+    const low = Number(value & BigInt(0xFFFFFFFF));
     buf.putInt(high);
     buf.putInt(low);
 }
@@ -109,13 +109,13 @@ export async function performLogin530(
 ): Promise<LoginResult> {
 
     // ── Phase 1: Handshake ──
-    const nameHash = Number((usernameToLong(username) >> 16n) & 31n);
+    const nameHash = Number((usernameToLong(username) >> BigInt(16)) & BigInt(31));
 
     // Send handshake: [14] [nameHash]
     const hsBuffer = Buffer.create(2);
     hsBuffer.putByte(14);
     hsBuffer.putByte(nameHash);
-    await socket.write(hsBuffer.data, 0, 2);
+    await socket.write(hsBuffer.buffer, 0, 2);
 
     // Read server response: 1 byte status
     const statusByte = await socket.read();
@@ -148,7 +148,7 @@ export async function performLogin530(
     rsaBlock.putString(password);
 
     // RSA encrypt
-    const rsaData = new Uint8Array(rsaBlock.data.buffer, 0, rsaBlock.offset);
+    const rsaData = new Uint8Array(rsaBlock.buffer.buffer, 0, rsaBlock.currentPosition);
     const encryptedRsa = rsaEncrypt(rsaData);
 
     // Build the full login packet
@@ -192,16 +192,16 @@ export async function performLogin530(
     }
 
     // Now wrap it all with the login opcode + size header
-    const loginPacket = Buffer.create(loginBlock.offset + 3);
+    const loginPacket = Buffer.create(loginBlock.currentPosition + 3);
     loginPacket.putByte(reconnecting ? 18 : 16);  // login opcode
-    loginPacket.putShort(loginBlock.offset);       // payload length
+    loginPacket.putShort(loginBlock.currentPosition);       // payload length
 
     // Copy login block payload
-    for (let i = 0; i < loginBlock.offset; i++) {
-        loginPacket.putByte(loginBlock.data[i]);
+    for (let i = 0; i < loginBlock.currentPosition; i++) {
+        loginPacket.putByte(loginBlock.buffer[i]);
     }
 
-    await socket.write(loginPacket.data, 0, loginPacket.offset);
+    await socket.write(loginPacket.buffer, 0, loginPacket.currentPosition);
 
     // ── Phase 3: Read login response ──
     const responseCode = await socket.read();

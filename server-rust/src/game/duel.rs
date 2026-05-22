@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
-use super::item::ItemId;
 use super::inventory::InventoryItem;
+use super::item::ItemId;
 
 /// Duel settings/rules.
 #[derive(Debug, Clone, Default)]

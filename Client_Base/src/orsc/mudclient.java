@@ -17137,6 +17137,24 @@ public final class mudclient implements Runnable {
 			if (C_CUSTOM_UI) {
 				repositionCustomUI();
 			}
+
+            // Auto-login logic for external login screens
+            String urlUser = clientPort.getParameter("username") != null ? clientPort.getParameter("username") : clientPort.getParameter("user");
+            String urlPass = clientPort.getParameter("password") != null ? clientPort.getParameter("password") : clientPort.getParameter("pass");
+            if (urlUser != null && urlPass != null && !urlUser.isEmpty() && !urlPass.isEmpty()) {
+                this.setUsername(urlUser);
+                this.password = urlPass;
+                this.loginScreenNumber = 2; // Transition to the login form state
+
+                // Pre-fill the UI components so the form reflects the passed credentials
+                if (this.panelLogin != null) {
+                    this.panelLogin.setText(this.controlLoginUser, urlUser);
+                    this.panelLogin.setText(this.controlLoginPass, urlPass);
+                }
+
+                this.autoLoginTimeout = 5; // Increase timeout for initial handshake
+                this.login(-12, this.password, this.getUsername(), false);
+            }
 		} catch (RuntimeException var9) {
 			throw GenUtil.makeThrowable(var9, "client.KC(" + var1 + ')');
 		}

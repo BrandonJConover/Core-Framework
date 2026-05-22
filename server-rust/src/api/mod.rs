@@ -28,6 +28,7 @@ pub mod endpoints;
 pub mod jwt;
 pub mod rate_limit;
 pub mod router;
+pub mod ticket;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -39,6 +40,7 @@ use crate::game::server::ServerState;
 
 pub use jwt::JwtUtil;
 pub use rate_limit::RateLimiter;
+pub use ticket::LoginTicketService;
 
 /// Default port for the modern client REST API.
 ///
@@ -78,6 +80,11 @@ pub struct ApiState {
     /// Configured player cap (mirrors `ServerConfiguration.MAX_PLAYERS` in
     /// Java). Surfaced in /api/status.
     pub player_limit: usize,
+
+    /// One-shot ticket store for the launcher → game-client handoff. Cloned
+    /// (shared `Arc` inside) into `ServerState` so the LOGIN packet handler
+    /// can consume tickets issued by `/api/auth/game-ticket`.
+    pub tickets: LoginTicketService,
 }
 
 impl ApiState {
@@ -102,6 +109,7 @@ impl ApiState {
             // Mirror ServerState::MAX_PLAYERS. Orchestrator can override
             // by mutating the field after construction if it has a config.
             player_limit: crate::game::server::MAX_PLAYERS,
+            tickets: LoginTicketService::new(),
         }
     }
 }
@@ -127,10 +135,7 @@ pub async fn start_api_server(
 /// Like [`start_api_server`] but takes a pre-built `ApiState`. Use this
 /// when wiring the database pool, custom rate-limit budgets, or a
 /// non-default JWT secret path.
-pub async fn start_api_server_with_state(
-    addr: SocketAddr,
-    state: ApiState,
-) -> anyhow::Result<()> {
+pub async fn start_api_server_with_state(addr: SocketAddr, state: ApiState) -> anyhow::Result<()> {
     let app = router::build_router(state);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("API listener online on {}", addr);

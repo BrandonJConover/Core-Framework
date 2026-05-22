@@ -1,11 +1,10 @@
 //! Session management module for player connections.
 //! Handles connection lifecycle, authentication, and session state.
 
-pub mod handler;
-
 use crate::game::player::Player;
-use crate::protocol::{Packet, PacketBuilder};
+use crate::protocol::legacy::ProtocolVersion;
 use crate::protocol::opcodes::{OpcodeIn, OpcodeOut};
+use crate::protocol::{Packet, PacketBuilder};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -112,6 +111,15 @@ impl Session {
     pub fn idle_time(&self) -> Duration {
         self.last_activity.elapsed()
     }
+
+    /// Protocol revision selected for this session.
+    ///
+    /// Before login, `client_version` is unknown and login opcode 0 is shared
+    /// across supported revisions, so v177 remains the safe default. Once the
+    /// login packet is parsed, dispatch should use the client's revision.
+    pub fn protocol_version(&self) -> ProtocolVersion {
+        ProtocolVersion::from_revision(self.client_version).unwrap_or(ProtocolVersion::V177)
+    }
 }
 
 /// Session manager for all active sessions.
@@ -165,7 +173,8 @@ impl SessionManager {
     ) -> Option<Arc<RwLock<Session>>> {
         // Check max sessions per IP
         let ip = address.ip();
-        let count = self.sessions_by_address
+        let count = self
+            .sessions_by_address
             .keys()
             .filter(|addr| addr.ip() == ip)
             .count();
@@ -312,12 +321,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_session_timeout() {
-        let session = Session::new(
-            1,
-            "127.0.0.1:12345".parse().unwrap(),
-            mpsc::channel(10).0,
-        );
+        let session = Session::new(1, "127.0.0.1:12345".parse().unwrap(), mpsc::channel(10).0);
 
         assert!(!session.is_timed_out(Duration::from_secs(60)));
+    }
+
+    #[tokio::test]
+    async fn test_session_protocol_version_defaults_and_tracks_client() {
+        let mut session = Session::new(1, "127.0.0.1:12345".parse().unwrap(), mpsc::channel(10).0);
+
+        assert_eq!(session.protocol_version(), ProtocolVersion::V177);
+        session.client_version = 235;
+        assert_eq!(session.protocol_version(), ProtocolVersion::V235);
+        session.client_version = 204;
+        assert_eq!(session.protocol_version(), ProtocolVersion::V203);
+        session.client_version = 9999;
+        assert_eq!(session.protocol_version(), ProtocolVersion::V177);
     }
 }

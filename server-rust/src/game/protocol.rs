@@ -509,10 +509,7 @@ impl<'a> PacketReader<'a> {
     /// Read a single byte.
     pub fn read_byte(&mut self) -> io::Result<u8> {
         if self.position >= self.data.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "No more data",
-            ));
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "No more data"));
         }
         let value = self.data[self.position];
         self.position += 1;
@@ -594,10 +591,7 @@ impl<'a> PacketReader<'a> {
 /// Decode a packet from raw bytes.
 pub fn decode_packet(data: &[u8]) -> io::Result<(Packet, usize)> {
     if data.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "No data",
-        ));
+        return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "No data"));
     }
 
     // Parse length
@@ -614,7 +608,11 @@ pub fn decode_packet(data: &[u8]) -> io::Result<(Packet, usize)> {
         (data[0] as usize, 1)
     };
 
-    let total_size = header_size + 1 + length; // header + opcode + payload
+    // `length` is the size of (opcode + payload) — matches Java
+    // `RSCProtocolDecoder` which reads `length` then subtracts 1 to get the
+    // payload size. The earlier code added an extra 1 here, requiring one
+    // more byte than the wire actually carries.
+    let total_size = header_size + length;
     if data.len() < total_size {
         return Err(io::Error::new(
             io::ErrorKind::UnexpectedEof,
@@ -623,7 +621,7 @@ pub fn decode_packet(data: &[u8]) -> io::Result<(Packet, usize)> {
     }
 
     let opcode = data[header_size];
-    let payload = data[header_size + 1..header_size + 1 + length].to_vec();
+    let payload = data[header_size + 1..header_size + length].to_vec();
 
     Ok((Packet::with_payload(opcode, payload), total_size))
 }

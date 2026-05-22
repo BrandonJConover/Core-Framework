@@ -123,15 +123,23 @@ impl SmithCategory {
     /// Get bars required for this category.
     pub fn bars_required(&self) -> u8 {
         match self {
-            SmithCategory::Dagger | SmithCategory::Nails |
-            SmithCategory::ArrowHeads | SmithCategory::DartTips => 1,
-            SmithCategory::Axe | SmithCategory::Mace |
-            SmithCategory::MediumHelmet | SmithCategory::Sword => 1,
+            SmithCategory::Dagger
+            | SmithCategory::Nails
+            | SmithCategory::ArrowHeads
+            | SmithCategory::DartTips => 1,
+            SmithCategory::Axe
+            | SmithCategory::Mace
+            | SmithCategory::MediumHelmet
+            | SmithCategory::Sword => 1,
             SmithCategory::Scimitar | SmithCategory::LongSword => 2,
-            SmithCategory::BattleAxe | SmithCategory::ChainBody |
-            SmithCategory::KiteShield | SmithCategory::TwoHandedSword => 3,
-            SmithCategory::PlateSkirt | SmithCategory::PlateLegs |
-            SmithCategory::FullHelmet | SmithCategory::SquareShield => 3,
+            SmithCategory::BattleAxe
+            | SmithCategory::ChainBody
+            | SmithCategory::KiteShield
+            | SmithCategory::TwoHandedSword => 3,
+            SmithCategory::PlateSkirt
+            | SmithCategory::PlateLegs
+            | SmithCategory::FullHelmet
+            | SmithCategory::SquareShield => 3,
             SmithCategory::PlateBody => 5,
         }
     }
@@ -278,42 +286,122 @@ impl SmithingManager {
     pub fn load_defaults(&mut self) {
         // Smelting recipes
         self.register_smelt(SmeltRecipe::new(
-            BarType::Bronze, 150, Some(202), 1, 1, // Copper + Tin
+            BarType::Bronze,
+            150,
+            Some(202),
+            1,
+            1, // Copper + Tin
+        ));
+        self.register_smelt(SmeltRecipe::new(BarType::Iron, 151, None, 1, 0));
+        self.register_smelt(SmeltRecipe::new(BarType::Silver, 383, None, 1, 0));
+        self.register_smelt(SmeltRecipe::new(
+            BarType::Steel,
+            151,
+            Some(155),
+            1,
+            2, // Iron + 2 Coal
+        ));
+        self.register_smelt(SmeltRecipe::new(BarType::Gold, 152, None, 1, 0));
+        self.register_smelt(SmeltRecipe::new(
+            BarType::Mithril,
+            153,
+            Some(155),
+            1,
+            4, // Mithril + 4 Coal
         ));
         self.register_smelt(SmeltRecipe::new(
-            BarType::Iron, 151, None, 1, 0,
+            BarType::Adamantite,
+            154,
+            Some(155),
+            1,
+            6, // Adamantite + 6 Coal
         ));
         self.register_smelt(SmeltRecipe::new(
-            BarType::Silver, 383, None, 1, 0,
-        ));
-        self.register_smelt(SmeltRecipe::new(
-            BarType::Steel, 151, Some(155), 1, 2, // Iron + 2 Coal
-        ));
-        self.register_smelt(SmeltRecipe::new(
-            BarType::Gold, 152, None, 1, 0,
-        ));
-        self.register_smelt(SmeltRecipe::new(
-            BarType::Mithril, 153, Some(155), 1, 4, // Mithril + 4 Coal
-        ));
-        self.register_smelt(SmeltRecipe::new(
-            BarType::Adamantite, 154, Some(155), 1, 6, // Adamantite + 6 Coal
-        ));
-        self.register_smelt(SmeltRecipe::new(
-            BarType::Runite, 409, Some(155), 1, 8, // Runite + 8 Coal
+            BarType::Runite,
+            409,
+            Some(155),
+            1,
+            8, // Runite + 8 Coal
         ));
 
         // Bronze items
-        self.register_smith_item(SmithItem::new(62, "Bronze Dagger", BarType::Bronze, SmithCategory::Dagger, 1));
-        self.register_smith_item(SmithItem::new(87, "Bronze Axe", BarType::Bronze, SmithCategory::Axe, 1));
-        self.register_smith_item(SmithItem::new(94, "Bronze Mace", BarType::Bronze, SmithCategory::Mace, 1));
-        self.register_smith_item(SmithItem::new(5, "Bronze Medium Helmet", BarType::Bronze, SmithCategory::MediumHelmet, 1));
-        self.register_smith_item(SmithItem::new(66, "Bronze Short Sword", BarType::Bronze, SmithCategory::Sword, 1));
-        self.register_smith_item(SmithItem::new(82, "Bronze Scimitar", BarType::Bronze, SmithCategory::Scimitar, 1));
-        self.register_smith_item(SmithItem::new(70, "Bronze Long Sword", BarType::Bronze, SmithCategory::LongSword, 1));
-        self.register_smith_item(SmithItem::new(205, "Bronze Chain Mail Body", BarType::Bronze, SmithCategory::ChainBody, 1));
-        self.register_smith_item(SmithItem::new(102, "Bronze Kite Shield", BarType::Bronze, SmithCategory::KiteShield, 1));
-        self.register_smith_item(SmithItem::new(74, "Bronze 2-handed Sword", BarType::Bronze, SmithCategory::TwoHandedSword, 1));
-        self.register_smith_item(SmithItem::new(214, "Bronze Plate Mail Body", BarType::Bronze, SmithCategory::PlateBody, 1));
+        self.register_smith_item(SmithItem::new(
+            62,
+            "Bronze Dagger",
+            BarType::Bronze,
+            SmithCategory::Dagger,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            87,
+            "Bronze Axe",
+            BarType::Bronze,
+            SmithCategory::Axe,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            94,
+            "Bronze Mace",
+            BarType::Bronze,
+            SmithCategory::Mace,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            5,
+            "Bronze Medium Helmet",
+            BarType::Bronze,
+            SmithCategory::MediumHelmet,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            66,
+            "Bronze Short Sword",
+            BarType::Bronze,
+            SmithCategory::Sword,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            82,
+            "Bronze Scimitar",
+            BarType::Bronze,
+            SmithCategory::Scimitar,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            70,
+            "Bronze Long Sword",
+            BarType::Bronze,
+            SmithCategory::LongSword,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            205,
+            "Bronze Chain Mail Body",
+            BarType::Bronze,
+            SmithCategory::ChainBody,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            102,
+            "Bronze Kite Shield",
+            BarType::Bronze,
+            SmithCategory::KiteShield,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            74,
+            "Bronze 2-handed Sword",
+            BarType::Bronze,
+            SmithCategory::TwoHandedSword,
+            1,
+        ));
+        self.register_smith_item(SmithItem::new(
+            214,
+            "Bronze Plate Mail Body",
+            BarType::Bronze,
+            SmithCategory::PlateBody,
+            1,
+        ));
 
         info!(
             "Loaded {} smelting recipes and {} smithable items",
@@ -335,10 +423,22 @@ mod tests {
 
     #[test]
     fn test_smith_item_level() {
-        let dagger = SmithItem::new(62, "Bronze Dagger", BarType::Bronze, SmithCategory::Dagger, 1);
+        let dagger = SmithItem::new(
+            62,
+            "Bronze Dagger",
+            BarType::Bronze,
+            SmithCategory::Dagger,
+            1,
+        );
         assert_eq!(dagger.required_level(), 1);
 
-        let platebody = SmithItem::new(214, "Bronze Platebody", BarType::Bronze, SmithCategory::PlateBody, 1);
+        let platebody = SmithItem::new(
+            214,
+            "Bronze Platebody",
+            BarType::Bronze,
+            SmithCategory::PlateBody,
+            1,
+        );
         assert_eq!(platebody.required_level(), 19);
     }
 

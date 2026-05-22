@@ -17,6 +17,8 @@ quinn = "0.10"                          # QUIC implementation
 rustls = { version = "0.22", features = ["ring"] }
 rcgen = "0.12"                          # Certificate generation
 bytes = "1.5"
+tokio-tungstenite = "0.21"              # WebSocket transport for the web client
+futures-util = "0.3"                    # SinkExt/StreamExt for tungstenite
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -84,6 +86,10 @@ hex = "0.4"
 
 # Futures
 futures = "0.3"
+
+[[bin]]
+name = "conn_storm"
+path = "src/bin/conn_storm.rs"
 
 [dev-dependencies]
 tokio-test = "0.4"

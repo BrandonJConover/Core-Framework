@@ -19,7 +19,12 @@ impl ServiceDiscovery {
         let provider: Box<dyn ServiceDiscoveryProvider> = match config.provider.as_str() {
             "consul" => Box::new(ConsulProvider::new(&config.consul_url).await?),
             "etcd" => Box::new(EtcdProvider::new(&config.etcd_endpoints).await?),
-            _ => return Err(anyhow::anyhow!("Unknown discovery provider: {}", config.provider)),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unknown discovery provider: {}",
+                    config.provider
+                ))
+            }
         };
 
         Ok(Self {
@@ -159,7 +164,10 @@ impl ServiceDiscoveryProvider for ConsulProvider {
 
     async fn deregister(&self, service_id: &str) -> Result<()> {
         self.client
-            .put(&format!("{}/v1/agent/service/deregister/{}", self.base_url, service_id))
+            .put(&format!(
+                "{}/v1/agent/service/deregister/{}",
+                self.base_url, service_id
+            ))
             .send()
             .await?
             .error_for_status()?;
@@ -168,8 +176,12 @@ impl ServiceDiscoveryProvider for ConsulProvider {
     }
 
     async fn discover(&self, service_name: &str) -> Result<Vec<ServiceInstance>> {
-        let response: Vec<serde_json::Value> = self.client
-            .get(&format!("{}/v1/health/service/{}?passing=true", self.base_url, service_name))
+        let response: Vec<serde_json::Value> = self
+            .client
+            .get(&format!(
+                "{}/v1/health/service/{}?passing=true",
+                self.base_url, service_name
+            ))
             .send()
             .await?
             .json()

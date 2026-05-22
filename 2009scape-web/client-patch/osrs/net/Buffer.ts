@@ -73,6 +73,18 @@ export class Buffer extends CacheableNode {
     public static mediumBuffers: LinkedList = new LinkedList();
     public static largeBuffers: LinkedList = new LinkedList();
 
+    /**
+     * Create a Buffer with an exact-byte capacity. Mirrors what Login530 expects —
+     * unlike `allocate(sizeMode)` which buckets to 100/5000/30000 byte slots, this
+     * gives the caller a precisely-sized backing array.
+     */
+    public static create(byteSize: number): Buffer {
+        const buffer: Buffer = new Buffer();
+        buffer.currentPosition = 0;
+        buffer.buffer = new Int8Array(Math.max(0, byteSize | 0));
+        return buffer;
+    }
+
     public static allocate(sizeMode: number): Buffer {
         {
             let buffer: Buffer = null;
@@ -115,73 +127,31 @@ export class Buffer extends CacheableNode {
     public random: ISAACCipher;
 
     public constructor(buffer?: any) {
-        if (
-            (buffer != null &&
-                ((buffer instanceof Array) as any) &&
-                (buffer.length == 0 || buffer[0] == null || typeof buffer[0] === "number")) ||
-            buffer === null
-        ) {
-            const __args = arguments;
-            super();
-            if (this.buffer === undefined) {
-                this.buffer = null;
-            }
-            if (this.currentPosition === undefined) {
-                this.currentPosition = 0;
-            }
-            if (this.bitPosition === undefined) {
-                this.bitPosition = 0;
-            }
-            if (this.random === undefined) {
-                this.random = null;
-            }
-            if (this.buffer === undefined) {
-                this.buffer = null;
-            }
-            if (this.currentPosition === undefined) {
-                this.currentPosition = 0;
-            }
-            if (this.bitPosition === undefined) {
-                this.bitPosition = 0;
-            }
-            if (this.random === undefined) {
-                this.random = null;
-            }
-            (() => {
-                // 530-compat: a null buffer arises when an archive getFile() returns null.
-                // Default to an empty array so downstream `buffer.buffer.length` reads 0
-                // (rather than crashing) and the get*() methods still have their null-guard.
-                this.buffer = buffer != null ? buffer : [];
-                this.currentPosition = 0;
-            })();
-        } else if (buffer === undefined) {
-            const __args = arguments;
-            super();
-            if (this.buffer === undefined) {
-                this.buffer = null;
-            }
-            if (this.currentPosition === undefined) {
-                this.currentPosition = 0;
-            }
-            if (this.bitPosition === undefined) {
-                this.bitPosition = 0;
-            }
-            if (this.random === undefined) {
-                this.random = null;
-            }
-            if (this.buffer === undefined) {
-                this.buffer = null;
-            }
-            if (this.currentPosition === undefined) {
-                this.currentPosition = 0;
-            }
-            if (this.bitPosition === undefined) {
-                this.bitPosition = 0;
-            }
-            if (this.random === undefined) {
-                this.random = null;
-            }
-        } else {
+        super();
+        this.buffer = null;
+        this.currentPosition = 0;
+        this.bitPosition = 0;
+        this.random = null;
+        if (buffer === undefined) {
+            return;
+        }
+        if (buffer === null) {
+            this.buffer = new Int8Array(0);
+            return;
+        }
+        if ((buffer instanceof Array) && (buffer.length === 0 || buffer[0] == null || typeof buffer[0] === "number")) {
+            this.buffer = Int8Array.from(buffer);
+            return;
+        }
+        if (buffer instanceof Int8Array) {
+            this.buffer = buffer;
+            return;
+        }
+        if (buffer instanceof Uint8Array) {
+            this.buffer = new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+            return;
+        }
+        {
             throw new Error("invalid overload");
         }
     }
@@ -224,7 +194,19 @@ export class Buffer extends CacheableNode {
     ]);
     private _suppressed: boolean = false;
 
+    public resetPacketState(clearCipher: boolean = false) {
+        this.currentPosition = 0;
+        this._suppressed = false;
+        if (clearCipher) {
+            this.random = null;
+        }
+    }
+
     public putOpcode(opcode: number) {
+        if (Configuration.OUTGOING_DIALECT === "openrsc235" && (opcode === 168 || opcode === 40 || opcode === 187 || opcode === 202)) {
+            this._suppressed = true;
+            return;
+        }
         const mapped = Buffer.OUTGOING_REMAP.get(opcode);
         if (mapped === undefined) {
             this._suppressed = true;
@@ -287,8 +269,8 @@ export class Buffer extends CacheableNode {
 
     public putString(str: string) {
         if (this._suppressed) return;
-        for (let c of str) {
-            this.buffer[this.currentPosition++] = c.charCodeAt(0);
+        for (let i = 0; i < str.length; i++) {
+            this.buffer[this.currentPosition++] = str.charCodeAt(i);
         }
         // 530 uses NUL (pjstr) as string terminator, not 377's 0x0A newline.
         this.buffer[this.currentPosition++] = 0;

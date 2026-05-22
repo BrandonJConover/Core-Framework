@@ -1,14 +1,32 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
+
+fn default_ws_port() -> u16 {
+    43494
+}
+fn default_max_sessions_per_ip() -> u32 {
+    5
+}
 
 /// Main server configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
     pub world_name: String,
     pub server_port: u16,
+    /// HTTP API port. Defaults to Java-compatible 43595, but can be moved for
+    /// side-by-side Java-vs-Rust local smoke testing.
+    pub api_port: u16,
     pub quic_port: u16,
+    /// WebSocket port (default 43494). Caddy proxies `/rsc-ws` and
+    /// `/rsc21-ws` to this port. Set to 0 to disable the WS listener.
+    #[serde(default = "default_ws_port")]
+    pub ws_port: u16,
     pub max_players: u32,
+    /// Per-IP session cap. Default 5 keeps a public deployment safe; bump
+    /// during local benchmarking (when all conn_storm sessions share 127.0.0.1).
+    #[serde(default = "default_max_sessions_per_ip")]
+    pub max_sessions_per_ip: u32,
 
     pub redis: RedisConfig,
     pub metrics: MetricsConfig,
@@ -83,8 +101,11 @@ impl Default for ServerConfig {
         Self {
             world_name: "world-1".to_string(),
             server_port: 43594,
+            api_port: 43595,
             quic_port: 43595,
+            ws_port: default_ws_port(),
             max_players: 2000,
+            max_sessions_per_ip: default_max_sessions_per_ip(),
             redis: RedisConfig::default(),
             metrics: MetricsConfig::default(),
             tracing: TracingConfig::default(),

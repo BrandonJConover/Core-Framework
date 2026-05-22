@@ -230,8 +230,8 @@ impl SocialManager {
 
 /// Build the full friend list packet. Each entry is a name + online flag.
 pub fn build_friend_list_packet(friends: &[(String, bool)]) -> Packet {
-    let mut builder = PacketBuilder::new(OpcodeOut::FriendList.into())
-        .write_short(friends.len() as u16);
+    let mut builder =
+        PacketBuilder::new(OpcodeOut::FriendList.into()).write_short(friends.len() as u16);
 
     for (name, online) in friends {
         builder = builder
@@ -252,8 +252,8 @@ pub fn build_friend_update_packet(username: &str, online: bool) -> Packet {
 
 /// Build the full ignore list packet.
 pub fn build_ignore_list_packet(ignored: &[String]) -> Packet {
-    let mut builder = PacketBuilder::new(OpcodeOut::IgnoreList.into())
-        .write_short(ignored.len() as u16);
+    let mut builder =
+        PacketBuilder::new(OpcodeOut::IgnoreList.into()).write_short(ignored.len() as u16);
 
     for name in ignored {
         builder = builder.write_string(name);
@@ -348,7 +348,13 @@ mod tests {
         let il = IgnoreList::new();
         let fl = FriendsList::new();
         let ps = PrivacySettings::default();
-        assert!(SocialManager::can_message("Sender", "Recipient", &il, &fl, &ps));
+        assert!(SocialManager::can_message(
+            "Sender",
+            "Recipient",
+            &il,
+            &fl,
+            &ps
+        ));
     }
 
     #[test]
@@ -357,7 +363,13 @@ mod tests {
         il.add_ignore("Sender");
         let fl = FriendsList::new();
         let ps = PrivacySettings::default();
-        assert!(!SocialManager::can_message("Sender", "Recipient", &il, &fl, &ps));
+        assert!(!SocialManager::can_message(
+            "Sender",
+            "Recipient",
+            &il,
+            &fl,
+            &ps
+        ));
     }
 
     #[test]
@@ -368,7 +380,13 @@ mod tests {
             block_private: true,
             ..Default::default()
         };
-        assert!(!SocialManager::can_message("Stranger", "Recipient", &il, &fl, &ps));
+        assert!(!SocialManager::can_message(
+            "Stranger",
+            "Recipient",
+            &il,
+            &fl,
+            &ps
+        ));
     }
 
     #[test]
@@ -380,7 +398,13 @@ mod tests {
             block_private: true,
             ..Default::default()
         };
-        assert!(SocialManager::can_message("TrustedFriend", "Recipient", &il, &fl, &ps));
+        assert!(SocialManager::can_message(
+            "TrustedFriend",
+            "Recipient",
+            &il,
+            &fl,
+            &ps
+        ));
     }
 
     #[test]
@@ -415,12 +439,9 @@ mod tests {
 
     #[test]
     fn test_friend_list_packet() {
-        let friends = vec![
-            ("Alice".to_string(), true),
-            ("Bob".to_string(), false),
-        ];
+        let friends = vec![("Alice".to_string(), true), ("Bob".to_string(), false)];
         let packet = build_friend_list_packet(&friends);
-        assert_eq!(packet.opcode, OpcodeOut::FriendList as u8);
+        assert_eq!(packet.opcode, OpcodeOut::FriendList.wire());
 
         let mut reader = PacketReader::new(&packet);
         let count = reader.read_short().unwrap();
@@ -435,7 +456,10 @@ mod tests {
     #[test]
     fn test_friend_update_packet() {
         let packet = build_friend_update_packet("Charlie", true);
-        assert_eq!(packet.opcode, OpcodeOut::FriendUpdate as u8);
+        // `as u8` is the enum *discriminant*; the packet carries the wire byte
+        // from the protocol-version table — these are not the same. Use the
+        // same path the builder uses.
+        assert_eq!(packet.opcode, OpcodeOut::FriendUpdate.wire());
 
         let mut reader = PacketReader::new(&packet);
         assert_eq!(reader.read_string().unwrap(), "Charlie");
@@ -446,7 +470,7 @@ mod tests {
     fn test_ignore_list_packet() {
         let ignored = vec!["Troll".to_string(), "Spammer".to_string()];
         let packet = build_ignore_list_packet(&ignored);
-        assert_eq!(packet.opcode, OpcodeOut::IgnoreList as u8);
+        assert_eq!(packet.opcode, OpcodeOut::IgnoreList.wire());
 
         let mut reader = PacketReader::new(&packet);
         let count = reader.read_short().unwrap();

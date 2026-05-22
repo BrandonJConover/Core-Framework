@@ -27,6 +27,7 @@ OPENRSC_CACHE_DIR="/opt/openrsc/Client_Base/Cache"
 OPENRSC_HOST="localhost"          # WSS hostname the browser will connect to
 OPENRSC_WS_PORT="43494"
 OPENRSC_TCP_PORT="43594"
+OPENRSC21_WS_PORT="${OPENRSC21_WS_PORT:-43496}"
 OPENRSC_RSA_EXP="00010001"
 OPENRSC_RSA_MOD="87cef754966ecb19806238d9fecf0f421e816976f74f365c86a584e51049794d41fefbdc5fed3a3ed3b7495ba24262bb7d1dd5d2ff9e306b5bbf5522a2e85b25"
 WORLDLIST_PATCHER="$REPO_ROOT/web-client/worldlist-patch.py"
@@ -178,6 +179,38 @@ server {
 	        proxy_read_timeout 86400;
 	        proxy_send_timeout 86400;
 	        proxy_buffering off;
+	    }
+
+	    location /rsc21-ws {
+	        proxy_pass http://127.0.0.1:$OPENRSC21_WS_PORT/;
+	        proxy_http_version 1.1;
+	        proxy_set_header Upgrade \$http_upgrade;
+	        proxy_set_header Connection "Upgrade";
+	        proxy_set_header Host \$host;
+	        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+	        proxy_read_timeout 86400;
+	        proxy_send_timeout 86400;
+	        proxy_buffering off;
+	    }
+
+	    location = /rsc21/mudclient21.html {
+	        alias $RSC_C_DIR/mudclient.html;
+	        add_header Cache-Control "no-store";
+	        add_header Cross-Origin-Opener-Policy "same-origin" always;
+	        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+	    }
+
+	    location ^~ /rsc21/ {
+	        types {
+	            text/html html;
+	            application/javascript js;
+	            application/wasm wasm;
+	            application/octet-stream data;
+	        }
+	        add_header Cross-Origin-Opener-Policy "same-origin" always;
+	        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+	        rewrite ^/rsc21/(.*)$ /\$1 break;
+	        try_files \$uri \$uri/ =404;
 	    }
 	
 	    # Cache large data file aggressively (only changes on rebuild)

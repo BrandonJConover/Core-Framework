@@ -120,11 +120,15 @@ impl Serializer for RscBinarySerializer {
 
     fn serialize_value(&self, _value: &serde_json::Value) -> Result<Vec<u8>> {
         // RSC binary uses a custom format, not generic serialization
-        Err(anyhow::anyhow!("Use Packet struct for RSC binary serialization"))
+        Err(anyhow::anyhow!(
+            "Use Packet struct for RSC binary serialization"
+        ))
     }
 
     fn deserialize_value(&self, _data: &[u8]) -> Result<serde_json::Value> {
-        Err(anyhow::anyhow!("Use Packet struct for RSC binary deserialization"))
+        Err(anyhow::anyhow!(
+            "Use Packet struct for RSC binary deserialization"
+        ))
     }
 }
 
@@ -289,8 +293,17 @@ mod tests {
 
     #[test]
     fn test_protocol_detection() {
-        assert_eq!(ProtocolAdapter::detect_protocol(&[0xC1, 0x01]), SerializationFormat::MessagePack);
-        assert_eq!(ProtocolAdapter::detect_protocol(&[0x00, 0x05]), SerializationFormat::RscBinary);
-        assert_eq!(ProtocolAdapter::detect_protocol(&[]), SerializationFormat::RscBinary);
+        assert_eq!(
+            ProtocolAdapter::detect_protocol(&[0xC1, 0x01]),
+            SerializationFormat::MessagePack
+        );
+        assert_eq!(
+            ProtocolAdapter::detect_protocol(&[0x00, 0x05]),
+            SerializationFormat::RscBinary
+        );
+        assert_eq!(
+            ProtocolAdapter::detect_protocol(&[]),
+            SerializationFormat::RscBinary
+        );
     }
 }

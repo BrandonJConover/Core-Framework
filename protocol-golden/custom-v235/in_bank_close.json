@@ -1,0 +1,10 @@
+{
+  "id": "in_bank_close",
+  "protocol": "custom-v235",
+  "direction": "client_to_server",
+  "opcode_enum": "BANK_CLOSE",
+  "wire_opcode": 212,
+  "payload_hex": "",
+  "fields": {},
+  "notes": "Payload only. Java Payload235Parser accepts BANK_CLOSE with zero payload bytes."
+}

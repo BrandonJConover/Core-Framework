@@ -1,0 +1,54 @@
+[CS2] vm=production
+[CS2] game live container hook: OK
+[CS2] add: status=ok intResult=12 cycles=4
+[CS2] branch_eq: status=ok intResult=1
+[CS2] varp_double: status=ok varp[101]=42
+[CS2] local_inc: status=ok intResult=100
+[CS2] strcat: status=ok stringResult="hello world"
+[CS2] call_script: status=ok intResult=14
+[CS2] args: intArg passed=7 result=7
+[CS2] strlen: status=ok intResult=7
+[CS2] substr: status=ok stringResult="World"
+[CS2] remove_tags: stringResult="red"
+[CS2] format: stringResult="1,234,567"
+[CS2] item_name: stringResult="Abyssal whip"
+[CS2] comp_width: intResult=200
+[CS2] comp_text: stringResult="Hi"
+[CS2] concat_int: stringResult="Level 99"
+[CS2] setText: text="New!"
+[CS2] setHidden: hidden=true
+[CS2] skillXp: intResult=1209022
+[CS2] invFill: intResult=3
+[CS2] array_rw: intResult=99
+[CS2] array_default: intResult=-1
+[CS2] dual_active: intResult=333 a="slot2" b="slot1"
+[CS2] direct_comp_width: intResult=321
+[CS2] component_lifecycle: status=ok created=2 deleted=1
+[CS2] direct_setters: status=ok x=50 y=75 text="direct"
+[CS2] setPos: x=50 y=75
+[CS2] itemSearch: intResult=4151
+[CS2] structParam: stringResult="VIP"
+[CS2] itemParam: stringResult="Abyssal"
+[CS2] math_utils: intResult=9
+[CS2] string_utils: stringResult="Ma'am <lt>B<gt>"
+[CS2] component_interact: option="Inspect" base="Choose" verb="Use"
+[CS2] client_queries: intResult=6670
+[CS2] move_coord: intResult=589302922
+[CS2] enum_datamap: stringResult="Attack-99112"
+[CS2] social_ints: intResult=1459
+[CS2] social_strings: stringResult="Alice-World 301-Raiders-Alice-Bob-Owner-World 301"
+[CS2] ge_offer: intResult=1804156
+[CS2] chat_ints: intResult=90
+[CS2] chat_strings: stringResult="Alice:Selling whip:Raiders:Brandon"
+[CS2] keyboard_time: intResult=28411068
+[CS2] display_modes: intResult=1410 fullscreen=false
+[CS2] preferences_viewport: intResult=3237
+[CS2] camera_ops: intResult=1324 moveHeight=80 pointHeight=90 pathLast=6 unlocks=1
+[CS2] login_account: intResult=17 direct=user created=CreateUser skipped=1
+[CS2] login_names: stringResult="OneTwo" remaining=0
+[CS2] world_ops: intResult=306 hop=302 last=302 sorted=4/false/1/true
+[CS2] world_strings: stringResult="TradeUSSkillUK"
+[CS2] appearance_child_text: calls="idkit:3/777|color:2/9|gender:1" intResult=39
+[CS2] client_actions: calls=13 intResult=0
+[CS2] halt: status=halt reason="unsupported opcode 9999"
+[CS2] all tests passed

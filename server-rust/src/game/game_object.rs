@@ -167,12 +167,22 @@ impl GameObject {
     }
 
     /// Create a scenery object.
-    pub fn scenery(id: EntityId, def_id: u32, position: Position, direction: ObjectDirection) -> Self {
+    pub fn scenery(
+        id: EntityId,
+        def_id: u32,
+        position: Position,
+        direction: ObjectDirection,
+    ) -> Self {
         Self::new(id, def_id, position, direction, ObjectType::Scenery)
     }
 
     /// Create a boundary object.
-    pub fn boundary(id: EntityId, def_id: u32, position: Position, direction: ObjectDirection) -> Self {
+    pub fn boundary(
+        id: EntityId,
+        def_id: u32,
+        position: Position,
+        direction: ObjectDirection,
+    ) -> Self {
         Self::new(id, def_id, position, direction, ObjectType::Boundary)
     }
 
@@ -487,7 +497,11 @@ mod tests {
         let obj = GameObject::scenery(
             EntityId(1),
             0, // Tree
-            Position { x: 100, y: 100, plane: 0 },
+            Position {
+                x: 100,
+                y: 100,
+                plane: 0,
+            },
             ObjectDirection::North,
         );
 
@@ -501,7 +515,11 @@ mod tests {
         let mut obj = GameObject::scenery(
             EntityId(1),
             100, // Rock
-            Position { x: 100, y: 100, plane: 0 },
+            Position {
+                x: 100,
+                y: 100,
+                plane: 0,
+            },
             ObjectDirection::North,
         );
 
@@ -524,7 +542,11 @@ mod tests {
         // Spawn a tree
         let id = manager.spawn_scenery(
             0, // Tree
-            Position { x: 100, y: 100, plane: 0 },
+            Position {
+                x: 100,
+                y: 100,
+                plane: 0,
+            },
             ObjectDirection::North,
         );
 

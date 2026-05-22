@@ -21,15 +21,9 @@ const MAX_FOLLOW_RANGE: i32 = 16;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PoisonSource {
     /// Poison from an NPC attack (e.g. poison spiders, KBD).
-    NpcAttack {
-        npc_id: u32,
-        base_damage: u8,
-    },
+    NpcAttack { npc_id: u32, base_damage: u8 },
     /// Poison from a player's poisoned weapon.
-    PlayerWeapon {
-        weapon_id: u32,
-        base_damage: u8,
-    },
+    PlayerWeapon { weapon_id: u32, base_damage: u8 },
 }
 
 impl PoisonSource {
@@ -230,7 +224,7 @@ impl PoisonManager {
 
 /// Server-message opcode used for the poison-indicator packet.
 /// In the RSC protocol this is typically sent as a server message.
-const POISON_INDICATOR_OPCODE: u8 = OpcodeOut::ServerMessage as u8;
+const POISON_INDICATOR_OPCODE: u8 = OpcodeOut::ServerMessage.wire();
 
 /// Build a packet that tells the client to show or hide the poison indicator.
 ///
@@ -355,7 +349,8 @@ mod tests {
             let start = ((level - 1) as usize) * 4;
             for i in 0..4 {
                 assert_eq!(
-                    expected_damages[start + i], damage,
+                    expected_damages[start + i],
+                    damage,
                     "hit {} should deal {} damage",
                     start + i,
                     damage
@@ -389,11 +384,11 @@ mod tests {
     #[test]
     fn test_build_poison_indicator_packet() {
         let pkt = build_poison_indicator_packet(true);
-        assert_eq!(pkt.opcode, OpcodeOut::ServerMessage as u8);
+        assert_eq!(pkt.opcode, OpcodeOut::ServerMessage.wire());
         assert!(!pkt.is_empty());
 
         let pkt_off = build_poison_indicator_packet(false);
-        assert_eq!(pkt_off.opcode, OpcodeOut::ServerMessage as u8);
+        assert_eq!(pkt_off.opcode, OpcodeOut::ServerMessage.wire());
     }
 
     #[test]

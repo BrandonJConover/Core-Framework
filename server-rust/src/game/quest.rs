@@ -140,22 +140,30 @@ impl QuestDefBuilder {
     }
 
     pub fn requires_skill(mut self, skill: SkillType, level: u8) -> Self {
-        self.def.requirements.push(QuestRequirement::SkillLevel { skill, level });
+        self.def
+            .requirements
+            .push(QuestRequirement::SkillLevel { skill, level });
         self
     }
 
     pub fn requires_quest(mut self, quest_id: u32) -> Self {
-        self.def.requirements.push(QuestRequirement::QuestComplete { quest_id });
+        self.def
+            .requirements
+            .push(QuestRequirement::QuestComplete { quest_id });
         self
     }
 
     pub fn requires_item(mut self, item_id: ItemId, amount: u32) -> Self {
-        self.def.requirements.push(QuestRequirement::HasItem { item_id, amount });
+        self.def
+            .requirements
+            .push(QuestRequirement::HasItem { item_id, amount });
         self
     }
 
     pub fn reward_xp(mut self, skill: SkillType, amount: u32) -> Self {
-        self.def.rewards.push(QuestReward::Experience { skill, amount });
+        self.def
+            .rewards
+            .push(QuestReward::Experience { skill, amount });
         self
     }
 

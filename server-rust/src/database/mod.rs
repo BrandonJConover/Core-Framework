@@ -5,7 +5,7 @@ pub mod player_repository;
 pub mod schema;
 
 use anyhow::{Context, Result};
-use sqlx::{mysql::MySqlPoolOptions, sqlite::SqlitePoolOptions, Pool, MySql, Sqlite};
+use sqlx::{mysql::MySqlPoolOptions, sqlite::SqlitePoolOptions, MySql, Pool, Sqlite};
 use std::time::Duration;
 use tracing::{info, warn};
 
@@ -200,6 +200,9 @@ mod tests {
         assert!(matches!(DatabaseType::from("mysql"), DatabaseType::MySql));
         assert!(matches!(DatabaseType::from("MariaDB"), DatabaseType::MySql));
         assert!(matches!(DatabaseType::from("sqlite"), DatabaseType::Sqlite));
-        assert!(matches!(DatabaseType::from("unknown"), DatabaseType::Sqlite));
+        assert!(matches!(
+            DatabaseType::from("unknown"),
+            DatabaseType::Sqlite
+        ));
     }
 }

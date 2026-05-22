@@ -6,6 +6,7 @@ export class InterfaceList {
     static loadedInterfaces: Set<number> = new Set<number>();
     static loadingInterfaces: Map<number, Promise<void>> = new Map<number, Promise<void>>();
     static openModalStack: { parentInterfaceId: number; rootCompId: number }[] = [];
+    static serverActiveProperties: Map<string, { accessMask: number; targetParam: number; startSlot: number; endSlot: number }> = new Map();
     private static replayedRecorder: boolean = false;
 
     static componentKey(interfaceId: number, childId: number): string {
@@ -21,6 +22,14 @@ export class InterfaceList {
         const childId = c.id & 0xFFFF;
         this.byKey.set(this.componentKey(interfaceId, childId), c);
         this.loadedInterfaces.add(interfaceId);
+    }
+
+    static componentsForInterface(interfaceId: number): Component[] {
+        const components: Component[] = [];
+        for (const component of Array.from(this.byKey.values())) {
+            if ((component.id >>> 16) === interfaceId) components.push(component);
+        }
+        return components.sort((a, b) => (a.id & 0xFFFF) - (b.id & 0xFFFF));
     }
 
     static loadInterface(js5: ComponentLoaderCache | null, interfaceId: number): Promise<void> {
@@ -42,7 +51,12 @@ export class InterfaceList {
     }
 
     static openModal(parentInterfaceId: number, rootCompId: number): void {
+        this.openModalStack = this.openModalStack.filter((x) => x.rootCompId !== rootCompId);
         this.openModalStack.push({ parentInterfaceId, rootCompId });
+    }
+
+    static closeSub(rootCompId: number): void {
+        this.openModalStack = this.openModalStack.filter((x) => x.rootCompId !== rootCompId && x.parentInterfaceId !== rootCompId);
     }
 
     static closeAll(): void {
@@ -67,6 +81,14 @@ export class InterfaceList {
     }
 
     private static applyLoaded(kind: string, interfaceId: number, childId: number, compId: number, payload: any): void {
+        if (kind === "SET_INTERFACE_SETTINGS") {
+            this.serverActiveProperties.set(this.componentKey(interfaceId, childId), {
+                accessMask: payload.accessMask | 0,
+                targetParam: -1,
+                startSlot: payload.startSlot | 0,
+                endSlot: payload.end | 0,
+            });
+        }
         const c = this.get(interfaceId, childId);
         if (!c) return;
         c.tracknum = payload && payload.tracknum !== undefined ? payload.tracknum : c.tracknum;
@@ -93,6 +115,27 @@ export class InterfaceList {
             case "SWITCH_WIDGET":
                 c.switchSource = payload.source | 0;
                 break;
+            case "IF_SETHIDE":
+                c.hidden = !!payload.hidden;
+                break;
+            case "CLIENT_SETVARC":
+                // Per-component VarC values are tracked on the game object (game.varcValues)
+                // by the packet handler; nothing to update on the component itself.
+                break;
+            case "SET_INTERFACE_SETTINGS":
+                c.serverActiveProperties = payload.accessMask | 0;
+                c.serverActiveStartSlot = payload.startSlot | 0;
+                c.serverActiveEndSlot = payload.end | 0;
+                break;
         }
+    }
+
+    static getServerActiveProperties(componentId: number, slot: number = -1): { accessMask: number; targetParam: number } {
+        const component = this.get(componentId >>> 16, componentId & 0xFFFF);
+        const stored = this.serverActiveProperties.get(this.componentKey(componentId >>> 16, componentId & 0xFFFF));
+        if (stored && (slot < 0 || stored.startSlot < 0 || (slot >= stored.startSlot && (stored.endSlot < 0 || slot <= stored.endSlot)))) {
+            return { accessMask: stored.accessMask, targetParam: stored.targetParam };
+        }
+        return { accessMask: component?.serverActiveProperties ?? 0, targetParam: -1 };
     }
 }

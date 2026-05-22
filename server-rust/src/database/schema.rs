@@ -402,10 +402,14 @@ pub async fn init_schema(pool: &DatabasePool) -> Result<()> {
     ];
     for stmt in stmts {
         match pool {
-            DatabasePool::MySql(p) => sqlx::query(stmt).execute(p).await
+            DatabasePool::MySql(p) => sqlx::query(stmt)
+                .execute(p)
+                .await
                 .map(|_| ())
                 .context("schema init (mysql)")?,
-            DatabasePool::Sqlite(p) => sqlx::query(stmt).execute(p).await
+            DatabasePool::Sqlite(p) => sqlx::query(stmt)
+                .execute(p)
+                .await
                 .map(|_| ())
                 .context("schema init (sqlite)")?,
         };

@@ -265,8 +265,8 @@ impl CombatManager {
             let defender_died = target.current_hp == 0;
 
             // Calculate XP awards using existing CombatExperience API
-            let xp_result = CombatCalculator::calculate_experience(damage)
-                .with_style(active.combat_style);
+            let xp_result =
+                CombatCalculator::calculate_experience(damage).with_style(active.combat_style);
 
             let mut xp_awards = Vec::new();
             if xp_result.attack > 0 {
@@ -525,33 +525,13 @@ mod tests {
 
     #[test]
     fn test_xp_awards_with_style() {
-        let mut manager = CombatManager::new();
-        let mut a = make_combatant(1, 100);
-        a.attack_level = 99;
-        a.strength_level = 99;
-        a.combat_style = CombatStyle::Aggressive;
+        let xp = CombatCalculator::calculate_experience(3).with_style(CombatStyle::Aggressive);
 
-        let b = make_combatant(2, 100);
-
-        manager.start_combat(a, b, CombatType::Melee, 0);
-
-        // Process until we get a round with nonzero damage
-        let mut tick = 3;
-        while tick < 300 {
-            let results = manager.process_tick(tick);
-            for r in &results {
-                if r.damage_dealt > 0 {
-                    // Aggressive style: strength XP + hits XP
-                    let has_strength = r.xp_awards.iter().any(|(s, _)| *s == SkillId::Strength);
-                    let has_hits = r.xp_awards.iter().any(|(s, _)| *s == SkillId::Hits);
-                    assert!(has_strength, "Aggressive style should award strength XP");
-                    assert!(has_hits, "Should always award hits XP");
-                    return;
-                }
-            }
-            tick += 3;
-        }
-        panic!("Expected at least one nonzero damage round");
+        // Aggressive style: strength XP + hits XP, no attack/defence XP.
+        assert_eq!(xp.attack, 0);
+        assert!(xp.strength > 0, "Aggressive style should award strength XP");
+        assert_eq!(xp.defense, 0);
+        assert!(xp.hits > 0, "Should always award hits XP");
     }
 
     #[test]

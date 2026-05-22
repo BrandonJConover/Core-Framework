@@ -11,8 +11,8 @@ use tracing::debug;
 use super::consumables::{get_food_def, get_potion_def};
 use super::entity::{EntityId, Position};
 use super::player::SkillId;
-use crate::protocol::{Packet, PacketBuilder};
 use crate::protocol::opcodes::OpcodeOut;
+use crate::protocol::{Packet, PacketBuilder};
 
 // ---------------------------------------------------------------------------
 // Result type
@@ -65,7 +65,7 @@ impl ItemUseContext {
     /// Convenience: push a server message packet and record the text.
     pub fn send_message(&mut self, text: &str) {
         self.messages.push(text.to_string());
-        let packet = PacketBuilder::new(OpcodeOut::ServerMessage as u8)
+        let packet = PacketBuilder::new(OpcodeOut::ServerMessage.wire())
             .write_string(text)
             .build();
         self.packets_out.push(packet);
@@ -78,42 +78,23 @@ impl ItemUseContext {
 
 /// Handler for using one inventory item on another.
 pub trait ItemOnItemHandler: Send + Sync {
-    fn handle(
-        &self,
-        item1_id: u32,
-        item2_id: u32,
-        context: &mut ItemUseContext,
-    ) -> ItemUseResult;
+    fn handle(&self, item1_id: u32, item2_id: u32, context: &mut ItemUseContext) -> ItemUseResult;
 }
 
 /// Handler for using an inventory item on a game object.
 pub trait ItemOnObjectHandler: Send + Sync {
-    fn handle(
-        &self,
-        item_id: u32,
-        object_id: u32,
-        context: &mut ItemUseContext,
-    ) -> ItemUseResult;
+    fn handle(&self, item_id: u32, object_id: u32, context: &mut ItemUseContext) -> ItemUseResult;
 }
 
 /// Handler for using an inventory item on an NPC.
 pub trait ItemOnNpcHandler: Send + Sync {
-    fn handle(
-        &self,
-        item_id: u32,
-        npc_id: EntityId,
-        context: &mut ItemUseContext,
-    ) -> ItemUseResult;
+    fn handle(&self, item_id: u32, npc_id: EntityId, context: &mut ItemUseContext)
+        -> ItemUseResult;
 }
 
 /// Handler for using an inventory item on another player.
 pub trait ItemOnPlayerHandler: Send + Sync {
-    fn handle(
-        &self,
-        item_id: u32,
-        target_id: u64,
-        context: &mut ItemUseContext,
-    ) -> ItemUseResult;
+    fn handle(&self, item_id: u32, target_id: u64, context: &mut ItemUseContext) -> ItemUseResult;
 }
 
 /// Handler for an "item command" (right-click action on an inventory item).
@@ -170,8 +151,12 @@ impl ItemUseDispatcher {
         object_id: u32,
         handler: impl ItemOnObjectHandler + 'static,
     ) {
-        debug!("Registered item-on-object handler: ({}, {})", item_id, object_id);
-        self.item_on_object.insert((item_id, object_id), Box::new(handler));
+        debug!(
+            "Registered item-on-object handler: ({}, {})",
+            item_id, object_id
+        );
+        self.item_on_object
+            .insert((item_id, object_id), Box::new(handler));
     }
 
     /// Register a handler for using `item_id` on NPC with definition ID `npc_def_id`.
@@ -181,8 +166,12 @@ impl ItemUseDispatcher {
         npc_def_id: u32,
         handler: impl ItemOnNpcHandler + 'static,
     ) {
-        debug!("Registered item-on-npc handler: ({}, {})", item_id, npc_def_id);
-        self.item_on_npc.insert((item_id, npc_def_id), Box::new(handler));
+        debug!(
+            "Registered item-on-npc handler: ({}, {})",
+            item_id, npc_def_id
+        );
+        self.item_on_npc
+            .insert((item_id, npc_def_id), Box::new(handler));
     }
 
     /// Register a handler for using `item_id` on another player.
@@ -282,7 +271,11 @@ impl Default for ItemUseDispatcher {
 
 /// Normalise an item pair so that (a, b) and (b, a) map to the same key.
 fn normalize_item_pair(a: u32, b: u32) -> (u32, u32) {
-    if a <= b { (a, b) } else { (b, a) }
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -346,9 +339,9 @@ impl ItemCommandHandler for DrinkPotionHandler {
 
 /// Known bone item IDs and their prayer XP rewards.
 const BONE_XP: &[(u32, u32)] = &[
-    (20, 15),   // Normal bones
-    (604, 30),  // Big bones
-    (614, 72),  // Dragon bones
+    (20, 15),  // Normal bones
+    (604, 30), // Big bones
+    (614, 72), // Dragon bones
 ];
 
 /// Item command handler for burying bones.
@@ -357,7 +350,10 @@ pub struct BuryBonesHandler;
 impl BuryBonesHandler {
     /// Look up prayer XP for a bone item.
     fn bone_xp(item_id: u32) -> Option<u32> {
-        BONE_XP.iter().find(|(id, _)| *id == item_id).map(|(_, xp)| *xp)
+        BONE_XP
+            .iter()
+            .find(|(id, _)| *id == item_id)
+            .map(|(_, xp)| *xp)
     }
 }
 
@@ -439,26 +435,25 @@ impl ItemCommandHandler for ReadScrollHandler {
 ///
 /// These are the same IDs listed in `consumables::FOOD_DEFS`.
 const DEFAULT_FOOD_IDS: &[u32] = &[
-    319, 320, 132, 140, 141, 346, 350, 355, 351, 362,
-    364, 352, 354, 316, 367, 373, 546, 370, 369, 325,
-    326, 327, 330, 333, 750, 257, 335, 336, 337, 228, 18,
+    319, 320, 132, 140, 141, 346, 350, 355, 351, 362, 364, 352, 354, 316, 367, 373, 546, 370, 369,
+    325, 326, 327, 330, 333, 750, 257, 335, 336, 337, 228, 18,
 ];
 
 /// Well-known potion dose item IDs that the default dispatcher should register.
 ///
 /// These cover every dose variant listed in `consumables::POTION_DEFS`.
 const DEFAULT_POTION_IDS: &[u32] = &[
-    474, 475, 476, 477,   // Attack potion
-    478, 479, 480, 481,   // Strength potion
-    482, 483, 484, 485,   // Defense potion
-    483, 484, 485, 486,   // Prayer potion
-    487, 488, 489, 490,   // Antipoison
-    491, 492, 493, 494,   // Super attack
-    495, 496, 497, 498,   // Super strength
-    499, 500, 501, 502,   // Super defense
-    503, 504, 505, 506,   // Ranging potion
-    507, 508, 509, 510,   // Magic potion
-    511, 512, 513, 514,   // Antifire
+    474, 475, 476, 477, // Attack potion
+    478, 479, 480, 481, // Strength potion
+    482, 483, 484, 485, // Defense potion
+    483, 484, 485, 486, // Prayer potion
+    487, 488, 489, 490, // Antipoison
+    491, 492, 493, 494, // Super attack
+    495, 496, 497, 498, // Super strength
+    499, 500, 501, 502, // Super defense
+    503, 504, 505, 506, // Ranging potion
+    507, 508, 509, 510, // Magic potion
+    511, 512, 513, 514, // Antifire
 ];
 
 /// Build a dispatcher with the built-in handlers already registered.
@@ -506,7 +501,12 @@ mod tests {
 
     struct TestCombineHandler;
     impl ItemOnItemHandler for TestCombineHandler {
-        fn handle(&self, item1_id: u32, item2_id: u32, context: &mut ItemUseContext) -> ItemUseResult {
+        fn handle(
+            &self,
+            item1_id: u32,
+            item2_id: u32,
+            context: &mut ItemUseContext,
+        ) -> ItemUseResult {
             context.send_message(&format!("Combined {} with {}", item1_id, item2_id));
             ItemUseResult::Success
         }
@@ -514,7 +514,12 @@ mod tests {
 
     struct TestObjectHandler;
     impl ItemOnObjectHandler for TestObjectHandler {
-        fn handle(&self, item_id: u32, object_id: u32, context: &mut ItemUseContext) -> ItemUseResult {
+        fn handle(
+            &self,
+            item_id: u32,
+            object_id: u32,
+            context: &mut ItemUseContext,
+        ) -> ItemUseResult {
             context.send_message(&format!("Used {} on object {}", item_id, object_id));
             ItemUseResult::Success
         }
@@ -522,7 +527,12 @@ mod tests {
 
     struct TestNpcHandler;
     impl ItemOnNpcHandler for TestNpcHandler {
-        fn handle(&self, item_id: u32, npc_id: EntityId, context: &mut ItemUseContext) -> ItemUseResult {
+        fn handle(
+            &self,
+            item_id: u32,
+            npc_id: EntityId,
+            context: &mut ItemUseContext,
+        ) -> ItemUseResult {
             context.send_message(&format!("Used {} on NPC {}", item_id, npc_id));
             ItemUseResult::Success
         }
@@ -530,7 +540,12 @@ mod tests {
 
     struct TestPlayerHandler;
     impl ItemOnPlayerHandler for TestPlayerHandler {
-        fn handle(&self, item_id: u32, target_id: u64, context: &mut ItemUseContext) -> ItemUseResult {
+        fn handle(
+            &self,
+            item_id: u32,
+            target_id: u64,
+            context: &mut ItemUseContext,
+        ) -> ItemUseResult {
             context.send_message(&format!("Used {} on player {}", item_id, target_id));
             ItemUseResult::Success
         }
@@ -559,14 +574,20 @@ mod tests {
         let mut d = ItemUseDispatcher::new();
         d.register_item_on_item(10, 20, TestCombineHandler);
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_on_item(20, 10, &mut ctx), ItemUseResult::Success);
+        assert_eq!(
+            d.dispatch_item_on_item(20, 10, &mut ctx),
+            ItemUseResult::Success
+        );
     }
 
     #[test]
     fn test_dispatch_item_on_item_miss() {
         let d = ItemUseDispatcher::new();
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_on_item(99, 100, &mut ctx), ItemUseResult::NotHandled);
+        assert_eq!(
+            d.dispatch_item_on_item(99, 100, &mut ctx),
+            ItemUseResult::NotHandled
+        );
     }
 
     #[test]
@@ -574,7 +595,10 @@ mod tests {
         let mut d = ItemUseDispatcher::new();
         d.register_item_on_object(50, 100, TestObjectHandler);
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_on_object(50, 100, &mut ctx), ItemUseResult::Success);
+        assert_eq!(
+            d.dispatch_item_on_object(50, 100, &mut ctx),
+            ItemUseResult::Success
+        );
         assert!(ctx.messages[0].contains("object 100"));
     }
 
@@ -582,7 +606,10 @@ mod tests {
     fn test_dispatch_item_on_object_miss() {
         let d = ItemUseDispatcher::new();
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_on_object(50, 999, &mut ctx), ItemUseResult::NotHandled);
+        assert_eq!(
+            d.dispatch_item_on_object(50, 999, &mut ctx),
+            ItemUseResult::NotHandled
+        );
     }
 
     #[test]
@@ -590,7 +617,10 @@ mod tests {
         let mut d = ItemUseDispatcher::new();
         d.register_item_on_npc(50, 10, TestNpcHandler);
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_on_npc(50, 10, EntityId(42), &mut ctx), ItemUseResult::Success);
+        assert_eq!(
+            d.dispatch_item_on_npc(50, 10, EntityId(42), &mut ctx),
+            ItemUseResult::Success
+        );
         assert!(ctx.messages[0].contains("NPC 42"));
     }
 
@@ -598,7 +628,10 @@ mod tests {
     fn test_dispatch_item_on_npc_miss() {
         let d = ItemUseDispatcher::new();
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_on_npc(50, 10, EntityId(42), &mut ctx), ItemUseResult::NotHandled);
+        assert_eq!(
+            d.dispatch_item_on_npc(50, 10, EntityId(42), &mut ctx),
+            ItemUseResult::NotHandled
+        );
     }
 
     #[test]
@@ -606,7 +639,10 @@ mod tests {
         let mut d = ItemUseDispatcher::new();
         d.register_item_on_player(50, TestPlayerHandler);
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_on_player(50, 7, &mut ctx), ItemUseResult::Success);
+        assert_eq!(
+            d.dispatch_item_on_player(50, 7, &mut ctx),
+            ItemUseResult::Success
+        );
         assert!(ctx.messages[0].contains("player 7"));
     }
 
@@ -614,7 +650,10 @@ mod tests {
     fn test_dispatch_item_on_player_miss() {
         let d = ItemUseDispatcher::new();
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_on_player(50, 7, &mut ctx), ItemUseResult::NotHandled);
+        assert_eq!(
+            d.dispatch_item_on_player(50, 7, &mut ctx),
+            ItemUseResult::NotHandled
+        );
     }
 
     #[test]
@@ -622,14 +661,20 @@ mod tests {
         let mut d = ItemUseDispatcher::new();
         d.register_item_command(50, NeedLevelHandler);
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_command(50, &mut ctx), ItemUseResult::RequiresLevel(SkillId::Magic, 33));
+        assert_eq!(
+            d.dispatch_item_command(50, &mut ctx),
+            ItemUseResult::RequiresLevel(SkillId::Magic, 33)
+        );
     }
 
     #[test]
     fn test_dispatch_item_command_miss() {
         let d = ItemUseDispatcher::new();
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_command(50, &mut ctx), ItemUseResult::NotHandled);
+        assert_eq!(
+            d.dispatch_item_command(50, &mut ctx),
+            ItemUseResult::NotHandled
+        );
     }
 
     #[test]
@@ -731,7 +776,7 @@ mod tests {
         assert_eq!(ctx.messages.len(), 1);
         assert_eq!(ctx.messages[0], "Hello world");
         assert_eq!(ctx.packets_out.len(), 1);
-        assert_eq!(ctx.packets_out[0].opcode, OpcodeOut::ServerMessage as u8);
+        assert_eq!(ctx.packets_out[0].opcode, OpcodeOut::ServerMessage.wire());
     }
 
     #[test]
@@ -745,6 +790,9 @@ mod tests {
     fn test_default_dispatcher() {
         let d = ItemUseDispatcher::default();
         let mut ctx = test_context();
-        assert_eq!(d.dispatch_item_command(1, &mut ctx), ItemUseResult::NotHandled);
+        assert_eq!(
+            d.dispatch_item_command(1, &mut ctx),
+            ItemUseResult::NotHandled
+        );
     }
 }

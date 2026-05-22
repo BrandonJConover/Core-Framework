@@ -1,0 +1,49 @@
+{
+  "id": "out_player_coords_known_move_remove_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_PLAYER_COORDS",
+  "wire_opcode": 191,
+  "payload_hex": "0f4287402b78",
+  "fields": {
+    "self": {
+      "x": 122,
+      "y": 647,
+      "direction": "south",
+      "direction_bits": 4
+    },
+    "known_count": 2,
+    "entries": [
+      {
+        "local_cache_slot": 0,
+        "update_required": true,
+        "movement_update": true,
+        "direction": "east",
+        "direction_bits": 6
+      },
+      {
+        "local_cache_slot": 1,
+        "update_required": true,
+        "movement_update": false,
+        "remove": true,
+        "remove_bits": 3
+      }
+    ],
+    "padding_bits": 3
+  },
+  "java_reference": {
+    "generator": "server-java-modern/src/com/openrsc/server/net/rsc/generators/impl/PayloadCustomGenerator.java",
+    "source": "server-java-modern/src/com/openrsc/server/GameStateUpdater.java#updatePlayers",
+    "source_struct": "server-java-modern/src/com/openrsc/server/net/rsc/struct/outgoing/MobsUpdateStruct.java",
+    "info_sequence": [
+      "Bits(self_x, 11)",
+      "Bits(self_y, 13)",
+      "Bits(self_sprite, 4)",
+      "Bits(known_count, 8)",
+      "Known player 0: Bits(update_required=1, 1), Bits(movement_update=0, 1), Bits(direction=6, 3)",
+      "Known player 1: Bits(update_required=1, 1), Bits(not_moving=1, 1), Bits(remove=3, 2)",
+      "Zero padding to byte boundary"
+    ]
+  },
+  "notes": "Payload only, without transport framing. This Java custom-client SEND_PLAYER_COORDS fixture covers the viewer at (122,647) facing south plus two already-known players in local-cache order: one walking east and one removed. Known movement/removal updates do not include player indices."
+}

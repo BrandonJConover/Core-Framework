@@ -2,10 +2,10 @@
 //!
 //! Implements a secure two-stage confirmation trading system.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 /// Item in a trade offer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,7 +98,10 @@ impl TradeSession {
         };
 
         // Check if same item already in offer (stack if possible)
-        if let Some(existing) = offer.iter_mut().find(|i| i.item_id == item.item_id && i.noted == item.noted) {
+        if let Some(existing) = offer
+            .iter_mut()
+            .find(|i| i.item_id == item.item_id && i.noted == item.noted)
+        {
             existing.amount = existing.amount.saturating_add(item.amount);
         } else {
             if offer.len() >= 12 {
@@ -111,7 +114,12 @@ impl TradeSession {
     }
 
     /// Remove an item from a player's offer.
-    pub fn remove_item(&mut self, player_id: u64, item_id: u32, amount: u32) -> Result<TradeItem, TradeError> {
+    pub fn remove_item(
+        &mut self,
+        player_id: u64,
+        item_id: u32,
+        amount: u32,
+    ) -> Result<TradeItem, TradeError> {
         if self.state != TradeState::InProgress {
             return Err(TradeError::InvalidState);
         }
@@ -129,7 +137,9 @@ impl TradeSession {
             return Err(TradeError::NotInTrade);
         };
 
-        let pos = offer.iter().position(|i| i.item_id == item_id)
+        let pos = offer
+            .iter()
+            .position(|i| i.item_id == item_id)
             .ok_or(TradeError::ItemNotInOffer)?;
 
         let item = &mut offer[pos];
@@ -319,17 +329,24 @@ impl TradeManager {
         self.sessions.insert(session_id, session);
         self.player_trades.insert(initiator_id, session_id);
 
-        info!("Trade session {} created: {} -> {}", session_id, initiator_id, target_id);
+        info!(
+            "Trade session {} created: {} -> {}",
+            session_id, initiator_id, target_id
+        );
         Ok(session_id)
     }
 
     /// Accept a pending trade request.
     pub fn accept_trade(&mut self, player_id: u64, initiator_id: u64) -> Result<u64, TradeError> {
-        let session_id = self.player_trades.get(&initiator_id)
+        let session_id = self
+            .player_trades
+            .get(&initiator_id)
             .copied()
             .ok_or(TradeError::NotInTrade)?;
 
-        let session = self.sessions.get_mut(&session_id)
+        let session = self
+            .sessions
+            .get_mut(&session_id)
             .ok_or(TradeError::NotInTrade)?;
 
         if session.player2_id != player_id {
@@ -345,11 +362,15 @@ impl TradeManager {
 
     /// Decline or cancel a trade.
     pub fn decline_trade(&mut self, player_id: u64) -> Result<u64, TradeError> {
-        let session_id = self.player_trades.get(&player_id)
+        let session_id = self
+            .player_trades
+            .get(&player_id)
             .copied()
             .ok_or(TradeError::NotInTrade)?;
 
-        let session = self.sessions.get_mut(&session_id)
+        let session = self
+            .sessions
+            .get_mut(&session_id)
             .ok_or(TradeError::NotInTrade)?;
 
         let other_player = session.other_player(player_id);
@@ -378,7 +399,10 @@ impl TradeManager {
     }
 
     /// Process a completed trade, returning items to swap.
-    pub fn complete_trade(&mut self, session_id: u64) -> Option<(u64, Vec<TradeItem>, u64, Vec<TradeItem>)> {
+    pub fn complete_trade(
+        &mut self,
+        session_id: u64,
+    ) -> Option<(u64, Vec<TradeItem>, u64, Vec<TradeItem>)> {
         let session = self.sessions.remove(&session_id)?;
 
         if session.state != TradeState::Completed {
@@ -401,7 +425,9 @@ impl TradeManager {
 
     /// Clean up timed-out trade sessions.
     pub fn cleanup_expired(&mut self) {
-        let expired: Vec<u64> = self.sessions.iter()
+        let expired: Vec<u64> = self
+            .sessions
+            .iter()
             .filter(|(_, s)| s.is_timed_out())
             .map(|(id, _)| *id)
             .collect();
@@ -455,8 +481,26 @@ mod tests {
 
         // Add items
         let session = manager.get_session_mut(1).unwrap();
-        session.add_item(1, TradeItem { item_id: 100, amount: 5, noted: false }).unwrap();
-        session.add_item(2, TradeItem { item_id: 200, amount: 10, noted: false }).unwrap();
+        session
+            .add_item(
+                1,
+                TradeItem {
+                    item_id: 100,
+                    amount: 5,
+                    noted: false,
+                },
+            )
+            .unwrap();
+        session
+            .add_item(
+                2,
+                TradeItem {
+                    item_id: 200,
+                    amount: 10,
+                    noted: false,
+                },
+            )
+            .unwrap();
 
         // First stage accept
         let session = manager.get_session_mut(1).unwrap();

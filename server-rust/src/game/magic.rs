@@ -594,10 +594,7 @@ impl Spellbook {
 #[derive(Debug, Clone, PartialEq)]
 pub enum CastResult {
     /// Spell cast successfully.
-    Success {
-        experience: f64,
-        damage: Option<u8>,
-    },
+    Success { experience: f64, damage: Option<u8> },
     /// Insufficient magic level.
     InsufficientLevel { required: u8, current: u8 },
     /// Missing runes.

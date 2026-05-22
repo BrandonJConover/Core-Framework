@@ -101,22 +101,14 @@ pub async fn post_login(
     // Database lookup.
     let pool = match state.db_pool.as_ref() {
         Some(p) => p,
-        None => {
-            return error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "database lookup failed",
-            )
-        }
+        None => return error_response(StatusCode::SERVICE_UNAVAILABLE, "database lookup failed"),
     };
 
     let record = match fetch_player_by_username(pool, &canonical).await {
         Ok(r) => r,
         Err(e) => {
             warn!("login DB lookup failed for {}: {}", canonical, e);
-            return error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "database lookup failed",
-            );
+            return error_response(StatusCode::SERVICE_UNAVAILABLE, "database lookup failed");
         }
     };
 
@@ -199,9 +191,7 @@ pub async fn post_register(
 
     let pool = match state.db_pool.as_ref() {
         Some(p) => p,
-        None => {
-            return error_response(StatusCode::SERVICE_UNAVAILABLE, "database write failed")
-        }
+        None => return error_response(StatusCode::SERVICE_UNAVAILABLE, "database write failed"),
     };
 
     // Username conflict check.
@@ -226,7 +216,12 @@ pub async fn post_register(
             return error_response(StatusCode::SERVICE_UNAVAILABLE, "could not create account");
         }
     };
-    let email = req.email.as_deref().map(str::trim).unwrap_or("").to_string();
+    let email = req
+        .email
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or("")
+        .to_string();
 
     let player_id = match insert_player(pool, &canonical, &hashed, &email, &identity).await {
         Ok(id) => id,
@@ -282,6 +277,38 @@ pub async fn post_refresh(
     (StatusCode::OK, Json(body))
 }
 
+/// POST /api/auth/game-ticket. Bearer-authenticated; issues a one-shot login
+/// ticket for the launcher → game-client handoff.
+///
+/// The browser presents the JWT it got from `/api/auth/login` and we mint a
+/// short-lived ticket. The launcher stuffs that ticket into the password slot
+/// of the regular RSC LOGIN packet; the game-server side calls
+/// `LoginTicketService::consume`, which validates and burns it. Bypasses
+/// bcrypt without giving the C client a brand-new auth protocol.
+///
+/// Mirrors Java's `GameTicketEndpoint`.
+pub async fn post_game_ticket(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    let token = match extract_bearer(&headers) {
+        Ok(t) => t,
+        Err(resp) => return resp,
+    };
+    let claims = match state.jwt.verify(&token) {
+        Some(c) => c,
+        None => return error_response(StatusCode::UNAUTHORIZED, "invalid or expired token"),
+    };
+
+    let ticket = state.tickets.issue(&claims.username);
+    let body = json!({
+        "username": claims.username,
+        "ticket": ticket,
+        "expiresIn": state.tickets.lifetime_secs(),
+    });
+    (StatusCode::OK, Json(body))
+}
+
 /// GET /api/auth/whoami. Verifies a Bearer token and echoes back the claims.
 pub async fn get_whoami(
     State(state): State<ApiState>,
@@ -309,11 +336,12 @@ pub async fn get_whoami(
 /// Parse a JSON request body. Returns a 400 error response on empty body or
 /// malformed JSON. Mirrors Java's `JsonHandler.parse` + the catch-all error
 /// path in each endpoint.
-fn parse_json_body<T: DeserializeOwned>(
-    body: &Bytes,
-) -> Result<T, (StatusCode, Json<Value>)> {
+fn parse_json_body<T: DeserializeOwned>(body: &Bytes) -> Result<T, (StatusCode, Json<Value>)> {
     if body.is_empty() {
-        return Err(error_response(StatusCode::BAD_REQUEST, "malformed JSON body"));
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "malformed JSON body",
+        ));
     }
     serde_json::from_slice::<T>(body)
         .map_err(|_| error_response(StatusCode::BAD_REQUEST, "malformed JSON body"))
@@ -432,20 +460,14 @@ async fn fetch_player_by_username(
     let q = "SELECT password_hash, banned FROM players WHERE username = ?";
     match pool {
         DatabasePool::MySql(pool) => {
-            let row = sqlx::query(q)
-                .bind(username)
-                .fetch_optional(pool)
-                .await?;
+            let row = sqlx::query(q).bind(username).fetch_optional(pool).await?;
             Ok(row.map(|r| AuthRecord {
                 password_hash: r.get("password_hash"),
                 banned: r.get("banned"),
             }))
         }
         DatabasePool::Sqlite(pool) => {
-            let row = sqlx::query(q)
-                .bind(username)
-                .fetch_optional(pool)
-                .await?;
+            let row = sqlx::query(q).bind(username).fetch_optional(pool).await?;
             Ok(row.map(|r| AuthRecord {
                 password_hash: r.get("password_hash"),
                 banned: r.get("banned"),

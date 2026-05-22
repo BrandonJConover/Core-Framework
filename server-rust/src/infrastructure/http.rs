@@ -124,10 +124,7 @@ async fn server_stats(State(state): State<AppState>) -> impl IntoResponse {
         .unwrap_or(0);
 
     Json(ServerStats {
-        uptime_seconds: infra
-            .metrics()
-            .map(|m| m.uptime_seconds())
-            .unwrap_or(0),
+        uptime_seconds: infra.metrics().map(|m| m.uptime_seconds()).unwrap_or(0),
         players_online,
         memory_usage_mb: get_memory_usage_mb(),
         timestamp: chrono::Utc::now(),

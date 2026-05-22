@@ -396,9 +396,13 @@ impl DropTableManager {
         // Hill Giant (NPC ID 21)
         self.register(
             DropTable::new(21)
-                .with_guaranteed(DropEntry::new(items::BIG_BONES, 1, 1).with_rarity(DropRarity::Always))
+                .with_guaranteed(
+                    DropEntry::new(items::BIG_BONES, 1, 1).with_rarity(DropRarity::Always),
+                )
                 .with_drop(DropEntry::new(items::COINS, 50, 15).with_amount_range(10, 50))
-                .with_drop(DropEntry::new(items::NATURE_RUNE, 3, 8).with_rarity(DropRarity::Uncommon))
+                .with_drop(
+                    DropEntry::new(items::NATURE_RUNE, 3, 8).with_rarity(DropRarity::Uncommon),
+                )
                 .with_drop(DropEntry::new(items::LAW_RUNE, 2, 4).with_rarity(DropRarity::Rare))
                 .with_drop(DropEntry::new(items::DEATH_RUNE, 2, 3).with_rarity(DropRarity::Rare))
                 .with_drop(DropEntry::new(items::LOBSTER, 1, 3).with_rarity(DropRarity::Uncommon))
@@ -411,10 +415,16 @@ impl DropTableManager {
             DropTable::new(22)
                 .with_guaranteed(DropEntry::new(items::BONES, 1, 1).with_rarity(DropRarity::Always))
                 .with_drop(DropEntry::new(items::COINS, 100, 10).with_amount_range(50, 200))
-                .with_drop(DropEntry::new(items::FIRE_RUNE, 10, 8).with_rarity(DropRarity::Uncommon))
-                .with_drop(DropEntry::new(items::CHAOS_RUNE, 5, 6).with_rarity(DropRarity::Uncommon))
+                .with_drop(
+                    DropEntry::new(items::FIRE_RUNE, 10, 8).with_rarity(DropRarity::Uncommon),
+                )
+                .with_drop(
+                    DropEntry::new(items::CHAOS_RUNE, 5, 6).with_rarity(DropRarity::Uncommon),
+                )
                 .with_drop(DropEntry::new(items::DEATH_RUNE, 3, 4).with_rarity(DropRarity::Rare))
-                .with_drop(DropEntry::new(items::BLOOD_RUNE, 2, 2).with_rarity(DropRarity::VeryRare))
+                .with_drop(
+                    DropEntry::new(items::BLOOD_RUNE, 2, 2).with_rarity(DropRarity::VeryRare),
+                )
                 .with_drop(DropEntry::new(items::MITHRIL_ORE, 1, 3).with_rarity(DropRarity::Rare))
                 .with_special(SpecialDrop::HerbTable, 8)
                 .with_special(SpecialDrop::GemTable, 4)
@@ -424,11 +434,17 @@ impl DropTableManager {
         // Greater Demon (NPC ID 24)
         self.register(
             DropTable::new(24)
-                .with_guaranteed(DropEntry::new(items::BIG_BONES, 1, 1).with_rarity(DropRarity::Always))
+                .with_guaranteed(
+                    DropEntry::new(items::BIG_BONES, 1, 1).with_rarity(DropRarity::Always),
+                )
                 .with_drop(DropEntry::new(items::COINS, 200, 8).with_amount_range(100, 300))
-                .with_drop(DropEntry::new(items::FIRE_RUNE, 15, 6).with_rarity(DropRarity::Uncommon))
+                .with_drop(
+                    DropEntry::new(items::FIRE_RUNE, 15, 6).with_rarity(DropRarity::Uncommon),
+                )
                 .with_drop(DropEntry::new(items::BLOOD_RUNE, 5, 4).with_rarity(DropRarity::Rare))
-                .with_drop(DropEntry::new(items::ADAMANTITE_ORE, 1, 2).with_rarity(DropRarity::VeryRare))
+                .with_drop(
+                    DropEntry::new(items::ADAMANTITE_ORE, 1, 2).with_rarity(DropRarity::VeryRare),
+                )
                 .with_special(SpecialDrop::HerbTable, 10)
                 .with_special(SpecialDrop::GemTable, 6)
                 .with_special(SpecialDrop::RareTable, 2),
@@ -437,12 +453,18 @@ impl DropTableManager {
         // Black Dragon (NPC ID 201)
         self.register(
             DropTable::new(201)
-                .with_guaranteed(DropEntry::new(items::DRAGON_BONES, 1, 1).with_rarity(DropRarity::Always))
+                .with_guaranteed(
+                    DropEntry::new(items::DRAGON_BONES, 1, 1).with_rarity(DropRarity::Always),
+                )
                 .with_drop(DropEntry::new(items::COINS, 500, 5).with_amount_range(200, 500))
                 .with_drop(DropEntry::new(items::BLOOD_RUNE, 10, 4).with_rarity(DropRarity::Rare))
                 .with_drop(DropEntry::new(items::LAW_RUNE, 10, 4).with_rarity(DropRarity::Rare))
-                .with_drop(DropEntry::new(items::ADAMANTITE_ORE, 2, 3).with_rarity(DropRarity::VeryRare))
-                .with_drop(DropEntry::new(items::RUNITE_ORE, 1, 1).with_rarity(DropRarity::UltraRare))
+                .with_drop(
+                    DropEntry::new(items::ADAMANTITE_ORE, 2, 3).with_rarity(DropRarity::VeryRare),
+                )
+                .with_drop(
+                    DropEntry::new(items::RUNITE_ORE, 1, 1).with_rarity(DropRarity::UltraRare),
+                )
                 .with_special(SpecialDrop::HerbTable, 12)
                 .with_special(SpecialDrop::GemTable, 8)
                 .with_special(SpecialDrop::RareTable, 4),

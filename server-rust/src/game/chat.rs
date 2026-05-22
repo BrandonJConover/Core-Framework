@@ -319,11 +319,7 @@ impl ChatManager {
 
     /// Get recent global messages.
     pub fn recent_global(&self, count: usize) -> Vec<&ChatMessage> {
-        self.global_messages
-            .iter()
-            .rev()
-            .take(count)
-            .collect()
+        self.global_messages.iter().rev().take(count).collect()
     }
 
     /// Broadcast announcement.

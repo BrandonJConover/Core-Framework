@@ -1,0 +1,15 @@
+{
+  "id": "in_privacy_settings_changed",
+  "protocol": "custom-v235",
+  "direction": "client_to_server",
+  "opcode_enum": "PRIVACY_SETTINGS_CHANGED",
+  "wire_opcode": 64,
+  "payload_hex": "00010200",
+  "fields": {
+    "block_chat": false,
+    "block_private": true,
+    "block_trade": true,
+    "block_duel": false
+  },
+  "notes": "Payload only. Java PayloadCustomParser reads PRIVACY_SETTINGS_CHANGED as four bytes: block_chat, block_private, block_trade, block_duel."
+}

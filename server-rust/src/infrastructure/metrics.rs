@@ -1,5 +1,5 @@
 use anyhow::Result;
-use metrics::{counter, gauge, histogram, describe_counter, describe_gauge, describe_histogram};
+use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge, histogram};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
@@ -49,7 +49,10 @@ impl MetricsCollector {
         describe_gauge!("openrsc_tick_late_ms", "Game tick lateness in ms");
 
         // Histograms
-        describe_histogram!("openrsc_packet_processing_seconds", "Packet processing time");
+        describe_histogram!(
+            "openrsc_packet_processing_seconds",
+            "Packet processing time"
+        );
         describe_histogram!("openrsc_game_tick_seconds", "Game tick duration");
         describe_histogram!("openrsc_db_query_seconds", "Database query duration");
         describe_histogram!("openrsc_login_processing_seconds", "Login processing time");
@@ -59,13 +62,15 @@ impl MetricsCollector {
     // Counter methods
     pub fn record_packet_received(&self, opcode: &str, size: usize) {
         counter!("openrsc_packets_received_total").increment(1);
-        counter!("openrsc_packets_received_by_opcode_total", "opcode" => opcode.to_string()).increment(1);
+        counter!("openrsc_packets_received_by_opcode_total", "opcode" => opcode.to_string())
+            .increment(1);
         histogram!("openrsc_packet_size_bytes", "direction" => "received").record(size as f64);
     }
 
     pub fn record_packet_sent(&self, opcode: &str, size: usize) {
         counter!("openrsc_packets_sent_total").increment(1);
-        counter!("openrsc_packets_sent_by_opcode_total", "opcode" => opcode.to_string()).increment(1);
+        counter!("openrsc_packets_sent_by_opcode_total", "opcode" => opcode.to_string())
+            .increment(1);
         histogram!("openrsc_packet_size_bytes", "direction" => "sent").record(size as f64);
     }
 
@@ -76,7 +81,8 @@ impl MetricsCollector {
         } else {
             counter!("openrsc_login_failures_total").increment(1);
             if let Some(r) = reason {
-                counter!("openrsc_login_failures_by_reason_total", "reason" => r.to_string()).increment(1);
+                counter!("openrsc_login_failures_by_reason_total", "reason" => r.to_string())
+                    .increment(1);
             }
         }
     }

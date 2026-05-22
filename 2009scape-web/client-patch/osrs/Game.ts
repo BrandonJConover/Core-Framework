@@ -1,4 +1,6 @@
+// @ts-ignore — parcel glob (TS only allows one wildcard per ambient module pattern).
 import cacheData from "./../client_cache/*.dat";
+// @ts-ignore — parcel glob with two wildcards.
 import cacheIndices from "./../client_cache/*.idx*";
 import { Index } from "./cache/Index";
 import { Archive } from "./cache/Archive";
@@ -50,9 +52,14 @@ import { FontLoader530 } from "./cache/media/FontLoader530";
 import { ISAACCipher } from "./net/ISAACCipher";
 import { LinkedList } from "./util/LinkedList";
 import { PacketConstants } from "./util/PacketConstants";
+import { Outgoing530 } from "./net/Outgoing530";
 import { SoundPlayer } from "./sound/SoundPlayer";
 import { SoundBank } from "./sound/SoundBank";
 import { MusicPlayer } from "./sound/MusicPlayer";
+import { Preferences } from "./util/Preferences";
+import { ClientScriptList530 } from "./script/ClientScriptList530";
+import type { Cs2Hooks } from "./script/ClientScript530";
+import { HuffmanCodec530 } from "./util/HuffmanCodec530";
 import { Item } from "./media/renderable/Item";
 import { Renderable } from "./media/renderable/Renderable";
 import { SpawnObjectNode } from "./scene/SpawnObjectNode";
@@ -68,10 +75,13 @@ import { ChatEncoder } from "./util/ChatEncoder";
 import { Actions } from "./Actions";
 import { ChatFilterSettings } from "./util/ChatFilterSettings";
 import { ClanState, PrivateMessageQueue } from "./util/PrivateMessageQueue";
+import { InterfaceList } from "./InterfaceList";
 import { tsMethodSignature } from "@babel/types";
 import { ParallelExecutor, sleep } from "./ParallelExecutor";
 import { array3d, array2d } from "./Arrays";
 import Long from "long";
+import { SceneWire530 } from "./scene/SceneWire530";
+import { FramesetCache530, makeFramesetCache530 } from "./cache/def/FramesetCache530";
 
 function init_SKILL_EXPERIENCE() {
     const bitfield = Array(99).fill(0);
@@ -106,6 +116,9 @@ export class Game extends GameShell {
     public static SKILL_EXPERIENCE: number[] = init_SKILL_EXPERIENCE();
     public static memberServer: boolean = true;
     public static lowMemory: boolean = false;
+    /** rev-530 idx26/0/0 texture metadata (per-id flags + average colour).
+     *  Populated by preloadDefs530(); null until the cache is loaded. */
+    public static textureMaterialList530: import("./cache/def/TextureMaterial530").TextureMaterialList530Data | null = null;
     public static localPlayer: Player = null;
     static playerColours: number[][] = [
         [6798, 107, 10283, 16, 4797, 7744, 5799, 4634, 33697, 22433, 2983, 54193],
@@ -345,6 +358,27 @@ export class Game extends GameShell {
     anInt968: number = 2048;
     players: Player[] = Array(this.anInt968).fill(null);
     cachedAppearances: Buffer[] = Array(this.anInt968).fill(null);
+    /** Lazy-constructed orchestrator that wires the rev-530 scene modules
+     *  (TerrainAdapter530 / NpcAttacher530 / PlayerAvatarAttacher530 /
+     *  ActorAnimator530 / LocMesh530). Built on first access via
+     *  `getOrCreateSceneWire530()`. */
+    sceneWire530: SceneWire530 | null = null;
+    /** Async seq→frameset resolver. Pre-warmed in the background so the
+     *  animator's per-tick lookup stays sync. Constructed lazily alongside
+     *  `sceneWire530` once `js5Cache` is available. */
+    framesetCache530: FramesetCache530 | null = null;
+    /** Render-tick counter for throttled SceneWire530 telemetry — every N
+     *  method57(true) passes we emit one animator-count log line. */
+    private sceneWire530TickLogCount: number = 0;
+    /** Player ids currently being composed by composePlayerAvatars530(). Used
+     *  to dedupe so a slow async compose doesn't get re-fired on every tick. */
+    private composingPlayers530: Set<number> = new Set();
+    /** Count of player-avatar composes that finished successfully. */
+    private playerComposeCount530: number = 0;
+    /** NPC slot indices currently being composed by composeNpcAvatars530(). */
+    private composingNpcs530: Set<number> = new Set();
+    /** Count of NPC composes that finished successfully. */
+    private npcComposeCount530: number = 0;
     npcs: Npc[] = Array(16384).fill(null);
     thisPlayerId: number = 2047;
     aClass6_1282: LinkedList = new LinkedList();
@@ -2118,6 +2152,9 @@ export class Game extends GameShell {
     }
 
     public method57(flag: boolean) {
+        const wire = flag ? this.sceneWire530 : null;
+        const npcCache530 = wire ? ActorDefinition.cache530 : null;
+        const basCache530 = wire ? ActorDefinition.basCache530 : null;
         for (let j: number = 0; j < this.anInt1133; j++) {
             {
                 const class50_sub1_sub4_sub3_sub1: Npc = this.npcs[this.anIntArray1134[j]];
@@ -2160,6 +2197,30 @@ export class Game extends GameShell {
                     class50_sub1_sub4_sub3_sub1.worldY,
                     class50_sub1_sub4_sub3_sub1.anInt1612
                 );
+                if (wire && npcCache530 && basCache530) {
+                    const npcId = class50_sub1_sub4_sub3_sub1.npcDefinition?.id ?? -1;
+                    if (npcId >= 0) {
+                        const data530 = npcCache530.get(npcId);
+                        const bas = data530 ? basCache530.get(data530.bastypeid) ?? null : null;
+                        if (bas) wire.tickActor(npcId, bas, "idle");
+                    }
+                }
+            }
+        }
+        if (flag && this.sceneWire530) {
+            this.sceneWire530TickLogCount++;
+            if (this.sceneWire530TickLogCount % 200 === 0) {
+                console.log("[SceneWire530] tick count=" + this.sceneWire530TickLogCount + " animators=" + this.sceneWire530.animatorCount() + " players=" + this.playerComposeCount530 + " npcs=" + this.npcComposeCount530);
+            }
+            try {
+                this.composePlayerAvatars530();
+            } catch (e) {
+                console.log("[PlayerAvatar530] poller failed: " + (e as Error).message);
+            }
+            try {
+                this.composeNpcAvatars530();
+            } catch (e) {
+                console.log("[NpcAvatar530] poller failed: " + (e as Error).message);
             }
         }
     }
@@ -3632,6 +3693,7 @@ export class Game extends GameShell {
     public async drawLoginScreen(flag: boolean) {
         await this.resetTitleScreen();
         this.aClass18_1200.createRasterizer();
+        Rasterizer.resetPixels();
         this.titleboxImage.drawImage(0, 0);
         const c: string = "\u0168";
         const c1: string = "\u00c8";
@@ -3973,6 +4035,9 @@ export class Game extends GameShell {
     public async login(username: string, password: string, reconnecting: boolean) {
         SignLink.errorName = username;
         try {
+            this.outBuffer.resetPacketState(true);
+            this.tempBuffer.resetPacketState();
+            this.buffer.resetPacketState();
             if (!reconnecting) {
                 this.statusLineOne = "";
                 this.statusLineTwo = "Connecting to server...";
@@ -4096,7 +4161,7 @@ export class Game extends GameShell {
                 try {
                     await sleep(500);
                 } catch (ignored) {}
-                this.login(username, password, reconnecting);
+                await this.login(username, password, reconnecting);
                 return;
             }
 
@@ -4326,7 +4391,7 @@ export class Game extends GameShell {
                         } catch (ignored) {}
                     }
                 }
-                this.login(username, password, reconnecting);
+                await this.login(username, password, reconnecting);
                 return;
             }
             if (responseCode === 22) {
@@ -4361,7 +4426,7 @@ export class Game extends GameShell {
                             await sleep(2000);
                         } catch (ignored) {}
                         this.anInt850++;
-                        this.login(username, password, reconnecting);
+                        await this.login(username, password, reconnecting);
                         return;
                     } else {
                         this.statusLineOne = "No response from loginserver";
@@ -4380,6 +4445,7 @@ export class Game extends GameShell {
                 return;
             }
         } catch (ex) {
+            console.error("[Login530] connection failed", ex);
             this.statusLineOne = "";
         }
         this.statusLineTwo = "Error connecting to server.";
@@ -4392,6 +4458,8 @@ export class Game extends GameShell {
         if (this.anInt873 > 0) {
             this.anInt873--;
         }
+        this.manageTextInputs();
+        await this.flushOutgoingPackets();
         for (let i: number = 0; i < 5; i++) {
             if (!(await this.parseIncomingPacket())) {
                 break;
@@ -4498,6 +4566,9 @@ export class Game extends GameShell {
             const k5: number = (l as number) | 0;
             this.outBuffer.putOpcode(19);
             this.outBuffer.putInt((k5 << 20) + (i5 << 19) + j4);
+            if (this.clickType === 1 && this.clickX >= 4 && this.clickX <= 516 && this.clickY >= 4 && this.clickY <= 338) {
+                this.tryLandscape530WalkFallback(this.clickX - 4, this.clickY - 4);
+            }
         }
         if (this.anInt1264 > 0) {
             this.anInt1264--;
@@ -4686,7 +4757,6 @@ export class Game extends GameShell {
         for (let k: number = 0; k < 5; k++) {
             this.quakeTimes[k]++;
         }
-        this.manageTextInputs();
         this.idleTime++;
         if (this.idleTime > 4500) {
             this.anInt873 = 250;
@@ -4752,24 +4822,46 @@ export class Game extends GameShell {
         if (this.anInt872 > 50) {
             this.outBuffer.putOpcode(40);
         }
+        await this.flushOutgoingPackets();
+    }
+
+    private async flushOutgoingPackets() {
         try {
             if (this.gameConnection != null && this.outBuffer.currentPosition > 0) {
                 this.gameConnection.write(this.outBuffer.currentPosition, 0, this.outBuffer.buffer);
                 this.outBuffer.currentPosition = 0;
                 this.anInt872 = 0;
-                return;
             }
         } catch (__e) {
-            // if (__e != null && __e instanceof IOException as any) {
-            //     this.dropClient();
-            //     return;
-
-            // }
+            if (__e != null && (((__e as any).type === "close") || (((__e as any).code != null) && ((__e as any).reason != null)))) {
+                await this.dropClient();
+                return;
+            }
             if (__e != null && ((__e instanceof Error) as any)) {
                 const exception: Error = __e as Error;
+                if (exception.message === "Not connected.") {
+                    await this.dropClient();
+                    return;
+                }
                 this.logout();
             }
         }
+    }
+
+    private skipLegacyRandomActionPacket(_opcode: number): void {
+        // These were 377-era anti-idle/randomizer side packets emitted inside
+        // menu actions. They are not gameplay intent in rt4 and have no
+        // compatible 530 body, so the browser client advances the old counters
+        // but intentionally sends nothing.
+    }
+
+    private skipUnsupportedCharacterDesignPacket(): void {
+        // 377 used opcode 163 for character design submission. In the rt4
+        // reference client, opcode 163 is only emitted by ReflectionCheck, while
+        // character-design CS2 opcodes 403/404/410 only mutate local
+        // PlayerAppearance state. The 2009scape Decoders530.kt server map also
+        // has no appearance/design decoder yet, so keep the local editor state
+        // until a native 530 submit packet is proven by server code or capture.
     }
 
     public method138() {
@@ -4826,21 +4918,13 @@ export class Game extends GameShell {
                             this.removeFriend(l1);
                         }
                         if (this.friendsListAction === 3 && this.chatMessage.length > 0) {
-                            this.outBuffer.putOpcode(227);
-                            this.outBuffer.putByte(0);
-                            const j: number = this.outBuffer.currentPosition;
-                            this.outBuffer.putLong(this.aLong1141);
-                            ChatEncoder.put(this.chatMessage, this.outBuffer);
-                            this.outBuffer.putLength(this.outBuffer.currentPosition - j);
+                            Outgoing530.privateMessage(this.outBuffer, this.aLong1141, this.chatMessage, PacketHandler530.huffman);
                             this.chatMessage = ChatEncoder.formatChatMessage(this.chatMessage);
                             this.addChatMessage(TextUtils.formatName(TextUtils.longToName(this.aLong1141)), this.chatMessage, 6);
                             if (this.privateChatMode === 2) {
                                 this.privateChatMode = 1;
                                 this.aBoolean1212 = true;
-                                this.outBuffer.putOpcode(176);
-                                this.outBuffer.putByte(this.publicChatMode);
-                                this.outBuffer.putByte(this.privateChatMode);
-                                this.outBuffer.putByte(this.tradeMode);
+                                Outgoing530.chatSettings(this.outBuffer, this.publicChatMode, this.privateChatMode, this.tradeMode);
                             }
                         }
                         if (this.friendsListAction === 4 && this.ignoresCount < 100) {
@@ -4867,8 +4951,7 @@ export class Game extends GameShell {
                             try {
                                 k = parseInt(this.inputInputMessage);
                             } catch (_ex) {}
-                            this.outBuffer.putOpcode(75);
-                            this.outBuffer.putInt(k);
+                            Outgoing530.resumeCountDialog(this.outBuffer, k);
                         }
                         this.inputType = 0;
                         this.redrawChatbox = true;
@@ -4884,8 +4967,7 @@ export class Game extends GameShell {
                     }
                     if (key === 13 || key === 10) {
                         if (this.inputInputMessage.length > 0) {
-                            this.outBuffer.putOpcode(206);
-                            this.outBuffer.putLong(TextUtils.nameToLong(this.inputInputMessage));
+                            Outgoing530.resumeNameDialog(this.outBuffer, TextUtils.nameToLong(this.inputInputMessage));
                         }
                         this.inputType = 0;
                         this.redrawChatbox = true;
@@ -4897,6 +4979,13 @@ export class Game extends GameShell {
                     }
                     if (key === 8 && this.inputInputMessage.length > 0) {
                         this.inputInputMessage = this.inputInputMessage.substring(0, this.inputInputMessage.length - 1);
+                        this.redrawChatbox = true;
+                    }
+                    if (key === 13 || key === 10) {
+                        if (this.inputInputMessage.length > 0) {
+                            Outgoing530.resumeStringDialog(this.outBuffer, this.inputInputMessage);
+                        }
+                        this.inputType = 0;
                         this.redrawChatbox = true;
                     }
                 } else if (this.backDialogueId === -1 && this.anInt1053 === -1) {
@@ -4993,9 +5082,7 @@ export class Game extends GameShell {
                             /* startsWith */ ((str, searchString, position = 0) =>
                                 str.substr(position, searchString.length) === searchString)(this.chatboxInput, "::")
                         ) {
-                            this.outBuffer.putOpcode(56);
-                            this.outBuffer.putByte(this.chatboxInput.length - 1);
-                            this.outBuffer.putString(this.chatboxInput.substring(2));
+                            Outgoing530.command(this.outBuffer, this.chatboxInput);
                         } else {
                             let s: string = this.chatboxInput.toLowerCase();
                             let colourCode: number = 0;
@@ -5105,15 +5192,7 @@ export class Game extends GameShell {
                                 effectCode = 5;
                                 this.chatboxInput = this.chatboxInput.substring(6);
                             }
-                            this.outBuffer.putOpcode(49);
-                            this.outBuffer.putByte(0);
-                            const bufPos: number = this.outBuffer.currentPosition;
-                            this.outBuffer.putByteNegated(colourCode);
-                            this.outBuffer.putByteAdded(effectCode);
-                            this.chatBuffer.currentPosition = 0;
-                            ChatEncoder.put(this.chatboxInput, this.chatBuffer);
-                            this.outBuffer.putBytes(this.chatBuffer.buffer, 0, this.chatBuffer.currentPosition);
-                            this.outBuffer.putLength(this.outBuffer.currentPosition - bufPos);
+                            Outgoing530.publicChat(this.outBuffer, colourCode, effectCode, this.chatboxInput, PacketHandler530.huffman);
                             this.chatboxInput = ChatEncoder.formatChatMessage(this.chatboxInput);
                             this.chatboxInput = ChatCensor.censorString(this.chatboxInput);
                             Game.localPlayer.forcedChat = this.chatboxInput;
@@ -5130,10 +5209,7 @@ export class Game extends GameShell {
                             if (this.publicChatMode === 2) {
                                 this.publicChatMode = 3;
                                 this.aBoolean1212 = true;
-                                this.outBuffer.putOpcode(176);
-                                this.outBuffer.putByte(this.publicChatMode);
-                                this.outBuffer.putByte(this.privateChatMode);
-                                this.outBuffer.putByte(this.tradeMode);
+                                Outgoing530.chatSettings(this.outBuffer, this.publicChatMode, this.privateChatMode, this.tradeMode);
                             }
                         }
                         this.chatboxInput = "";
@@ -5344,28 +5420,19 @@ export class Game extends GameShell {
                 this.publicChatMode = (this.publicChatMode + 1) % 4;
                 this.aBoolean1212 = true;
                 this.redrawChatbox = true;
-                this.outBuffer.putOpcode(176);
-                this.outBuffer.putByte(this.publicChatMode);
-                this.outBuffer.putByte(this.privateChatMode);
-                this.outBuffer.putByte(this.tradeMode);
+                Outgoing530.chatSettings(this.outBuffer, this.publicChatMode, this.privateChatMode, this.tradeMode);
             }
             if (this.clickX >= 135 && this.clickX <= 235 && this.clickY >= 467 && this.clickY <= 499) {
                 this.privateChatMode = (this.privateChatMode + 1) % 3;
                 this.aBoolean1212 = true;
                 this.redrawChatbox = true;
-                this.outBuffer.putOpcode(176);
-                this.outBuffer.putByte(this.publicChatMode);
-                this.outBuffer.putByte(this.privateChatMode);
-                this.outBuffer.putByte(this.tradeMode);
+                Outgoing530.chatSettings(this.outBuffer, this.publicChatMode, this.privateChatMode, this.tradeMode);
             }
             if (this.clickX >= 273 && this.clickX <= 373 && this.clickY >= 467 && this.clickY <= 499) {
                 this.tradeMode = (this.tradeMode + 1) % 3;
                 this.aBoolean1212 = true;
                 this.redrawChatbox = true;
-                this.outBuffer.putOpcode(176);
-                this.outBuffer.putByte(this.publicChatMode);
-                this.outBuffer.putByte(this.privateChatMode);
-                this.outBuffer.putByte(this.tradeMode);
+                Outgoing530.chatSettings(this.outBuffer, this.publicChatMode, this.privateChatMode, this.tradeMode);
             }
             if (this.clickX >= 412 && this.clickX <= 512 && this.clickY >= 467 && this.clickY <= 499) {
                 if (this.openInterfaceId === -1) {
@@ -5955,6 +6022,22 @@ export class Game extends GameShell {
             l3--;
             const l5: number = this.anIntArray1123[l3];
             const j6: number = this.anIntArray1124[l3];
+            if (Configuration.OUTGOING_DIALECT === "openrsc235") {
+                this.outBuffer.putOpcode530(packetType === 2 ? 16 : 187);
+                this.outBuffer.putShort(l5 + this.nextTopLeftTileX);
+                this.outBuffer.putShort(j6 + this.nextTopRightTileY);
+                this.destinationX = this.anIntArray1123[0];
+                this.destinationY = this.anIntArray1124[0];
+                for (let l6: number = 1; l6 < j4; l6++) {
+                    l3--;
+                    this.outBuffer.putByte(this.anIntArray1123[l3] - l5);
+                    this.outBuffer.putByte(this.anIntArray1124[l3] - j6);
+                }
+                if (Game.localPlayer?.setPosition) {
+                    Game.localPlayer.setPosition(this.destinationX, this.destinationY, false);
+                }
+                return true;
+            }
             // Native 530 body layout (rt4-client ClientProt.method3502):
             //   opcode, length-byte, ctrl(p1add), destX(p2 BE raw),
             //   destY(p2add BE), then per-waypoint dx(p1add) + dy(p1sub).
@@ -5985,6 +6068,44 @@ export class Game extends GameShell {
             return true;
         }
         return packetType !== 1;
+    }
+
+    private tryLandscape530WalkFallback(clickX: number, clickY: number): boolean {
+        const chunks = (this.currentScene as any)?.landscape530?.[this.plane]?.chunks;
+        if (!chunks || chunks.length === 0 || !Game.localPlayer) {
+            return false;
+        }
+        const srcX = Game.localPlayer.pathX[0];
+        const srcY = Game.localPlayer.pathY[0];
+        const dirX = Math.max(-1, Math.min(1, Math.round((clickX - 256) / 96)));
+        const dirY = Math.max(-1, Math.min(1, Math.round((clickY - 167) / 72)));
+        const candidates: number[][] = [];
+        const pushCandidate = (x: number, y: number) => {
+            if (x >= 0 && y >= 0 && x < 104 && y < 104 && (x !== srcX || y !== srcY)) {
+                candidates.push([x, y]);
+            }
+        };
+        for (const step of [8, 6, 4, 2]) {
+            pushCandidate(srcX + dirX * step, srcY + dirY * step);
+        }
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+            for (const step of [4, 2]) {
+                pushCandidate(srcX + dx * step, srcY + dy * step);
+            }
+        }
+        for (const [dstX, dstY] of candidates) {
+            if (this.walk(true, false, dstY, srcY, 0, 0, 0, 0, dstX, 0, 0, srcX)) {
+                Scene.clickedTileX = -1;
+                Scene.anInt486 = -1;
+                Scene.aBoolean482 = false;
+                this.anInt1020 = this.clickX;
+                this.anInt1021 = this.clickY;
+                this.crossType = 1;
+                this.crossIndex = 0;
+                return true;
+            }
+        }
+        return false;
     }
 
     public menuHasAddFriend(i: number, byte0: number): boolean {
@@ -6217,6 +6338,7 @@ export class Game extends GameShell {
             this.secondMenuOperand[this.menuActionRow] = this.mouseY;
             this.menuActionRow++;
         }
+        const sceneActionStart = this.menuActionRow;
         let i: number = -1;
         if (byte0 !== 7) {
             this.opcode = -1;
@@ -6442,6 +6564,131 @@ export class Game extends GameShell {
                 }
             }
         }
+        this.addSceneTileFallbackMenu(sceneActionStart);
+    }
+
+    private addSceneTileFallbackMenu(sceneActionStart: number) {
+        if (!Game.localPlayer || !this.currentScene) {
+            return;
+        }
+        const locActions = [35, 389, 888, 892, 1280, 318, 921, 118, 553, 432];
+        for (let row = sceneActionStart; row < this.menuActionRow; row++) {
+            if (locActions.indexOf(this.menuActionTypes[row]) >= 0) {
+                return;
+            }
+        }
+        const baseX = Game.localPlayer.pathX?.[0] ?? (Game.localPlayer.worldX >> 7);
+        const baseY = Game.localPlayer.pathY?.[0] ?? (Game.localPlayer.worldY >> 7);
+        const wantX = Math.max(0, Math.min(103, baseX + Math.round((this.mouseX - 260) / 64)));
+        const wantY = Math.max(0, Math.min(103, baseY + Math.round((this.mouseY - 170) / 56)));
+        let best: { hash: number; x: number; y: number; distance: number } = null;
+        for (let radius = 0; radius <= 8 && best == null; radius++) {
+            for (let x = Math.max(0, wantX - radius); x <= Math.min(103, wantX + radius); x++) {
+                for (let y = Math.max(0, wantY - radius); y <= Math.min(103, wantY + radius); y++) {
+                    if (Math.abs(x - wantX) !== radius && Math.abs(y - wantY) !== radius) {
+                        continue;
+                    }
+                    const hashes = [
+                        this.currentScene.method267(this.plane, x, y),
+                        this.currentScene.method268(x, 0, this.plane, y),
+                        this.currentScene.method269(this.plane, x, y),
+                        this.currentScene.getFloorDecorationHash(this.plane, x, y),
+                    ];
+                    for (const hash of hashes) {
+                        if (hash <= 0 || this.currentScene.method271(this.plane, x, y, hash) < 0) {
+                            continue;
+                        }
+                        let loc = GameObjectDefinition.getDefinition((hash >> 14) & 32767);
+                        if (loc?.childrenIds != null) {
+                            loc = loc.getChildDefinition();
+                        }
+                        if (!loc?.options?.some((option) => option != null)) {
+                            continue;
+                        }
+                        const distance = Math.abs(x - wantX) + Math.abs(y - wantY);
+                        if (best == null || distance < best.distance) {
+                            best = { hash, x, y, distance };
+                        }
+                    }
+                }
+            }
+        }
+        if (best != null) {
+            this.addSceneLocMenuRows(best.hash, best.x, best.y);
+            return;
+        }
+        let bestNpc: { index: number; x: number; y: number; distance: number } = null;
+        for (let i = 0; i < this.anInt1133; i++) {
+            const index = this.anIntArray1134[i];
+            const npc = this.npcs[index];
+            if (!npc?.npcDefinition?.clickable) {
+                continue;
+            }
+            const x = npc.pathX?.[0] ?? (npc.worldX >> 7);
+            const y = npc.pathY?.[0] ?? (npc.worldY >> 7);
+            const distance = Math.abs(x - wantX) + Math.abs(y - wantY);
+            if (distance > 10) {
+                continue;
+            }
+            if (bestNpc == null || distance < bestNpc.distance) {
+                bestNpc = { index, x, y, distance };
+            }
+        }
+        if (bestNpc != null) {
+            this.method82(this.npcs[bestNpc.index].npcDefinition, bestNpc.y, bestNpc.x, bestNpc.index, (-76 as number) | 0);
+        }
+    }
+
+    private addSceneLocMenuRows(hash: number, x: number, y: number) {
+        let loc: GameObjectDefinition = GameObjectDefinition.getDefinition((hash >> 14) & 32767);
+        if (loc.childrenIds != null) {
+            loc = loc.getChildDefinition();
+        }
+        if (loc == null) {
+            return;
+        }
+        if (this.itemSelected === 1) {
+            this.menuActionTexts[this.menuActionRow] = "Use " + this.aString1150 + " with @cya@" + loc.name;
+            this.menuActionTypes[this.menuActionRow] = 467;
+            this.selectedMenuActions[this.menuActionRow] = hash;
+            this.firstMenuOperand[this.menuActionRow] = x;
+            this.secondMenuOperand[this.menuActionRow] = y;
+            this.menuActionRow++;
+            return;
+        }
+        if (this.widgetSelected === 1) {
+            if ((this.anInt1173 & 4) === 4) {
+                this.menuActionTexts[this.menuActionRow] = this.selectedWidgetName + " @cya@" + loc.name;
+                this.menuActionTypes[this.menuActionRow] = 376;
+                this.selectedMenuActions[this.menuActionRow] = hash;
+                this.firstMenuOperand[this.menuActionRow] = x;
+                this.secondMenuOperand[this.menuActionRow] = y;
+                this.menuActionRow++;
+            }
+            return;
+        }
+        if (loc.options != null) {
+            for (let option = 4; option >= 0; option--) {
+                if (loc.options[option] != null) {
+                    this.menuActionTexts[this.menuActionRow] = loc.options[option] + " @cya@" + loc.name;
+                    if (option === 0) this.menuActionTypes[this.menuActionRow] = 35;
+                    if (option === 1) this.menuActionTypes[this.menuActionRow] = 389;
+                    if (option === 2) this.menuActionTypes[this.menuActionRow] = 888;
+                    if (option === 3) this.menuActionTypes[this.menuActionRow] = 892;
+                    if (option === 4) this.menuActionTypes[this.menuActionRow] = 1280;
+                    this.selectedMenuActions[this.menuActionRow] = hash;
+                    this.firstMenuOperand[this.menuActionRow] = x;
+                    this.secondMenuOperand[this.menuActionRow] = y;
+                    this.menuActionRow++;
+                }
+            }
+        }
+        this.menuActionTexts[this.menuActionRow] = "Examine @cya@" + loc.name;
+        this.menuActionTypes[this.menuActionRow] = 1412;
+        this.selectedMenuActions[this.menuActionRow] = loc.id << 14;
+        this.firstMenuOperand[this.menuActionRow] = x;
+        this.secondMenuOperand[this.menuActionRow] = y;
+        this.menuActionRow++;
     }
 
     public method38(i: number, j: number, k: number, class50_sub1_sub4_sub3_sub2: Player, l: number) {
@@ -7523,8 +7770,14 @@ export class Game extends GameShell {
         }
     }
 
-    public dropClient() {
+    public async dropClient() {
         if (this.anInt873 > 0) {
+            this.logout();
+            return;
+        }
+        const reconnectUsername = this.username;
+        const reconnectPassword = this.password;
+        if (reconnectUsername.length === 0 || reconnectPassword.length === 0) {
             this.logout();
             return;
         }
@@ -7534,12 +7787,14 @@ export class Game extends GameShell {
         const class17: BufferedConnection = this.gameConnection;
         this.loggedIn = false;
         this.anInt850 = 0;
-        this.login(this.username, this.password, true);
+        await this.login(reconnectUsername, reconnectPassword, true);
         if (!this.loggedIn) {
             this.logout();
         }
         try {
-            class17.close();
+            if (class17 != null) {
+                class17.close();
+            }
             return;
         } catch (_ex) {
             return;
@@ -7565,9 +7820,9 @@ export class Game extends GameShell {
                 let flag1: boolean = false;
                 try {
                     const stream: Buffer = SoundTrack.data(this.sound[index], this.soundType[index]);
-                    // TODO fix sound
-                    new SoundPlayer(
-                        null /*new ByteArrayInputStream(stream.buffer, 0, stream.currentPosition)*/,
+                    SoundPlayer.playSynth(
+                        stream.buffer as unknown as number[],
+                        stream.currentPosition,
                         this.soundVolume[index],
                         this.soundDelay[index]
                     );
@@ -7610,7 +7865,7 @@ export class Game extends GameShell {
                 }
             }
         }
-        if (this.previousSong > 0) {
+        if (!(this as any).js5Cache && this.previousSong > 0) {
             this.previousSong -= 20;
             if (this.previousSong < 0) {
                 this.previousSong = 0;
@@ -7771,10 +8026,16 @@ export class Game extends GameShell {
             return false;
         }
         try {
+            const socketClient = (this.gameConnection as any)?.socket?.client;
+            if (this.loggedIn && socketClient != null && socketClient.connected === false) {
+                await this.dropClient();
+                return false;
+            }
             let available: number = this.gameConnection.getAvailable();
             if (available === 0) {
                 return false;
             }
+            let originalOpcode530 = this.opcode;
             if (this.opcode === -1) {
                 await this.gameConnection.read$byte_A$int$int(this.buffer.buffer, 0, 1);
                 this.opcode = this.buffer.buffer[0] & 255;
@@ -7784,7 +8045,7 @@ export class Game extends GameShell {
                 //     this.opcode = (this.opcode - this.incomingRandom.nextInt()) & 255;
                 // }
                 // Save original 530 opcode and use 530 size table
-                const originalOpcode530 = this.opcode;
+                originalOpcode530 = this.opcode;
                 this.packetSize = PacketConstants.PACKET_SIZES[originalOpcode530];
                 available--;
             }
@@ -9185,8 +9446,16 @@ export class Game extends GameShell {
             //     this.dropClient();
 
             // }
+            if (__e != null && ((__e as any).type === "close" || (((__e as any).code != null) && ((__e as any).reason != null)))) {
+                await this.dropClient();
+                return false;
+            }
             if (__e != null && ((__e instanceof Error) as any)) {
                 const exception: Error = __e as Error;
+                if (exception.message === "EOF" || exception.message === "Not connected.") {
+                    await this.dropClient();
+                    return false;
+                }
                 let s1: string =
                     "T2 - " +
                     this.opcode +
@@ -9310,6 +9579,97 @@ export class Game extends GameShell {
         if (this.interfaceUpdates.length > 50) {
             this.interfaceUpdates.shift();
         }
+    }
+
+    public syncLegacyInventoryWidget(componentHash: number, comp: any): void {
+        if (!comp || componentHash < 0 || !Widget.interfaces) return;
+        const widget = Widget.forId(componentHash);
+        const items: number[] = comp.inventoryItems || [];
+        const amounts: number[] = comp.inventoryItemAmounts || [];
+        widget.type = 2;
+        widget.width = widget.width || comp.width || Math.max(items.length, comp.inventorySlotCount || 0);
+        widget.height = widget.height || comp.height || 1;
+        widget.items = items.map((itemId: number) => itemId >= 0 ? itemId + 1 : 0);
+        widget.itemAmounts = amounts.slice();
+        widget.itemSwapable = !!comp.itemSwapable;
+        widget.isInventory = !!comp.isInventory;
+        widget.itemUsable = !!comp.itemUsable;
+        widget.itemDeletesDraged = !!comp.itemDeletesDragged;
+        widget.options = (comp.inventoryOptions && comp.inventoryOptions.length > 0)
+            ? comp.inventoryOptions.slice()
+            : (comp.ops && comp.ops.length > 0 ? comp.ops.slice() : widget.options);
+        widget.itemSpritePadsX = comp.invMarginX ?? widget.itemSpritePadsX ?? 0;
+        widget.itemSpritePadsY = comp.invMarginY ?? widget.itemSpritePadsY ?? 0;
+        widget.imageX = comp.invOffsetX && comp.invOffsetX.length > 0 ? comp.invOffsetX.slice() : (widget.imageX || []);
+        widget.imageY = comp.invOffsetY && comp.invOffsetY.length > 0 ? comp.invOffsetY.slice() : (widget.imageY || []);
+        while (widget.imageX.length < 20) widget.imageX.push(0);
+        while (widget.imageY.length < 20) widget.imageY.push(0);
+    }
+
+    public syncLegacyInterfaceWidgets(interfaceId: number, rootWidgetId: number = interfaceId): void {
+        if (!Widget.interfaces || interfaceId < 0 || rootWidgetId < 0) return;
+        const components = InterfaceList.componentsForInterface(interfaceId);
+        if (components.length === 0) return;
+
+        const root = Widget.forId(rootWidgetId);
+        const children = components.filter((component) => {
+            if ((component.id & 0xFFFF) === 0) return false;
+            return component.type === 0 || component.type === 2 || (component.inventorySlotCount | 0) > 0 || component.inventoryItems.length > 0;
+        });
+        root.id = rootWidgetId;
+        root.parentId = -1;
+        root.type = 0;
+        root.width = root.width || 512;
+        root.height = root.height || 334;
+        root.scrollLimit = root.scrollLimit || 0;
+        root.hiddenUntilHovered = false;
+        root.children = children.map((component) => component.id | 0);
+        root.childrenX = children.map((component) => component.x | 0);
+        root.childrenY = children.map((component) => component.y | 0);
+
+        for (const component of children) {
+            const widget = Widget.forId(component.id | 0);
+            widget.id = component.id | 0;
+            widget.parentId = rootWidgetId;
+            widget.type = ((component.inventorySlotCount | 0) > 0 || component.inventoryItems.length > 0) ? 2 : (component.type | 0);
+            widget.contentType = component.contentType | 0;
+            widget.width = component.width | 0;
+            widget.height = component.height | 0;
+            widget.alpha = component.alpha | 0;
+            widget.hiddenUntilHovered = !!component.hidden;
+            widget.disabledText = component.text || widget.disabledText || "";
+            widget.enabledText = component.activeText || widget.enabledText || "";
+            widget.disabledColor = component.colour | 0;
+            widget.enabledColor = component.activeColour | 0;
+            widget.modelType = component.modelType | 0;
+            widget.modelId = component.modelId | 0;
+            widget.disabledAnimation = component.modelSeqId | 0;
+            widget.enabledAnimation = component.activeModelSeqId | 0;
+            widget.zoom = component.modelZoom | 0;
+            widget.rotationX = component.modelXAngle | 0;
+            widget.rotationY = component.modelYAngle | 0;
+            widget.options = component.ops && component.ops.length > 0 ? component.ops.slice() : (widget.options || []);
+            if ((component.inventorySlotCount | 0) > 0 || component.inventoryItems.length > 0) {
+                this.syncLegacyInventoryWidget(component.id | 0, component);
+            }
+        }
+
+        if (interfaceId === 762) {
+            this.openInterfaceId = rootWidgetId;
+        }
+    }
+
+    public rt4InterfaceDiagnostics(): any {
+        const loadedInterfaces = Array.from(InterfaceList.loadedInterfaces.values()).sort((a, b) => a - b);
+        const openModalStack = InterfaceList.openModalStack.map((entry) => ({ ...entry }));
+        const self: any = this;
+        return {
+            topInterface: self.topInterface || null,
+            openModalStack,
+            loadedInterfaces,
+            recentPackets530: (self.packetTrace530 || []).slice(-40),
+            recentContainers530: (self.containerTrace530 || []).slice(-40),
+        };
     }
 
     /*private*/ public parsePlayerBlock(id: number, player: Player, mask: number, buffer: Buffer) {
@@ -10194,6 +10554,15 @@ export class Game extends GameShell {
         this.loginScreenState = 0;
         this.username = "";
         this.password = "";
+        this.outBuffer.resetPacketState(true);
+        this.tempBuffer.resetPacketState();
+        this.buffer.resetPacketState();
+        this.incomingRandom = null;
+        this.opcode = -1;
+        this.lastOpcode = -1;
+        this.secondLastOpcode = -1;
+        this.thirdLastOpcode = -1;
+        this.packetSize = 0;
         this.resetModelCaches();
         this.currentScene.method241();
         for (let plane: number = 0; plane < 4; plane++) {
@@ -10735,6 +11104,33 @@ export class Game extends GameShell {
                 }
             }
             this.method18((3 as number) | 0);
+            try {
+                const wire = this.getOrCreateSceneWire530();
+                if (wire && this.currentScene) {
+                    // TerrainAdapter530 reads floor overlay/underlay arrays
+                    // and a FloType530 lookup map. The Region (class8) holds
+                    // the parsed [plane][x][z] arrays — we synthesize a host
+                    // shape that pulls heights from `this` and floors from
+                    // the freshly-built region.
+                    const FloType530M = require("./cache/def/FloType530").FloType530;
+                    const FloorDefinitionM = require("./cache/def/FloorDefinition").FloorDefinition;
+                    const terrainHost: any = {
+                        anIntArrayArrayArray891: this.anIntArrayArrayArray891,
+                        currentSceneTileFlags: this.currentSceneTileFlags,
+                        floorOverlayIds: (class8 as any).overlayFloorIds ?? null,
+                        floorUnderlayIds: (class8 as any).underlayFloorIds ?? null,
+                        floTypeCache: FloType530M.cache530,
+                        floorDefinitionCache: FloorDefinitionM.cache,
+                    };
+                    const stats = wire.rebuildLandscape(terrainHost, this.currentScene as any);
+                    const ovSize = (class8 as any).overlayFloorIds ? "yes" : "no";
+                    const unSize = (class8 as any).underlayFloorIds ? "yes" : "no";
+                    const flo = FloType530M.cache530 ? FloType530M.cache530.size : 0;
+                    console.log("[SceneWire530] landscape rebuilt: planes=" + stats.attached + " verts=" + stats.verts + " tris=" + stats.tris + " (overlays=" + ovSize + " underlays=" + unSize + " flo=" + flo + ")");
+                }
+            } catch (e) {
+                console.log("[SceneWire530] rebuildLandscape failed: " + (e as Error).message);
+            }
         } catch (exception) {
             console.log("method93 failed: " + ((exception as Error)?.stack || (exception as Error)?.message || exception));
         }
@@ -11828,11 +12224,12 @@ export class Game extends GameShell {
         this.anIntArray1084 = Array(32768).fill(0);
         this.anIntArray1085 = Array(32768).fill(0);
         await this.drawLoadingText(10, "Connecting to fileserver");
-        if (!this.startedRenderingFlames) {
-            this.shouldRenderFlames = true;
-            this.startedRenderingFlames = true;
-            this.run();
-        }
+        // The legacy 377 flame loop is pure title-screen decoration, but in
+        // the 530 browser client it can monopolize the JS thread enough to
+        // make canvas input and Playwright diagnostics unreliable. Keep the
+        // static title buffers and let the main game loop own the frame budget.
+        this.shouldRenderFlames = false;
+        this.startedRenderingFlames = false;
     }
 
     public async drawLoadingText(i: number, s: string) {
@@ -11844,6 +12241,10 @@ export class Game extends GameShell {
             return;
         }
         this.aClass18_1200.createRasterizer();
+        // Wipe the dialog buffer between progress steps so the bar/text don't
+        // accumulate. The 377 layout got away without this because the title
+        // JPG slice stamped a fresh background each frame; 530 has no JPG.
+        Rasterizer.resetPixels();
         const c: string = "\u0168";
         const c1: string = "\u00c8";
         const byte0: number = 20;
@@ -11961,7 +12362,7 @@ export class Game extends GameShell {
             Game.parallelExecutor.startRaw(this.processFlamesCycle, this);
             // this.processFlamesCycle();
         } else {
-            super.run();
+            await super.run();
         }
     }
 
@@ -12241,6 +12642,10 @@ export class Game extends GameShell {
                 (globalThis as any).js5Cache = js5Cache;
                 SoundBank.attach(js5Cache);
                 MusicPlayer.load();
+                ClientScriptList530.attach(js5Cache);
+                (this as any).cs2LoadScript = (id: number) => ClientScriptList530.get(id);
+                this.setupCs2Hooks530();
+                this.preloadHuffman530(js5Cache).catch((e) => console.log("preloadHuffman530 failed: " + (e as Error).message));
                 console.log("Js5Cache initialized");
                 await this.preloadSprites530(js5Cache);
                 // Try font preload — each fetch in preloadFonts530 is wrapped in
@@ -12279,6 +12684,543 @@ export class Game extends GameShell {
         if (sprites.name_icons) sprites.mod_icons = sprites.name_icons;
         (globalThis as any).sprites530 = sprites;
         console.log("530 sprites decoded: " + Object.keys(sprites).join(","));
+    }
+
+    async preloadHuffman530(js5Cache: Js5Cache) {
+        const bits = await this.withTimeout(js5Cache.getNamedFileBytes(10, "huffman", ""), 1500);
+        if (!bits || bits.length === 0) {
+            console.log("HuffmanCodec530: idx10 huffman file missing");
+            return;
+        }
+        PacketHandler530.huffman = new HuffmanCodec530(bits);
+        console.log("HuffmanCodec530 initialized (" + bits.length + " symbols)");
+    }
+
+    setupCs2Hooks530() {
+        const game = this;
+        const itemSearch = { results: [] as number[], pos: 0 };
+        const getParamDefault = (paramId: number): number | string => {
+            const p = (globalThis as any).paramTypes530?.get(paramId);
+            if (!p) return 0;
+            return p.isString ? (p.defaultString ?? "") : (p.defaultInt | 0);
+        };
+        const getObjParam = (params: any, paramId: number): number | string | null => {
+            if (!params) return getParamDefault(paramId);
+            const v = params[paramId];
+            return v !== undefined ? v : getParamDefault(paramId);
+        };
+        const normalizeSocialName = (name: string): string => (name || "")
+            .replace(/^@cr\d+@/i, "")
+            .replace(/^<img=\d+>/i, "")
+            .trim()
+            .toLowerCase();
+        const getOldName = (longs: Long[], names: string[], index: number): string => {
+            if (index < 0) return "";
+            const cached = names?.[index];
+            if (cached) return cached;
+            const value = longs?.[index];
+            return value ? TextUtils.formatName(TextUtils.longToName(value)) : "";
+        };
+        const getFriend = (index: number) => {
+            const native = (game as any).friendList as any[] | undefined;
+            if (native && index >= 0 && index < native.length) {
+                const f = native[index];
+                const world = (f.worldId ?? f.world ?? 0) | 0;
+                return {
+                    name: f.name || "",
+                    world,
+                    rank: (f.rank ?? 0) | 0,
+                    worldName: f.worldName || "",
+                    sameGame: world > 0 && world === Game.world,
+                };
+            }
+            if (index < 0 || index >= game.friendsCount) return null;
+            const world = game.friendWorlds[index] | 0;
+            return {
+                name: getOldName(game.friends, game.friendUsernames, index),
+                world,
+                rank: 0,
+                worldName: world > 0 ? "World " + world : "",
+                sameGame: world > 0 && world === Game.world,
+            };
+        };
+        const getIgnoreName = (index: number): string => {
+            const native = (game as any).ignoreList as string[] | undefined;
+            if (native && index >= 0 && index < native.length) return native[index] || "";
+            if (index < 0 || index >= game.ignoresCount) return "";
+            return TextUtils.formatName(TextUtils.longToName(game.ignores[index]));
+        };
+        const getClan = () => {
+            const clan: any = game.clanState;
+            if (!clan) return null;
+            return {
+                name: clan.name || "",
+                owner: clan.owner || "",
+                rank: (clan.rank ?? 0) | 0,
+                minKick: (clan.minKick ?? 0) | 0,
+                members: (clan.members || []).map((m: any) => ({
+                    name: m.name || "",
+                    world: (m.world ?? m.worldId ?? 0) | 0,
+                    rank: (m.rank ?? 0) | 0,
+                    worldName: m.worldName || "",
+                })),
+            };
+        };
+        const getChatMessage = (index: number) => {
+            if (index < 0 || index >= 100 || !game.chatMessages[index]) return null;
+            return {
+                type: game.chatTypes[index] | 0,
+                name: game.chatPlayerNames[index] || "",
+                message: game.chatMessages[index] || "",
+                clan: (game as any).chatClanNames?.[index] || "",
+                phraseId: ((game as any).chatPhraseIds?.[index] ?? -1) | 0,
+            };
+        };
+        const displayModes = [
+            { width: 765, height: 503 },
+            { width: 800, height: 600 },
+            { width: 1024, height: 768 },
+            { width: 1280, height: 720 },
+            { width: 1920, height: 1080 },
+        ];
+        const normalizeWorld = (w: any) => w ? {
+            id: (w.id ?? w.world ?? w.worldId ?? 0) | 0,
+            flags: (w.flags ?? w.mask ?? 0) | 0,
+            activity: w.activity || "",
+            countryFlag: (w.countryFlag ?? w.flag ?? w.location ?? 0) | 0,
+            countryName: w.countryName || w.name || "",
+            players: (w.players ?? w.playerCount ?? 0) | 0,
+        } : null;
+        const getWorldList = (): any[] => {
+            const list = (game as any).worldList530 ?? (game as any).worlds530 ?? (game as any).worlds ?? [];
+            return Array.isArray(list) ? list : [];
+        };
+        const getWorldSortValue = (world: any, key: number): number | string => {
+            const w = normalizeWorld(world);
+            if (!w) return 0;
+            if (key === 1) return w.players;
+            if (key === 2) return w.countryFlag;
+            if (key === 3) return w.activity;
+            if (key === 4) return w.flags;
+            return w.id;
+        };
+        const boolPrefs = new Set([
+            "allLevelsVisible", "removeRoofsSelectively", "showGroundDecorations",
+            "highDetailTextures", "manyIdleAnimations", "flickeringEffectsOn",
+            "manyGroundTextures", "characterShadowsOn", "highDetailLighting",
+            "highWaterDetail", "fogEnabled", "stereo", "neverRemoveRoofs",
+            "cursorsEnabled",
+        ]);
+        const getPref = (key: string): number => {
+            const v = (Preferences as any)[key];
+            if (typeof v === "boolean") return v ? 1 : 0;
+            return (v ?? 0) | 0;
+        };
+        const setPref = (key: string, value: number): number => {
+            if (key === "particleSetting" && value > 2) return 0;
+            (Preferences as any)[key] = boolPrefs.has(key) ? value !== 0 : (value | 0);
+            if (key === "musicVolume") Preferences.musicMuted = value <= 0;
+            if (key === "soundEffectVolume") Preferences.muteSfx = value <= 0;
+            return 1;
+        };
+        if (!(game as any).cs2Viewport) {
+            (game as any).cs2Viewport = {
+                near: [256, 205],
+                far: [256, 320],
+                clamp: [1, 32767, 1, 32767],
+            };
+        }
+        const viewport = (game as any).cs2Viewport;
+        const getAppearanceState = () => {
+            const player: any = Game.localPlayer;
+            if (!player) return null;
+            if (!player.appearance530) player.appearance530 = { slots: [], colors: [0, 0, 0, 0, 0], gender: 0 };
+            if (!Array.isArray(player.appearance530.colors)) player.appearance530.colors = [0, 0, 0, 0, 0];
+            if (!Array.isArray(player.appearance530.slots)) player.appearance530.slots = [];
+            return player.appearance530;
+        };
+        const estimateTextWidth = (text: string): number => (text || "").replace(/<[^>]*>/g, "").length * 6;
+        const estimateLineCount = (text: string, width: number): number => {
+            const lineCapacity = Math.max(1, Math.floor(Math.max(1, width | 0) / 6));
+            let lines = 0;
+            for (const part of (text || "").replace(/<br>/gi, "\n").replace(/<[^>]*>/g, "").split("\n")) {
+                lines += Math.max(1, Math.ceil(part.length / lineCapacity));
+            }
+            return lines | 0;
+        };
+        const hooks: Cs2Hooks = {
+            getFriendListState: () => {
+                const native = (game as any).friendList as any[] | undefined;
+                if (native || game.friendsCount > 0) return 2;
+                return game.friendListStatus | 0;
+            },
+            getFriendCount: () => {
+                const native = (game as any).friendList as any[] | undefined;
+                return native ? native.length : (game.friendsCount | 0);
+            },
+            getFriend,
+            getFriendIndex: (name: string) => {
+                const target = normalizeSocialName(name);
+                const count = ((game as any).friendList as any[] | undefined)?.length ?? game.friendsCount;
+                for (let i = 0; i < count; i++) {
+                    if (normalizeSocialName(getFriend(i)?.name || "") === target) return i;
+                }
+                return -1;
+            },
+            isFriend: (name: string) => {
+                const target = normalizeSocialName(name);
+                const count = ((game as any).friendList as any[] | undefined)?.length ?? game.friendsCount;
+                for (let i = 0; i < count; i++) {
+                    if (normalizeSocialName(getFriend(i)?.name || "") === target) return true;
+                }
+                return false;
+            },
+            getIgnoreCount: () => {
+                const native = (game as any).ignoreList as string[] | undefined;
+                return native ? native.length : (game.ignoresCount | 0);
+            },
+            getIgnoreName,
+            isIgnored: (name: string) => {
+                const target = normalizeSocialName(name);
+                const count = ((game as any).ignoreList as string[] | undefined)?.length ?? game.ignoresCount;
+                for (let i = 0; i < count; i++) {
+                    if (normalizeSocialName(getIgnoreName(i)) === target) return true;
+                }
+                return false;
+            },
+            getClan,
+            getSelfName: () => ((Game.localPlayer as any)?.playerName ?? "") as string,
+            getCountry: () => ((game as any).country ?? 0) | 0,
+            getPublicChatSetting: () => game.publicChatMode | 0,
+            getPrivateChatSetting: () => game.privateChatMode | 0,
+            getTradeSetting: () => game.tradeMode | 0,
+            setChatSettings: (publicFilter: number, privateFilter: number, tradeFilter: number) => {
+                game.publicChatMode = publicFilter | 0;
+                game.privateChatMode = privateFilter | 0;
+                game.tradeMode = tradeFilter | 0;
+            },
+            addGameMessage: (message: string) => {
+                game.addChatMessage("", message || "", 0);
+            },
+            animateSelf: (seqId: number, delay: number) => {
+                const p: any = Game.localPlayer;
+                if (!p) return;
+                p.emoteAnimation = seqId | 0;
+                p.animationDelay = delay | 0;
+                p.currentAnimation = 0;
+                p.anInt1616 = 0;
+            },
+            closeWidgets: () => { game.closeWidgets(); },
+            resumeIntegerInput: (value: number) => { (game as any).cs2ResumeInteger = value | 0; },
+            resumeNameInput: (name: string) => { (game as any).cs2ResumeName = name || ""; },
+            resumeStringInput: (value: string) => { (game as any).cs2ResumeString = value || ""; },
+            clickPlayerOption: (option: string, playerIndex: number) => {
+                (game as any).cs2PlayerOptionClick = { option: option || "", playerIndex: playerIndex | 0 };
+            },
+            runWidgetAction: (arg0: number, arg1: number, component: any) => {
+                (game as any).cs2WidgetAction = { arg0: arg0 | 0, arg1: arg1 | 0, component };
+            },
+            sendDialogAction: (componentId: number) => {
+                const actionId = componentId | 0;
+                (game as any).cs2DialogAction = actionId;
+                Outgoing530.dialogAction(game.outBuffer, actionId);
+            },
+            playSoundEffect: (soundId: number, loops: number, delay: number) => {
+                (game as any).cs2LastSound = { soundId: soundId | 0, loops: loops | 0, delay: delay | 0 };
+                SoundPlayer.play(Preferences.soundEffectVolume, soundId | 0, delay | 0);
+            },
+            playMusic: (songId: number) => {
+                (game as any).cs2LastMusic = songId | 0;
+                MusicPlayer.playSong(songId | 0);
+            },
+            playMusicEffect: (jingleId: number, delay: number) => {
+                (game as any).cs2LastJingle = { jingleId: jingleId | 0, delay: delay | 0 };
+                MusicPlayer.playJingle(jingleId | 0, Preferences.musicVolume);
+            },
+            getChatMessage,
+            getChatSize: () => {
+                let count = 0;
+                for (let i = 0; i < game.chatMessages.length; i++) if (game.chatMessages[i] != null) count++;
+                return count;
+            },
+            isKeyHeld: (key: "alt" | "ctrl" | "shift") => {
+                if (key === "ctrl") return game.keyStatus[5] === 1 || !!(game as any).ctrlHeld;
+                if (key === "alt") return !!(game as any).altHeld;
+                return !!(game as any).shiftHeld;
+            },
+            getCurrentTimeMillis: () => Date.now(),
+            setPreference: setPref,
+            getPreference: getPref,
+            setViewport: (key: "near" | "far" | "clamp", values: number[]) => {
+                viewport[key] = values.slice();
+            },
+            getViewport: (key: "near" | "far" | "size") => {
+                if (key === "size") return [game.width | 0, game.height | 0];
+                return viewport[key] || [];
+            },
+            moveCameraTo: (coord: number, height: number, speed: number, acceleration: number) => {
+                (game as any).cs2CameraMove = { coord, height, speed, acceleration };
+                game.cameraX = ((coord >> 14) & 0x3FFF) * 128;
+                game.cameraZ = (coord & 0x3FFF) * 128;
+                game.cameraY = height | 0;
+            },
+            pointCameraAt: (coord: number, height: number, speed: number, acceleration: number) => {
+                (game as any).cs2CameraPoint = { coord, height, speed, acceleration };
+            },
+            setCameraPath: (values: number[]) => {
+                (game as any).cs2CameraPath = values.slice();
+            },
+            unlockCamera: () => {
+                (game as any).cs2CameraMove = null;
+                (game as any).cs2CameraPoint = null;
+                (game as any).cs2CameraPath = null;
+            },
+            setCameraRotation: (pitch: number, yaw: number) => {
+                game.cameraPitch = Math.max(128, Math.min(383, pitch | 0));
+                game.cameraYaw = (yaw | 0) & 2047;
+            },
+            getCameraRotation: () => ({ pitch: game.cameraPitch | 0, yaw: game.cameraYaw | 0 }),
+            requestDirectLogin: (username: string, password: string, flags: number) => {
+                (game as any).cs2DirectLogin = { username, password, flags };
+                game.username = username;
+                game.password = password;
+            },
+            skipLoginStage: () => { (game as any).cs2LoginStageSkipped = true; },
+            resetLoginReply: () => { (game as any).loginReply = -2; },
+            checkAccountInfo: (a: number, b: number, c: number, d: number) => {
+                (game as any).cs2AccountInfoCheck = { a, b, c, d };
+            },
+            requestAccountName: (name: string) => { (game as any).cs2AccountNameRequest = name; },
+            createAccount: (username: string, password: string, a: number, b: number, c: number, d: number) => {
+                (game as any).cs2CreateAccount = { username, password, a, b, c, d };
+            },
+            resetAccountCreateReply: () => { (game as any).accountCreateReply = -2; },
+            getGameLoginReply: () => ((game as any).loginReply ?? (game as any).loginResponse ?? 0) | 0,
+            getWorldSwitchTimer: () => ((game as any).worldSwitchTimer ?? 0) | 0,
+            getAccountCreateReply: () => ((game as any).accountCreateReply ?? 0) | 0,
+            getSuggestedAccountNames: () => (game as any).suggestedAccountNames ?? [],
+            clearSuggestedAccountNames: () => { (game as any).suggestedAccountNames = []; },
+            getDetailedLoginReply: () => ((game as any).detailedLoginReply ?? 0) | 0,
+            canShowVideoAd: () => !!(game as any).canShowVideoAd,
+            isShowingVideoAd: () => !!(game as any).showingVideoAd,
+            fetchWorldList: () => {
+                (game as any).worldListFetched = true;
+                return true;
+            },
+            getFirstWorld: () => {
+                (game as any).worldListCursor530 = 0;
+                const world = getWorldList()[0];
+                if (world) (game as any).worldListCursor530 = 1;
+                return normalizeWorld(world);
+            },
+            getNextWorld: () => {
+                const list = getWorldList();
+                const idx = ((game as any).worldListCursor530 ?? 0) | 0;
+                const world = list[idx];
+                (game as any).worldListCursor530 = idx + 1;
+                return normalizeWorld(world);
+            },
+            hopWorld: (worldId: number) => {
+                const world = normalizeWorld(getWorldList().find((w) => normalizeWorld(w)?.id === (worldId | 0)));
+                if (!world) return false;
+                (game as any).pendingWorldHop = world;
+                return true;
+            },
+            setLastWorld: (worldId: number) => { Preferences.lastWorldId = worldId | 0; },
+            getLastWorld: () => Preferences.lastWorldId | 0,
+            getWorldById: (worldId: number) => normalizeWorld(getWorldList().find((w) => normalizeWorld(w)?.id === (worldId | 0))),
+            sortWorldList: (primaryKey: number, primaryAscending: boolean, secondaryKey: number, secondaryAscending: boolean) => {
+                getWorldList().sort((a, b) => {
+                    const av = getWorldSortValue(a, primaryKey);
+                    const bv = getWorldSortValue(b, primaryKey);
+                    let cmp = av < bv ? -1 : av > bv ? 1 : 0;
+                    if (cmp === 0) {
+                        const as = getWorldSortValue(a, secondaryKey);
+                        const bs = getWorldSortValue(b, secondaryKey);
+                        cmp = as < bs ? -1 : as > bs ? 1 : 0;
+                        if (!secondaryAscending) cmp = -cmp;
+                    }
+                    return primaryAscending ? cmp : -cmp;
+                });
+            },
+            setSiteSettingsMembers: (members: boolean) => { Preferences.siteSettingsMembers = members; },
+            isSiteSettingsMembers: () => Preferences.siteSettingsMembers,
+            setPlayerIdentikit: (featureId: number, identikit: number) => {
+                const app = getAppearanceState();
+                if (!app) return;
+                app.slots[featureId | 0] = { kind: "idk", idkId: identikit | 0 };
+                (Game.localPlayer as any).appearanceDirty = true;
+            },
+            setPlayerColor: (slot: number, color: number) => {
+                const app = getAppearanceState();
+                if (!app) return;
+                app.colors[slot | 0] = color | 0;
+                (Game.localPlayer as any).appearanceDirty = true;
+            },
+            setPlayerGender: (female: boolean) => {
+                const app = getAppearanceState();
+                if (!app) return;
+                app.gender = female ? 1 : 0;
+                (Game.localPlayer as any).appearanceDirty = true;
+            },
+            hasOpenInterface: (parentId: number) => {
+                const p = parentId | 0;
+                if (InterfaceList.openModalStack.some((x) => (x.parentInterfaceId | 0) === p)) return true;
+                return game.openInterfaceId === p || game.anInt1089 === p || game.dialogueId === p || game.backDialogueId === p;
+            },
+            hasChildInterface: (parentId: number, interfaceId: number) => {
+                const p = parentId | 0;
+                const i = interfaceId | 0;
+                return InterfaceList.openModalStack.some((x) => (x.parentInterfaceId | 0) === p && (x.rootCompId | 0) === i);
+            },
+            measureTextLineCount: (text: string, width: number) => estimateLineCount(text, width),
+            measureTextMaxLineWidth: (text: string, width: number) => Math.min(estimateTextWidth(text), Math.max(0, width | 0)),
+            getDisplayModeCount: () => displayModes.length,
+            getDisplayMode: (index: number) => displayModes[index] ?? null,
+            getPreferredFullscreenMode: () => {
+                const width = ((game as any).preferredFullscreenWidth ?? game.width) | 0;
+                const height = ((game as any).preferredFullscreenHeight ?? game.height) | 0;
+                for (let i = 0; i < displayModes.length; i++) {
+                    if (displayModes[i].width === width && displayModes[i].height === height) return i;
+                }
+                return -1;
+            },
+            requestFullscreen: (width: number, height: number) => {
+                (game as any).preferredFullscreenWidth = width | 0;
+                (game as any).preferredFullscreenHeight = height | 0;
+                (game as any).fullscreenRequested = true;
+                return true;
+            },
+            exitFullscreen: () => { (game as any).fullscreenRequested = false; },
+            getWindowMode: () => ((game as any).windowMode ?? 2) | 0,
+            setWindowMode: (mode: number) => { (game as any).windowMode = mode | 0; },
+            getPreferredWindowMode: () => ((game as any).preferredWindowMode ?? ((game as any).windowMode ?? 2)) | 0,
+            setPreferredWindowMode: (mode: number) => { (game as any).preferredWindowMode = mode | 0; },
+            getGrandExchangeOffer: (slot: number) => {
+                const offer = (game as any).geOffers?.[slot];
+                if (!offer) return null;
+                return {
+                    type: (offer.type ?? 0) | 0,
+                    status: (offer.status ?? 0) | 0,
+                    item: (offer.item ?? -1) | 0,
+                    price: (offer.price ?? 0) | 0,
+                    count: (offer.count ?? 0) | 0,
+                    completedCount: (offer.completedCount ?? 0) | 0,
+                    completedGold: (offer.completedGold ?? 0) | 0,
+                };
+            },
+            getComponent: (hash: number) => {
+                const c = InterfaceList.get(hash >>> 16, hash & 0xFFFF);
+                return c ? (c as any) : null;
+            },
+            getItem: (id: number) => {
+                const item = ItemDefinition.cache530?.get(id);
+                if (!item) return null;
+                return {
+                    name: item.name,
+                    cost: item.cost,
+                    isStackable: item.stackable === 1,
+                    isMembers: item.members,
+                    notedId: item.certlink,
+                    realId: item.certlink,
+                    groundOptions: item.ops,
+                    inventoryOptions: item.iops,
+                };
+            },
+            getItemAttribute: (itemId: number, attrId: number) => {
+                return getObjParam(ItemDefinition.cache530?.get(itemId)?.params, attrId);
+            },
+            getNpcAttribute: (npcId: number, attrId: number) => {
+                const npc: any = ActorDefinition.cache530?.get(npcId);
+                if (!npc) return getParamDefault(attrId);
+                const p = npc.params?.get ? npc.params.get(attrId) : null;
+                if (!p) return getParamDefault(attrId);
+                return p.isString ? (p.stringValue ?? "") : (p.intValue ?? 0);
+            },
+            getLocParam: (locId: number, paramId: number) => {
+                const loc: any = GameObjectDefinition.cache530?.get(locId);
+                const v = loc?.params ? loc.params[paramId] : undefined;
+                if (v && typeof v === "object" && "value" in v) return v.value;
+                return v !== undefined ? v : getParamDefault(paramId);
+            },
+            getStructParam: (structId: number, paramId: number) => {
+                const s = (globalThis as any).structTypes530?.get(structId);
+                if (!s?.params) return getParamDefault(paramId);
+                for (const p of s.params) {
+                    if (p.key === paramId) return p.isString ? (p.stringValue ?? "") : (p.intValue ?? 0);
+                }
+                return getParamDefault(paramId);
+            },
+            getSkill: (skillId: number) => {
+                if (skillId < 0 || skillId >= SkillConstants.SKILL_COUNT) return null;
+                return {
+                    currentLevel: game.anIntArray843[skillId] | 0,
+                    actualLevel: game.anIntArray1029[skillId] | 0,
+                    xp: game.anIntArray1054[skillId] | 0,
+                };
+            },
+            getClientCycle: () => Game.pulseCycle | 0,
+            getMyLocation: () => {
+                const p: any = Game.localPlayer;
+                const x = (p ? (p.worldX >> 7) : 0) + game.nextTopLeftTileX;
+                const y = (p ? (p.worldY >> 7) : 0) + game.nextTopRightTileY;
+                return ((game.plane & 0x3) << 28) | ((x & 0x3FFF) << 14) | (y & 0x3FFF);
+            },
+            isMembers: () => Game.memberServer || game.playerMembers > 0,
+            getClientRights: () => ((game as any).playerRights ?? (game as any).rights ?? 0) | 0,
+            getSystemUpdateTimer: () => game.systemUpdateTime | 0,
+            getWorldId: () => ((game as any).worldId ?? 0) | 0,
+            getRunEnergy: () => ((game as any).runEnergy ?? (game as any).anInt1169 ?? 0) | 0,
+            getPlayerWeight: () => game.runWeight | 0,
+            getBlackmarks: () => ((game as any).blackmarks ?? 0) | 0,
+            getCombatLevel: () => ((Game.localPlayer as any)?.combatLevel ?? 0) | 0,
+            isMapQuickChat: () => !!(game as any).mapQuickChat,
+            getPlayerGender: () => ((Game.localPlayer as any)?.appearance?.gender ? 1 : 0),
+            getLoginType: () => ((game as any).loginType ?? 0) | 0,
+            getLanguage: () => ((game as any).language ?? 0) | 0,
+            getAffiliate: () => ((game as any).affiliate ?? 0) | 0,
+            getEnum: (enumId: number) => (globalThis as any).enumTypes530?.get(enumId) ?? null,
+            getContainer: (containerId: number) => {
+                const liveItems = (game as any).containerItems?.[containerId];
+                const liveAmounts = (game as any).containerAmounts?.[containerId];
+                if (liveItems && liveAmounts) {
+                    return { items: liveItems, amounts: liveAmounts, capacity: liveItems.length };
+                }
+                const byComponent = InterfaceList.get(containerId >>> 16, containerId & 0xFFFF);
+                const widget = Widget.interfaces && containerId >= 0 && containerId < Widget.interfaces.length
+                    ? Widget.interfaces[containerId]
+                    : null;
+                const src: any = byComponent || widget;
+                const items = src?.inventoryItems || src?.items;
+                const amounts = src?.inventoryItemAmounts || src?.itemAmounts;
+                if (!items || !amounts) return null;
+                return { items, amounts, capacity: items.length };
+            },
+            searchItem: (query: string, stockMarketOnly: number) => {
+                const q = (query || "").toLowerCase();
+                const hits: { id: number; name: string }[] = [];
+                ItemDefinition.cache530?.forEach((item: any, id: number) => {
+                    if (stockMarketOnly === 1 && !item.stockMarket) return;
+                    if (item.certtemplate !== undefined && item.certtemplate !== -1) return;
+                    if (item.lentTemplate !== undefined && item.lentTemplate !== -1) return;
+                    if (item.dummyItem !== undefined && item.dummyItem !== 0) return;
+                    const name = item.name || "";
+                    if (name.toLowerCase().indexOf(q) !== -1) hits.push({ id, name });
+                });
+                if (hits.length > 250) {
+                    itemSearch.results = [];
+                    itemSearch.pos = 0;
+                    return -1;
+                }
+                hits.sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
+                itemSearch.results = hits.map((h) => h.id);
+                itemSearch.pos = 0;
+                return itemSearch.results.length;
+            },
+            nextSearchResult: () => itemSearch.pos < itemSearch.results.length ? itemSearch.results[itemSearch.pos++] : -1,
+            resetSearch: () => { itemSearch.pos = 0; },
+        };
+        (this as any).cs2Hooks = hooks;
     }
 
     async preloadFonts530(js5Cache: Js5Cache) {
@@ -12335,8 +13277,12 @@ export class Game extends GameShell {
         // Floors first — small set, eager fill, renderer reads cache[id] directly.
         try {
             const FloorDef = (await import("./cache/def/FloorDefinition")).FloorDefinition;
+            const FloType530M = (await import("./cache/def/FloType530")).FloType530;
+            // Init the FloType530 cache before FloorDef.loadFrom530 — its
+            // internal FloType530.load() calls populate it as a side effect.
+            if (!FloType530M.cache530) FloType530M.cache530 = new Map();
             const n = await FloorDef.loadFrom530(js5Cache, 200);
-            console.log("530 floors loaded: " + n);
+            console.log("530 floors loaded: " + n + " (FloType530 cache size=" + FloType530M.cache530.size + ")");
         } catch (e) {
             console.log("preloadDefs530 floors failed: " + (e as Error).message);
         }
@@ -12350,13 +13296,21 @@ export class Game extends GameShell {
         const NpcType530M = (await import("./cache/def/NpcType530")).NpcType530;
         const LocType530M = (await import("./cache/def/LocType530")).LocType530;
         const BasType530M = (await import("./cache/def/BasType530")).BasType530;
+        const ParamType530M = (await import("./cache/def/ParamType530")).ParamType530;
+        const StructType530M = (await import("./cache/def/StructType530")).StructType530;
+        const EnumType530M = (await import("./cache/def/EnumType530")).EnumType530;
+        const IdkType530M = (await import("./cache/def/IdkType530")).IdkType530;
+        if (!IdkType530M.cache530) IdkType530M.cache530 = new Map();
         if (!ItemDef.cache530) ItemDef.cache530 = new Map();
         if (!ActorDef.cache530) ActorDef.cache530 = new Map();
         if (!GameObjDef.cache530) GameObjDef.cache530 = new Map();
         if (!ActorDef.basCache530) ActorDef.basCache530 = new Map();
+        if (!(globalThis as any).paramTypes530) (globalThis as any).paramTypes530 = new Map();
+        if (!(globalThis as any).structTypes530) (globalThis as any).structTypes530 = new Map();
+        if (!(globalThis as any).enumTypes530) (globalThis as any).enumTypes530 = new Map();
         const BOOTSTRAP_MAX = 2048;
         const CHUNK = 64;
-        let items = 0, npcs = 0, locs = 0, bas = 0;
+        let items = 0, npcs = 0, locs = 0, bas = 0, params = 0, structs = 0, enums = 0, idks = 0;
         for (let base = 0; base < BOOTSTRAP_MAX; base += CHUNK) {
             const promises: Promise<void>[] = [];
             for (let i = 0; i < CHUNK && base + i < BOOTSTRAP_MAX; i++) {
@@ -12385,12 +13339,41 @@ export class Game extends GameShell {
                         if (b) { ActorDef.basCache530!.set(id, b); bas++; }
                     } catch (e) { /* skip */ }
                 })());
+                promises.push((async () => {
+                    try {
+                        const p = await ParamType530M.load(js5Cache, id);
+                        if (p) { (globalThis as any).paramTypes530.set(id, p); params++; }
+                    } catch (e) { /* skip */ }
+                })());
+                promises.push((async () => {
+                    try {
+                        const s = await StructType530M.load(js5Cache, id);
+                        if (s) { (globalThis as any).structTypes530.set(id, s); structs++; }
+                    } catch (e) { /* skip */ }
+                })());
+                promises.push((async () => {
+                    try {
+                        const e = await EnumType530M.load(js5Cache, id);
+                        if (e) { (globalThis as any).enumTypes530.set(id, e); enums++; }
+                    } catch (e) { /* skip */ }
+                })());
+                if (id < 512) {
+                    // IdkType records live at idx2/group=3/file=id and number a few
+                    // hundred — bound the preload to the first 512 ids to keep the
+                    // loop balanced with the other types.
+                    promises.push((async () => {
+                        try {
+                            const k = await IdkType530M.load(js5Cache, id);
+                            if (k) { idks++; }
+                        } catch (e) { /* skip */ }
+                    })());
+                }
             }
             await Promise.all(promises);
             // Yield to the event loop so rendering / input keeps frame.
             await new Promise<void>((res) => setTimeout(res, 0));
         }
-        console.log("530 defs preloaded: items=" + items + " npcs=" + npcs + " locs=" + locs + " bas=" + bas);
+        console.log("530 defs preloaded: items=" + items + " npcs=" + npcs + " locs=" + locs + " bas=" + bas + " params=" + params + " structs=" + structs + " enums=" + enums + " idks=" + idks);
 
         // Model preload: walk the loaded NPC + Loc records, gather every
         // model id they reference, and pull each one through RawModel530 +
@@ -12438,6 +13421,36 @@ export class Game extends GameShell {
         } catch (e) {
             console.log("model preload failed: " + (e as Error).message);
         }
+        try {
+            const TextureMaterialList530M = (await import("./cache/def/TextureMaterial530")).TextureMaterialList530;
+            const list = await TextureMaterialList530M.load(js5Cache);
+            if (list) {
+                Game.textureMaterialList530 = list;
+                let opaque = 0, blends = 0, animated = 0, present = 0;
+                for (let i = 0; i < list.count; i++) {
+                    if (!list.exists[i]) continue;
+                    present++;
+                    if (list.isOpaque[i]) opaque++;
+                    if (list.blends[i]) blends++;
+                    if (list.isAnimated[i]) animated++;
+                }
+                console.log("530 textures: count=" + list.count + " present=" + present + " opaque=" + opaque + " blends=" + blends + " animated=" + animated);
+                // (Removed: 256-id texture-material decode validation pass.
+                // It was boot-time instrumentation — load() ran 256 times, ~67
+                // failures spammed stack-trace warnings, and the cumulative
+                // work pinned the V8 main thread post-init so hard that even
+                // setTimeout callbacks couldn't fire — input handlers stalled
+                // for tens of seconds after the title screen showed. Real
+                // renderer calls into TextureMaterial530.load happen on
+                // demand and are wrapped in try/catch upstream, so removing
+                // the eager pass loses nothing but the boot-time spam.)
+            } else {
+                console.log("530 textures: idx26/0/0 missing");
+            }
+        } catch (e) {
+            console.log("texture-list preload failed: " + (e as Error).message);
+        }
+        this.preloadFramesets530().catch((e) => console.log("preloadFramesets530 failed: " + (e as Error).message));
     }
 
     async withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -12447,13 +13460,251 @@ export class Game extends GameShell {
         ]);
     }
 
+    /**
+     * Lazy-construct the SceneWire530 orchestrator. Pulls deps from the
+     * existing 530 caches: bridge factory wraps Model530Bridge, frameset
+     * lookup is backed by `FramesetCache530` (idx20 SeqType → idx0/idx1
+     * AnimFrameset), raw-model loader hits Js5Cache idx7 via
+     * RawModel530.load. Returns the cached instance on subsequent calls.
+     *
+     * Callers are responsible for pre-warming `framesetCache530` for the
+     * seq ids actually referenced by NPCs/players in view; the lookup
+     * returns null for unwarmed ids and the animator falls back to
+     * "no animation" gracefully.
+     */
+    getOrCreateSceneWire530(): SceneWire530 | null {
+        if (this.sceneWire530) return this.sceneWire530;
+        const js5Cache = (this as any).js5Cache;
+        if (!js5Cache) return null;
+        if (!this.framesetCache530) {
+            this.framesetCache530 = makeFramesetCache530(js5Cache);
+        }
+        const framesetLookup = this.framesetCache530.lookup();
+        let nextBridgeId = 0;
+        const bridge = {
+            attachModel: (raw: any) => {
+                if (!raw || raw.vertexCount <= 0) return null;
+                // Production wraps `new Model530Bridge(id)` + `attachModel(raw)`.
+                // Inline-construct here to avoid a circular Game.ts ↔ Bridge import.
+                return {
+                    id: ++nextBridgeId,
+                    rawModel: raw,
+                    verts: raw.vertexCount,
+                    tris: raw.triangleCount,
+                    reset: () => { /* per-instance cleanup is owned by the bridge */ },
+                };
+            },
+        };
+        this.sceneWire530 = new SceneWire530({
+            bridge,
+            framesetLookup,
+            rawModelLoader: async (id: number) => {
+                try {
+                    const RawModel530M = (await import("./cache/def/RawModel530")).RawModel530;
+                    return await RawModel530M.load(js5Cache, id);
+                } catch (_) {
+                    return null;
+                }
+            },
+        });
+        return this.sceneWire530;
+    }
+
+    /**
+     * Pre-warm `framesetCache530` for every seq id referenced by the
+     * loaded BasType cache. Called in the background after the def
+     * preload completes so the animator's first sync `framesetLookup`
+     * call already has data.
+     *
+     * Returns the count of cache entries newly added. Safe to call
+     * repeatedly — already-cached and known-missing seq ids are skipped.
+     * Failures are silent (per-id) so a slow / missing idx20 sector
+     * cannot stall startup.
+     */
+    async preloadFramesets530(): Promise<number> {
+        if (!this.framesetCache530) {
+            // Construct the cache lazily so callers that hit this before
+            // `getOrCreateSceneWire530()` still get the preload.
+            const js5Cache = (this as any).js5Cache;
+            if (!js5Cache) return 0;
+            this.framesetCache530 = makeFramesetCache530(js5Cache);
+        }
+        const ActorDef = (await import("./cache/def/ActorDefinition")).ActorDefinition;
+        const cache = (ActorDef as any).basCache530 as Map<number, any> | null;
+        if (!cache || cache.size === 0) return 0;
+        const { collectAllBasSeqIds } = await import("./cache/def/FramesetCache530");
+        const seqIds = collectAllBasSeqIds(cache);
+        if (seqIds.length === 0) return 0;
+        const added = await this.framesetCache530.preload(seqIds);
+        console.log(
+            "[FramesetCache530] preloaded " + added + " framesets from " +
+            seqIds.length + " unique seq ids (" + cache.size + " bas types)"
+        );
+        return added;
+    }
+
+    /**
+     * Per-tick scan: any player whose `appearanceDirty` flag is set gets a
+     * fire-and-forget composeAppearanceModel run. On success the resulting
+     * RawModel530Data is handed to SceneWire530.rebuildPlayerAvatar; the
+     * dirty flag is cleared regardless so a doomed compose doesn't loop.
+     *
+     * In-flight composes are deduped via `composingPlayers530`. The compose
+     * is async and may straddle multiple frames — that's fine, the player's
+     * appearance only updates when the server pushes a new APPEARANCE mask
+     * so re-firing on the next dirty flag is correct.
+     */
+    composePlayerAvatars530(): void {
+        const wire = this.sceneWire530;
+        if (!wire) return;
+        const players = this.players;
+        if (!players) return;
+        for (let i = 0; i < players.length; i++) {
+            const p: any = players[i];
+            if (!p) continue;
+            if (!p.appearanceDirty) continue;
+            if (this.composingPlayers530.has(i)) continue;
+            this.composingPlayers530.add(i);
+            // Clear the dirty flag eagerly so a slow compose doesn't get
+            // re-armed by a subsequent tick before we finish.
+            p.appearanceDirty = false;
+            const playerId = i;
+            (async () => {
+                try {
+                    const PA530M = await import("./media/renderable/PlayerAppearance530");
+                    const ItemDef = (await import("./cache/def/ItemDefinition")).ItemDefinition;
+                    const IdkType530M = (await import("./cache/def/IdkType530")).IdkType530;
+                    const RawModel530M = (await import("./cache/def/RawModel530")).RawModel530;
+                    const idkLookup = (id: number) => (IdkType530M.cache530 ? IdkType530M.cache530.get(id) ?? null : null);
+                    const objLookup = (id: number) => (ItemDef.cache530 ? ItemDef.cache530.get(id) ?? null : null);
+                    const rawLoader = (id: number) => RawModel530M.load((this as any).js5Cache, id);
+                    const skinFive = [Game.SKIN_COLOURS, Game.SKIN_COLOURS, Game.SKIN_COLOURS, Game.SKIN_COLOURS, Game.SKIN_COLOURS];
+                    const mesh = await PA530M.composeAppearanceModel(
+                        p.appearance530,
+                        idkLookup as any,
+                        objLookup as any,
+                        rawLoader,
+                        Game.playerColours,
+                        skinFive,
+                    );
+                    if (mesh) {
+                        p.composedModel530 = mesh;
+                        wire.rebuildPlayerAvatar(p, mesh);
+                        this.playerComposeCount530++;
+                        if (this.playerComposeCount530 % 10 === 1) {
+                            console.log("[PlayerAvatar530] composed=" + this.playerComposeCount530 + " (latest pid=" + playerId + " verts=" + mesh.vertexCount + " tris=" + mesh.triangleCount + ")");
+                        }
+                    }
+                } catch (e) {
+                    console.log("[PlayerAvatar530] compose failed pid=" + playerId + ": " + (e as Error).message);
+                } finally {
+                    this.composingPlayers530.delete(playerId);
+                }
+            })();
+        }
+    }
+
+    /**
+     * Per-tick scan: any visible NPC whose `composedDefId530` doesn't match
+     * its current ActorDefinition.id gets a fire-and-forget composeNpcModel
+     * run. The composed mesh is handed to SceneWire530.rebuildNpcAppearance
+     * and the def-id is stamped onto the npc so a stable definition only
+     * composes once.
+     *
+     * The dirty signal is "def-id changed" rather than an explicit dirty
+     * flag because NPCs change appearance via npcDefinition swap (multi-NPC
+     * transform). When the def stays stable, the slot is skipped on every
+     * subsequent tick.
+     */
+    composeNpcAvatars530(): void {
+        const wire = this.sceneWire530;
+        if (!wire) return;
+        const cache = ActorDefinition.cache530;
+        if (!cache || cache.size === 0) return;
+        const max = Math.min(this.anInt1133, this.anIntArray1134.length);
+        for (let j = 0; j < max; j++) {
+            const slot = this.anIntArray1134[j];
+            const npc: any = this.npcs[slot];
+            if (!npc || !npc.isVisible || !npc.isVisible()) continue;
+            const def = npc.npcDefinition;
+            if (!def) continue;
+            const defId = def.id;
+            if (defId < 0) continue;
+            if (npc.composedDefId530 === defId) continue;
+            if (this.composingNpcs530.has(slot)) continue;
+            const npcType = cache.get(defId);
+            if (!npcType || !(npcType as any).modelIndices || (npcType as any).modelIndices.length === 0) {
+                npc.composedDefId530 = defId; // mark resolved-to-no-mesh so we don't retry
+                continue;
+            }
+            this.composingNpcs530.add(slot);
+            const slotIdx = slot;
+            const targetDefId = defId;
+            (async () => {
+                try {
+                    const NA530M = await import("./scene/NpcAppearance530");
+                    const RawModel530M = (await import("./cache/def/RawModel530")).RawModel530;
+                    const rawLoader = (id: number) => RawModel530M.load((this as any).js5Cache, id);
+                    const mesh = await NA530M.composeNpcModel(npcType as any, rawLoader);
+                    // The npc may have been replaced/removed mid-compose; re-fetch.
+                    const live: any = this.npcs[slotIdx];
+                    if (mesh && live && live.npcDefinition && live.npcDefinition.id === targetDefId) {
+                        live.composedModel530 = mesh;
+                        wire.rebuildNpcAppearance(live, mesh);
+                        live.composedDefId530 = targetDefId;
+                        this.npcComposeCount530++;
+                        if (this.npcComposeCount530 % 25 === 1) {
+                            console.log("[NpcAvatar530] composed=" + this.npcComposeCount530 + " (latest defId=" + targetDefId + " verts=" + mesh.vertexCount + " tris=" + mesh.triangleCount + ")");
+                        }
+                    } else if (live) {
+                        // Compose failed or NPC moved on — still stamp so we don't loop.
+                        if (live.npcDefinition && live.npcDefinition.id === targetDefId) {
+                            live.composedDefId530 = targetDefId;
+                        }
+                    }
+                } catch (e) {
+                    console.log("[NpcAvatar530] compose failed slot=" + slotIdx + ": " + (e as Error).message);
+                } finally {
+                    this.composingNpcs530.delete(slotIdx);
+                }
+            })();
+        }
+    }
+
     async prepareTitleBackground() {
         const jpgBytes = this.titleArchive.getFile("title.dat");
         // When running against the 530 cache, title.dat isn't present as a named
-        // file in idx0 (that archive doesn't exist in 530). Skip the title JPG work
-        // — the title screen will show as a solid background, which is fine since
-        // we go straight to the login form.
-        if (!jpgBytes) return;
+        // file in idx0 (that archive doesn't exist in 530). The 377 path here
+        // would slice the JPG into 8 sub-buffers (flame backdrops, title-box
+        // borders, logo). Without the JPG those buffers stay holding whatever
+        // the previous frame stamped on them — including the loading-bar
+        // pixels — which then bleeds through every subsequent draw because
+        // drawLoginScreen only paints a small dialog over the top.
+        //
+        // For the 530 fallback: zero every shared title buffer so the title
+        // state starts from a clean black backdrop, and disable the flame
+        // animation since its source emblems came from the same JPG slice.
+        if (!jpgBytes) {
+            const blackOut = (b: ProducingGraphicsBuffer) => {
+                if (!b) return;
+                b.createRasterizer();
+                Rasterizer.resetPixels();
+            };
+            blackOut(this.flameLeftBackground);
+            blackOut(this.flameRightBackground);
+            blackOut(this.aClass18_1198);
+            blackOut(this.aClass18_1199);
+            blackOut(this.aClass18_1200);
+            blackOut(this.aClass18_1203);
+            blackOut(this.aClass18_1204);
+            blackOut(this.aClass18_1205);
+            blackOut(this.aClass18_1206);
+            // Halt the flame compute thread — its inputs are blank so all the
+            // per-frame pixel work would just churn CPU for no visible output.
+            this.shouldRenderFlames = false;
+            this.startedRenderingFlames = false;
+            return;
+        }
         let abyte0: Int8Array = new Int8Array(jpgBytes);
         let class50_sub1_sub1_sub1: ImageRGB = await ImageRGB.fromJpg(abyte0);
         this.flameLeftBackground.createRasterizer();
@@ -12553,22 +13804,17 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(245);
-                this.outBuffer.putLEShortAdded(clicked);
+                Outgoing530.playerAction1(this.outBuffer, clicked);
             }
         }
         if (action === 227) {
             Game.anInt1165;
             Game.anInt1165++;
             if (Game.anInt1165 >= 62) {
-                this.outBuffer.putOpcode(165);
-                this.outBuffer.putByte(206);
+                this.skipLegacyRandomActionPacket(165);
                 Game.anInt1165 = 0;
             }
-            this.outBuffer.putOpcode(228);
-            this.outBuffer.putLEShortDup(first);
-            this.outBuffer.putShortAdded(clicked);
-            this.outBuffer.putShort(second);
+            Outgoing530.objAction4(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -12601,8 +13847,7 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(45);
-                this.outBuffer.putShortAdded(clicked);
+                Outgoing530.playerFollow(this.outBuffer, clicked);
             }
         }
         if (action === 921) {
@@ -12613,21 +13858,16 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(67);
-                this.outBuffer.putShortAdded(clicked);
+                Outgoing530.npcAction2(this.outBuffer, clicked);
             }
         }
         if (action === 961) {
             Game.anInt1139 = Game.anInt1139 + clicked;
             if (Game.anInt1139 >= 115) {
-                this.outBuffer.putOpcode(126);
-                this.outBuffer.putByte(125);
+                this.skipLegacyRandomActionPacket(126);
                 Game.anInt1139 = 0;
             }
-            this.outBuffer.putOpcode(203);
-            this.outBuffer.putShortAdded(second);
-            this.outBuffer.putLEShortDup(first);
-            this.outBuffer.putLEShortDup(clicked);
+            Outgoing530.objAction1(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -12640,19 +13880,10 @@ export class Game extends GameShell {
             }
         }
         if (action === 467 && this.method80(second, 0, first, clicked)) {
-            this.outBuffer.putOpcode(152);
-            this.outBuffer.putLEShortDup((clicked >> 14) & 32767);
-            this.outBuffer.putLEShortDup(this.anInt1148);
-            this.outBuffer.putLEShortDup(this.anInt1149);
-            this.outBuffer.putLEShortDup(second + this.nextTopRightTileY);
-            this.outBuffer.putShort(this.anInt1147);
-            this.outBuffer.putLEShortAdded(first + this.nextTopLeftTileX);
+            Outgoing530.useOnLoc(this.outBuffer, this.anInt1147, this.anInt1149, this.anInt1148, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, (clicked >> 14) & 32767);
         }
         if (action === 9) {
-            this.outBuffer.putOpcode(3);
-            this.outBuffer.putShortAdded(clicked);
-            this.outBuffer.putShort(second);
-            this.outBuffer.putShort(first);
+            Outgoing530.objInComponentAction1(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -12672,8 +13903,7 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(42);
-                this.outBuffer.putLEShortDup(clicked);
+                Outgoing530.npcAction4(this.outBuffer, clicked);
             }
         }
         if (action === 677) {
@@ -12697,8 +13927,7 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(116);
-                this.outBuffer.putLEShortDup(clicked);
+                Outgoing530.playerTrade(this.outBuffer, clicked);
             }
         }
         if (
@@ -12747,16 +13976,10 @@ export class Game extends GameShell {
             this.anInt1021 = this.clickY;
             this.crossType = 2;
             this.crossIndex = 0;
-            this.outBuffer.putOpcode(54);
-            this.outBuffer.putShortAdded(clicked);
-            this.outBuffer.putLEShortDup(second + this.nextTopRightTileY);
-            this.outBuffer.putShort(first + this.nextTopLeftTileX);
+            Outgoing530.objstackAction2(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, clicked);
         }
         if (action === 399) {
-            this.outBuffer.putOpcode(24);
-            this.outBuffer.putLEShortDup(second);
-            this.outBuffer.putLEShortDup(clicked);
-            this.outBuffer.putShortAdded(first);
+            Outgoing530.objAction2(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -12789,16 +14012,11 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(57);
-                this.outBuffer.putShort(clicked);
-                this.outBuffer.putLEShortDup(this.anInt1149);
-                this.outBuffer.putLEShortAdded(this.anInt1148);
-                this.outBuffer.putShort(this.anInt1147);
+                Outgoing530.useOnNpc(this.outBuffer, this.anInt1147, this.anInt1149, this.anInt1148, clicked);
             }
         }
         if (action === Actions.TOGGLE_SETTING_WIDGET) {
-            this.outBuffer.putOpcode(79);
-            this.outBuffer.putShort(second);
+            Outgoing530.ifCs2(this.outBuffer, second);
             const widget: Widget = Widget.forId(second);
             if (widget.opcodes != null && widget.opcodes[0][0] === 5) {
                 const setting: number = widget.opcodes[0][1];
@@ -12828,25 +14046,20 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(233);
-                this.outBuffer.putShortAdded(clicked);
+                Outgoing530.playerAction5(this.outBuffer, clicked);
             }
         }
         if (action === 14) {
             if (!this.menuOpen) {
                 this.currentScene.method279(0, this.clickX - 4, this.clickY - 4);
+                this.tryLandscape530WalkFallback(this.clickX - 4, this.clickY - 4);
             } else {
                 this.currentScene.method279(0, first - 4, second - 4);
+                this.tryLandscape530WalkFallback(first - 4, second - 4);
             }
         }
         if (action === 903) {
-            this.outBuffer.putOpcode(1);
-            this.outBuffer.putShort(clicked);
-            this.outBuffer.putLEShortDup(this.anInt1147);
-            this.outBuffer.putLEShortDup(this.anInt1149);
-            this.outBuffer.putLEShortAdded(this.anInt1148);
-            this.outBuffer.putShortAdded(first);
-            this.outBuffer.putShortAdded(second);
+            Outgoing530.useOnItem(this.outBuffer, this.anInt1147, this.anInt1149, this.anInt1148, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -12859,11 +14072,7 @@ export class Game extends GameShell {
             }
         }
         if (action === 361) {
-            this.outBuffer.putOpcode(36);
-            this.outBuffer.putShort(this.anInt1172);
-            this.outBuffer.putShortAdded(second);
-            this.outBuffer.putShortAdded(first);
-            this.outBuffer.putShortAdded(clicked);
+            Outgoing530.componentObjAction(this.outBuffer, 0, this.anInt1172, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -12898,20 +14107,14 @@ export class Game extends GameShell {
                 this.crossIndex = 0;
                 Game.anInt1235 = Game.anInt1235 + clicked;
                 if (Game.anInt1235 >= 143) {
-                    this.outBuffer.putOpcode(157);
-                    this.outBuffer.putInt(0);
+                    this.skipLegacyRandomActionPacket(157);
                     Game.anInt1235 = 0;
                 }
-                this.outBuffer.putOpcode(13);
-                this.outBuffer.putLEShortAdded(clicked);
+                Outgoing530.npcAction3(this.outBuffer, clicked);
             }
         }
         if (action === 376 && this.method80(second, 0, first, clicked)) {
-            this.outBuffer.putOpcode(210);
-            this.outBuffer.putShort(this.anInt1172);
-            this.outBuffer.putLEShortDup((clicked >> 14) & 32767);
-            this.outBuffer.putShortAdded(first + this.nextTopLeftTileX);
-            this.outBuffer.putLEShortDup(second + this.nextTopRightTileY);
+            Outgoing530.componentLocAction(this.outBuffer, 0, this.anInt1172, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, (clicked >> 14) & 32767);
         }
         if (action === 432) {
             const class50_sub1_sub4_sub3_sub1_4: Npc = this.npcs[clicked];
@@ -12934,8 +14137,7 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(8);
-                this.outBuffer.putLEShortDup(clicked);
+                Outgoing530.npcAction5(this.outBuffer, clicked);
             }
         }
         if (action === Actions.CLOSE_WIDGETS) {
@@ -12962,9 +14164,7 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(31);
-                this.outBuffer.putShort(clicked);
-                this.outBuffer.putLEShortDup(this.anInt1172);
+                Outgoing530.componentPlayerAction(this.outBuffer, 0, this.anInt1172, clicked);
             }
         }
         if (action === 67) {
@@ -12988,9 +14188,7 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(104);
-                this.outBuffer.putShortAdded(this.anInt1172);
-                this.outBuffer.putLEShortDup(clicked);
+                Outgoing530.componentNpcAction(this.outBuffer, 0, this.anInt1172, clicked);
             }
         }
         if (action === 68) {
@@ -13015,10 +14213,7 @@ export class Game extends GameShell {
             this.anInt1021 = this.clickY;
             this.crossType = 2;
             this.crossIndex = 0;
-            this.outBuffer.putOpcode(77);
-            this.outBuffer.putShortAdded(first + this.nextTopLeftTileX);
-            this.outBuffer.putShort(second + this.nextTopRightTileY);
-            this.outBuffer.putLEShortAdded(clicked);
+            Outgoing530.objstackAction1(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, clicked);
         }
         if (action === 684) {
             let flag2: boolean = this.walk(
@@ -13047,14 +14242,10 @@ export class Game extends GameShell {
             }
             Game.anInt1052++;
             if (Game.anInt1052 >= 84) {
-                this.outBuffer.putOpcode(222);
-                this.outBuffer.putTriByte(11257922);
+                this.skipLegacyRandomActionPacket(222);
                 Game.anInt1052 = 0;
             }
-            this.outBuffer.putOpcode(71);
-            this.outBuffer.putLEShortAdded(clicked);
-            this.outBuffer.putLEShortAdded(first + this.nextTopLeftTileX);
-            this.outBuffer.putShortAdded(second + this.nextTopRightTileY);
+            Outgoing530.objstackAction1(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, clicked);
         }
         if (action === Actions.ACCEPT_TRADE || action === Actions.ACCEPT_CHALLENGE) {
             let name: string = this.menuActionTexts[id];
@@ -13091,12 +14282,10 @@ export class Game extends GameShell {
                             Game.localPlayer.pathX[0]
                         );
                         if (action === Actions.ACCEPT_TRADE) {
-                            this.outBuffer.putOpcode(116);
-                            this.outBuffer.putLEShortDup(this.playerList[index]);
+                            Outgoing530.playerTrade(this.outBuffer, this.playerList[index]);
                         }
                         if (action === Actions.ACCEPT_CHALLENGE) {
-                            this.outBuffer.putOpcode(245);
-                            this.outBuffer.putLEShortAdded(this.playerList[index]);
+                            Outgoing530.playerAction1(this.outBuffer, this.playerList[index]);
                         }
                         found = true;
                         break;
@@ -13108,10 +14297,7 @@ export class Game extends GameShell {
             }
         }
         if (action === 225) {
-            this.outBuffer.putOpcode(177);
-            this.outBuffer.putShortAdded(first);
-            this.outBuffer.putLEShortDup(clicked);
-            this.outBuffer.putLEShortDup(second);
+            Outgoing530.objOperate(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -13147,10 +14333,7 @@ export class Game extends GameShell {
             return;
         }
         if (action === 891) {
-            this.outBuffer.putOpcode(4);
-            this.outBuffer.putLEShortDup(first);
-            this.outBuffer.putLEShortAdded(clicked);
-            this.outBuffer.putLEShortAdded(second);
+            Outgoing530.objAction5(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -13163,10 +14346,7 @@ export class Game extends GameShell {
             }
         }
         if (action === 894) {
-            this.outBuffer.putOpcode(158);
-            this.outBuffer.putLEShortAdded(first);
-            this.outBuffer.putLEShortAdded(clicked);
-            this.outBuffer.putLEShortDup(second);
+            Outgoing530.objInComponentAction5(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -13180,30 +14360,18 @@ export class Game extends GameShell {
         }
         if (action === 1280) {
             this.method80(second, 0, first, clicked);
-            this.outBuffer.putOpcode(55);
-            this.outBuffer.putLEShortDup((clicked >> 14) & 32767);
-            this.outBuffer.putLEShortDup(second + this.nextTopRightTileY);
-            this.outBuffer.putShort(first + this.nextTopLeftTileX);
+            Outgoing530.locAction5(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, (clicked >> 14) & 32767);
         }
         if (action === 35) {
             this.method80(second, 0, first, clicked);
-            this.outBuffer.putOpcode(181);
-            this.outBuffer.putShortAdded(first + this.nextTopLeftTileX);
-            this.outBuffer.putLEShortDup(second + this.nextTopRightTileY);
-            this.outBuffer.putLEShortDup((clicked >> 14) & 32767);
+            Outgoing530.locAction1(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, (clicked >> 14) & 32767);
         }
         if (action === 888) {
             this.method80(second, 0, first, clicked);
-            this.outBuffer.putOpcode(50);
-            this.outBuffer.putShortAdded(second + this.nextTopRightTileY);
-            this.outBuffer.putLEShortDup((clicked >> 14) & 32767);
-            this.outBuffer.putLEShortAdded(first + this.nextTopLeftTileX);
+            Outgoing530.locAction3(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, (clicked >> 14) & 32767);
         }
         if (action === 324) {
-            this.outBuffer.putOpcode(161);
-            this.outBuffer.putLEShortAdded(first);
-            this.outBuffer.putLEShortAdded(clicked);
-            this.outBuffer.putLEShortDup(second);
+            Outgoing530.objAction3(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -13235,8 +14403,7 @@ export class Game extends GameShell {
                 flag7 = this.handleWidgetDynamicAction(class13_2);
             }
             if (flag7) {
-                this.outBuffer.putOpcode(79);
-                this.outBuffer.putShort(second);
+                Outgoing530.ifCs2(this.outBuffer, second);
             }
         }
         if (action === 1412) {
@@ -13251,16 +14418,12 @@ export class Game extends GameShell {
             this.addChatMessage("", s9, 0);
         }
         if (action === 575 && !this.aBoolean1239) {
-            this.outBuffer.putOpcode(226);
-            this.outBuffer.putShort(second);
+            Outgoing530.continueDialogue(this.outBuffer, second, first);
             this.aBoolean1239 = true;
         }
         if (action === 892) {
             this.method80(second, 0, first, clicked);
-            this.outBuffer.putOpcode(136);
-            this.outBuffer.putShort(first + this.nextTopLeftTileX);
-            this.outBuffer.putLEShortDup(second + this.nextTopRightTileY);
-            this.outBuffer.putShort((clicked >> 14) & 32767);
+            Outgoing530.locAction4(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, (clicked >> 14) & 32767);
         }
         if (action === 270) {
             let flag3: boolean = this.walk(
@@ -13284,10 +14447,7 @@ export class Game extends GameShell {
             this.anInt1021 = this.clickY;
             this.crossType = 2;
             this.crossIndex = 0;
-            this.outBuffer.putOpcode(230);
-            this.outBuffer.putLEShortDup(clicked);
-            this.outBuffer.putShortAdded(first + this.nextTopLeftTileX);
-            this.outBuffer.putShort(second + this.nextTopRightTileY);
+            Outgoing530.objstackAction5(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, clicked);
         }
         if (action === 596) {
             const class50_sub1_sub4_sub3_sub2_5: Player = this.players[clicked];
@@ -13310,11 +14470,7 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(143);
-                this.outBuffer.putLEShortDup(this.anInt1149);
-                this.outBuffer.putLEShortAdded(this.anInt1147);
-                this.outBuffer.putShort(this.anInt1148);
-                this.outBuffer.putShortAdded(clicked);
+                Outgoing530.useOnPlayer(this.outBuffer, this.anInt1147, this.anInt1149, this.anInt1148, clicked);
             }
         }
         if (action === 100) {
@@ -13339,13 +14495,7 @@ export class Game extends GameShell {
             this.anInt1021 = this.clickY;
             this.crossType = 2;
             this.crossIndex = 0;
-            this.outBuffer.putOpcode(211);
-            this.outBuffer.putLEShortAdded(this.anInt1147);
-            this.outBuffer.putShortAdded(this.anInt1149);
-            this.outBuffer.putLEShortAdded(second + this.nextTopRightTileY);
-            this.outBuffer.putLEShortAdded(first + this.nextTopLeftTileX);
-            this.outBuffer.putLEShortDup(this.anInt1148);
-            this.outBuffer.putLEShortDup(clicked);
+            Outgoing530.useOnGroundItem(this.outBuffer, this.anInt1147, this.anInt1149, this.anInt1148, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, clicked);
         }
         if (action === 1668) {
             const class50_sub1_sub4_sub3_sub1_6: Npc = this.npcs[clicked];
@@ -13390,20 +14540,13 @@ export class Game extends GameShell {
             Game.anInt1100;
             Game.anInt1100++;
             if (Game.anInt1100 >= 120) {
-                this.outBuffer.putOpcode(95);
-                this.outBuffer.putInt(0);
+                this.skipLegacyRandomActionPacket(95);
                 Game.anInt1100 = 0;
             }
-            this.outBuffer.putOpcode(100);
-            this.outBuffer.putShort(first + this.nextTopLeftTileX);
-            this.outBuffer.putShortAdded(second + this.nextTopRightTileY);
-            this.outBuffer.putLEShortAdded(clicked);
+            Outgoing530.objstackAction2(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, clicked);
         }
         if (action === 444) {
-            this.outBuffer.putOpcode(91);
-            this.outBuffer.putLEShortDup(clicked);
-            this.outBuffer.putLEShortAdded(first);
-            this.outBuffer.putShort(second);
+            Outgoing530.objInComponentAction2(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -13431,16 +14574,10 @@ export class Game extends GameShell {
         }
         if (action === 389) {
             this.method80(second, 0, first, clicked);
-            this.outBuffer.putOpcode(241);
-            this.outBuffer.putShort((clicked >> 14) & 32767);
-            this.outBuffer.putShort(first + this.nextTopLeftTileX);
-            this.outBuffer.putShortAdded(second + this.nextTopRightTileY);
+            Outgoing530.locAction2(this.outBuffer, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, (clicked >> 14) & 32767);
         }
         if (action === 564) {
-            this.outBuffer.putOpcode(231);
-            this.outBuffer.putLEShortAdded(second);
-            this.outBuffer.putLEShortDup(first);
-            this.outBuffer.putShort(clicked);
+            Outgoing530.objInComponentAction3(this.outBuffer, first, clicked, second);
             this.atInventoryLoopCycle = 0;
             this.anInt1330 = second;
             this.anInt1331 = first;
@@ -13479,8 +14616,7 @@ export class Game extends GameShell {
             }
         }
         if (action === Actions.RESET_SETTING_WIDGET) {
-            this.outBuffer.putOpcode(79);
-            this.outBuffer.putShort(second);
+            Outgoing530.ifCs2(this.outBuffer, second);
             const widget: Widget = Widget.forId(second);
             if (widget.opcodes != null && widget.opcodes[0][0] === 5) {
                 const operand: number = widget.opcodes[0][1];
@@ -13512,8 +14648,7 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(112);
-                this.outBuffer.putLEShortDup(clicked);
+                Outgoing530.npcAction1(this.outBuffer, clicked);
             }
         }
         if (action === 199) {
@@ -13538,11 +14673,7 @@ export class Game extends GameShell {
             this.anInt1021 = this.clickY;
             this.crossType = 2;
             this.crossIndex = 0;
-            this.outBuffer.putOpcode(83);
-            this.outBuffer.putLEShortDup(clicked);
-            this.outBuffer.putShort(second + this.nextTopRightTileY);
-            this.outBuffer.putLEShortDup(this.anInt1172);
-            this.outBuffer.putLEShortAdded(first + this.nextTopLeftTileX);
+            Outgoing530.componentGroundItemAction(this.outBuffer, 0, this.anInt1172, first + this.nextTopLeftTileX, second + this.nextTopRightTileY, clicked);
         }
         if (action === 55) {
             this.method44(Game.aBoolean1190, this.dialogueId);
@@ -13590,8 +14721,7 @@ export class Game extends GameShell {
                 this.anInt1021 = this.clickY;
                 this.crossType = 2;
                 this.crossIndex = 0;
-                this.outBuffer.putOpcode(194);
-                this.outBuffer.putLEShortDup(clicked);
+                Outgoing530.playerRequestAssist(this.outBuffer, clicked);
             }
         }
         this.itemSelected = 0;
@@ -13683,14 +14813,7 @@ export class Game extends GameShell {
             this.method25();
         }
         if (type === 326) {
-            this.outBuffer.putOpcode(163);
-            this.outBuffer.putByte(this.characterEditChangeGenger ? 0 : 1);
-            for (let i1: number = 0; i1 < 7; i1++) {
-                this.outBuffer.putByte(this.characterEditIdentityKits[i1]);
-            }
-            for (let l1: number = 0; l1 < 5; l1++) {
-                this.outBuffer.putByte(this.characterEditColors[l1]);
-            }
+            this.skipUnsupportedCharacterDesignPacket();
             return true;
         }
         if (type === 620) {
@@ -13699,17 +14822,14 @@ export class Game extends GameShell {
         if (type >= 601 && type <= 613) {
             this.closeWidgets();
             if (this.reportedName.length > 0) {
-                this.outBuffer.putOpcode(184);
-                this.outBuffer.putLong(TextUtils.nameToLong(this.reportedName));
-                this.outBuffer.putByte(type - 601);
-                this.outBuffer.putByte(this.reportMutePlayer ? 1 : 0);
+                Outgoing530.bugReport(this.outBuffer, TextUtils.nameToLong(this.reportedName), type - 600, this.reportMutePlayer);
             }
         }
         return false;
     }
 
     public closeWidgets() {
-        this.outBuffer.putOpcode(110);
+        Outgoing530.closeModal(this.outBuffer);
         if (this.anInt1089 !== -1) {
             this.method44(Game.aBoolean1190, this.anInt1089);
             this.anInt1089 = -1;
@@ -13792,8 +14912,7 @@ export class Game extends GameShell {
                             this.friends[k] = this.friends[k + 1];
                         }
                     }
-                    this.outBuffer.putOpcode(141);
-                    this.outBuffer.putLong(l);
+                    Outgoing530.removeFriend(this.outBuffer, l);
                     break;
                 }
             }
@@ -13818,8 +14937,7 @@ export class Game extends GameShell {
                     for (let k: number = j; k < this.ignoresCount; k++) {
                         this.ignores[k] = this.ignores[k + 1];
                     }
-                    this.outBuffer.putOpcode(160);
-                    this.outBuffer.putLong(l);
+                    Outgoing530.removeIgnore(this.outBuffer, l);
                     break;
                 }
             }
@@ -13872,8 +14990,7 @@ export class Game extends GameShell {
             this.friendWorlds[this.friendsCount] = 0;
             this.friendsCount++;
             this.redrawTabArea = true;
-            this.outBuffer.putOpcode(120);
-            this.outBuffer.putLong(name);
+            Outgoing530.addFriend(this.outBuffer, name);
             return;
         } catch (runtimeexception) {
             SignLink.reportError("94629, " + name + ", , " + runtimeexception.toString());
@@ -13905,8 +15022,7 @@ export class Game extends GameShell {
             }
             this.ignores[this.ignoresCount++] = name;
             this.redrawTabArea = true;
-            this.outBuffer.putOpcode(217);
-            this.outBuffer.putLong(name);
+            Outgoing530.addIgnore(this.outBuffer, name);
             return;
         } catch (runtimeexception) {
             SignLink.reportError("27939, " + i + ", " + name + ", " + runtimeexception.toString());

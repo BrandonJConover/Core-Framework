@@ -1,0 +1,3 @@
+[Huffman] decode "hi": result="hi" bytesConsumed=1
+[Huffman] decode "hihi": result="hihi"
+[Huffman] all tests passed

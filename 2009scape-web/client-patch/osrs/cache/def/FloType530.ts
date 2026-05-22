@@ -76,16 +76,44 @@ class FloBuf {
     }
 }
 
-/**
- * Mirrors rt4-client ColorUtils.rgbToHsl() packing: we don't yet need the actual HSL
- * computation here — it's done lazily by the renderer once it has the floor color.
- * For now we just preserve the magenta sentinel rule from FloType.method492():
- *   color === 0xFF00FF (16711935) ⇒ -1, otherwise pass the RGB through. The actual
- *   HSL conversion is the renderer's responsibility — keeping it out of this parser
- *   means we don't have to port ColorUtils too.
- */
-function method492Passthrough(rgb: number): number {
-    return rgb === 0xFF00FF ? -1 : rgb;
+function rgbToHsl(rgb: number): number {
+    const r = ((rgb >> 16) & 0xff) / 256.0;
+    const g = ((rgb >> 8) & 0xff) / 256.0;
+    const b = (rgb & 0xff) / 256.0;
+    const min = Math.min(r, g, b);
+    const max = Math.max(r, g, b);
+    const light = (min + max) / 2.0;
+    let hue = 0.0;
+    let sat = 0.0;
+
+    if (min !== max) {
+        sat = light < 0.5 ? (max - min) / (min + max) : (max - min) / (2.0 - max - min);
+        if (max === r) {
+            hue = (g - b) / (max - min);
+        } else if (max === g) {
+            hue = (b - r) / (max - min) + 2.0;
+        } else {
+            hue = (r - g) / (max - min) + 4.0;
+        }
+    }
+
+    hue /= 6.0;
+    let h = (hue * 256.0) | 0;
+    let s = (sat * 256.0) | 0;
+    let l = (light * 256.0) | 0;
+    if (s < 0) s = 0;
+    else if (s > 255) s = 255;
+    if (l < 0) l = 0;
+    else if (l > 255) l = 255;
+    if (l > 243) s >>= 4;
+    else if (l > 217) s >>= 3;
+    else if (l > 192) s >>= 2;
+    else if (l > 179) s >>= 1;
+    return ((h >> 2) << 10) + ((s >> 5) << 7) + (l >> 1);
+}
+
+function method492(rgb: number): number {
+    return rgb === 0xFF00FF ? -1 : rgbToHsl(rgb);
 }
 
 function defaultData(id: number): FloType530Data {
@@ -108,6 +136,12 @@ function defaultData(id: number): FloType530Data {
 }
 
 export class FloType530 {
+    /** Per-id record cache. Populated as a side-effect of load() so any
+     *  caller that has previously requested an id can hit it synchronously
+     *  via cache530.get(id). The TerrainAdapter530 floLookup uses this to
+     *  resolve overlay/underlay floor records during landscape mesh build. */
+    public static cache530: Map<number, FloType530Data> | null = null;
+
     /** Parse a single FloType buffer. Returns null on empty input. */
     static decode(data: Uint8Array, id: number): FloType530Data | null {
         if (!data) return null;
@@ -127,7 +161,7 @@ export class FloType530 {
     private static decodeOpcode(buf: FloBuf, opcode: number, out: FloType530Data, id: number): void {
         if (opcode === 1) {
             out.baseColorRgb = buf.g3();
-            out.baseColor = method492Passthrough(out.baseColorRgb);
+            out.baseColor = method492(out.baseColorRgb);
         } else if (opcode === 2) {
             out.texture = buf.g1();
         } else if (opcode === 3) {
@@ -137,7 +171,7 @@ export class FloType530 {
             out.occludeUnderlay = false;
         } else if (opcode === 7) {
             out.secondaryColorRgb = buf.g3();
-            out.secondaryColor = method492Passthrough(out.secondaryColorRgb);
+            out.secondaryColor = method492(out.secondaryColorRgb);
         } else if (opcode === 8) {
             // Deob writes the id to a static global (FloType.anInt865 = id). We surface
             // it through markerId for callers that want to mirror the side-effect.
@@ -166,8 +200,14 @@ export class FloType530 {
      */
     static async load(js5Cache: Js5Cache, floId: number): Promise<FloType530Data | null> {
         if (floId < 0) return null;
+        if (FloType530.cache530) {
+            const hit = FloType530.cache530.get(floId);
+            if (hit !== undefined) return hit;
+        }
         const data = await js5Cache.getFileBytes(2, 4, floId);
         if (!data || data.byteLength === 0) return null;
-        return FloType530.decode(data, floId);
+        const decoded = FloType530.decode(data, floId);
+        if (decoded && FloType530.cache530) FloType530.cache530.set(floId, decoded);
+        return decoded;
     }
 }

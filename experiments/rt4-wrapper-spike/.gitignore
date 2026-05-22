@@ -1,0 +1,4 @@
+public/client-*.jar
+public/config.json
+public/rt4-spike-launcher.jar
+build/

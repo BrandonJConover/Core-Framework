@@ -28,6 +28,31 @@ export class SoundPlayer {
         return SoundPlayer.volume;
     }
 
+    /**
+     * Decode and play a synthesized WAV blob produced by SoundTrack.encode().
+     * The buffer is a number[] (rt4-style); we copy to a typed array first
+     * because SoundTrack reuses its 441000-byte buffer between calls.
+     */
+    public static playSynth(rawBuffer: number[], byteLength: number, volume: number, delayTicks: number): void {
+        if (Preferences.muteSfx || volume <= 0 || byteLength < 44) return;
+        const ctx = AudioContextHolder.get();
+        if (!ctx) return;
+        const snapshot = new Uint8Array(byteLength);
+        for (let i = 0; i < byteLength; i++) snapshot[i] = rawBuffer[i] & 0xFF;
+        const ab = snapshot.buffer.slice(0, byteLength);
+        const gainValue = this.volumeScale(volume);
+        const startAt = ctx.currentTime + Math.max(0, delayTicks * 0.02);
+        ctx.decodeAudioData(ab).then(decoded => {
+            const node = ctx.createBufferSource();
+            const gain = ctx.createGain();
+            gain.gain.value = gainValue;
+            node.buffer = decoded;
+            node.connect(gain);
+            gain.connect(ctx.destination);
+            try { node.start(startAt); } catch (_) { try { node.start(); } catch (__) {} }
+        }).catch(() => {});
+    }
+
     public static play(volume: number, trackId: number, delayTicks: number) {
         if (Preferences.muteSfx || trackId < 0 || volume <= 0) return;
         if (this.queue.length >= this.maxConcurrent) return;

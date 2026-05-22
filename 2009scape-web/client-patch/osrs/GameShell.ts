@@ -22,7 +22,7 @@ export class GameShell {
 
     /*private*/ public deltime: number = 20;
 
-    public mindel: number = 1;
+    public mindel: number = 20;
 
     /*private*/ public optims: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
@@ -77,6 +77,9 @@ export class GameShell {
         }
         return a;
     })(128);
+    public altHeld: boolean = false;
+    public ctrlHeld: boolean = false;
+    public shiftHeld: boolean = false;
 
     /*private*/ public inputBuffer: number[] = (s => {
         const a = [];
@@ -145,6 +148,14 @@ export class GameShell {
 
             this.canvas.addEventListener("keydown", this.keyPressed.bind(this));
             this.canvas.addEventListener("keyup", this.keyReleased.bind(this));
+            this.canvas.addEventListener("focus", this.focusGained.bind(this));
+            this.canvas.addEventListener("blur", this.focusLost.bind(this));
+            window.addEventListener("keydown", (event: KeyboardEvent) => {
+                if (event.target !== this.canvas) this.keyPressed(event);
+            });
+            window.addEventListener("keyup", (event: KeyboardEvent) => {
+                if (event.target !== this.canvas) this.keyReleased(event);
+            });
 
             // ── Mobile touch setup ──
             this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -259,7 +270,6 @@ export class GameShell {
                 this.clickTime = this.lastClick;
                 this.eventMouseButtonPressed = 0;
                 await this.doLogic();
-                this.readIndex = this.writeIndex;
             }
         }
         ld.count &= 255;
@@ -532,6 +542,7 @@ export class GameShell {
 
     public mousePressed(mouseevent: MouseEvent) {
         AudioContextHolder.unlock();
+        this.canvas.focus();
         let [mouseX, mouseY] = this.getMouseCanvasCoords(mouseevent);
 
         this.idleTime = 0;
@@ -594,6 +605,9 @@ export class GameShell {
     public keyPressed(event: KeyboardEvent) {
         this.idleTime = 0;
         const keyCode: number = event.keyCode;
+        this.altHeld = !!event.altKey || keyCode === 18;
+        this.ctrlHeld = !!event.ctrlKey || keyCode === 17;
+        this.shiftHeld = !!event.shiftKey || keyCode === 16;
         let keyChar: number = (event.key.length == 1) ? event.key.charCodeAt(0) : keyCode;
         if (keyChar < 30) {
             keyChar = 0;
@@ -655,6 +669,9 @@ export class GameShell {
     public keyReleased(event: KeyboardEvent) {
         this.idleTime = 0;
         const keyCode: number = event.keyCode;
+        this.altHeld = keyCode === 18 ? false : !!event.altKey;
+        this.ctrlHeld = keyCode === 17 ? false : !!event.ctrlKey;
+        this.shiftHeld = keyCode === 16 ? false : !!event.shiftKey;
         let keyChar: number = (event.key.length == 1) ? event.key.charCodeAt(0) : keyCode;
         if (keyChar < 36) {
             keyChar = 0;
@@ -710,6 +727,9 @@ export class GameShell {
 
     public focusLost(focusevent: FocusEvent) {
         this.awtFocus = false;
+        this.altHeld = false;
+        this.ctrlHeld = false;
+        this.shiftHeld = false;
         for (let key: number = 0; key < 128; key++) {
             this.keyStatus[key] = 0;
         }

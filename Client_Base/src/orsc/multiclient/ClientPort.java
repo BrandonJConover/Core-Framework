@@ -49,6 +49,10 @@ public interface ClientPort {
 
 	String getConnectivityText();
 
+	default String getParameter(String name) {
+		return null;
+	}
+
 	void resized();
 
 	Sprite getSpriteFromByteArray(ByteArrayInputStream byteArrayInputStream);

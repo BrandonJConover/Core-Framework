@@ -8,10 +8,10 @@ use rand::Rng;
 /// Combat style enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatStyle {
-    Controlled,  // Balanced XP
-    Aggressive,  // Strength focused
-    Accurate,    // Attack focused
-    Defensive,   // Defense focused
+    Controlled, // Balanced XP
+    Aggressive, // Strength focused
+    Accurate,   // Attack focused
+    Defensive,  // Defense focused
 }
 
 impl CombatStyle {

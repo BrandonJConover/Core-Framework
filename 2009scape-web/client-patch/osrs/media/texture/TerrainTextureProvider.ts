@@ -1,6 +1,5 @@
 // TerrainTextureProvider — caches and lazily builds 64×64 ARGB texture
-// pixel buffers from the cached idx26 op-graph blobs that FloType530
-// records reference.
+// pixel buffers from cached texture op data that FloType530 records reference.
 //
 // Scope (P3c, offline gates only): two ops are wired through the op
 // switch — ColorFill (op 1) and VerticalGradient (op 2). The other
@@ -9,11 +8,12 @@
 // of throwing. Expand coverage when a specific FloType id is observed
 // rendering wrong.
 //
-// rt4 reference: Texture.java + the TextureOp* family. The on-wire
-// op-graph format used by 530 is dense enough that this v0 module
-// uses a simplified TLV encoding for the trace-harness fixtures —
-// the real cache decoder is a sibling concern that lands once we
-// can prove a single texture builds end-to-end against fixture bytes.
+// rt4 reference: Texture.java + the TextureOp* family. The legacy
+// runOpGraph path keeps the simplified TLV encoding used by the offline
+// trace harness. buildFromMaterial consumes real TextureMaterial530 metadata
+// for common leaf ops that do not need full graph evaluation.
+
+import type { TextureMaterial530Data, TextureOpBase } from "../../cache/def/TextureMaterial530";
 
 export const TEXTURE_SIZE = 64;
 export const TEXTURE_PIXELS = TEXTURE_SIZE * TEXTURE_SIZE;
@@ -59,6 +59,19 @@ export class TerrainTextureProvider {
     static build(textureId: number, opBytes: Uint8Array): Uint32Array {
         const pixels = runOpGraph(opBytes);
         this.put(textureId, pixels);
+        return pixels;
+    }
+
+    /**
+     * Build a texture directly from decoded rev-530 TextureMaterial metadata
+     * when the material's main output is a simple leaf op. Returns null for
+     * multi-input procedural graphs so callers can keep their existing flat
+     * fallback until broader op evaluation lands.
+     */
+    static buildFromMaterial(material: TextureMaterial530Data | null): Uint32Array | null {
+        const pixels = renderMaterialLeaf530(material);
+        if (!pixels || !material) return null;
+        this.put(material.id, pixels);
         return pixels;
     }
 
@@ -127,10 +140,83 @@ export function runOpGraph(bytes: Uint8Array): Uint32Array {
     return canvas;
 }
 
+/**
+ * Minimal real-metadata renderer for common standalone rt4 texture ops.
+ * This intentionally handles leaves whose output is fully determined by the op
+ * record itself, plus tiny one-input wrappers whose child can already render.
+ * Anything needing broader graph evaluation returns null.
+ */
+export function renderMaterialLeaf530(material: TextureMaterial530Data | null): Uint32Array | null {
+    if (!material) return null;
+    return renderMaterialOp530(material, material.mainOpIndex, new Set());
+}
+
 // ── helpers ──
+
+function renderMaterialOp530(
+    material: TextureMaterial530Data,
+    opIndex: number,
+    visiting: Set<number>,
+): Uint32Array | null {
+    if (visiting.has(opIndex)) return null;
+    const op = material.ops[opIndex];
+    if (!op) return null;
+    if (op.inputs.length === 0) return renderLeafOp(op);
+    if (op.fields.kind !== 22 || op.inputs.length !== 1) return null;
+
+    visiting.add(opIndex);
+    const child = renderMaterialOp530(material, op.inputs[0], visiting);
+    visiting.delete(opIndex);
+    return child ? invertArgbPixels(child) : null;
+}
+
+function renderLeafOp(op: TextureOpBase): Uint32Array | null {
+    if (op.inputs.length !== 0) return null;
+    switch (op.fields.kind) {
+        case 0: {
+            const canvas = new Uint32Array(TEXTURE_PIXELS);
+            fillSolid(canvas, grayscale12ToArgb(op.fields.v));
+            return canvas;
+        }
+        case 1: {
+            const canvas = new Uint32Array(TEXTURE_PIXELS);
+            fillSolid(canvas, rgb24ToArgb(op.fields.rgb24));
+            return canvas;
+        }
+        case 2:
+            return fillHorizontalGrayGradient();
+        case 3:
+            return fillVerticalGrayGradient();
+        default:
+            return null;
+    }
+}
+
+function invertArgbPixels(src: Uint32Array): Uint32Array {
+    const canvas = new Uint32Array(TEXTURE_PIXELS);
+    for (let i = 0; i < src.length; i++) {
+        const argb = src[i];
+        canvas[i] = packArgb(
+            (argb >>> 24) & 0xff,
+            0xff - ((argb >>> 16) & 0xff),
+            0xff - ((argb >>> 8) & 0xff),
+            0xff - (argb & 0xff),
+        );
+    }
+    return canvas;
+}
 
 function packArgb(a: number, r: number, g: number, b: number): number {
     return (((a & 0xff) << 24) | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff)) >>> 0;
+}
+
+function rgb24ToArgb(rgb24: number): number {
+    return packArgb(0xff, (rgb24 >>> 16) & 0xff, (rgb24 >>> 8) & 0xff, rgb24 & 0xff);
+}
+
+function grayscale12ToArgb(value12: number): number {
+    const v = Math.max(0, Math.min(255, value12 >> 4));
+    return packArgb(0xff, v, v, v);
 }
 
 function fillSolid(canvas: Uint32Array, argb: number): void {
@@ -160,4 +246,23 @@ function fillVerticalGradient(canvas: Uint32Array, topArgb: number, botArgb: num
             canvas[rowBase + x] = argb;
         }
     }
+}
+
+function fillHorizontalGrayGradient(): Uint32Array {
+    const canvas = new Uint32Array(TEXTURE_PIXELS);
+    const denom = Math.max(1, TEXTURE_SIZE - 1);
+    for (let x = 0; x < TEXTURE_SIZE; x++) {
+        const v = ((x * 255) / denom) | 0;
+        const argb = packArgb(0xff, v, v, v);
+        for (let y = 0; y < TEXTURE_SIZE; y++) {
+            canvas[y * TEXTURE_SIZE + x] = argb;
+        }
+    }
+    return canvas;
+}
+
+function fillVerticalGrayGradient(): Uint32Array {
+    const canvas = new Uint32Array(TEXTURE_PIXELS);
+    fillVerticalGradient(canvas, packArgb(0xff, 0, 0, 0), packArgb(0xff, 0xff, 0xff, 0xff));
+    return canvas;
 }
