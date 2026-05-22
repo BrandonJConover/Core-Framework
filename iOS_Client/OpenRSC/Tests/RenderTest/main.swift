@@ -58,6 +58,35 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(RSCGameEngine.appearanceAnimationIndex(137), 136)
     }
 
+    func test_v235_item_action_packets_match_server_parser_lengths() {
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeItemDropPacket(slot: 3)),
+            [0x00, 0x03, RSCOutOpcode.itemDrop.rawValue, 0x00, 0x03]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeItemCommandPacket(slot: 4)),
+            [0x00, 0x03, RSCOutOpcode.itemCommand.rawValue, 0x00, 0x04]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeItemUseOnGroundPacket(x: 144, z: 645, groundItemId: 77, slot: 2)),
+            [0x00, 0x09, RSCOutOpcode.itemUseOnGround.rawValue,
+             0x00, 0x90, 0x02, 0x85, 0x00, 0x4D, 0x00, 0x02]
+        )
+    }
+
+    func test_v235_bank_action_packets_include_ignored_magic_field() {
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeBankDepositPacket(itemId: 10, amount: 70_000)),
+            [0x00, 0x0B, RSCOutOpcode.bankDeposit.rawValue,
+             0x00, 0x0A, 0x00, 0x01, 0x11, 0x70, 0x00, 0x00, 0x00, 0x00]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeBankWithdrawPacket(itemId: 20, amount: 5)),
+            [0x00, 0x0B, RSCOutOpcode.bankWithdraw.rawValue,
+             0x00, 0x14, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00]
+        )
+    }
+
     @MainActor
     func test_rsc_update_players_case5_stores_raw_appearance_and_clears_local_refresh_flag() {
         let ws = RSCWorldState()

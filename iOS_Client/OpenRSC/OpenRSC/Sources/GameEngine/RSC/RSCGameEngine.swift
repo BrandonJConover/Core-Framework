@@ -3016,15 +3016,33 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
+    static func makeItemDropPacket(slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.itemDrop.rawValue))
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
+    static func makeItemCommandPacket(slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.itemCommand.rawValue))
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
+    static func makeItemUseOnGroundPacket(x: Int, z: Int, groundItemId: Int, slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnGround.rawValue))
+        buf.putShort(x)
+        buf.putShort(z)
+        buf.putShort(groundItemId)
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
     func dropItem(slot: Int) {
         Task {
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemDrop.rawValue))
-            buf.putShort(slot)
-            let amount = worldState.inventory.first(where: { $0.id == slot })?.amount ?? 1
-            buf.putInt(max(1, amount))
-            let data = buf.finishPacket()
-            try? await connection.send(data)
+            try? await connection.send(Self.makeItemDropPacket(slot: slot))
         }
     }
 
@@ -3037,18 +3055,12 @@ final class RSCGameEngine: ObservableObject {
 
     func itemCommand(slot: Int, commandIndex: Int, amount: Int = 1) {
         Task {
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemCommand.rawValue))
-            buf.putShort(slot)
-            buf.putInt(max(1, amount))
-            buf.putByte(commandIndex)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeItemCommandPacket(slot: slot))
         }
     }
 
     func itemCommandAll(slot: Int, commandIndex: Int) {
-        let amount = worldState.inventory.first(where: { $0.id == slot })?.amount ?? 1
-        itemCommand(slot: slot, commandIndex: commandIndex, amount: amount)
+        itemCommand(slot: slot, commandIndex: commandIndex)
     }
 
     func useItem(slot: Int) {
@@ -3122,13 +3134,12 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let approach = approachTileForGroundItem(x: x, z: z)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnGround.rawValue))
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            buf.putShort(slot)
-            buf.putShort(itemId)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeItemUseOnGroundPacket(
+                x: serverTileX(x),
+                z: serverTileZ(z),
+                groundItemId: itemId,
+                slot: slot
+            ))
             clearPendingItemUse()
         }
     }
@@ -3188,24 +3199,37 @@ final class RSCGameEngine: ObservableObject {
 
     // MARK: - Bank actions
 
+    /// The v235 parser requires this final 4-byte field for deposit/withdraw,
+    /// but BankHandler ignores the value (matching the Java comment that it is
+    /// an authentic-client relic).
+    static let bankActionMagicNumber = 0
+
+    static func makeBankDepositPacket(itemId: Int, amount: Int) -> Data {
+        makeBankActionPacket(opcode: .bankDeposit, itemId: itemId, amount: amount)
+    }
+
+    static func makeBankWithdrawPacket(itemId: Int, amount: Int) -> Data {
+        makeBankActionPacket(opcode: .bankWithdraw, itemId: itemId, amount: amount)
+    }
+
+    private static func makeBankActionPacket(opcode: RSCOutOpcode, itemId: Int, amount: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(opcode.rawValue))
+        buf.putShort(itemId)
+        buf.putInt(amount)
+        buf.putInt(bankActionMagicNumber)
+        return buf.finishPacket()
+    }
+
     func bankDeposit(itemId: Int, amount: Int) {
         Task {
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.bankDeposit.rawValue))
-            buf.putShort(itemId)
-            buf.putInt(amount)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeBankDepositPacket(itemId: itemId, amount: amount))
         }
     }
 
     func bankWithdraw(itemId: Int, amount: Int, noted: Bool = false) {
         Task {
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.bankWithdraw.rawValue))
-            buf.putShort(itemId)
-            buf.putInt(amount)
-            buf.putByte(noted ? 1 : 0)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeBankWithdrawPacket(itemId: itemId, amount: amount))
         }
     }
 
