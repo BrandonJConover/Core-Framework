@@ -269,6 +269,9 @@ struct GameView: View {
         if engine.worldState.shopOpen {
             ShopPanel(worldState: engine.worldState, engine: engine)
         }
+        if engine.worldState.bankPinOpen {
+            BankPinDialog(worldState: engine.worldState, engine: engine)
+        }
         if engine.worldState.dialogueOpen {
             DialogueOverlayView(worldState: engine.worldState, engine: engine)
         }
@@ -328,6 +331,75 @@ struct GameView: View {
 }
 
 // MARK: - Server Message Dialog
+
+private struct BankPinDialog: View {
+    @ObservedObject var worldState: RSCWorldState
+    let engine: RSCGameEngine
+    @State private var pin: String = ""
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                Text("Bank PIN")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(Color(hex: "#c8a951"))
+
+                SecureField("Enter PIN", text: $pin)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .multilineTextAlignment(.center)
+                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .background(Color(hex: "#111111"))
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "#4a3a18"), lineWidth: 1))
+                    .cornerRadius(4)
+                    .onChange(of: pin) { newValue in
+                        let filtered = newValue.filter(\.isNumber)
+                        pin = String(filtered.prefix(8))
+                    }
+
+                HStack(spacing: 10) {
+                    Button("Cancel") {
+                        pin = ""
+                        worldState.bankPinOpen = false
+                    }
+                    .buttonStyle(DialogButtonStyle(color: Color(hex: "#444444")))
+
+                    Button("Submit") {
+                        let trimmed = pin.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        engine.submitBankPin(trimmed)
+                        pin = ""
+                    }
+                    .buttonStyle(DialogButtonStyle(color: Color(hex: "#2d6a2d")))
+                }
+            }
+            .padding(16)
+            .frame(width: 260)
+            .background(Color(hex: "#1a1a1a"))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: "#c8a951"), lineWidth: 1))
+            .cornerRadius(6)
+        }
+    }
+}
+
+private struct DialogButtonStyle: ButtonStyle {
+    let color: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background(color.opacity(configuration.isPressed ? 0.65 : 1.0))
+            .cornerRadius(4)
+    }
+}
 
 private struct ServerMessageDialog: View {
     @ObservedObject var worldState: RSCWorldState

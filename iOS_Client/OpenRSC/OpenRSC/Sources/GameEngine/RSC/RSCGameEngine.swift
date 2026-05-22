@@ -3433,6 +3433,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func submitBankPin(_ pin: String) {
+        worldState.bankPinOpen = false
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.interfaceOptions.rawValue))

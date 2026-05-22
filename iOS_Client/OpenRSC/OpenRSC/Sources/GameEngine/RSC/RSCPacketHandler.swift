@@ -586,7 +586,7 @@ final class RSCPacketHandler {
 
         case 6: // updateDuelDialog — opponent stake items
             let duelTheirCount = buf.getUnsignedByte()
-            let duelTheirItems = self.readItemStackMetadata(buf: buf, count: duelTheirCount, maxStored: RSCWorldState.maxDuelStakeSlots, includesNotedByte: false)
+            let duelTheirItems = self.readItemStackMetadataAuto(buf: buf, count: duelTheirCount, maxStored: RSCWorldState.maxDuelStakeSlots)
             ws.duelTheirStakeMetadata = duelTheirItems
             ws.duelTheirStake = self.legacyStacks(duelTheirItems)
             ws.duelAccepted = false
@@ -598,19 +598,27 @@ final class RSCPacketHandler {
             ws.duelOpponentName = buf.getString()
             // Their stake
             let duelTheirCount = buf.getUnsignedByte()
-            let duelTheirItems = self.readItemStackMetadata(buf: buf, count: duelTheirCount, maxStored: RSCWorldState.maxDuelStakeSlots, includesNotedByte: false)
+            let duelConfirmBytes = buf.getBytes(buf.bytesRemaining)
+            let duelConfirmGroups = self.parseTwoItemStackGroups(
+                bytes: duelConfirmBytes,
+                firstCount: duelTheirCount,
+                firstMaxStored: RSCWorldState.maxDuelStakeSlots,
+                secondMaxStored: RSCWorldState.maxDuelStakeSlots,
+                trailingBytes: 4
+            )
+            let duelTheirItems = duelConfirmGroups.first
             ws.duelTheirStakeMetadata = duelTheirItems
             ws.duelTheirStake = self.legacyStacks(duelTheirItems)
             // My stake
-            let duelMyCount = buf.getUnsignedByte()
-            let duelMyItems = self.readItemStackMetadata(buf: buf, count: duelMyCount, maxStored: RSCWorldState.maxDuelStakeSlots, includesNotedByte: false)
+            let duelMyItems = duelConfirmGroups.second
             ws.duelMyStakeMetadata = duelMyItems
             ws.duelMyStake = self.legacyStacks(duelMyItems)
             // Settings
-            ws.duelSettings[0] = buf.getUnsignedByte() == 1
-            ws.duelSettings[1] = buf.getUnsignedByte() == 1
-            ws.duelSettings[2] = buf.getUnsignedByte() == 1
-            ws.duelSettings[3] = buf.getUnsignedByte() == 1
+            let duelSettingsBytes = duelConfirmGroups.trailing
+            ws.duelSettings[0] = duelSettingsBytes.indices.contains(0) && duelSettingsBytes[0] == 1
+            ws.duelSettings[1] = duelSettingsBytes.indices.contains(1) && duelSettingsBytes[1] == 1
+            ws.duelSettings[2] = duelSettingsBytes.indices.contains(2) && duelSettingsBytes[2] == 1
+            ws.duelSettings[3] = duelSettingsBytes.indices.contains(3) && duelSettingsBytes[3] == 1
             ws.duelAccepted = false
             ws.duelOpponentAccepted = false
 
@@ -1806,16 +1814,22 @@ final class RSCPacketHandler {
     // opcode 97 — updateTradeDialog: opponent items, then our items
     private func handleUpdateTradeDialog(buf: ByteBuffer, ws: RSCWorldState) {
         let theirCount = buf.getUnsignedByte()
-        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: false)
-        let myCount = buf.bytesRemaining > 0 ? buf.getUnsignedByte() : 0
-        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: false)
+        let groups = parseTwoItemStackGroups(
+            bytes: buf.getBytes(buf.bytesRemaining),
+            firstCount: theirCount,
+            firstMaxStored: RSCWorldState.maxTradeOfferSlots,
+            secondMaxStored: RSCWorldState.maxTradeOfferSlots,
+            trailingBytes: 0
+        )
+        let theirItems = groups.first
+        let myItems = groups.second
         ws.tradeTheirOfferMetadata = theirItems
         ws.tradeMyOfferMetadata = myItems
         ws.tradeTheirOffer = legacyStacks(theirItems)
         ws.tradeMyOffer = legacyStacks(myItems)
         ws.tradeAccepted = false
         ws.tradePartnerAccepted = false
-        print("[Packet] Trade update: their=\(theirCount) items, mine=\(myCount) items")
+        print("[Packet] Trade update: their=\(theirItems.count) items, mine=\(myItems.count) items")
     }
 
     // opcode 20 — confirmTrade: show confirmation screen
@@ -1823,9 +1837,15 @@ final class RSCPacketHandler {
         let partnerName = buf.getString()
         ws.tradePartnerName = partnerName
         let theirCount = buf.getUnsignedByte()
-        let theirItems = readItemStackMetadata(buf: buf, count: theirCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: false)
-        let myCount = buf.getUnsignedByte()
-        let myItems = readItemStackMetadata(buf: buf, count: myCount, maxStored: RSCWorldState.maxTradeOfferSlots, includesNotedByte: false)
+        let groups = parseTwoItemStackGroups(
+            bytes: buf.getBytes(buf.bytesRemaining),
+            firstCount: theirCount,
+            firstMaxStored: RSCWorldState.maxTradeOfferSlots,
+            secondMaxStored: RSCWorldState.maxTradeOfferSlots,
+            trailingBytes: 0
+        )
+        let theirItems = groups.first
+        let myItems = groups.second
         ws.tradeTheirOfferMetadata = theirItems
         ws.tradeMyOfferMetadata = myItems
         ws.tradeTheirOffer = legacyStacks(theirItems)
@@ -1849,6 +1869,72 @@ final class RSCPacketHandler {
             }
         }
         return items
+    }
+
+    private func readItemStackMetadataAuto(buf: ByteBuffer, count: Int, maxStored: Int) -> [RSCItemStackMetadata] {
+        let bytes = buf.getBytes(buf.bytesRemaining)
+        let includeNoted = bytes.count >= count * 7 && (bytes.count == count * 7 || bytes.count % max(1, count * 7) == 0)
+        return parseItemStackMetadata(bytes: bytes, count: count, maxStored: maxStored, includesNotedByte: includeNoted).items
+    }
+
+    private func parseTwoItemStackGroups(
+        bytes: [UInt8],
+        firstCount: Int,
+        firstMaxStored: Int,
+        secondMaxStored: Int,
+        trailingBytes: Int
+    ) -> (first: [RSCItemStackMetadata], second: [RSCItemStackMetadata], trailing: [UInt8]) {
+        for includesNotedByte in [true, false] {
+            let firstParsed = parseItemStackMetadata(bytes: bytes, count: firstCount, maxStored: firstMaxStored, includesNotedByte: includesNotedByte)
+            var offset = firstParsed.offset
+            guard firstParsed.complete, offset < bytes.count - trailingBytes else { continue }
+            let secondCount = Int(bytes[offset])
+            offset += 1
+            let remainingForSecond = Array(bytes[offset..<bytes.count])
+            let secondParsed = parseItemStackMetadata(bytes: remainingForSecond, count: secondCount, maxStored: secondMaxStored, includesNotedByte: includesNotedByte)
+            offset += secondParsed.offset
+            guard secondParsed.complete, offset + trailingBytes == bytes.count else { continue }
+            let trailing = trailingBytes > 0 ? Array(bytes[offset..<bytes.count]) : []
+            return (firstParsed.items, secondParsed.items, trailing)
+        }
+
+        let firstParsed = parseItemStackMetadata(bytes: bytes, count: firstCount, maxStored: firstMaxStored, includesNotedByte: false)
+        var offset = firstParsed.offset
+        let secondCount = offset < bytes.count ? Int(bytes[offset]) : 0
+        offset = min(bytes.count, offset + 1)
+        let remainingForSecond = offset < bytes.count ? Array(bytes[offset..<bytes.count]) : []
+        let secondParsed = parseItemStackMetadata(bytes: remainingForSecond, count: secondCount, maxStored: secondMaxStored, includesNotedByte: false)
+        offset = min(bytes.count, offset + secondParsed.offset)
+        let trailingStart = min(offset, bytes.count)
+        return (firstParsed.items, secondParsed.items, Array(bytes[trailingStart..<bytes.count]))
+    }
+
+    private func parseItemStackMetadata(
+        bytes: [UInt8],
+        count: Int,
+        maxStored: Int,
+        includesNotedByte: Bool
+    ) -> (items: [RSCItemStackMetadata], offset: Int, complete: Bool) {
+        var items: [RSCItemStackMetadata] = []
+        var offset = 0
+        let stride = includesNotedByte ? 7 : 6
+
+        for index in 0..<count {
+            guard bytes.count - offset >= stride else { return (items, offset, false) }
+            let itemId = (Int(bytes[offset]) << 8) | Int(bytes[offset + 1])
+            offset += 2
+            let noted = includesNotedByte ? (bytes[offset] != 0) : false
+            if includesNotedByte { offset += 1 }
+            let amount = (Int(bytes[offset]) << 24)
+                | (Int(bytes[offset + 1]) << 16)
+                | (Int(bytes[offset + 2]) << 8)
+                | Int(bytes[offset + 3])
+            offset += 4
+            if index < maxStored {
+                items.append(RSCItemStackMetadata(id: itemId, amount: amount, noted: noted))
+            }
+        }
+        return (items, offset, true)
     }
 
     private func legacyStacks(_ items: [RSCItemStackMetadata]) -> [(id: Int, amount: Int)] {

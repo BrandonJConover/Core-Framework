@@ -421,6 +421,27 @@ final class RenderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func test_rsc_trade_update_reads_noted_stack_metadata_when_present() {
+        let ws = RSCWorldState()
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 97, payload: Data([
+            0x01,                         // partner count
+            0x00, 0x64,                   // partner item id 100
+            0x01,                         // partner item is noted
+            0x00, 0x00, 0x00, 0x02,       // partner amount 2
+            0x01,                         // my count
+            0x00, 0xC8,                   // my item id 200
+            0x00,                         // my item is not noted
+            0x00, 0x00, 0x00, 0x03        // my amount 3
+        ]))
+
+        XCTAssertEqual(ws.tradeTheirOfferMetadata, [RSCItemStackMetadata(id: 100, amount: 2, noted: true)])
+        XCTAssertEqual(ws.tradeMyOfferMetadata, [RSCItemStackMetadata(id: 200, amount: 3, noted: false)])
+    }
+
+    @MainActor
     func test_rsc_duel_settings_use_java_order_and_one_means_restriction() {
         let ws = RSCWorldState()
         let handler = RSCPacketHandler()
@@ -467,6 +488,29 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(ws.duelSettings, [true, false, true, false])
         XCTAssertFalse(ws.duelAccepted)
         XCTAssertFalse(ws.duelOpponentAccepted)
+    }
+
+    @MainActor
+    func test_rsc_duel_confirm_reads_noted_stack_metadata_when_present() {
+        let ws = RSCWorldState()
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 172, payload: Data(rscStringBytes("Bob") + [
+            0x01,                         // opponent stake count
+            0x00, 0x65,                   // opponent item id 101
+            0x01,                         // noted
+            0x00, 0x00, 0x00, 0x02,       // amount 2
+            0x01,                         // my stake count
+            0x00, 0x66,                   // my item id 102
+            0x00,                         // unnoted
+            0x00, 0x00, 0x00, 0x03,       // amount 3
+            1, 0, 1, 0                    // restrictions
+        ]))
+
+        XCTAssertEqual(ws.duelTheirStakeMetadata, [RSCItemStackMetadata(id: 101, amount: 2, noted: true)])
+        XCTAssertEqual(ws.duelMyStakeMetadata, [RSCItemStackMetadata(id: 102, amount: 3, noted: false)])
+        XCTAssertEqual(ws.duelSettings, [true, false, true, false])
     }
 
     @MainActor
