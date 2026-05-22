@@ -180,7 +180,7 @@ final class Pathfinder {
 
         let worldX = worldState.absoluteWorldX(localX)
         let worldZ = worldState.absoluteWorldZ(localZ)
-        guard let tile = landscapeLoader.getTile(worldX: worldX, worldZ: worldZ, plane: 0) else {
+        guard let tile = landscapeLoader.getTile(worldX: worldX, worldZ: worldZ, plane: worldState.requestedPlane) else {
             return true  // Unknown tiles are walkable
         }
 
