@@ -3,8 +3,8 @@ import SwiftUI
 // Shop modal: shop stock (left) and your inventory (right).
 //
 // Server protocol (Java client mudclient.java:3780/3813/3732):
-//  - Buy:   opcode 236 [SHORT itemID][SHORT amount]
-//  - Sell:  opcode 221 [SHORT itemID][SHORT amount]
+//  - Buy:   opcode 236 [SHORT itemID][SHORT currentStock][SHORT amount]
+//  - Sell:  opcode 221 [SHORT itemID][SHORT currentStock][SHORT amount]
 //  - Close: opcode 166 (already wired in RSCGameEngine.closeShop)
 struct ShopPanel: View {
     @ObservedObject var worldState: RSCWorldState
@@ -72,10 +72,10 @@ struct ShopPanel: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 4) {
                         ForEach(Array(worldState.shopItems.enumerated()), id: \.offset) { _, item in
                             PanelItemTile(itemId: item.id, amount: item.stock,
-                                          subtitle: "\(item.price)gp")
+                                          subtitle: "base \(item.price)")
                                 .onTapGesture {
                                     pending = PendingShopAction(isBuy: true, itemId: item.id,
-                                                                stock: item.stock, unitPrice: item.price)
+                                                                stock: item.stock, unitPrice: 0)
                                 }
                         }
                     }
@@ -93,14 +93,15 @@ struct ShopPanel: View {
                     .foregroundColor(.white)
                 ScrollView {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 4) {
-                        ForEach(worldState.inventory) { item in
-                            // Sell price = shop's bid for that item (if shop sells it).
-                            let bid = worldState.shopItems.first(where: { $0.id == item.itemId })?.price
+                        ForEach(worldState.inventory.filter { $0.itemId != 0 }) { item in
+                            let sellable = worldState.shopSellableItemIds.contains(item.itemId)
                             PanelItemTile(itemId: item.itemId, amount: item.amount,
-                                          subtitle: bid.map { "\($0)gp" })
+                                          subtitle: sellable ? "Sell" : "No sell")
+                                .opacity(sellable ? 1.0 : 0.35)
                                 .onTapGesture {
+                                    guard sellable else { return }
                                     pending = PendingShopAction(isBuy: false, itemId: item.itemId,
-                                                                stock: item.amount, unitPrice: bid ?? 0)
+                                                                stock: item.amount, unitPrice: 0)
                                 }
                         }
                     }
@@ -133,7 +134,7 @@ struct ShopPanel: View {
                 .foregroundColor(Color(hex: "#c8a951"))
 
             HStack(spacing: 6) {
-                ForEach([1, 5, 10], id: \.self) { qty in
+                ForEach([1, 5, 10, 50], id: \.self) { qty in
                     Button(action: {
                         commit(p: p, qty: qty)
                     }) {
@@ -141,9 +142,11 @@ struct ShopPanel: View {
                             Text("\(qty)")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.white)
-                            Text(priceText(p: p, qty: qty))
-                                .font(.system(size: 9))
-                                .foregroundColor(.yellow)
+                            if let price = priceText(p: p, qty: qty) {
+                                Text(price)
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.yellow)
+                            }
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -153,8 +156,7 @@ struct ShopPanel: View {
                 }
             }
 
-            Text(p.isBuy ? "Buying from shop @ \(p.unitPrice)gp ea"
-                         : "Selling to shop @ \(p.unitPrice)gp ea")
+            Text(p.isBuy ? "Buying from shop stock" : "Selling to shop")
                 .font(.system(size: 10))
                 .foregroundColor(Color(hex: "#888888"))
 
@@ -167,7 +169,8 @@ struct ShopPanel: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#3a3a3a"), lineWidth: 1))
     }
 
-    private func priceText(p: PendingShopAction, qty: Int) -> String {
+    private func priceText(p: PendingShopAction, qty: Int) -> String? {
+        guard p.unitPrice > 0 else { return nil }
         let total = p.unitPrice * qty
         return p.isBuy ? "= \(total)gp" : "+ \(total)gp"
     }
