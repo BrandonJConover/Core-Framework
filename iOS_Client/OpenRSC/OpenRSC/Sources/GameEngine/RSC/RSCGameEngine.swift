@@ -2417,8 +2417,6 @@ final class RSCGameEngine: ObservableObject {
         worldState.walkTargetY = markerEnd?.z ?? destZ
         worldState.walkTargetTimeout = 80
 
-        let buf = ByteBuffer()
-        buf.newPacket(opcode: walkToEntity ? 16 : 187)
         // Java sends the first actual path step as the packet anchor, then
         // up to 25 signed waypoint deltas relative to that anchor. The server
         // adds the anchor itself as step zero, so using the current player tile
@@ -2426,16 +2424,9 @@ final class RSCGameEngine: ObservableObject {
         // The anchor is transmitted in Java/server tile coordinates
         // (midRegionBase + local). worldOffset is only for local terrain
         // archive addressing and must not be sent back to the server.
+        let serverPath = encodedPath.map { (x: serverTileX($0.x), z: serverTileZ($0.z)) }
         let firstStep = encodedPath[0]
-        buf.putShort(serverTileX(firstStep.x))
-        buf.putShort(serverTileZ(firstStep.z))
-        for wp in encodedPath.dropFirst().prefix(25) {
-            let dx = max(-128, min(127, wp.x - firstStep.x))
-            let dz = max(-128, min(127, wp.z - firstStep.z))
-            buf.putByte(dx)
-            buf.putByte(dz)
-        }
-        let packet = buf.finishPacket()
+        let packet = Self.makeWalkPacket(serverPath: serverPath, walkToEntity: walkToEntity)
         logAction(
             walkToEntity ? "walk-entity" : "walk",
             opcode: walkToEntity ? Int(RSCOutOpcode.walkToEntity.rawValue) : Int(RSCOutOpcode.walkToPoint.rawValue),
@@ -2444,6 +2435,21 @@ final class RSCGameEngine: ObservableObject {
         )
         try? await connection.send(packet)
         return encodedPath
+    }
+
+    static func makeWalkPacket(serverPath: [(x: Int, z: Int)], walkToEntity: Bool) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(walkToEntity ? RSCOutOpcode.walkToEntity.rawValue : RSCOutOpcode.walkToPoint.rawValue))
+        guard let firstStep = serverPath.first else { return buf.finishPacket() }
+        buf.putShort(firstStep.x)
+        buf.putShort(firstStep.z)
+        for wp in serverPath.dropFirst().prefix(25) {
+            let dx = max(-128, min(127, wp.x - firstStep.x))
+            let dz = max(-128, min(127, wp.z - firstStep.z))
+            buf.putByte(dx)
+            buf.putByte(dz)
+        }
+        return buf.finishPacket()
     }
 
     func blink(toX x: Int, z: Int) {
@@ -2874,10 +2880,7 @@ final class RSCGameEngine: ObservableObject {
             if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
                 await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.npcAttack.rawValue))
-            buf.putShort(serverIndex)
-            let data = buf.finishPacket()
+            let data = Self.makeNpcTargetPacket(opcode: .npcAttack, serverIndex: serverIndex)
             logAction("npc-attack", opcode: RSCOutOpcode.npcAttack, payload: data, details: "serverIndex=\(serverIndex)")
             try? await connection.send(data)
         }
@@ -2925,10 +2928,7 @@ final class RSCGameEngine: ObservableObject {
             if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
                 await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.npcTalkTo.rawValue))
-            buf.putShort(serverIndex)
-            let data = buf.finishPacket()
+            let data = Self.makeNpcTargetPacket(opcode: .npcTalkTo, serverIndex: serverIndex)
             logAction("npc-talk", opcode: RSCOutOpcode.npcTalkTo, payload: data, details: "serverIndex=\(serverIndex)")
             try? await connection.send(data)
         }
@@ -3080,6 +3080,58 @@ final class RSCGameEngine: ObservableObject {
         return buf.finishPacket()
     }
 
+    static func makeNpcTargetPacket(opcode: RSCOutOpcode, serverIndex: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(opcode.rawValue))
+        buf.putShort(serverIndex)
+        return buf.finishPacket()
+    }
+
+    static func makeGroundItemTakePacket(x: Int, z: Int, itemId: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.groundItemTake.rawValue))
+        buf.putShort(x)
+        buf.putShort(z)
+        buf.putShort(itemId)
+        return buf.finishPacket()
+    }
+
+    static func makeObjectActionPacket(opcode: RSCOutOpcode, x: Int, z: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(opcode.rawValue))
+        buf.putShort(x)
+        buf.putShort(z)
+        return buf.finishPacket()
+    }
+
+    static func makeWallActionPacket(opcode: RSCOutOpcode, x: Int, z: Int, direction: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(opcode.rawValue))
+        buf.putShort(x)
+        buf.putShort(z)
+        buf.putByte(direction)
+        return buf.finishPacket()
+    }
+
+    static func makeItemUseOnObjectPacket(x: Int, z: Int, slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnObject.rawValue))
+        buf.putShort(x)
+        buf.putShort(z)
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
+    static func makeItemUseOnWallPacket(x: Int, z: Int, direction: Int, slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.wallUseItem.rawValue))
+        buf.putShort(x)
+        buf.putShort(z)
+        buf.putByte(direction)
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
     func dropItem(slot: Int) {
         Task {
             let amount = worldState.inventory.indices.contains(slot) ? worldState.inventory[slot].amount : 1
@@ -3200,12 +3252,11 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let approach = approachTileForObject(x: x, z: z)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnObject.rawValue))
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            buf.putShort(slot)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeItemUseOnObjectPacket(
+                x: serverTileX(x),
+                z: serverTileZ(z),
+                slot: slot
+            ))
             clearPendingItemUse()
         }
     }
@@ -3214,13 +3265,12 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.wallUseItem.rawValue))
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            buf.putByte(direction)
-            buf.putShort(slot)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeItemUseOnWallPacket(
+                x: serverTileX(x),
+                z: serverTileZ(z),
+                direction: direction,
+                slot: slot
+            ))
             clearPendingItemUse()
         }
     }
@@ -3229,12 +3279,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let approach = approachTileForGroundItem(x: x, z: y)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.groundItemTake.rawValue))
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(y))
-            buf.putShort(itemId)
-            let packet = buf.finishPacket()
+            let packet = Self.makeGroundItemTakePacket(x: serverTileX(x), z: serverTileZ(y), itemId: itemId)
             logAction("ground-take", opcode: RSCOutOpcode.groundItemTake, payload: packet, details: "item=\(itemId) tile=(\(x),\(y)) server=(\(serverTileX(x)),\(serverTileZ(y)))")
             try? await connection.send(packet)
         }
@@ -3451,11 +3496,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let approach = approachTileForObject(x: x, z: z)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand1.rawValue))
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            let packet = buf.finishPacket()
+            let packet = Self.makeObjectActionPacket(opcode: .objectCommand1, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-1", opcode: RSCOutOpcode.objectCommand1, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
         }
@@ -3465,11 +3506,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let approach = approachTileForObject(x: x, z: z)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.objectCommand2.rawValue))
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            let packet = buf.finishPacket()
+            let packet = Self.makeObjectActionPacket(opcode: .objectCommand2, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-2", opcode: RSCOutOpcode.objectCommand2, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
         }
@@ -3479,12 +3516,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand1.rawValue))
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            buf.putByte(direction)
-            let packet = buf.finishPacket()
+            let packet = Self.makeWallActionPacket(opcode: .wallCommand1, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-1", opcode: RSCOutOpcode.wallCommand1, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
         }
@@ -3494,12 +3526,7 @@ final class RSCGameEngine: ObservableObject {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.wallCommand2.rawValue))
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            buf.putByte(direction)
-            let packet = buf.finishPacket()
+            let packet = Self.makeWallActionPacket(opcode: .wallCommand2, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-2", opcode: RSCOutOpcode.wallCommand2, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
         }

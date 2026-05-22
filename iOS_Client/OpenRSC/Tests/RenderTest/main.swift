@@ -89,6 +89,73 @@ final class RenderPipelineTests: XCTestCase {
         )
     }
 
+    func test_custom10009_walk_packets_match_server_parser_lengths() {
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeWalkPacket(
+                serverPath: [(x: 180, z: 260), (x: 181, z: 260), (x: 181, z: 261)],
+                walkToEntity: false
+            )),
+            [0x00, 0x09, RSCOutOpcode.walkToPoint.rawValue,
+             0x00, 0xB4, 0x01, 0x04,
+             0x01, 0x00, 0x01, 0x01]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeWalkPacket(
+                serverPath: [(x: 180, z: 260), (x: 179, z: 259)],
+                walkToEntity: false
+            )),
+            [0x00, 0x07, RSCOutOpcode.walkToPoint.rawValue,
+             0x00, 0xB4, 0x01, 0x04,
+             0xFF, 0xFF]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeWalkPacket(
+                serverPath: [(x: 184, z: 265)],
+                walkToEntity: true
+            )),
+            [0x00, 0x05, RSCOutOpcode.walkToEntity.rawValue,
+             0x00, 0xB8, 0x01, 0x09]
+        )
+    }
+
+    func test_custom10009_target_action_packets_match_server_parser_lengths() {
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeNpcTargetPacket(opcode: .npcAttack, serverIndex: 321)),
+            [0x00, 0x03, RSCOutOpcode.npcAttack.rawValue,
+             0x01, 0x41]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeNpcTargetPacket(opcode: .npcTalkTo, serverIndex: 321)),
+            [0x00, 0x03, RSCOutOpcode.npcTalkTo.rawValue,
+             0x01, 0x41]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeGroundItemTakePacket(x: 180, z: 260, itemId: 77)),
+            [0x00, 0x07, RSCOutOpcode.groundItemTake.rawValue,
+             0x00, 0xB4, 0x01, 0x04, 0x00, 0x4D]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeObjectActionPacket(opcode: .objectCommand1, x: 180, z: 260)),
+            [0x00, 0x05, RSCOutOpcode.objectCommand1.rawValue,
+             0x00, 0xB4, 0x01, 0x04]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeWallActionPacket(opcode: .wallCommand2, x: 180, z: 260, direction: 3)),
+            [0x00, 0x06, RSCOutOpcode.wallCommand2.rawValue,
+             0x00, 0xB4, 0x01, 0x04, 0x03]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeItemUseOnObjectPacket(x: 180, z: 260, slot: 2)),
+            [0x00, 0x07, RSCOutOpcode.itemUseOnObject.rawValue,
+             0x00, 0xB4, 0x01, 0x04, 0x00, 0x02]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeItemUseOnWallPacket(x: 180, z: 260, direction: 3, slot: 2)),
+            [0x00, 0x08, RSCOutOpcode.wallUseItem.rawValue,
+             0x00, 0xB4, 0x01, 0x04, 0x03, 0x00, 0x02]
+        )
+    }
+
     @MainActor
     func test_rsc_update_players_case5_stores_raw_appearance_and_clears_local_refresh_flag() {
         let ws = RSCWorldState()
