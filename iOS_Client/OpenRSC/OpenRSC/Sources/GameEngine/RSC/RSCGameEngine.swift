@@ -290,7 +290,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private var terrainBuilt = false
-    private var terrainBuiltAtSector: (Int, Int) = (-1, -1)
+    private var terrainBuiltAtSector: (Int, Int, Int) = (-1, -1, Int.min)
     /// Number of models in the scene that belong to the static terrain mesh.
     /// Anything past this index is per-frame ephemera (game objects). We
     /// truncate back to this on every tick before re-instantiating objects.
@@ -388,18 +388,20 @@ final class RSCGameEngine: ObservableObject {
             // directly would rebuild around the wrong origin after recenter.
             let secX = worldState.midRegionBaseX / 48
             let secZ = worldState.midRegionBaseZ / 48
-            if !terrainBuilt || terrainBuiltAtSector != (secX, secZ) {
+            let plane = worldState.requestedPlane
+            if !terrainBuilt || terrainBuiltAtSector != (secX, secZ, plane) {
                 world.landscapeLoader = landscapeLoader
                 let absX = worldState.absoluteWorldX(px)
                 let absZ = worldState.absoluteWorldZ(pz)
                 // Clear previously-added landscape models so we don't accumulate
                 for i in 0..<scene.modelCount { scene.models[i] = nil }
                 scene.modelCount = 0
-                world.loadSections(worldX: absX, worldZ: absZ, plane: 0)
+                world.loadSections(worldX: absX, worldZ: absZ, plane: plane)
                 terrainBuilt = true
-                terrainBuiltAtSector = (secX, secZ)
+                terrainBuiltAtSector = (secX, secZ, plane)
                 terrainModelCount = scene.modelCount
-                print("[Engine] Terrain mesh built for sector (\(secX),\(secZ)) at abs (\(absX),\(absZ)); scene has \(scene.modelCount) models")
+                worldState.loadingArea = false
+                print("[Engine] Terrain mesh built for sector (\(secX),\(secZ)) plane=\(plane) at abs (\(absX),\(absZ)); scene has \(scene.modelCount) models")
             }
 
             // Game-object 3D models. Mirrors PacketHandler.gotObjectsPacket()

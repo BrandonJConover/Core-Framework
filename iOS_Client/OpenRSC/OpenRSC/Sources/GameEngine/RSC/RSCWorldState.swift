@@ -673,6 +673,11 @@ final class RSCWorldState: ObservableObject {
     /// base so terrain, NPCs, and server-tile action packets all agree.
     var midRegionBaseX: Int = 0
     var midRegionBaseZ: Int = 0
+    var currentRegionMinX: Int = 0
+    var currentRegionMaxX: Int = 0
+    var currentRegionMinZ: Int = 0
+    var currentRegionMaxZ: Int = 0
+    var lastHeightOffset: Int = Int.min
 
     /// True terrain/archive world coordinate. Use this for LandscapeLoader,
     /// wilderness checks, debug labels, and anything else that needs the
@@ -700,11 +705,27 @@ final class RSCWorldState: ObservableObject {
     func recenterRegion(packedPlayerX: Int, packedPlayerZ: Int) -> (localX: Int, localZ: Int, changed: Bool) {
         let wantX = packedPlayerX + worldOffsetX
         let wantZ = packedPlayerZ + worldOffsetZ
-        let nextBaseX = ((wantX + 24) / 48) * 48 - 48 - worldOffsetX
-        let nextBaseZ = ((wantZ + 24) / 48) * 48 - 48 - worldOffsetZ
+
+        // Java mudclient.loadNextRegion keeps a 64x64 active terrain window
+        // with hysteresis and only recenters when the offset-inclusive player
+        // coordinate leaves that window or the height plane changes. Rebuilding
+        // the 48-tile base on every opcode 191 makes retained NPC/player/object
+        // locals jump a region early.
+        if lastHeightOffset == requestedPlane,
+           currentRegionMinX < wantX, wantX < currentRegionMaxX,
+           currentRegionMinZ < wantZ, wantZ < currentRegionMaxZ {
+            return (packedPlayerX - midRegionBaseX, packedPlayerZ - midRegionBaseZ, false)
+        }
+
+        let midRegionX = (wantX + 24) / 48
+        let midRegionZ = (wantZ + 24) / 48
+        let nextBaseAbsX = midRegionX * 48 - 48
+        let nextBaseAbsZ = midRegionZ * 48 - 48
+        let nextBaseX = nextBaseAbsX - worldOffsetX
+        let nextBaseZ = nextBaseAbsZ - worldOffsetZ
         let deltaX = nextBaseX - midRegionBaseX
         let deltaZ = nextBaseZ - midRegionBaseZ
-        let changed = deltaX != 0 || deltaZ != 0
+        let changed = deltaX != 0 || deltaZ != 0 || lastHeightOffset != requestedPlane
 
         if changed {
             for i in players.indices {
@@ -737,6 +758,11 @@ final class RSCWorldState: ObservableObject {
             }
             midRegionBaseX = nextBaseX
             midRegionBaseZ = nextBaseZ
+            currentRegionMaxX = midRegionX * 48 + 32
+            currentRegionMinX = midRegionX * 48 - 32
+            currentRegionMaxZ = midRegionZ * 48 + 32
+            currentRegionMinZ = midRegionZ * 48 - 32
+            lastHeightOffset = requestedPlane
         }
 
         return (packedPlayerX - midRegionBaseX, packedPlayerZ - midRegionBaseZ, changed)

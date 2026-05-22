@@ -556,6 +556,11 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertTrue(recentered.changed)
         XCTAssertEqual(ws.midRegionBaseX, 144)
         XCTAssertEqual(ws.midRegionBaseZ, 240)
+        XCTAssertEqual(ws.lastHeightOffset, 0)
+        XCTAssertEqual(ws.currentRegionMinX, 2464)
+        XCTAssertEqual(ws.currentRegionMaxX, 2528)
+        XCTAssertEqual(ws.currentRegionMinZ, 1984)
+        XCTAssertEqual(ws.currentRegionMaxZ, 2048)
         XCTAssertEqual(recentered.localX, 36)
         XCTAssertEqual(recentered.localZ, 20)
         XCTAssertEqual(ws.players[0].x, -23)
@@ -585,6 +590,41 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(ws.serverTileZ(20), 260)
         XCTAssertEqual(ws.absoluteWorldX(36), 2484)
         XCTAssertEqual(ws.absoluteWorldZ(20), 2036)
+    }
+
+    @MainActor
+    func test_rsc_recenter_region_keeps_java_region_until_bounds_are_crossed() {
+        let ws = RSCWorldState()
+        ws.worldOffsetX = 2304
+        ws.worldOffsetZ = 1776
+        ws.requestedPlane = 0
+
+        let first = ws.recenterRegion(packedPlayerX: 180, packedPlayerZ: 260)
+        XCTAssertTrue(first.changed)
+        XCTAssertEqual(first.localX, 36)
+        XCTAssertEqual(first.localZ, 20)
+
+        ws.players = [
+            RSCPlayer(id: 99, x: 40, y: 25, previousX: 39, previousY: 24, name: "Stay", moving: true, combatLevel: 3),
+        ]
+
+        let inside = ws.recenterRegion(packedPlayerX: 190, packedPlayerZ: 265)
+        XCTAssertFalse(inside.changed)
+        XCTAssertEqual(ws.midRegionBaseX, 144)
+        XCTAssertEqual(ws.midRegionBaseZ, 240)
+        XCTAssertEqual(inside.localX, 46)
+        XCTAssertEqual(inside.localZ, 25)
+        XCTAssertEqual(ws.players[0].x, 40)
+        XCTAssertEqual(ws.players[0].previousX, 39)
+
+        let crossed = ws.recenterRegion(packedPlayerX: 225, packedPlayerZ: 265)
+        XCTAssertTrue(crossed.changed)
+        XCTAssertEqual(ws.midRegionBaseX, 192)
+        XCTAssertEqual(ws.midRegionBaseZ, 240)
+        XCTAssertEqual(crossed.localX, 33)
+        XCTAssertEqual(crossed.localZ, 25)
+        XCTAssertEqual(ws.players[0].x, -8)
+        XCTAssertEqual(ws.players[0].previousX, -9)
     }
 
     // --- 1. Sprite archive format ---
