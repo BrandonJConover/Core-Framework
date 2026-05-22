@@ -2392,6 +2392,10 @@ final class RSCGameEngine: ObservableObject {
 
     @discardableResult
     private func sendWalkPath(toX destX: Int, toZ destZ: Int, walkToEntity: Bool) async -> [(x: Int, z: Int)] {
+        if worldState.localPlayerX == destX && worldState.localPlayerY == destZ {
+            return []
+        }
+
         let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
         let path = pathfinder.findPath(
             fromX: worldState.localPlayerX,
@@ -2402,12 +2406,10 @@ final class RSCGameEngine: ObservableObject {
         )
 
         let encodedPath: [(x: Int, z: Int)]
-        if path.isEmpty && !walkToEntity {
+        if path.isEmpty {
             worldState.walkTargetTimeout = 0
             worldState.addChat(sender: "[Path]", text: "I can't reach that.")
             return []
-        } else if path.isEmpty {
-            encodedPath = [(x: destX, z: destZ)]
         } else {
             encodedPath = path
         }
@@ -2435,6 +2437,27 @@ final class RSCGameEngine: ObservableObject {
         )
         try? await connection.send(packet)
         return encodedPath
+    }
+
+    private func queueApproach(toX destX: Int, z destZ: Int, action: String) async -> Bool {
+        let path = await sendWalkPath(toX: destX, toZ: destZ, walkToEntity: true)
+        if worldState.localPlayerX == destX && worldState.localPlayerY == destZ {
+            return true
+        }
+        guard !path.isEmpty else {
+            print("[Action] blocked action=\"\(action)\" approach=(\(destX),\(destZ))")
+            return false
+        }
+        return true
+    }
+
+    private func queueEntityApproach(toX destX: Int, z destZ: Int, action: String) async -> Bool {
+        let dx = abs(worldState.localPlayerX - destX)
+        let dz = abs(worldState.localPlayerY - destZ)
+        if max(dx, dz) <= 1 {
+            return true
+        }
+        return await queueApproach(toX: destX, z: destZ, action: action)
     }
 
     static func makeWalkPacket(serverPath: [(x: Int, z: Int)], walkToEntity: Bool) -> Data {
@@ -2880,7 +2903,7 @@ final class RSCGameEngine: ObservableObject {
     func attackNPC(serverIndex: Int) {
         Task {
             if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-attack") else { return }
             }
             let data = Self.makeNpcTargetPacket(opcode: .npcAttack, serverIndex: serverIndex)
             logAction("npc-attack", opcode: RSCOutOpcode.npcAttack, payload: data, details: "serverIndex=\(serverIndex)")
@@ -2891,7 +2914,7 @@ final class RSCGameEngine: ObservableObject {
     func attackPlayer(serverIndex: Int) {
         Task {
             if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
+                guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-attack") else { return }
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerAttack.rawValue))
@@ -2928,7 +2951,7 @@ final class RSCGameEngine: ObservableObject {
     func talkToNPC(serverIndex: Int) {
         Task {
             if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-talk") else { return }
             }
             let data = Self.makeNpcTargetPacket(opcode: .npcTalkTo, serverIndex: serverIndex)
             logAction("npc-talk", opcode: RSCOutOpcode.npcTalkTo, payload: data, details: "serverIndex=\(serverIndex)")
@@ -3211,7 +3234,7 @@ final class RSCGameEngine: ObservableObject {
     func useItemOnNPC(slot: Int, serverIndex: Int) {
         Task {
             if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "item-on-npc") else { return }
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnNpc.rawValue))
@@ -3225,7 +3248,7 @@ final class RSCGameEngine: ObservableObject {
     func useItemOnPlayer(slot: Int, serverIndex: Int) {
         Task {
             if let player = worldState.players.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
+                guard await queueEntityApproach(toX: player.x, z: player.y, action: "item-on-player") else { return }
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerUseItem.rawValue))
@@ -3239,7 +3262,7 @@ final class RSCGameEngine: ObservableObject {
     func useItemOnGroundItem(slot: Int, x: Int, z: Int, itemId: Int) {
         Task {
             let approach = approachTileForGroundItem(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "item-on-ground") else { return }
             try? await connection.send(Self.makeItemUseOnGroundPacket(
                 x: serverTileX(x),
                 z: serverTileZ(z),
@@ -3253,7 +3276,7 @@ final class RSCGameEngine: ObservableObject {
     func useItemOnObject(slot: Int, x: Int, z: Int) {
         Task {
             let approach = approachTileForObject(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "item-on-object") else { return }
             try? await connection.send(Self.makeItemUseOnObjectPacket(
                 x: serverTileX(x),
                 z: serverTileZ(z),
@@ -3266,7 +3289,7 @@ final class RSCGameEngine: ObservableObject {
     func useItemOnWall(slot: Int, x: Int, z: Int, direction: Int) {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "item-on-wall") else { return }
             try? await connection.send(Self.makeItemUseOnWallPacket(
                 x: serverTileX(x),
                 z: serverTileZ(z),
@@ -3280,7 +3303,7 @@ final class RSCGameEngine: ObservableObject {
     func pickupGroundItem(x: Int, y: Int, itemId: Int) {
         Task {
             let approach = approachTileForGroundItem(x: x, z: y)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "ground-take") else { return }
             let packet = Self.makeGroundItemTakePacket(x: serverTileX(x), z: serverTileZ(y), itemId: itemId)
             logAction("ground-take", opcode: RSCOutOpcode.groundItemTake, payload: packet, details: "item=\(itemId) tile=(\(x),\(y)) server=(\(serverTileX(x)),\(serverTileZ(y)))")
             try? await connection.send(packet)
@@ -3498,7 +3521,7 @@ final class RSCGameEngine: ObservableObject {
     func objectAction1(x: Int, z: Int) {
         Task {
             let approach = approachTileForObject(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "object-1") else { return }
             let packet = Self.makeObjectActionPacket(opcode: .objectCommand1, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-1", opcode: RSCOutOpcode.objectCommand1, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
@@ -3508,7 +3531,7 @@ final class RSCGameEngine: ObservableObject {
     func objectAction2(x: Int, z: Int) {
         Task {
             let approach = approachTileForObject(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "object-2") else { return }
             let packet = Self.makeObjectActionPacket(opcode: .objectCommand2, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-2", opcode: RSCOutOpcode.objectCommand2, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
@@ -3518,7 +3541,7 @@ final class RSCGameEngine: ObservableObject {
     func wallAction1(x: Int, z: Int, direction: Int) {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "wall-1") else { return }
             let packet = Self.makeWallActionPacket(opcode: .wallCommand1, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-1", opcode: RSCOutOpcode.wallCommand1, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
@@ -3528,7 +3551,7 @@ final class RSCGameEngine: ObservableObject {
     func wallAction2(x: Int, z: Int, direction: Int) {
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "wall-2") else { return }
             let packet = Self.makeWallActionPacket(opcode: .wallCommand2, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-2", opcode: RSCOutOpcode.wallCommand2, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
@@ -3548,38 +3571,37 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func castSpellOnNPC(spellId: Int, npcServerIndex: Int) {
-        worldState.clearPendingTargetMode()
         Task {
             if let npc = worldState.npcs.first(where: { $0.id == npcServerIndex }) {
-                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "spell-on-npc") else { return }
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnNpc.rawValue))
             buf.putShort(spellId)
             buf.putShort(npcServerIndex)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
     func castSpellOnPlayer(spellId: Int, playerServerIndex: Int) {
-        worldState.clearPendingTargetMode()
         Task {
             if let player = worldState.players.first(where: { $0.id == playerServerIndex }) {
-                await sendWalkPath(toX: player.x, toZ: player.y, walkToEntity: true)
+                guard await queueEntityApproach(toX: player.x, z: player.y, action: "spell-on-player") else { return }
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnPlayer.rawValue))
             buf.putShort(spellId)
             buf.putShort(playerServerIndex)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
     func castSpellOnGroundItem(spellId: Int, x: Int, z: Int, itemId: Int) {
-        worldState.clearPendingTargetMode()
         Task {
             let approach = approachTileForGroundItem(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "spell-on-ground") else { return }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnGroundItem.rawValue))
             buf.putShort(spellId)
@@ -3587,28 +3609,28 @@ final class RSCGameEngine: ObservableObject {
             buf.putShort(serverTileZ(z))
             buf.putShort(itemId)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
     func castSpellOnObject(spellId: Int, x: Int, z: Int) {
-        worldState.clearPendingTargetMode()
         Task {
             let approach = approachTileForObject(x: x, z: z)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "spell-on-object") else { return }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnObject.rawValue))
             buf.putShort(spellId)
             buf.putShort(serverTileX(x))
             buf.putShort(serverTileZ(z))
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
     func castSpellOnWall(spellId: Int, x: Int, z: Int, direction: Int) {
-        worldState.clearPendingTargetMode()
         Task {
             let approach = approachTileForWall(x: x, z: z, direction: direction)
-            await sendWalkPath(toX: approach.x, toZ: approach.z, walkToEntity: true)
+            guard await queueApproach(toX: approach.x, z: approach.z, action: "spell-on-wall") else { return }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnWall.rawValue))
             // The native login targets the custom 10009 protocol branch, whose
@@ -3619,6 +3641,7 @@ final class RSCGameEngine: ObservableObject {
             buf.putShort(serverTileZ(z))
             buf.putByte(direction)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -3667,15 +3690,15 @@ final class RSCGameEngine: ObservableObject {
     /// Cast a spell on a ground tile (telekinetic grab, alch on ground item).
     /// Mirrors RSCOutOpcode.castOnLand (158) with [short spellId][short x][short z].
     func castSpellOnGround(spellId: Int, x: Int, z: Int) {
-        worldState.clearPendingTargetMode()
         Task {
-            await sendWalkPath(toX: x, toZ: z, walkToEntity: true)
+            guard await queueApproach(toX: x, z: z, action: "spell-on-ground-tile") else { return }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnLand.rawValue))
             buf.putShort(spellId)
             buf.putShort(serverTileX(x))
             buf.putShort(serverTileZ(z))
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -3823,6 +3846,9 @@ final class RSCGameEngine: ObservableObject {
 
     func followPlayer(serverIndex: Int) {
         Task {
+            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
+                guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-follow") else { return }
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerFollow.rawValue))
             buf.putShort(serverIndex)
@@ -3835,6 +3861,9 @@ final class RSCGameEngine: ObservableObject {
     /// accepts (TradePanel opens) or declines.
     func requestTrade(serverIndex: Int) {
         Task {
+            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
+                guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-trade") else { return }
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerTrade.rawValue))
             buf.putShort(serverIndex)
@@ -3846,6 +3875,9 @@ final class RSCGameEngine: ObservableObject {
     /// confirms, the DuelPanel opens for both sides.
     func requestDuel(serverIndex: Int) {
         Task {
+            if let player = worldState.players.first(where: { $0.id == serverIndex }) {
+                guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-duel") else { return }
+            }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.playerDuel.rawValue))
             buf.putShort(serverIndex)
@@ -3856,7 +3888,7 @@ final class RSCGameEngine: ObservableObject {
     func npcCommand(serverIndex: Int) {
         Task {
             if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-1") else { return }
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand.rawValue))
@@ -3868,7 +3900,7 @@ final class RSCGameEngine: ObservableObject {
     func npcCommand2(serverIndex: Int) {
         Task {
             if let npc = worldState.npcs.first(where: { $0.id == serverIndex }) {
-                await sendWalkPath(toX: npc.x, toZ: npc.y, walkToEntity: true)
+                guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-2") else { return }
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand2.rawValue))
