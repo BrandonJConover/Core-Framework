@@ -454,20 +454,64 @@ final class RenderPipelineTests: XCTestCase {
         handler.worldState = ws
 
         var bits = BitWriter()
-        bits.write(120, count: 11)  // local x
-        bits.write(240, count: 13)  // local z
+        bits.write(120, count: 11)  // packed local x
+        bits.write(240, count: 13)  // packed local z
         bits.write(4, count: 4)     // local direction
         bits.write(1, count: 8)     // only first known remote player remains
         bits.write(0, count: 1)     // retained player has no update
 
         handler.handlePacket(opcode: 191, payload: Data(bits.bytes))
 
-        XCTAssertEqual(ws.localPlayerX, 120)
-        XCTAssertEqual(ws.localPlayerY, 240)
+        XCTAssertEqual(ws.midRegionBaseX, 48)
+        XCTAssertEqual(ws.midRegionBaseZ, 192)
+        XCTAssertEqual(ws.localPlayerX, 72)
+        XCTAssertEqual(ws.localPlayerY, 48)
         XCTAssertEqual(ws.players.map(\.id), [100])
         XCTAssertNotNil(ws.playerAppearances[7])
         XCTAssertNotNil(ws.playerAppearances[100])
         XCTAssertNil(ws.playerAppearances[200])
+    }
+
+    @MainActor
+    func test_rsc_recenter_region_keeps_retained_entities_local_and_absolute_helpers_correct() {
+        let ws = RSCWorldState()
+        ws.worldOffsetX = 2304
+        ws.worldOffsetZ = 1776
+        ws.localPlayerX = 20
+        ws.localPlayerY = 30
+        ws.midRegionBaseX = 96
+        ws.midRegionBaseZ = 144
+        ws.players = [
+            RSCPlayer(id: 10, x: 25, y: 35, previousX: 24, previousY: 34, name: "Shift", moving: true, combatLevel: 3),
+        ]
+        ws.npcs = [
+            RSCNPC(id: 20, x: 30, y: 40, previousX: 29, previousY: 39, npcId: 1, name: "NPC"),
+        ]
+        ws.gameObjects = [RSCGameObject(objectId: 1, x: 31, y: 41, direction: 0)]
+        ws.wallObjects = [RSCWallObject(wallId: 2, x: 32, y: 42, direction: 1)]
+        ws.groundItems = [RSCGroundItem(itemId: 3, x: 33, y: 43, amount: 1)]
+        ws.walkTargetX = 34
+        ws.walkTargetY = 44
+        ws.walkTargetTimeout = 10
+
+        let recentered = ws.recenterRegion(packedPlayerX: 180, packedPlayerZ: 260)
+
+        XCTAssertTrue(recentered.changed)
+        XCTAssertEqual(ws.midRegionBaseX, 144)
+        XCTAssertEqual(ws.midRegionBaseZ, 240)
+        XCTAssertEqual(recentered.localX, 36)
+        XCTAssertEqual(recentered.localZ, 20)
+        XCTAssertEqual(ws.players[0].x, -23)
+        XCTAssertEqual(ws.players[0].previousX, -24)
+        XCTAssertEqual(ws.players[0].y, -61)
+        XCTAssertEqual(ws.npcs[0].x, -18)
+        XCTAssertEqual(ws.npcs[0].y, -56)
+        XCTAssertEqual(ws.gameObjects[0].x, -17)
+        XCTAssertEqual(ws.wallObjects[0].y, -54)
+        XCTAssertEqual(ws.groundItems[0].x, -15)
+        XCTAssertEqual(ws.walkTargetX, -14)
+        XCTAssertEqual(ws.absoluteWorldX(recentered.localX), 2484)
+        XCTAssertEqual(ws.absoluteWorldZ(recentered.localZ), 2036)
     }
 
     // --- 1. Sprite archive format ---
