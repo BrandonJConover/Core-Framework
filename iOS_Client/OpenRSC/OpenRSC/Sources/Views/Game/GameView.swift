@@ -1025,12 +1025,12 @@ private struct StatsPanelView_Internal: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 2) {
                 ForEach(worldState.skills) { skill in
                     HStack {
-                        Text(RSCWorldState.skillShortName(for: skill.id))
+                        Text(worldState.skillShortName(for: skill.id))
                             .font(.system(size: 9)).foregroundColor(Color(hex: "#aaa"))
                         Spacer()
                         Text("\(skill.current)/\(skill.base)")
                             .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundColor(skill.current < skill.base ? .red : .white)
+                            .foregroundColor(skill.current < skill.base ? .red : (skill.current > skill.base ? .green : .white))
                     }
                     .padding(.horizontal, 4).padding(.vertical, 2)
                     .background(Color(hex: "#222222")).cornerRadius(3)

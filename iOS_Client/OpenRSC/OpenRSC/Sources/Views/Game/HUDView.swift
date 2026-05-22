@@ -416,7 +416,7 @@ private struct StatsPanelView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 3) {
                     ForEach(worldState.skills) { skill in
                         HStack {
-                            Text(RSCWorldState.skillName(for: skill.id))
+                            Text(worldState.skillName(for: skill.id))
                                 .font(.system(size: 11))
                                 .foregroundColor(Color(hex: "#aaaaaa"))
                             Spacer()
@@ -1501,7 +1501,7 @@ private struct QuestPanelView: View {
                 Image(systemName: "star.fill")
                     .font(.system(size: 10))
                     .foregroundColor(Color(hex: "#c8a951"))
-                Text("Quest Points: \(worldState.quests.filter { $0.stage == -1 }.count)")
+                Text("Quest Points: \(worldState.questPoints)")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(Color(hex: "#c8a951"))
                 Spacer()

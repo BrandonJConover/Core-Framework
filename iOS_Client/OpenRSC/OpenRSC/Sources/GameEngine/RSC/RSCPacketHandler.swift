@@ -160,14 +160,9 @@ final class RSCPacketHandler {
                 let xp159 = Int(UInt32(bitPattern: Int32(buf.get32()))) / 4
                 ws.ensureSkillExists(skill159)
                 if skill159 < ws.skills.count {
-                    let oldXP = ws.skills[skill159].experience
                     ws.skills[skill159].current = current159
                     ws.skills[skill159].base = base159
-                    ws.skills[skill159].experience = xp159
-                    let gained = xp159 - oldXP
-                    if gained > 0 {
-                        ws.addXPDrop(skillId: skill159, amount: gained)
-                    }
+                    ws.updateExperience(skill: skill159, xp: xp159)
                 }
             }
 
@@ -1532,6 +1527,7 @@ final class RSCPacketHandler {
 
         // Quest points
         let questPoints = buf.bytesRemaining > 0 ? buf.getUnsignedByte() : 0
+        ws.questPoints = questPoints
 
         // Build skills array
         var skills = [RSCSkill]()

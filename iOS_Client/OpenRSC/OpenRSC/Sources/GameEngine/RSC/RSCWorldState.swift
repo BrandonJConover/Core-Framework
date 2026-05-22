@@ -371,23 +371,42 @@ final class RSCWorldState: ObservableObject {
     static let maxTradeOfferSlots = 12
     static let maxDuelStakeSlots = 8
     static let maxShopSlots = 40
-    static let skillNames = [
+    private static let baseSkillNames = [
         "Attack", "Defense", "Strength", "Hits", "Ranged",
         "Prayer", "Magic", "Cooking", "Woodcut", "Fletching",
         "Fishing", "Firemaking", "Crafting", "Smithing", "Mining",
-        "Herblaw", "Agility", "Thieving", "Runecraft", "Harvesting"
+        "Herblaw", "Agility", "Thieving"
     ]
-    static let skillShortNames = [
+    private static let baseSkillShortNames = [
         "Atk", "Def", "Str", "HP", "Rng", "Pray", "Mag", "Cook", "WC", "Fletch",
-        "Fish", "FM", "Craft", "Smith", "Mine", "Herb", "Agil", "Thief", "RC", "Harvest"
+        "Fish", "FM", "Craft", "Smith", "Mine", "Herb", "Agil", "Thief"
     ]
 
-    static func skillName(for id: Int) -> String {
-        id >= 0 && id < skillNames.count ? skillNames[id] : "Skill \(id)"
+    func skillName(for id: Int) -> String {
+        if id >= 0 && id < Self.baseSkillNames.count { return Self.baseSkillNames[id] }
+        return extendedSkillName(for: id, short: false) ?? "Skill \(id)"
     }
 
-    static func skillShortName(for id: Int) -> String {
-        id >= 0 && id < skillShortNames.count ? skillShortNames[id] : "?\(id)"
+    func skillShortName(for id: Int) -> String {
+        if id >= 0 && id < Self.baseSkillShortNames.count { return Self.baseSkillShortNames[id] }
+        return extendedSkillName(for: id, short: true) ?? "?\(id)"
+    }
+
+    private func extendedSkillName(for id: Int, short: Bool) -> String? {
+        var nextId = Self.baseSkillNames.count
+        if wantRunecraft {
+            if id == nextId { return short ? "RC" : "Runecraft" }
+            nextId += 1
+        }
+        if wantHarvesting {
+            if id == nextId { return short ? "Harvest" : "Harvesting" }
+            nextId += 1
+        }
+        // Some servers send extended stat packets before the config flags.
+        // Preserve the common both-skills ordering as a readable fallback.
+        if id == 18 { return short ? "RC" : "Runecraft" }
+        if id == 19 { return short ? "Harvest" : "Harvesting" }
+        return nil
     }
 
     @Published var localPlayerX: Int = 0
@@ -633,7 +652,7 @@ final class RSCWorldState: ObservableObject {
     @Published var xpDrops: [XPDrop] = []
 
     func addXPDrop(skillId: Int, amount: Int) {
-        xpDrops.append(XPDrop(skill: Self.skillName(for: skillId), amount: amount, timestamp: Date()))
+        xpDrops.append(XPDrop(skill: skillName(for: skillId), amount: amount, timestamp: Date()))
         pruneExpiredXPDrops()
     }
 
@@ -644,6 +663,7 @@ final class RSCWorldState: ObservableObject {
 
     // Quest journal
     @Published var quests: [(id: Int, name: String, stage: Int)] = []
+    @Published var questPoints: Int = 0
 
     // Character appearance creation
     @Published var showAppearanceChange: Bool = false
@@ -944,7 +964,9 @@ final class RSCWorldState: ObservableObject {
     func updateExperience(skill: Int, xp: Int) {
         ensureSkillExists(skill)
         guard skill >= 0 && skill < skills.count else { return }
+        let gained = xp - skills[skill].experience
         skills[skill].experience = xp
+        if gained > 0 { addXPDrop(skillId: skill, amount: gained) }
     }
 
     func updateStatCurrent(skill: Int, level: Int) {
