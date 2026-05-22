@@ -804,13 +804,13 @@ final class RenderPipelineTests: XCTestCase {
 
     func test_scene_projects_player_origin_near_screen_center() {
         let (graphics, scene) = buildEngine()
-        scene.setCamera(centerX: 0, centerY: -180, centerZ: 0,
+        scene.setCamera(centerX: 64, centerY: -180, centerZ: 64,
                         xRot: 256, yRot: 0, zRot: 0,  // xRot=64*4
                         offset: 1500)
 
-        let (sx, sy, depth) = scene.projectPoint(worldX: 0, worldY: 0, worldZ: 0)
-        print("player origin: screen=(\(sx),\(sy)) depth=\(depth)")
-        XCTAssertGreaterThan(depth, 0, "Player origin must be in front of camera")
+        let (sx, sy, depth) = scene.projectPoint(worldX: 64, worldY: 0, worldZ: 64)
+        print("player tile center: screen=(\(sx),\(sy)) depth=\(depth)")
+        XCTAssertGreaterThan(depth, 0, "Player tile center must be in front of camera")
         XCTAssertGreaterThan(sx, -Int32(graphics.width2), "Screen X within one screen-width of center")
         XCTAssertLessThan(sx, 2 * Int32(graphics.width2))
         XCTAssertGreaterThan(sy, -Int32(graphics.height2))
@@ -819,13 +819,13 @@ final class RenderPipelineTests: XCTestCase {
 
     func test_scene_projects_nearby_tile_on_screen() {
         let (_, scene) = buildEngine()
-        scene.setCamera(centerX: 0, centerY: -180, centerZ: 0,
+        scene.setCamera(centerX: 64, centerY: -180, centerZ: 64,
                         xRot: 256, yRot: 0, zRot: 0,
                         offset: 1500)
         // One tile in each cardinal direction — should all stay near the screen
-        for (wx, wz) in [(128, 0), (-128, 0), (0, 128), (0, -128), (0, 256), (256, 256)] {
+        for (wx, wz) in [(192, 64), (-64, 64), (64, 192), (64, -64), (64, 320), (320, 320)] {
             let (sx, sy, depth) = scene.projectPoint(worldX: Int32(wx), worldY: 0, worldZ: Int32(wz))
-            print("  tile (\(wx),0,\(wz)) → (\(sx),\(sy)) depth=\(depth)")
+            print("  tile center (\(wx),0,\(wz)) -> (\(sx),\(sy)) depth=\(depth)")
             // Allow points within ~2× screen size — near the player everything should project close
             XCTAssertGreaterThan(depth, -100, "tile (\(wx),\(wz)) behind plane — depth=\(depth)")
         }
@@ -839,7 +839,7 @@ final class RenderPipelineTests: XCTestCase {
         world.loadSections(worldX: 217, worldZ: 741, plane: 0)
         XCTAssertGreaterThanOrEqual(scene.modelCount, 1, "At least one landscape model was added")
 
-        scene.setCamera(centerX: 0, centerY: -180, centerZ: 0,
+        scene.setCamera(centerX: 64, centerY: -180, centerZ: 64,
                         xRot: 256, yRot: 0, zRot: 0,
                         offset: 1500)
 
@@ -894,7 +894,7 @@ final class RenderPipelineTests: XCTestCase {
         loader.bridgeInto(graphics)
         NPCDefinitions.assignAnimationNumbers()
 
-        scene.setCamera(centerX: 0, centerY: -180, centerZ: 0,
+        scene.setCamera(centerX: 64, centerY: -180, centerZ: 64,
                         xRot: 256, yRot: 0, zRot: 0,
                         offset: 1500)
 

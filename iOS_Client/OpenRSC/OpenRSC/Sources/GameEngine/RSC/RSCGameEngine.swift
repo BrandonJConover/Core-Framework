@@ -290,7 +290,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private var terrainBuilt = false
-    private var terrainBuiltAtSector: (Int, Int, Int) = (-1, -1, Int.min)
+    private var terrainBuiltAtTile: (Int, Int, Int) = (-1, -1, Int.min)
     /// Number of models in the scene that belong to the static terrain mesh.
     /// Anything past this index is per-frame ephemera (game objects). We
     /// truncate back to this on every tick before re-instantiating objects.
@@ -382,23 +382,25 @@ final class RSCGameEngine: ObservableObject {
         let landscapeReady = landscapeLoader.isLoaded
 
         if havePos && landscapeReady, let scene = self.scene, let graphics = self.graphics, let world = self.world {
-            // Rebuild terrain mesh when the Java-style region base shifts
-            // (each mid-region is 48 tiles, with the player kept local to
-            // that region). `px/pz` are region-local, so sectoring them
-            // directly would rebuild around the wrong origin after recenter.
+            // Rebuild terrain mesh around the current player tile. The mesh is
+            // generated in player-local coordinates (tile offset -half...half),
+            // while actors are also rendered relative to the current player.
+            // If we only rebuild on region-base shifts, walking inside a region
+            // leaves terrain anchored to the previous player tile and actors
+            // appear to drift across the wrong ground.
             let secX = worldState.midRegionBaseX / 48
             let secZ = worldState.midRegionBaseZ / 48
             let plane = worldState.requestedPlane
-            if !terrainBuilt || terrainBuiltAtSector != (secX, secZ, plane) {
+            let absX = worldState.absoluteWorldX(px)
+            let absZ = worldState.absoluteWorldZ(pz)
+            if !terrainBuilt || terrainBuiltAtTile != (absX, absZ, plane) {
                 world.landscapeLoader = landscapeLoader
-                let absX = worldState.absoluteWorldX(px)
-                let absZ = worldState.absoluteWorldZ(pz)
                 // Clear previously-added landscape models so we don't accumulate
                 for i in 0..<scene.modelCount { scene.models[i] = nil }
                 scene.modelCount = 0
                 world.loadSections(worldX: absX, worldZ: absZ, plane: plane)
                 terrainBuilt = true
-                terrainBuiltAtSector = (secX, secZ, plane)
+                terrainBuiltAtTile = (absX, absZ, plane)
                 terrainModelCount = scene.modelCount
                 worldState.loadingArea = false
                 print("[Engine] Terrain mesh built for sector (\(secX),\(secZ)) plane=\(plane) at abs (\(absX),\(absZ)); scene has \(scene.modelCount) models")
@@ -470,18 +472,18 @@ final class RSCGameEngine: ObservableObject {
                 }
             }
 
-            // Camera setup. The terrain mesh is built in player-local coordinates
-            // (World.generateLandscapeModel places verts at tileX*128, tileX in [-half,+half]).
-            // So camera center = (0, -cameraY, 0) puts the camera directly above the player
-            // origin. Absolute world position doesn't enter the projection math.
+            // Camera setup. Terrain tiles are quads from tileOffset*128 to
+            // tileOffset*128+128, and actors/taps use tile centers at +64.
+            // Center the camera on that tile center so the local player,
+            // terrain, and hit-testing share one frame.
             let desiredZoom = Int32(1200.0 / max(0.5, min(3.0, Double(zoomLevel))))
             cameraZoom = cameraZoomWithOcclusion(desiredZoom)
             let cameraY: Int32 = 180  // height above ground
             scene.fogLandscapeDistance = cameraZoom * 6
             scene.setCamera(
-                centerX: 0,
+                centerX: 64,
                 centerY: -cameraY,
-                centerZ: 0,
+                centerZ: 64,
                 xRot: cameraPitch * 4,
                 yRot: cameraRotation * 4,
                 zRot: 0,
