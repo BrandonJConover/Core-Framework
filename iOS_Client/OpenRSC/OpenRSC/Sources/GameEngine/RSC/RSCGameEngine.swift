@@ -2112,8 +2112,23 @@ final class RSCGameEngine: ObservableObject {
         var nearest: RSCGameObject? = nil
         var nearestDist = Int.max
         for object in worldState.gameObjects {
-            let dx = object.x - x
-            let dz = object.y - z
+            let footprint = objectFootprint(for: object)
+            let dx: Int
+            if x < footprint.minX {
+                dx = footprint.minX - x
+            } else if x > footprint.maxX {
+                dx = x - footprint.maxX
+            } else {
+                dx = 0
+            }
+            let dz: Int
+            if z < footprint.minZ {
+                dz = footprint.minZ - z
+            } else if z > footprint.maxZ {
+                dz = z - footprint.maxZ
+            } else {
+                dz = 0
+            }
             let dist = dx * dx + dz * dz
             if dist < nearestDist && dist <= 4 {
                 nearestDist = dist
@@ -2393,12 +2408,15 @@ final class RSCGameEngine: ObservableObject {
         let destZ = target.z
 
         let targetNPC = nearestNPCOnScreen(gameX: gameX, gameY: gameY)
-            ?? nearestNPC(toX: destX, z: destZ, maxDistanceSquared: 1)
+            ?? nearestNPC(toX: destX, z: destZ)
         let targetPlayer = nearestPlayerOnScreen(gameX: gameX, gameY: gameY)
-            ?? nearestPlayer(toX: destX, z: destZ, maxDistanceSquared: 1)
+            ?? nearestPlayer(toX: destX, z: destZ)
         let targetGroundItem = nearestGroundItemOnScreen(gameX: gameX, gameY: gameY)
+            ?? nearestGroundItem(toX: destX, z: destZ)
         let targetObject = nearestGameObjectOnScreen(gameX: gameX, gameY: gameY)
+            ?? nearestGameObject(toX: destX, z: destZ)
         let targetWall = nearestWallObjectOnScreen(gameX: gameX, gameY: gameY)
+            ?? nearestWallObject(toX: destX, z: destZ)
 
         // Item-use target mode — armed by inventory "Use". The next tap on a
         // world entity consumes the pending item instead of doing default walk
