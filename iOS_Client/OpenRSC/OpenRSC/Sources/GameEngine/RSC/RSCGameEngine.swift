@@ -2674,10 +2674,46 @@ final class RSCGameEngine: ObservableObject {
             .flatMap { slot in worldState.inventory.first(where: { $0.id == slot })?.itemId }
             .map { ItemNames.name(for: $0) } ?? "item"
         let pendingSpellId = worldState.pendingSpellId
-        let normalAction: (@escaping () -> Void) -> () -> Void = { [weak self] action in
-            {
-                self?.worldState.clearPendingTargetMode()
+        let staleTargetAction: () -> Void = { [weak self] in
+            self?.worldState.contextMenuOpen = false
+            self?.worldState.contextMenuActions = []
+            self?.worldState.addChat(sender: "[Action]", text: "That target is no longer available.")
+        }
+        func guardedAction(
+            isCurrent: @escaping () -> Bool,
+            clearPendingTarget: Bool,
+            action: @escaping () -> Void
+        ) -> () -> Void {
+            { [weak self] in
+                guard isCurrent() else {
+                    staleTargetAction()
+                    return
+                }
+                if clearPendingTarget {
+                    self?.worldState.clearPendingTargetMode()
+                }
                 action()
+            }
+        }
+        func npcStillCurrent(_ npc: RSCNPC) -> Bool {
+            worldState.npcs.contains { $0.id == npc.id && $0.npcId == npc.npcId }
+        }
+        func playerStillCurrent(_ player: RSCPlayer) -> Bool {
+            worldState.players.contains { $0.id == player.id }
+        }
+        func groundItemStillCurrent(_ item: RSCGroundItem) -> Bool {
+            worldState.groundItems.contains {
+                $0.x == item.x && $0.y == item.y && $0.itemId == item.itemId
+            }
+        }
+        func wallStillCurrent(_ wall: RSCWallObject) -> Bool {
+            worldState.wallObjects.contains {
+                $0.x == wall.x && $0.y == wall.y && $0.wallId == wall.wallId && $0.direction == wall.direction
+            }
+        }
+        func objectStillCurrent(_ object: RSCGameObject) -> Bool {
+            worldState.gameObjects.contains {
+                $0.x == object.x && $0.y == object.y && $0.objectId == object.objectId && $0.direction == object.direction
             }
         }
 
@@ -2702,41 +2738,41 @@ final class RSCGameEngine: ObservableObject {
             if targetNPC?.id == npc.id || (targetNPC == nil && distSq <= 1) {
                 title = npc.name
                 if let pendingItemSlot {
-                    actions.append(("Use \(pendingItemName) with \(npc.name)", "hand.point.up.left", { [weak self] in
+                    actions.append(("Use \(pendingItemName) with \(npc.name)", "hand.point.up.left", guardedAction(isCurrent: { npcStillCurrent(npc) }, clearPendingTarget: false, action: { [weak self] in
                         self?.useItemOnNPC(slot: pendingItemSlot, serverIndex: npc.id)
-                    }))
+                    })))
                 }
                 if let pendingSpellId {
-                    actions.append(("Cast spell on \(npc.name)", "sparkles", { [weak self] in
+                    actions.append(("Cast spell on \(npc.name)", "sparkles", guardedAction(isCurrent: { npcStillCurrent(npc) }, clearPendingTarget: false, action: { [weak self] in
                         self?.castSpellOnNPC(spellId: pendingSpellId, npcServerIndex: npc.id)
-                    }))
+                    })))
                 }
-                actions.append(("Talk to \(npc.name)", "bubble.left", normalAction { [weak self] in
+                actions.append(("Talk to \(npc.name)", "bubble.left", guardedAction(isCurrent: { npcStillCurrent(npc) }, clearPendingTarget: true, action: { [weak self] in
                     self?.talkToNPC(serverIndex: npc.id)
-                }))
+                })))
                 if let def = NPCDefinitions.get(npc.npcId) {
                     let command1 = def.command.trimmingCharacters(in: .whitespacesAndNewlines)
                     let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
                     if def.attackable {
-                        actions.append(("Attack \(npc.name) (lvl \(def.combatLevel))", "bolt.fill", normalAction { [weak self] in
+                        actions.append(("Attack \(npc.name) (lvl \(def.combatLevel))", "bolt.fill", guardedAction(isCurrent: { npcStillCurrent(npc) }, clearPendingTarget: true, action: { [weak self] in
                             self?.attackNPC(serverIndex: npc.id)
-                        }))
+                        })))
                     }
                     if isActionableCommand(command1) {
-                        actions.append(("\(command1) \(npc.name)", "hand.raised", normalAction { [weak self] in
+                        actions.append(("\(command1) \(npc.name)", "hand.raised", guardedAction(isCurrent: { npcStillCurrent(npc) }, clearPendingTarget: true, action: { [weak self] in
                             self?.npcCommand(serverIndex: npc.id)
-                        }))
+                        })))
                     }
                     if isActionableCommand(command2) {
-                        actions.append(("\(command2) \(npc.name)", "ellipsis.circle", normalAction { [weak self] in
+                        actions.append(("\(command2) \(npc.name)", "ellipsis.circle", guardedAction(isCurrent: { npcStillCurrent(npc) }, clearPendingTarget: true, action: { [weak self] in
                             self?.npcCommand2(serverIndex: npc.id)
-                        }))
+                        })))
                     }
                 }
-                actions.append(("Examine \(npc.name)", "eye", normalAction { [weak self] in
+                actions.append(("Examine \(npc.name)", "eye", guardedAction(isCurrent: { npcStillCurrent(npc) }, clearPendingTarget: true, action: { [weak self] in
                     let descr = NPCDefinitions.get(npc.npcId)?.description ?? npc.name
                     self?.worldState.addChat(sender: "[Examine]", text: descr)
-                }))
+                })))
                 break
             }
         }
@@ -2747,30 +2783,30 @@ final class RSCGameEngine: ObservableObject {
             if targetPlayer?.id == player.id || (targetPlayer == nil && pdx * pdx + pdz * pdz <= 1) {
                 title = player.name
                 if let pendingItemSlot {
-                    actions.append(("Use \(pendingItemName) with \(player.name)", "hand.point.up.left", { [weak self] in
+                    actions.append(("Use \(pendingItemName) with \(player.name)", "hand.point.up.left", guardedAction(isCurrent: { playerStillCurrent(player) }, clearPendingTarget: false, action: { [weak self] in
                         self?.useItemOnPlayer(slot: pendingItemSlot, serverIndex: player.id)
-                    }))
+                    })))
                 }
                 if let pendingSpellId {
-                    actions.append(("Cast spell on \(player.name)", "sparkles", { [weak self] in
+                    actions.append(("Cast spell on \(player.name)", "sparkles", guardedAction(isCurrent: { playerStillCurrent(player) }, clearPendingTarget: false, action: { [weak self] in
                         self?.castSpellOnPlayer(spellId: pendingSpellId, playerServerIndex: player.id)
-                    }))
+                    })))
                 }
-                actions.append(("Attack \(player.name)", "bolt.fill", normalAction { [weak self] in
+                actions.append(("Attack \(player.name)", "bolt.fill", guardedAction(isCurrent: { playerStillCurrent(player) }, clearPendingTarget: true, action: { [weak self] in
                     self?.attackPlayer(serverIndex: player.id)
-                }))
-                actions.append(("Trade with \(player.name)", "arrow.left.arrow.right", normalAction { [weak self] in
+                })))
+                actions.append(("Trade with \(player.name)", "arrow.left.arrow.right", guardedAction(isCurrent: { playerStillCurrent(player) }, clearPendingTarget: true, action: { [weak self] in
                     self?.requestTrade(serverIndex: player.id)
-                }))
-                actions.append(("Duel \(player.name)", "shield.lefthalf.filled", normalAction { [weak self] in
+                })))
+                actions.append(("Duel \(player.name)", "shield.lefthalf.filled", guardedAction(isCurrent: { playerStillCurrent(player) }, clearPendingTarget: true, action: { [weak self] in
                     self?.requestDuel(serverIndex: player.id)
-                }))
-                actions.append(("Follow \(player.name)", "figure.walk", normalAction { [weak self] in
+                })))
+                actions.append(("Follow \(player.name)", "figure.walk", guardedAction(isCurrent: { playerStillCurrent(player) }, clearPendingTarget: true, action: { [weak self] in
                     self?.followPlayer(serverIndex: player.id)
-                }))
-                actions.append(("Examine \(player.name)", "eye", normalAction { [weak self] in
+                })))
+                actions.append(("Examine \(player.name)", "eye", guardedAction(isCurrent: { playerStillCurrent(player) }, clearPendingTarget: true, action: { [weak self] in
                     self?.worldState.addChat(sender: "[Examine]", text: "\(player.name) (combat level \(player.combatLevel))")
-                }))
+                })))
                 break
             }
         }
@@ -2783,18 +2819,18 @@ final class RSCGameEngine: ObservableObject {
                 let itemName = ItemNames.name(for: item.itemId)
                 title = itemName
                 if let pendingItemSlot {
-                    actions.append(("Use \(pendingItemName) with \(itemName)", "hand.point.up.left", { [weak self] in
+                    actions.append(("Use \(pendingItemName) with \(itemName)", "hand.point.up.left", guardedAction(isCurrent: { groundItemStillCurrent(item) }, clearPendingTarget: false, action: { [weak self] in
                         self?.useItemOnGroundItem(slot: pendingItemSlot, x: item.x, z: item.y, itemId: item.itemId)
-                    }))
+                    })))
                 }
                 if let pendingSpellId {
-                    actions.append(("Cast spell on \(itemName)", "sparkles", { [weak self] in
+                    actions.append(("Cast spell on \(itemName)", "sparkles", guardedAction(isCurrent: { groundItemStillCurrent(item) }, clearPendingTarget: false, action: { [weak self] in
                         self?.castSpellOnGroundItem(spellId: pendingSpellId, x: item.x, z: item.y, itemId: item.itemId)
-                    }))
+                    })))
                 }
-                actions.append(("Take \(itemName)", "arrow.down.circle", normalAction { [weak self] in
+                actions.append(("Take \(itemName)", "arrow.down.circle", guardedAction(isCurrent: { groundItemStillCurrent(item) }, clearPendingTarget: true, action: { [weak self] in
                     self?.pickupGroundItem(x: item.x, y: item.y, itemId: item.itemId)
-                }))
+                })))
                 break
             }
         }
@@ -2809,39 +2845,39 @@ final class RSCGameEngine: ObservableObject {
                 let wallName = EntityDefinitions.getDoorDef(wall.wallId)?.name ?? "Door"
                 title = wallName
                 if let pendingItemSlot {
-                    actions.append(("Use \(pendingItemName) with \(wallName)", "hand.point.up.left", { [weak self] in
+                    actions.append(("Use \(pendingItemName) with \(wallName)", "hand.point.up.left", guardedAction(isCurrent: { wallStillCurrent(wall) }, clearPendingTarget: false, action: { [weak self] in
                         self?.useItemOnWall(slot: pendingItemSlot, x: wall.x, z: wall.y, direction: wall.direction)
-                    }))
+                    })))
                 }
                 if let pendingSpellId {
-                    actions.append(("Cast spell on \(wallName)", "sparkles", { [weak self] in
+                    actions.append(("Cast spell on \(wallName)", "sparkles", guardedAction(isCurrent: { wallStillCurrent(wall) }, clearPendingTarget: false, action: { [weak self] in
                         self?.castSpellOnWall(spellId: pendingSpellId, x: wall.x, z: wall.y, direction: wall.direction)
-                    }))
+                    })))
                 }
                 if let def = EntityDefinitions.getDoorDef(wall.wallId) {
                     let command1 = def.command1.trimmingCharacters(in: .whitespacesAndNewlines)
                     let command2 = def.command2.trimmingCharacters(in: .whitespacesAndNewlines)
                     if isActionableCommand(command1) {
-                        actions.append(("\(command1) \(wallName)", "door.left.hand.open", normalAction { [weak self] in
+                        actions.append(("\(command1) \(wallName)", "door.left.hand.open", guardedAction(isCurrent: { wallStillCurrent(wall) }, clearPendingTarget: true, action: { [weak self] in
                             self?.wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
-                        }))
+                        })))
                     }
                     if isActionableCommand(command2) {
-                        actions.append(("\(command2) \(wallName)", "door.left.hand.closed", normalAction { [weak self] in
+                        actions.append(("\(command2) \(wallName)", "door.left.hand.closed", guardedAction(isCurrent: { wallStillCurrent(wall) }, clearPendingTarget: true, action: { [weak self] in
                             self?.wallAction2(x: wall.x, z: wall.y, direction: wall.direction)
-                        }))
+                        })))
                     }
                 } else {
-                    actions.append(("Open \(wallName)", "door.left.hand.open", normalAction { [weak self] in
+                    actions.append(("Open \(wallName)", "door.left.hand.open", guardedAction(isCurrent: { wallStillCurrent(wall) }, clearPendingTarget: true, action: { [weak self] in
                         self?.wallAction1(x: wall.x, z: wall.y, direction: wall.direction)
-                    }))
-                    actions.append(("Close \(wallName)", "door.left.hand.closed", normalAction { [weak self] in
+                    })))
+                    actions.append(("Close \(wallName)", "door.left.hand.closed", guardedAction(isCurrent: { wallStillCurrent(wall) }, clearPendingTarget: true, action: { [weak self] in
                         self?.wallAction2(x: wall.x, z: wall.y, direction: wall.direction)
-                    }))
+                    })))
                 }
-                actions.append(("Examine \(wallName)", "eye", normalAction { [weak self] in
+                actions.append(("Examine \(wallName)", "eye", guardedAction(isCurrent: { wallStillCurrent(wall) }, clearPendingTarget: true, action: { [weak self] in
                     self?.worldState.addChat(sender: "[Examine]", text: wallName)
-                }))
+                })))
                 break
             }
         }
@@ -2858,34 +2894,35 @@ final class RSCGameEngine: ObservableObject {
                 let command1 = def?.command1.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let command2 = def?.command2.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 if let pendingItemSlot {
-                    actions.append(("Use \(pendingItemName) with \(objName)", "hand.point.up.left", { [weak self] in
+                    actions.append(("Use \(pendingItemName) with \(objName)", "hand.point.up.left", guardedAction(isCurrent: { objectStillCurrent(obj) }, clearPendingTarget: false, action: { [weak self] in
                         self?.useItemOnObject(slot: pendingItemSlot, x: obj.x, z: obj.y)
-                    }))
+                    })))
                 }
                 if let pendingSpellId {
-                    actions.append(("Cast spell on \(objName)", "sparkles", { [weak self] in
+                    actions.append(("Cast spell on \(objName)", "sparkles", guardedAction(isCurrent: { objectStillCurrent(obj) }, clearPendingTarget: false, action: { [weak self] in
                         self?.castSpellOnObject(spellId: pendingSpellId, x: obj.x, z: obj.y)
-                    }))
+                    })))
                 }
                 if isActionableCommand(command1) {
-                    actions.append(("\(command1) \(objName)", "hand.tap", normalAction { [weak self] in
+                    actions.append(("\(command1) \(objName)", "hand.tap", guardedAction(isCurrent: { objectStillCurrent(obj) }, clearPendingTarget: true, action: { [weak self] in
                         self?.objectAction1(x: obj.x, z: obj.y)
-                    }))
+                    })))
                 }
                 if isActionableCommand(command2) {
-                    actions.append(("\(command2) \(objName)", "ellipsis.circle", normalAction { [weak self] in
+                    actions.append(("\(command2) \(objName)", "ellipsis.circle", guardedAction(isCurrent: { objectStillCurrent(obj) }, clearPendingTarget: true, action: { [weak self] in
                         self?.objectAction2(x: obj.x, z: obj.y)
-                    }))
+                    })))
                 }
-                actions.append(("Examine \(objName)", "eye", normalAction { [weak self] in
+                actions.append(("Examine \(objName)", "eye", guardedAction(isCurrent: { objectStillCurrent(obj) }, clearPendingTarget: true, action: { [weak self] in
                     self?.worldState.addChat(sender: "[Examine]", text: def?.description.isEmpty == false ? def!.description : objName)
-                }))
+                })))
                 break
             }
         }
 
         // Always add walk option
-        actions.append(("Walk here", "figure.walk", normalAction { [weak self] in
+        actions.append(("Walk here", "figure.walk", { [weak self] in
+            self?.worldState.clearPendingTargetMode()
             Task {
                 await self?.sendWalkPath(toX: worldX, toZ: worldZ, walkToEntity: false)
             }
