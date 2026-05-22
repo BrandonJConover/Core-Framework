@@ -49,6 +49,63 @@ final class RenderPipelineTests: XCTestCase {
         )
     }
 
+    func test_rsc_appearance_layers_are_mapped_from_server_ids_to_animation_indexes() {
+        // Opcode 234 case 5 carries 1-based layer animation ids. Java stores
+        // those raw values, then renders layerAnimation[x] - 1. Keep this
+        // explicit because a raw render shifts boots/shields into nearby gear.
+        XCTAssertEqual(RSCGameEngine.appearanceAnimationIndex(0), -1)
+        XCTAssertEqual(RSCGameEngine.appearanceAnimationIndex(1), 0)
+        XCTAssertEqual(RSCGameEngine.appearanceAnimationIndex(137), 136)
+    }
+
+    @MainActor
+    func test_rsc_load_stats_preserves_current_base_and_experience_arrays() {
+        let ws = RSCWorldState()
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        let skillCount = 18
+        var payload: [UInt8] = []
+        payload += (0..<skillCount).map { UInt8(10 + $0) } // current
+        payload += (0..<skillCount).map { UInt8(20 + $0) } // base
+        for i in 0..<skillCount {
+            payload += be32Bytes((1_000 + i) * 4)
+        }
+        payload.append(7) // quest points
+
+        handler.handlePacket(opcode: 156, payload: Data(payload))
+
+        XCTAssertEqual(ws.skills.count, skillCount)
+        XCTAssertEqual(ws.skills[0].current, 10)
+        XCTAssertEqual(ws.skills[0].base, 20)
+        XCTAssertEqual(ws.skills[0].experience, 1_000)
+        XCTAssertEqual(ws.skills[17].current, 27)
+        XCTAssertEqual(ws.skills[17].base, 37)
+        XCTAssertEqual(ws.skills[17].experience, 1_017)
+        XCTAssertEqual(ws.questPoints, 7)
+    }
+
+    @MainActor
+    func test_rsc_update_stat_preserves_drained_current_level_separately_from_base() {
+        let ws = RSCWorldState()
+        ws.ensureSkillExists(3)
+        ws.skills[3].current = 10
+        ws.skills[3].base = 10
+        ws.skills[3].experience = 100
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 159, payload: Data([
+            0x03,       // Hits
+            0x07,       // current drained value
+            0x0A        // base level
+        ] + be32Bytes(400)))
+
+        XCTAssertEqual(ws.skills[3].current, 7)
+        XCTAssertEqual(ws.skills[3].base, 10)
+        XCTAssertEqual(ws.skills[3].experience, 100)
+    }
+
     @MainActor
     func test_rsc_bank_open_uses_short_counts_and_int_amounts() {
         let ws = RSCWorldState()
@@ -564,6 +621,16 @@ final class RenderPipelineTests: XCTestCase {
         let u = (UInt32(b[i]) << 24) | (UInt32(b[i+1]) << 16)
               | (UInt32(b[i+2]) << 8) | UInt32(b[i+3])
         return Int(Int32(bitPattern: u))
+    }
+
+    private func be32Bytes(_ value: Int) -> [UInt8] {
+        let v = UInt32(bitPattern: Int32(value))
+        return [
+            UInt8((v >> 24) & 0xFF),
+            UInt8((v >> 16) & 0xFF),
+            UInt8((v >> 8) & 0xFF),
+            UInt8(v & 0xFF)
+        ]
     }
 
     // --- 1b. Texture page semantics ---

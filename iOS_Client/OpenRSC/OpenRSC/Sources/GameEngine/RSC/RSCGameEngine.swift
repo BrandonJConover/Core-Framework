@@ -552,7 +552,7 @@ final class RSCGameEngine: ObservableObject {
             for player in worldState.players {
                 let appearance = worldState.playerAppearances[player.id]
                 let sprites: [Int] = appearance.map { app in
-                    app.layerSprites.map(animationIndexFromAppearanceId)
+                    app.layerSprites.map(Self.appearanceAnimationIndex)
                 } ?? defaultPlayerSprites
                 let hairIdx = appearance?.colourHair ?? defaultHairIdx
                 let topIdx = appearance?.colourTop ?? defaultTopIdx
@@ -582,7 +582,7 @@ final class RSCGameEngine: ObservableObject {
             // the player faces the NPC mid-fight.
             let localCombatRole: CharacterBillboards.CombatRole = worldState.inCombat ? .combatB : .none
             if let localApp = worldState.playerAppearances[worldState.playerServerIndex] {
-                let localSprites = localApp.layerSprites.map(animationIndexFromAppearanceId)
+                let localSprites = localApp.layerSprites.map(Self.appearanceAnimationIndex)
                 CharacterBillboards.register(
                     scene: scene, spriteLoader: spriteLoader,
                     tileX: 0, tileZ: 0,
@@ -637,7 +637,7 @@ final class RSCGameEngine: ObservableObject {
         return Int32(bitPattern: transform)
     }
 
-    private func animationIndexFromAppearanceId(_ id: Int) -> Int {
+    static func appearanceAnimationIndex(_ id: Int) -> Int {
         // Server player appearance layers are 1-based. Java's drawPlayer uses
         // `layerAnimation[mappedLayer] - 1`; rendering the raw id shifts boots
         // into full helms and shields into crossbows.

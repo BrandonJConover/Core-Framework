@@ -1011,6 +1011,18 @@ private struct StatsPanelView_Internal: View {
 
     var body: some View {
         ScrollView {
+            HStack {
+                Text("Skills")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white)
+                Spacer()
+                Text("Cur/Base")
+                    .font(.system(size: 9))
+                    .foregroundColor(Color(hex: "#c8a951"))
+            }
+            .padding(.horizontal, 4)
+            .padding(.top, 4)
+
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 2) {
                 ForEach(worldState.skills) { skill in
                     HStack {

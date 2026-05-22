@@ -412,7 +412,7 @@ private struct StatsPanelView: View {
                 Text("Skills")
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Text("Combat Lvl \(worldState.combatLevel)")
+                Text("Cur/Base  Combat Lvl \(worldState.combatLevel)")
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: "#c8a951"))
             }
