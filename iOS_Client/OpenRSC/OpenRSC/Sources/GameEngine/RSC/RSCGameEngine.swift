@@ -3016,17 +3016,20 @@ final class RSCGameEngine: ObservableObject {
         }
     }
 
-    static func makeItemDropPacket(slot: Int) -> Data {
+    static func makeItemDropPacket(slot: Int, amount: Int) -> Data {
         let buf = ByteBuffer()
         buf.newPacket(opcode: Int(RSCOutOpcode.itemDrop.rawValue))
         buf.putShort(slot)
+        buf.putInt(max(1, amount))
         return buf.finishPacket()
     }
 
-    static func makeItemCommandPacket(slot: Int) -> Data {
+    static func makeItemCommandPacket(slot: Int, commandIndex: Int, amount: Int) -> Data {
         let buf = ByteBuffer()
         buf.newPacket(opcode: Int(RSCOutOpcode.itemCommand.rawValue))
         buf.putShort(slot)
+        buf.putInt(max(1, amount))
+        buf.putByte(commandIndex)
         return buf.finishPacket()
     }
 
@@ -3035,14 +3038,15 @@ final class RSCGameEngine: ObservableObject {
         buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnGround.rawValue))
         buf.putShort(x)
         buf.putShort(z)
-        buf.putShort(groundItemId)
         buf.putShort(slot)
+        buf.putShort(groundItemId)
         return buf.finishPacket()
     }
 
     func dropItem(slot: Int) {
         Task {
-            try? await connection.send(Self.makeItemDropPacket(slot: slot))
+            let amount = worldState.inventory.indices.contains(slot) ? worldState.inventory[slot].amount : 1
+            try? await connection.send(Self.makeItemDropPacket(slot: slot, amount: amount))
         }
     }
 
@@ -3055,12 +3059,17 @@ final class RSCGameEngine: ObservableObject {
 
     func itemCommand(slot: Int, commandIndex: Int, amount: Int = 1) {
         Task {
-            try? await connection.send(Self.makeItemCommandPacket(slot: slot))
+            try? await connection.send(Self.makeItemCommandPacket(
+                slot: slot,
+                commandIndex: commandIndex,
+                amount: amount
+            ))
         }
     }
 
     func itemCommandAll(slot: Int, commandIndex: Int) {
-        itemCommand(slot: slot, commandIndex: commandIndex)
+        let amount = worldState.inventory.indices.contains(slot) ? worldState.inventory[slot].amount : 1
+        itemCommand(slot: slot, commandIndex: commandIndex, amount: amount)
     }
 
     func useItem(slot: Int) {
@@ -3199,25 +3208,20 @@ final class RSCGameEngine: ObservableObject {
 
     // MARK: - Bank actions
 
-    /// The v235 parser requires this final 4-byte field for deposit/withdraw,
-    /// but BankHandler ignores the value (matching the Java comment that it is
-    /// an authentic-client relic).
-    static let bankActionMagicNumber = 0
-
     static func makeBankDepositPacket(itemId: Int, amount: Int) -> Data {
-        makeBankActionPacket(opcode: .bankDeposit, itemId: itemId, amount: amount)
-    }
-
-    static func makeBankWithdrawPacket(itemId: Int, amount: Int) -> Data {
-        makeBankActionPacket(opcode: .bankWithdraw, itemId: itemId, amount: amount)
-    }
-
-    private static func makeBankActionPacket(opcode: RSCOutOpcode, itemId: Int, amount: Int) -> Data {
         let buf = ByteBuffer()
-        buf.newPacket(opcode: Int(opcode.rawValue))
+        buf.newPacket(opcode: Int(RSCOutOpcode.bankDeposit.rawValue))
         buf.putShort(itemId)
         buf.putInt(amount)
-        buf.putInt(bankActionMagicNumber)
+        return buf.finishPacket()
+    }
+
+    static func makeBankWithdrawPacket(itemId: Int, amount: Int, noted: Bool) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.bankWithdraw.rawValue))
+        buf.putShort(itemId)
+        buf.putInt(amount)
+        buf.putByte(noted ? 1 : 0)
         return buf.finishPacket()
     }
 
@@ -3229,7 +3233,7 @@ final class RSCGameEngine: ObservableObject {
 
     func bankWithdraw(itemId: Int, amount: Int, noted: Bool = false) {
         Task {
-            try? await connection.send(Self.makeBankWithdrawPacket(itemId: itemId, amount: amount))
+            try? await connection.send(Self.makeBankWithdrawPacket(itemId: itemId, amount: amount, noted: noted))
         }
     }
 
