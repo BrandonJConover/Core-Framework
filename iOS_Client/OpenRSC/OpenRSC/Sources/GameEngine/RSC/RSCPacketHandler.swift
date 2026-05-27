@@ -11,8 +11,7 @@ final class RSCPacketHandler {
     }
 
     private func closeTransactionalPanels(_ ws: RSCWorldState, except panel: TransactionalPanel) {
-        ws.contextMenuOpen = false
-        ws.contextMenuActions = []
+        ws.closeContextMenu()
         ws.pendingItemUseSlot = nil
         ws.pendingSpellId = nil
 
@@ -251,8 +250,7 @@ final class RSCPacketHandler {
             ws.tradeTheirOffer = []
             ws.tradeMyOfferMetadata = []
             ws.tradeTheirOfferMetadata = []
-            ws.contextMenuOpen = false
-            ws.contextMenuActions = []
+            ws.closeContextMenu()
             ws.clearPendingTargetMode()
 
         case 20:  // confirmTrade — show confirmation screen
@@ -328,7 +326,7 @@ final class RSCPacketHandler {
         case 222: // showServerMsg — Java showServerMessageDialog(), top box
             let text = buf.getString()
             ws.clearPendingTargetMode()
-            ws.contextMenuOpen = false
+            ws.closeContextMenu()
             ws.dialogueOpen = false
             ws.dialogueOptions = []
             ws.serverMessageDialogText = text
@@ -507,7 +505,7 @@ final class RSCPacketHandler {
             ws.bankOpen = false
             ws.bankPinOpen = false
             ws.bankItems = []
-            ws.contextMenuOpen = false
+            ws.closeContextMenu()
             ws.pendingItemUseSlot = nil
             ws.pendingSpellId = nil
 
@@ -515,7 +513,7 @@ final class RSCPacketHandler {
             ws.shopOpen = false
             ws.shopItems = []
             ws.shopSellableItemIds = []
-            ws.contextMenuOpen = false
+            ws.closeContextMenu()
             ws.pendingItemUseSlot = nil
             ws.pendingSpellId = nil
 
@@ -632,8 +630,7 @@ final class RSCPacketHandler {
             ws.duelTheirStake = []
             ws.duelMyStakeMetadata = []
             ws.duelTheirStakeMetadata = []
-            ws.contextMenuOpen = false
-            ws.contextMenuActions = []
+            ws.closeContextMenu()
             ws.clearPendingTargetMode()
 
         case 30:  // toggleDuelSetting — 4 bytes for retreat/magic/prayer/weapons
@@ -653,7 +650,7 @@ final class RSCPacketHandler {
         case 89:  // showServerMessageDialogTwo — Java lower/centered server modal
             let msg89 = buf.getString()
             ws.clearPendingTargetMode()
-            ws.contextMenuOpen = false
+            ws.closeContextMenu()
             ws.dialogueOpen = false
             ws.dialogueOptions = []
             ws.serverMessageDialogText = msg89
@@ -714,7 +711,7 @@ final class RSCPacketHandler {
         case 110: // SEND_INPUT_BOX — custom prompt string
             let prompt = buf.getString()
             ws.clearPendingTargetMode()
-            ws.contextMenuOpen = false
+            ws.closeContextMenu()
             ws.dialogueOpen = false
             ws.dialogueOptions = []
             ws.inputPromptText = prompt
@@ -1489,7 +1486,7 @@ final class RSCPacketHandler {
             options.append(buf.getString())
         }
         ws.clearPendingTargetMode()
-        ws.contextMenuOpen = false
+        ws.closeContextMenu()
         ws.serverMessageDialogOpen = false
         ws.inputPromptOpen = false
         ws.dialogueOptions = options

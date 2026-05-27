@@ -545,13 +545,18 @@ final class RSCWorldState: ObservableObject {
         pendingSpellId = nil
     }
 
+    func closeContextMenu() {
+        contextMenuOpen = false
+        contextMenuTitle = ""
+        contextMenuActions = []
+    }
+
     /// Close blocking UI before showing a terminal connection state. This
     /// keeps stale welcome/sleep/trade/etc. overlays from sitting above the
     /// connection-lost dialog and trapping touch input.
     func closeBlockingUIForConnectionClosed() {
         clearPendingTargetMode()
-        contextMenuOpen = false
-        contextMenuActions = []
+        closeContextMenu()
         bankOpen = false
         bankPinOpen = false
         shopOpen = false

@@ -477,6 +477,7 @@ final class RenderPipelineTests: XCTestCase {
         ws.tradeMyOfferMetadata = [RSCItemStackMetadata(id: 100, amount: 2, noted: true)]
         ws.tradeTheirOfferMetadata = [RSCItemStackMetadata(id: 200, amount: 3, noted: false)]
         ws.contextMenuOpen = true
+        ws.contextMenuTitle = "Old target"
         ws.contextMenuActions = [("Take", "hand", {})]
         ws.pendingItemUseSlot = 4
         ws.pendingSpellId = 7
@@ -494,6 +495,7 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertTrue(ws.tradeMyOfferMetadata.isEmpty)
         XCTAssertTrue(ws.tradeTheirOfferMetadata.isEmpty)
         XCTAssertFalse(ws.contextMenuOpen)
+        XCTAssertEqual(ws.contextMenuTitle, "")
         XCTAssertTrue(ws.contextMenuActions.isEmpty)
         XCTAssertNil(ws.pendingItemUseSlot)
         XCTAssertNil(ws.pendingSpellId)
@@ -614,6 +616,7 @@ final class RenderPipelineTests: XCTestCase {
         ws.duelMyStakeMetadata = [RSCItemStackMetadata(id: 101, amount: 2, noted: true)]
         ws.duelTheirStakeMetadata = [RSCItemStackMetadata(id: 102, amount: 3, noted: false)]
         ws.contextMenuOpen = true
+        ws.contextMenuTitle = "Old target"
         ws.contextMenuActions = [("Attack", "bolt", {})]
         ws.pendingItemUseSlot = 2
         ws.pendingSpellId = 5
@@ -631,6 +634,7 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertTrue(ws.duelMyStakeMetadata.isEmpty)
         XCTAssertTrue(ws.duelTheirStakeMetadata.isEmpty)
         XCTAssertFalse(ws.contextMenuOpen)
+        XCTAssertEqual(ws.contextMenuTitle, "")
         XCTAssertTrue(ws.contextMenuActions.isEmpty)
         XCTAssertNil(ws.pendingItemUseSlot)
         XCTAssertNil(ws.pendingSpellId)
@@ -658,6 +662,86 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertFalse(ws.bankOpen)
         XCTAssertFalse(ws.bankPinOpen)
         XCTAssertTrue(ws.shopOpen)
+    }
+
+    @MainActor
+    func test_rsc_close_bank_clears_context_actions_title_and_pending_target_mode() {
+        let ws = RSCWorldState()
+        ws.bankOpen = true
+        ws.bankPinOpen = true
+        ws.bankItems = [(id: 10, amount: 1)]
+        ws.contextMenuOpen = true
+        ws.contextMenuTitle = "Old bank target"
+        ws.contextMenuActions = [("Withdraw", "tray.and.arrow.up", {})]
+        ws.pendingItemUseSlot = 3
+        ws.pendingSpellId = 8
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 203, payload: Data())
+
+        XCTAssertFalse(ws.bankOpen)
+        XCTAssertFalse(ws.bankPinOpen)
+        XCTAssertTrue(ws.bankItems.isEmpty)
+        XCTAssertFalse(ws.contextMenuOpen)
+        XCTAssertEqual(ws.contextMenuTitle, "")
+        XCTAssertTrue(ws.contextMenuActions.isEmpty)
+        XCTAssertNil(ws.pendingItemUseSlot)
+        XCTAssertNil(ws.pendingSpellId)
+    }
+
+    @MainActor
+    func test_rsc_exit_shop_clears_context_actions_title_and_pending_target_mode() {
+        let ws = RSCWorldState()
+        ws.shopOpen = true
+        ws.shopItems = [(id: 20, stock: 5, price: 30)]
+        ws.shopSellableItemIds = [20]
+        ws.contextMenuOpen = true
+        ws.contextMenuTitle = "Old shop target"
+        ws.contextMenuActions = [("Buy", "cart", {})]
+        ws.pendingItemUseSlot = 4
+        ws.pendingSpellId = 9
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 137, payload: Data())
+
+        XCTAssertFalse(ws.shopOpen)
+        XCTAssertTrue(ws.shopItems.isEmpty)
+        XCTAssertTrue(ws.shopSellableItemIds.isEmpty)
+        XCTAssertFalse(ws.contextMenuOpen)
+        XCTAssertEqual(ws.contextMenuTitle, "")
+        XCTAssertTrue(ws.contextMenuActions.isEmpty)
+        XCTAssertNil(ws.pendingItemUseSlot)
+        XCTAssertNil(ws.pendingSpellId)
+    }
+
+    @MainActor
+    func test_rsc_server_message_packets_clear_context_actions_title_and_pending_target_mode() {
+        for opcode: UInt8 in [222, 89] {
+            let ws = RSCWorldState()
+            ws.contextMenuOpen = true
+            ws.contextMenuTitle = "Old target"
+            ws.contextMenuActions = [("Talk", "bubble.left", {})]
+            ws.pendingItemUseSlot = 5
+            ws.pendingSpellId = 10
+            ws.dialogueOpen = true
+            ws.dialogueOptions = ["Old option"]
+            let handler = RSCPacketHandler()
+            handler.worldState = ws
+
+            handler.handlePacket(opcode: opcode, payload: Data(rscStringBytes("Server says hello")))
+
+            XCTAssertFalse(ws.contextMenuOpen, "opcode \(opcode)")
+            XCTAssertEqual(ws.contextMenuTitle, "", "opcode \(opcode)")
+            XCTAssertTrue(ws.contextMenuActions.isEmpty, "opcode \(opcode)")
+            XCTAssertNil(ws.pendingItemUseSlot, "opcode \(opcode)")
+            XCTAssertNil(ws.pendingSpellId, "opcode \(opcode)")
+            XCTAssertFalse(ws.dialogueOpen, "opcode \(opcode)")
+            XCTAssertTrue(ws.dialogueOptions.isEmpty, "opcode \(opcode)")
+            XCTAssertTrue(ws.serverMessageDialogOpen, "opcode \(opcode)")
+            XCTAssertEqual(ws.serverMessageDialogText, "Server says hello", "opcode \(opcode)")
+        }
     }
 
     @MainActor
