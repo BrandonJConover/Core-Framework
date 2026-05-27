@@ -154,6 +154,56 @@ final class RenderPipelineTests: XCTestCase {
             [0x00, 0x08, RSCOutOpcode.wallUseItem.rawValue,
              0x00, 0xB4, 0x01, 0x04, 0x03, 0x00, 0x02]
         )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeItemUseOnNpcPacket(serverIndex: 321, slot: 2)),
+            [0x00, 0x05, RSCOutOpcode.itemUseOnNpc.rawValue,
+             0x01, 0x41, 0x00, 0x02]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeItemUseOnPlayerPacket(serverIndex: 321, slot: 2)),
+            [0x00, 0x05, RSCOutOpcode.playerUseItem.rawValue,
+             0x01, 0x41, 0x00, 0x02]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeItemUseOnItemPacket(slot1: 2, slot2: 4)),
+            [0x00, 0x05, RSCOutOpcode.itemUseOnItem.rawValue,
+             0x00, 0x02, 0x00, 0x04]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeSpellOnItemPacket(spellId: 42, slot: 2)),
+            [0x00, 0x05, RSCOutOpcode.castOnItem.rawValue,
+             0x00, 0x2A, 0x00, 0x02]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeSpellOnNpcPacket(spellId: 42, serverIndex: 321)),
+            [0x00, 0x05, RSCOutOpcode.castOnNpc.rawValue,
+             0x00, 0x2A, 0x01, 0x41]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeSpellOnPlayerPacket(spellId: 42, serverIndex: 321)),
+            [0x00, 0x05, RSCOutOpcode.castOnPlayer.rawValue,
+             0x00, 0x2A, 0x01, 0x41]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeSpellOnObjectPacket(spellId: 42, x: 180, z: 260)),
+            [0x00, 0x07, RSCOutOpcode.castOnObject.rawValue,
+             0x00, 0x2A, 0x00, 0xB4, 0x01, 0x04]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeSpellOnWallPacket(spellId: 42, x: 180, z: 260, direction: 3)),
+            [0x00, 0x08, RSCOutOpcode.castOnWall.rawValue,
+             0x00, 0x2A, 0x00, 0xB4, 0x01, 0x04, 0x03]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeSpellOnGroundItemPacket(spellId: 42, x: 180, z: 260, itemId: 77)),
+            [0x00, 0x09, RSCOutOpcode.castOnGroundItem.rawValue,
+             0x00, 0x2A, 0x00, 0xB4, 0x01, 0x04, 0x00, 0x4D]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeSpellOnLandPacket(spellId: 42, x: 180, z: 260)),
+            [0x00, 0x07, RSCOutOpcode.castOnLand.rawValue,
+             0x00, 0x2A, 0x00, 0xB4, 0x01, 0x04]
+        )
     }
 
     @MainActor

@@ -2680,16 +2680,13 @@ final class RSCGameEngine: ObservableObject {
         }
         func guardedAction(
             isCurrent: @escaping () -> Bool,
-            clearPendingTarget: Bool,
+            clearPendingTarget _: Bool,
             action: @escaping () -> Void
         ) -> () -> Void {
-            { [weak self] in
+            {
                 guard isCurrent() else {
                     staleTargetAction()
                     return
-                }
-                if clearPendingTarget {
-                    self?.worldState.clearPendingTargetMode()
                 }
                 action()
             }
@@ -2950,6 +2947,7 @@ final class RSCGameEngine: ObservableObject {
             let data = Self.makeNpcTargetPacket(opcode: .npcAttack, serverIndex: serverIndex)
             logAction("npc-attack", opcode: RSCOutOpcode.npcAttack, payload: data, details: "serverIndex=\(serverIndex)")
             try? await connection.send(data)
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -2969,6 +2967,7 @@ final class RSCGameEngine: ObservableObject {
             buf.putShort(serverIndex)
             let data = buf.finishPacket()
             try? await connection.send(data)
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -3010,6 +3009,7 @@ final class RSCGameEngine: ObservableObject {
             let data = Self.makeNpcTargetPacket(opcode: .npcTalkTo, serverIndex: serverIndex)
             logAction("npc-talk", opcode: RSCOutOpcode.npcTalkTo, payload: data, details: "serverIndex=\(serverIndex)")
             try? await connection.send(data)
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -3159,6 +3159,30 @@ final class RSCGameEngine: ObservableObject {
         return buf.finishPacket()
     }
 
+    static func makeItemUseOnNpcPacket(serverIndex: Int, slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnNpc.rawValue))
+        buf.putShort(serverIndex)
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
+    static func makeItemUseOnPlayerPacket(serverIndex: Int, slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.playerUseItem.rawValue))
+        buf.putShort(serverIndex)
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
+    static func makeItemUseOnItemPacket(slot1: Int, slot2: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnItem.rawValue))
+        buf.putShort(slot1)
+        buf.putShort(slot2)
+        return buf.finishPacket()
+    }
+
     static func makeNpcTargetPacket(opcode: RSCOutOpcode, serverIndex: Int) -> Data {
         let buf = ByteBuffer()
         buf.newPacket(opcode: Int(opcode.rawValue))
@@ -3208,6 +3232,68 @@ final class RSCGameEngine: ObservableObject {
         buf.putShort(z)
         buf.putByte(direction)
         buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
+    static func makeSpellOnItemPacket(spellId: Int, slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.castOnItem.rawValue))
+        buf.putShort(spellId)
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
+    static func makeSpellOnNpcPacket(spellId: Int, serverIndex: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.castOnNpc.rawValue))
+        buf.putShort(spellId)
+        buf.putShort(serverIndex)
+        return buf.finishPacket()
+    }
+
+    static func makeSpellOnPlayerPacket(spellId: Int, serverIndex: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.castOnPlayer.rawValue))
+        buf.putShort(spellId)
+        buf.putShort(serverIndex)
+        return buf.finishPacket()
+    }
+
+    static func makeSpellOnObjectPacket(spellId: Int, x: Int, z: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.castOnObject.rawValue))
+        buf.putShort(spellId)
+        buf.putShort(x)
+        buf.putShort(z)
+        return buf.finishPacket()
+    }
+
+    static func makeSpellOnWallPacket(spellId: Int, x: Int, z: Int, direction: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.castOnWall.rawValue))
+        buf.putShort(spellId)
+        buf.putShort(x)
+        buf.putShort(z)
+        buf.putByte(direction)
+        return buf.finishPacket()
+    }
+
+    static func makeSpellOnGroundItemPacket(spellId: Int, x: Int, z: Int, itemId: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.castOnGroundItem.rawValue))
+        buf.putShort(spellId)
+        buf.putShort(x)
+        buf.putShort(z)
+        buf.putShort(itemId)
+        return buf.finishPacket()
+    }
+
+    static func makeSpellOnLandPacket(spellId: Int, x: Int, z: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.castOnLand.rawValue))
+        buf.putShort(spellId)
+        buf.putShort(x)
+        buf.putShort(z)
         return buf.finishPacket()
     }
 
@@ -3296,11 +3382,7 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("item-on-npc")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnNpc.rawValue))
-            buf.putShort(serverIndex)
-            buf.putShort(slot)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeItemUseOnNpcPacket(serverIndex: serverIndex, slot: slot))
             clearPendingItemUse()
         }
     }
@@ -3316,11 +3398,7 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("item-on-player")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.playerUseItem.rawValue))
-            buf.putShort(serverIndex)
-            buf.putShort(slot)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeItemUseOnPlayerPacket(serverIndex: serverIndex, slot: slot))
             clearPendingItemUse()
         }
     }
@@ -3405,16 +3483,13 @@ final class RSCGameEngine: ObservableObject {
             let packet = Self.makeGroundItemTakePacket(x: serverTileX(x), z: serverTileZ(y), itemId: itemId)
             logAction("ground-take", opcode: RSCOutOpcode.groundItemTake, payload: packet, details: "item=\(itemId) tile=(\(x),\(y)) server=(\(serverTileX(x)),\(serverTileZ(y)))")
             try? await connection.send(packet)
+            worldState.clearPendingTargetMode()
         }
     }
 
     func useItemOnItem(slot1: Int, slot2: Int) {
         Task {
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemUseOnItem.rawValue))
-            buf.putShort(slot1)
-            buf.putShort(slot2)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeItemUseOnItemPacket(slot1: slot1, slot2: slot2))
             clearPendingItemUse()
         }
     }
@@ -3631,6 +3706,7 @@ final class RSCGameEngine: ObservableObject {
             let packet = Self.makeObjectActionPacket(opcode: .objectCommand1, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-1", opcode: RSCOutOpcode.objectCommand1, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -3649,6 +3725,7 @@ final class RSCGameEngine: ObservableObject {
             let packet = Self.makeObjectActionPacket(opcode: .objectCommand2, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-2", opcode: RSCOutOpcode.objectCommand2, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -3667,6 +3744,7 @@ final class RSCGameEngine: ObservableObject {
             let packet = Self.makeWallActionPacket(opcode: .wallCommand1, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-1", opcode: RSCOutOpcode.wallCommand1, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -3685,6 +3763,7 @@ final class RSCGameEngine: ObservableObject {
             let packet = Self.makeWallActionPacket(opcode: .wallCommand2, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-2", opcode: RSCOutOpcode.wallCommand2, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
             try? await connection.send(packet)
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -3711,11 +3790,7 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("spell-on-npc")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.castOnNpc.rawValue))
-            buf.putShort(spellId)
-            buf.putShort(npcServerIndex)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeSpellOnNpcPacket(spellId: spellId, serverIndex: npcServerIndex))
             worldState.clearPendingTargetMode()
         }
     }
@@ -3731,11 +3806,7 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("spell-on-player")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.castOnPlayer.rawValue))
-            buf.putShort(spellId)
-            buf.putShort(playerServerIndex)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeSpellOnPlayerPacket(spellId: spellId, serverIndex: playerServerIndex))
             worldState.clearPendingTargetMode()
         }
     }
@@ -3752,13 +3823,12 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("spell-on-ground")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.castOnGroundItem.rawValue))
-            buf.putShort(spellId)
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            buf.putShort(itemId)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeSpellOnGroundItemPacket(
+                spellId: spellId,
+                x: serverTileX(x),
+                z: serverTileZ(z),
+                itemId: itemId
+            ))
             worldState.clearPendingTargetMode()
         }
     }
@@ -3775,12 +3845,7 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("spell-on-object")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.castOnObject.rawValue))
-            buf.putShort(spellId)
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeSpellOnObjectPacket(spellId: spellId, x: serverTileX(x), z: serverTileZ(z)))
             worldState.clearPendingTargetMode()
         }
     }
@@ -3797,16 +3862,12 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("spell-on-wall")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.castOnWall.rawValue))
-            // The native login targets the custom 10009 protocol branch, whose
-            // spell structs read spell first, then target coordinate + boundary
-            // direction.
-            buf.putShort(spellId)
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            buf.putByte(direction)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeSpellOnWallPacket(
+                spellId: spellId,
+                x: serverTileX(x),
+                z: serverTileZ(z),
+                direction: direction
+            ))
             worldState.clearPendingTargetMode()
         }
     }
@@ -3858,12 +3919,7 @@ final class RSCGameEngine: ObservableObject {
     func castSpellOnGround(spellId: Int, x: Int, z: Int) {
         Task {
             guard await queueApproach(toX: x, z: z, action: "spell-on-ground-tile") else { return }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.castOnLand.rawValue))
-            buf.putShort(spellId)
-            buf.putShort(serverTileX(x))
-            buf.putShort(serverTileZ(z))
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeSpellOnLandPacket(spellId: spellId, x: serverTileX(x), z: serverTileZ(z)))
             worldState.clearPendingTargetMode()
         }
     }
@@ -3872,11 +3928,7 @@ final class RSCGameEngine: ObservableObject {
     /// Mirrors mudclient.java ITEM_CAST_SPELL: opcode 4, [short spellId][short slot].
     func castSpellOnItem(spellId: Int, slot: Int) {
         Task {
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.castOnItem.rawValue))
-            buf.putShort(spellId)  // server reads spellId first per mudclient (idOrZ then indexOrX)
-            buf.putShort(slot)
-            try? await connection.send(buf.finishPacket())
+            try? await connection.send(Self.makeSpellOnItemPacket(spellId: spellId, slot: slot))
             worldState.clearPendingTargetMode()
         }
     }
@@ -4025,6 +4077,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.playerFollow.rawValue))
             buf.putShort(serverIndex)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -4046,6 +4099,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.playerTrade.rawValue))
             buf.putShort(serverIndex)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -4066,6 +4120,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.playerDuel.rawValue))
             buf.putShort(serverIndex)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -4084,6 +4139,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand.rawValue))
             buf.putShort(serverIndex)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
@@ -4102,6 +4158,7 @@ final class RSCGameEngine: ObservableObject {
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand2.rawValue))
             buf.putShort(serverIndex)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
