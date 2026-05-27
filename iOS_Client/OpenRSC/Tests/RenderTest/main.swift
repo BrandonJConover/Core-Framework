@@ -466,6 +466,39 @@ final class RenderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func test_rsc_trade_confirmed_clears_offer_metadata_and_pending_target_mode() {
+        let ws = RSCWorldState()
+        ws.tradeOpen = true
+        ws.tradeConfirmOpen = true
+        ws.tradeAccepted = true
+        ws.tradePartnerAccepted = true
+        ws.tradeMyOffer = [(id: 100, amount: 2)]
+        ws.tradeTheirOffer = [(id: 200, amount: 3)]
+        ws.tradeMyOfferMetadata = [RSCItemStackMetadata(id: 100, amount: 2, noted: true)]
+        ws.tradeTheirOfferMetadata = [RSCItemStackMetadata(id: 200, amount: 3, noted: false)]
+        ws.contextMenuOpen = true
+        ws.contextMenuActions = [("Take", "hand", {})]
+        ws.pendingItemUseSlot = 4
+        ws.pendingSpellId = 7
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 128, payload: Data())
+
+        XCTAssertFalse(ws.tradeOpen)
+        XCTAssertFalse(ws.tradeConfirmOpen)
+        XCTAssertFalse(ws.tradeAccepted)
+        XCTAssertFalse(ws.tradePartnerAccepted)
+        XCTAssertTrue(ws.tradeMyOffer.isEmpty)
+        XCTAssertTrue(ws.tradeTheirOffer.isEmpty)
+        XCTAssertTrue(ws.tradeMyOfferMetadata.isEmpty)
+        XCTAssertTrue(ws.tradeTheirOfferMetadata.isEmpty)
+        XCTAssertFalse(ws.contextMenuOpen)
+        XCTAssertNil(ws.pendingItemUseSlot)
+        XCTAssertNil(ws.pendingSpellId)
+    }
+
+    @MainActor
     func test_rsc_duel_settings_use_java_order_and_one_means_restriction() {
         let ws = RSCWorldState()
         let handler = RSCPacketHandler()
@@ -566,6 +599,39 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(ws.duelTheirStakeMetadata, [RSCItemStackMetadata(id: 101, amount: 2, noted: true)])
         XCTAssertEqual(ws.duelMyStakeMetadata, [RSCItemStackMetadata(id: 102, amount: 3, noted: false)])
         XCTAssertEqual(ws.duelSettings, [true, false, true, false])
+    }
+
+    @MainActor
+    func test_rsc_close_duel_dialog_clears_stake_metadata_and_pending_target_mode() {
+        let ws = RSCWorldState()
+        ws.duelOpen = true
+        ws.duelConfirmOpen = true
+        ws.duelAccepted = true
+        ws.duelOpponentAccepted = true
+        ws.duelMyStake = [(id: 101, amount: 2)]
+        ws.duelTheirStake = [(id: 102, amount: 3)]
+        ws.duelMyStakeMetadata = [RSCItemStackMetadata(id: 101, amount: 2, noted: true)]
+        ws.duelTheirStakeMetadata = [RSCItemStackMetadata(id: 102, amount: 3, noted: false)]
+        ws.contextMenuOpen = true
+        ws.contextMenuActions = [("Attack", "bolt", {})]
+        ws.pendingItemUseSlot = 2
+        ws.pendingSpellId = 5
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+
+        handler.handlePacket(opcode: 225, payload: Data())
+
+        XCTAssertFalse(ws.duelOpen)
+        XCTAssertFalse(ws.duelConfirmOpen)
+        XCTAssertFalse(ws.duelAccepted)
+        XCTAssertFalse(ws.duelOpponentAccepted)
+        XCTAssertTrue(ws.duelMyStake.isEmpty)
+        XCTAssertTrue(ws.duelTheirStake.isEmpty)
+        XCTAssertTrue(ws.duelMyStakeMetadata.isEmpty)
+        XCTAssertTrue(ws.duelTheirStakeMetadata.isEmpty)
+        XCTAssertFalse(ws.contextMenuOpen)
+        XCTAssertNil(ws.pendingItemUseSlot)
+        XCTAssertNil(ws.pendingSpellId)
     }
 
     @MainActor
@@ -862,6 +928,47 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(crossed.localZ, 25)
         XCTAssertEqual(ws.players[0].x, -8)
         XCTAssertEqual(ws.players[0].previousX, -9)
+    }
+
+    @MainActor
+    func test_rsc_pathfinder_wall_boundaries_block_crossing_only() {
+        assertBoundaryWallBlocksDirectPath(
+            wall: RSCWallObject(x: 10, y: 20, wallId: 42, direction: 0),
+            from: (x: 10, z: 19),
+            to: (x: 10, z: 20)
+        )
+        assertBoundaryWallBlocksDirectPath(
+            wall: RSCWallObject(x: 10, y: 20, wallId: 43, direction: 1),
+            from: (x: 9, z: 20),
+            to: (x: 10, z: 20)
+        )
+    }
+
+    @MainActor
+    private func assertBoundaryWallBlocksDirectPath(
+        wall: RSCWallObject,
+        from: (x: Int, z: Int),
+        to: (x: Int, z: Int),
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let clearPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: RSCWorldState())
+            .findPath(fromX: from.x, fromZ: from.z, toX: to.x, toZ: to.z, maxSteps: 20)
+        XCTAssertEqual(clearPath.count, 1, file: file, line: line)
+        XCTAssertEqual(clearPath[0].x, to.x, file: file, line: line)
+        XCTAssertEqual(clearPath[0].z, to.z, file: file, line: line)
+
+        let blockedWorld = RSCWorldState()
+        blockedWorld.wallObjects = [wall]
+        let blockedPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: blockedWorld)
+            .findPath(fromX: from.x, fromZ: from.z, toX: to.x, toZ: to.z, maxSteps: 20)
+        XCTAssertFalse(blockedPath.isEmpty, file: file, line: line)
+        XCTAssertFalse(
+            blockedPath[0].x == to.x && blockedPath[0].z == to.z,
+            "Boundary wall should block the direct adjacent step and force a route around",
+            file: file,
+            line: line
+        )
     }
 
     // --- 1. Sprite archive format ---
