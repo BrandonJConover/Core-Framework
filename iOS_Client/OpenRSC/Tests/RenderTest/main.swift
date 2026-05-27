@@ -984,6 +984,24 @@ final class RenderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func test_rsc_pathfinder_prevents_diagonal_corner_cut_through_wall_edges() {
+        let clearPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: RSCWorldState())
+            .findPath(fromX: 0, fromZ: 0, toX: 1, toZ: 1, maxSteps: 20)
+        XCTAssertEqual(clearPath.count, 1)
+        XCTAssertEqual(clearPath[0].x, 1)
+        XCTAssertEqual(clearPath[0].z, 1)
+
+        let blockedWorld = RSCWorldState()
+        blockedWorld.wallObjects = [
+            RSCWallObject(x: 1, y: 0, wallId: 1, direction: 1),
+            RSCWallObject(x: 0, y: 1, wallId: 1, direction: 0)
+        ]
+        let blockedPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: blockedWorld)
+            .findPath(fromX: 0, fromZ: 0, toX: 1, toZ: 1, maxSteps: 20)
+        XCTAssertTrue(blockedPath.isEmpty, "Blocked wall edges should prevent the diagonal shortcut")
+    }
+
+    @MainActor
     private func assertBoundaryWallBlocksDirectPath(
         wall: RSCWallObject,
         from: (x: Int, z: Int),
