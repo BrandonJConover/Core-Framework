@@ -947,6 +947,43 @@ final class RenderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func test_rsc_pathfinder_objects_block_destination_tile_but_allow_route_around() {
+        let clearPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: RSCWorldState())
+            .findPath(fromX: 0, fromZ: 0, toX: 1, toZ: 0, maxSteps: 20)
+        XCTAssertEqual(clearPath.count, 1)
+        XCTAssertEqual(clearPath[0].x, 1)
+        XCTAssertEqual(clearPath[0].z, 0)
+
+        let blockedWorld = RSCWorldState()
+        blockedWorld.gameObjects = [RSCGameObject(x: 1, y: 0, objectId: 99_999, direction: 0)]
+        let blockedPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: blockedWorld)
+            .findPath(fromX: 0, fromZ: 0, toX: 1, toZ: 0, maxSteps: 20)
+        XCTAssertFalse(blockedPath.isEmpty)
+        XCTAssertFalse(
+            blockedPath[0].x == 1 && blockedPath[0].z == 0,
+            "Live scenery should block stepping directly onto its occupied tile"
+        )
+    }
+
+    @MainActor
+    func test_rsc_pathfinder_prevents_diagonal_corner_cut_through_objects() {
+        let clearPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: RSCWorldState())
+            .findPath(fromX: 0, fromZ: 0, toX: 1, toZ: 1, maxSteps: 20)
+        XCTAssertEqual(clearPath.count, 1)
+        XCTAssertEqual(clearPath[0].x, 1)
+        XCTAssertEqual(clearPath[0].z, 1)
+
+        let blockedWorld = RSCWorldState()
+        blockedWorld.gameObjects = [
+            RSCGameObject(x: 1, y: 0, objectId: 99_998, direction: 0),
+            RSCGameObject(x: 0, y: 1, objectId: 99_997, direction: 0)
+        ]
+        let blockedPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: blockedWorld)
+            .findPath(fromX: 0, fromZ: 0, toX: 1, toZ: 1, maxSteps: 20)
+        XCTAssertTrue(blockedPath.isEmpty, "Blocked corner sides should prevent the diagonal shortcut")
+    }
+
+    @MainActor
     private func assertBoundaryWallBlocksDirectPath(
         wall: RSCWallObject,
         from: (x: Int, z: Int),
