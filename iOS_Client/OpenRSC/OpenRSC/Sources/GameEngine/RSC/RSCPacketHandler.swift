@@ -252,6 +252,7 @@ final class RSCPacketHandler {
             ws.tradeMyOfferMetadata = []
             ws.tradeTheirOfferMetadata = []
             ws.contextMenuOpen = false
+            ws.contextMenuActions = []
             ws.clearPendingTargetMode()
 
         case 20:  // confirmTrade — show confirmation screen
@@ -632,6 +633,7 @@ final class RSCPacketHandler {
             ws.duelMyStakeMetadata = []
             ws.duelTheirStakeMetadata = []
             ws.contextMenuOpen = false
+            ws.contextMenuActions = []
             ws.clearPendingTargetMode()
 
         case 30:  // toggleDuelSetting — 4 bytes for retreat/magic/prayer/weapons

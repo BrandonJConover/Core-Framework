@@ -494,6 +494,7 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertTrue(ws.tradeMyOfferMetadata.isEmpty)
         XCTAssertTrue(ws.tradeTheirOfferMetadata.isEmpty)
         XCTAssertFalse(ws.contextMenuOpen)
+        XCTAssertTrue(ws.contextMenuActions.isEmpty)
         XCTAssertNil(ws.pendingItemUseSlot)
         XCTAssertNil(ws.pendingSpellId)
     }
@@ -630,6 +631,7 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertTrue(ws.duelMyStakeMetadata.isEmpty)
         XCTAssertTrue(ws.duelTheirStakeMetadata.isEmpty)
         XCTAssertFalse(ws.contextMenuOpen)
+        XCTAssertTrue(ws.contextMenuActions.isEmpty)
         XCTAssertNil(ws.pendingItemUseSlot)
         XCTAssertNil(ws.pendingSpellId)
     }
