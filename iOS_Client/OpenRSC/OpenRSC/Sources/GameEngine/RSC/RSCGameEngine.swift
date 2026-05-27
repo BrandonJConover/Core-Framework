@@ -2521,23 +2521,18 @@ final class RSCGameEngine: ObservableObject {
             let targetWall = screenWall ?? exactWall
             let targetObject = screenObject ?? exactObject
             if let npc = targetNPC {
-                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on NPC \(npc.id)")
                 useItemOnNPC(slot: itemSlot, serverIndex: npc.id)
             } else if let player = targetPlayer {
-                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on player \(player.id)")
                 useItemOnPlayer(slot: itemSlot, serverIndex: player.id)
             } else if let item = targetGroundItem {
-                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on ground item \(item.itemId)")
                 useItemOnGroundItem(slot: itemSlot, x: item.x, z: item.y, itemId: item.itemId)
             } else if let wall = targetWall {
-                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on wall \(wall.wallId)")
                 useItemOnWall(slot: itemSlot, x: wall.x, z: wall.y, direction: wall.direction)
             } else if let object = targetObject {
-                worldState.pendingItemUseSlot = nil
                 print("[Input] Use item slot \(itemSlot) on object \(object.objectId)")
                 useItemOnObject(slot: itemSlot, x: object.x, z: object.y)
             } else {
@@ -2551,7 +2546,6 @@ final class RSCGameEngine: ObservableObject {
         // triggering walk/talk. Resolve specific entities before falling back
         // to a bare land cast.
         if let spellId = worldState.pendingSpellId {
-            worldState.pendingSpellId = nil
             let targetNPC = screenNPC ?? exactNPC
             let targetPlayer = screenPlayer ?? exactPlayer
             let targetGroundItem = screenGroundItem ?? exactGroundItem
