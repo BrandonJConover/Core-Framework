@@ -3871,13 +3871,13 @@ final class RSCGameEngine: ObservableObject {
     /// Cast a spell on an inventory item (e.g. enchant, low alch, superheat).
     /// Mirrors mudclient.java ITEM_CAST_SPELL: opcode 4, [short spellId][short slot].
     func castSpellOnItem(spellId: Int, slot: Int) {
-        worldState.clearPendingTargetMode()
         Task {
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.castOnItem.rawValue))
             buf.putShort(spellId)  // server reads spellId first per mudclient (idOrZ then indexOrX)
             buf.putShort(slot)
             try? await connection.send(buf.finishPacket())
+            worldState.clearPendingTargetMode()
         }
     }
 
