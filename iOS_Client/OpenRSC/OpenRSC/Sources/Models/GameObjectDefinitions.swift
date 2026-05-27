@@ -24,8 +24,8 @@ enum GameObjectDefinitions {
     /// now, but we must preserve entry order because object IDs index directly
     /// into this table.
     static func loadArchive() {
-        guard let path = Bundle.main.path(forResource: "GameObjectDef", ofType: "xml"),
-              let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
+        guard let url = gameObjectDefURL(),
+              let data = try? Data(contentsOf: url) else {
             print("[ObjectDef] GameObjectDef.xml not found")
             return
         }
@@ -57,6 +57,18 @@ enum GameObjectDefinitions {
         }
         defs = parsed
         print("[ObjectDef] Loaded \(defs.count) object definitions")
+    }
+
+    private static func gameObjectDefURL() -> URL? {
+        if let url = Bundle.main.url(forResource: "GameObjectDef", withExtension: "xml") {
+            return url
+        }
+        #if SWIFT_PACKAGE
+        if let url = Bundle.module.url(forResource: "GameObjectDef", withExtension: "xml") {
+            return url
+        }
+        #endif
+        return nil
     }
 
     static func get(_ id: Int) -> GameObjectDefinition? {

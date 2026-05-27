@@ -958,10 +958,14 @@ final class RenderPipelineTests: XCTestCase {
         blockedWorld.gameObjects = [RSCGameObject(x: 1, y: 0, objectId: 99_999, direction: 0)]
         let blockedPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: blockedWorld)
             .findPath(fromX: 0, fromZ: 0, toX: 1, toZ: 0, maxSteps: 20)
-        XCTAssertFalse(blockedPath.isEmpty)
+        XCTAssertTrue(blockedPath.isEmpty, "Live scenery should block entering its occupied tile")
+
+        let routeAroundPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: blockedWorld)
+            .findPath(fromX: 0, fromZ: 0, toX: 2, toZ: 0, maxSteps: 20)
+        XCTAssertFalse(routeAroundPath.isEmpty)
         XCTAssertFalse(
-            blockedPath[0].x == 1 && blockedPath[0].z == 0,
-            "Live scenery should block stepping directly onto its occupied tile"
+            routeAroundPath[0].x == 1 && routeAroundPath[0].z == 0,
+            "Route-around path should not step through the occupied scenery tile"
         )
     }
 
@@ -981,6 +985,53 @@ final class RenderPipelineTests: XCTestCase {
         let blockedPath = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: blockedWorld)
             .findPath(fromX: 0, fromZ: 0, toX: 1, toZ: 1, maxSteps: 20)
         XCTAssertTrue(blockedPath.isEmpty, "Blocked corner sides should prevent the diagonal shortcut")
+    }
+
+    @MainActor
+    func test_rsc_pathfinder_multi_tile_object_footprint_blocks_all_occupied_tiles() {
+        GameObjectDefinitions.loadArchive()
+        let well = GameObjectDefinitions.get(2)
+        XCTAssertEqual(well?.name, "Well")
+        XCTAssertEqual(well?.width, 2)
+        XCTAssertEqual(well?.height, 2)
+
+        let blockedWorld = RSCWorldState()
+        blockedWorld.gameObjects = [RSCGameObject(x: 5, y: 5, objectId: 2, direction: 0)]
+        let pathfinder = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: blockedWorld)
+        for caseData in [
+            (from: (x: 4, z: 5), to: (x: 5, z: 5)),
+            (from: (x: 7, z: 5), to: (x: 6, z: 5)),
+            (from: (x: 4, z: 6), to: (x: 5, z: 6)),
+            (from: (x: 7, z: 6), to: (x: 6, z: 6))
+        ] {
+            let path = pathfinder.findPath(
+                fromX: caseData.from.x,
+                fromZ: caseData.from.z,
+                toX: caseData.to.x,
+                toZ: caseData.to.z,
+                maxSteps: 20
+            )
+            XCTAssertTrue(path.isEmpty, "Object footprint should block occupied tile \(caseData.to)")
+        }
+    }
+
+    @MainActor
+    func test_rsc_pathfinder_rotated_object_footprint_swaps_width_and_height() {
+        GameObjectDefinitions.loadArchive()
+        let range = GameObjectDefinitions.get(11)
+        XCTAssertEqual(range?.name, "Range")
+        XCTAssertEqual(range?.width, 1)
+        XCTAssertEqual(range?.height, 2)
+
+        let blockedWorld = RSCWorldState()
+        blockedWorld.gameObjects = [RSCGameObject(x: 5, y: 5, objectId: 11, direction: 2)]
+        let pathfinder = Pathfinder(landscapeLoader: LandscapeLoader(), worldState: blockedWorld)
+        for tile in [(5, 5), (6, 5)] {
+            let path = pathfinder.findPath(fromX: tile.0, fromZ: tile.1 - 1, toX: tile.0, toZ: tile.1, maxSteps: 20)
+            XCTAssertTrue(path.isEmpty, "Rotated footprint should block occupied tile \(tile)")
+        }
+        let unblockedPath = pathfinder.findPath(fromX: 5, fromZ: 4, toX: 5, toZ: 6, maxSteps: 20)
+        XCTAssertFalse(unblockedPath.isEmpty, "Rotated 1x2 footprint should not occupy the old vertical second tile")
     }
 
     @MainActor

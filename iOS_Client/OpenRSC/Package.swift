@@ -22,6 +22,7 @@ let package = Package(
             resources: [
                 .process("Rendering/Shaders.metal"),
                 .copy("WebClient"),
+                .copy("../GameObjectDef.xml"),
                 .copy("../Resources")
             ]
         ),
