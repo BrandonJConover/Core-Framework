@@ -1933,9 +1933,18 @@ final class RSCGameEngine: ObservableObject {
         // actor whose retained client coordinate has drifted outside that
         // envelope; those are stale visually and look like random NPCs popping
         // around the player.
-        let dx = abs(npc.x - worldState.localPlayerX)
-        let dz = abs(npc.y - worldState.localPlayerY)
-        return max(dx, dz) <= 34
+        Self.isNPCInProtocolVisualRange(
+            npcX: npc.x,
+            npcZ: npc.y,
+            localX: worldState.localPlayerX,
+            localZ: worldState.localPlayerY
+        )
+    }
+
+    static func isNPCInProtocolVisualRange(npcX: Int, npcZ: Int, localX: Int, localZ: Int) -> Bool {
+        let dx = abs(npcX - localX)
+        let dz = abs(npcZ - localZ)
+        return max(dx, dz) <= 32
     }
 
     private func minimumGameRadius(forScreenPoints points: CGFloat) -> Double {

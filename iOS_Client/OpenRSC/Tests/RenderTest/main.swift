@@ -1039,6 +1039,15 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(Array(updated.sprites.dropFirst(2)), Array(existingSprites.dropFirst(2)))
     }
 
+    func test_npc_protocol_visual_range_matches_signed_offset_envelope() {
+        XCTAssertTrue(RSCGameEngine.isNPCInProtocolVisualRange(npcX: 132, npcZ: 200, localX: 100, localZ: 200))
+        XCTAssertTrue(RSCGameEngine.isNPCInProtocolVisualRange(npcX: 68, npcZ: 200, localX: 100, localZ: 200))
+        XCTAssertTrue(RSCGameEngine.isNPCInProtocolVisualRange(npcX: 100, npcZ: 232, localX: 100, localZ: 200))
+
+        XCTAssertFalse(RSCGameEngine.isNPCInProtocolVisualRange(npcX: 133, npcZ: 200, localX: 100, localZ: 200))
+        XCTAssertFalse(RSCGameEngine.isNPCInProtocolVisualRange(npcX: 100, npcZ: 233, localX: 100, localZ: 200))
+    }
+
     @MainActor
     func test_rsc_player_known_count_prunes_stale_players_and_appearances() {
         let ws = RSCWorldState()
