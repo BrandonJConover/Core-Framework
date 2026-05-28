@@ -333,6 +333,8 @@ private struct InventoryPanelView: View {
                                     engine.cancelItemUse()
                                 }
                                 selectedSlot = nil
+                            } else if engine.performPrimaryInventoryCommandIfAvailable(slot: item.id, itemId: item.itemId) {
+                                selectedSlot = nil
                             } else {
                                 selectedSlot = selectedSlot == item.id ? nil : item.id
                             }
@@ -354,7 +356,7 @@ private struct InventoryPanelView: View {
                             engine.itemCommand(slot: slot, commandIndex: option.index)
                             selectedSlot = nil
                         }
-                        .buttonStyle(ActionButtonStyle(color: .orange))
+                        .buttonStyle(ActionButtonStyle(color: option.isPrimaryTapAction ? .green : .orange))
                     }
                     Button("Use") { engine.useItem(slot: slot); selectedSlot = nil }
                         .buttonStyle(ActionButtonStyle(color: .blue))

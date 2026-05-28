@@ -3383,6 +3383,17 @@ final class RSCGameEngine: ObservableObject {
         ItemDefinitions.commandOptions(for: itemId)
     }
 
+    func primaryInventoryCommand(for itemId: Int) -> ItemCommandOption? {
+        ItemDefinitions.primaryTapCommand(for: itemId)
+    }
+
+    @discardableResult
+    func performPrimaryInventoryCommandIfAvailable(slot: Int, itemId: Int) -> Bool {
+        guard let option = primaryInventoryCommand(for: itemId) else { return false }
+        itemCommand(slot: slot, commandIndex: option.index)
+        return true
+    }
+
     func itemCommand(slot: Int, commandIndex: Int, amount: Int = 1) {
         Task {
             let packet = Self.makeItemCommandPacket(

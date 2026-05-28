@@ -76,6 +76,17 @@ final class RenderPipelineTests: XCTestCase {
         )
     }
 
+    func test_inventory_primary_tap_command_classification() {
+        XCTAssertTrue(ItemDefinitions.isPrimaryTapCommand("Eat"))
+        XCTAssertTrue(ItemDefinitions.isPrimaryTapCommand(" drink "))
+        XCTAssertTrue(ItemDefinitions.isPrimaryTapCommand("Bury"))
+        XCTAssertTrue(ItemDefinitions.isPrimaryTapCommand("Open"))
+        XCTAssertFalse(ItemDefinitions.isPrimaryTapCommand("Drop"))
+        XCTAssertFalse(ItemDefinitions.isPrimaryTapCommand("Wear"))
+        XCTAssertFalse(ItemDefinitions.isPrimaryTapCommand("Wield"))
+        XCTAssertFalse(ItemDefinitions.isPrimaryTapCommand("Use"))
+    }
+
     func test_custom10009_bank_action_packets_match_server_parser_lengths() {
         XCTAssertEqual(
             Array(RSCGameEngine.makeBankDepositPacket(itemId: 10, amount: 70_000)),

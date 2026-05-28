@@ -5,6 +5,10 @@ struct ItemCommandOption: Identifiable, Equatable {
     let label: String
 
     var id: Int { index }
+
+    var isPrimaryTapAction: Bool {
+        ItemDefinitions.isPrimaryTapCommand(label)
+    }
 }
 
 enum ItemDefinitions {
@@ -66,6 +70,19 @@ enum ItemDefinitions {
             let label = command.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !label.isEmpty, label.lowercased() != "null" else { return nil }
             return ItemCommandOption(index: index, label: label)
+        }
+    }
+
+    static func primaryTapCommand(for id: Int) -> ItemCommandOption? {
+        commandOptions(for: id).first { $0.isPrimaryTapAction }
+    }
+
+    static func isPrimaryTapCommand(_ label: String) -> Bool {
+        switch label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "eat", "drink", "bury", "light", "read", "open", "search", "rub", "empty":
+            return true
+        default:
+            return false
         }
     }
 }

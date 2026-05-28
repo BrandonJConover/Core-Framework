@@ -1013,6 +1013,8 @@ private struct InventoryPanelCompact: View {
                                     engine.cancelItemUse()
                                 }
                                 selectedSlot = nil
+                            } else if engine.performPrimaryInventoryCommandIfAvailable(slot: item.id, itemId: item.itemId) {
+                                selectedSlot = nil
                             } else {
                                 selectedSlot = selectedSlot == item.id ? nil : item.id
                             }
@@ -1063,7 +1065,7 @@ private struct InventoryPanelCompact: View {
                             selectedSlot = nil
                         }
                         .font(.system(size: 9))
-                        .foregroundColor(.orange)
+                        .foregroundColor(option.isPrimaryTapAction ? .green : .orange)
                     }
                     Button(worldState.pendingSpellId == nil
                            ? (worldState.pendingItemUseSlot == nil ? "Use" : "Use with")
