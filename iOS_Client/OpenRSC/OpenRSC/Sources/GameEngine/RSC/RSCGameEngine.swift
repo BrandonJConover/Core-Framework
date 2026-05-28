@@ -516,7 +516,7 @@ final class RSCGameEngine: ObservableObject {
                 let localZ = Int((tileZ * 128.0).rounded()) + 64
                 return world.getElevation(x: localX, z: localZ)
             }
-            for npc in worldState.npcs {
+            for npc in worldState.npcs where isNPCInActiveVisualRange(npc) {
                 if let def = NPCDefinitions.get(npc.npcId) {
                     let role: CharacterBillboards.CombatRole = npc.combatTimeout > 0 ? .combatA : .none
                     let tileX = npc.interpolatedX - Double(px)
@@ -910,7 +910,7 @@ final class RSCGameEngine: ObservableObject {
         let px = worldState.localPlayerX
         let pz = worldState.localPlayerY
 
-        for npc in worldState.npcs where npc.messageTimeout > 0 && !npc.message.isEmpty {
+        for npc in worldState.npcs where isNPCInActiveVisualRange(npc) && npc.messageTimeout > 0 && !npc.message.isEmpty {
             drawCharacterChatBubble(
                 scene: scene,
                 tileX: npc.x - px,
@@ -1022,7 +1022,7 @@ final class RSCGameEngine: ObservableObject {
         let px = worldState.localPlayerX
         let pz = worldState.localPlayerY
 
-        for npc in worldState.npcs where npc.skullVisible > 0 {
+        for npc in worldState.npcs where isNPCInActiveVisualRange(npc) && npc.skullVisible > 0 {
             let dx = npc.x - px
             let dz = npc.y - pz
             guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
@@ -1131,7 +1131,7 @@ final class RSCGameEngine: ObservableObject {
             )
         }
 
-        for npc in worldState.npcs where npc.projectileRange > 0 && npc.projectileSprite >= 0 {
+        for npc in worldState.npcs where isNPCInActiveVisualRange(npc) && npc.projectileRange > 0 && npc.projectileSprite >= 0 {
             guard let source = projectileSourcePosition(
                 serverIndex: npc.projectileSourceServerIndex,
                 isNpc: npc.projectileSourceIsNpc
@@ -1162,7 +1162,7 @@ final class RSCGameEngine: ObservableObject {
 
     private func projectileSourcePosition(serverIndex: Int, isNpc: Bool) -> (x: Int, z: Int)? {
         if isNpc {
-            return worldState.npcs.first(where: { $0.id == serverIndex }).map { ($0.x, $0.y) }
+            return worldState.npcs.first(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }).map { ($0.x, $0.y) }
         }
         if serverIndex == worldState.playerServerIndex {
             return (worldState.localPlayerX, worldState.localPlayerY)
@@ -1243,7 +1243,7 @@ final class RSCGameEngine: ObservableObject {
         let px = worldState.localPlayerX
         let pz = worldState.localPlayerY
 
-        for npc in worldState.npcs where npc.bubbleTimeout > 0 && npc.bubbleItem >= 0 {
+        for npc in worldState.npcs where isNPCInActiveVisualRange(npc) && npc.bubbleTimeout > 0 && npc.bubbleItem >= 0 {
             let dx = npc.x - px
             let dz = npc.y - pz
             guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
@@ -1331,7 +1331,7 @@ final class RSCGameEngine: ObservableObject {
         let pz = worldState.localPlayerY
 
         // NPCs in the active damage window
-        for npc in worldState.npcs where npc.damageTaken > 0 && npc.combatTimeout > 150 {
+        for npc in worldState.npcs where isNPCInActiveVisualRange(npc) && npc.damageTaken > 0 && npc.combatTimeout > 150 {
             let dx = npc.x - px
             let dz = npc.y - pz
             guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
@@ -1678,7 +1678,7 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Draw NPCs with labels, health bars, damage splats, and chat
-        for npc in worldState.npcs {
+        for npc in worldState.npcs where isNPCInActiveVisualRange(npc) {
             let npcSX = centerX + (npc.x - px) * tp
             let npcSY = centerY + (npc.y - pz) * tp
             guard npcSX > -tp*3 && npcSX < w + tp*3 && npcSY > -tp*3 && npcSY < h + tp*3 else { continue }
@@ -1924,6 +1924,18 @@ final class RSCGameEngine: ObservableObject {
         return (Double(proj.screenX), Double(proj.screenY), proj.depth)
     }
 
+    private func isNPCInActiveVisualRange(_ npc: RSCNPC) -> Bool {
+        // Custom protocol 10009 announces NPCs with 6-bit signed offsets
+        // (-32...31) from the local player. Keep the protocol-owned known list
+        // intact for subsequent delta packets, but never render or select an
+        // actor whose retained client coordinate has drifted outside that
+        // envelope; those are stale visually and look like random NPCs popping
+        // around the player.
+        let dx = abs(npc.x - worldState.localPlayerX)
+        let dz = abs(npc.y - worldState.localPlayerY)
+        return max(dx, dz) <= 34
+    }
+
     private func minimumGameRadius(forScreenPoints points: CGFloat) -> Double {
         let viewSize = touchTranslator.viewSize
         guard viewSize.width > 0, viewSize.height > 0 else {
@@ -1943,7 +1955,7 @@ final class RSCGameEngine: ObservableObject {
         let minRadius = minimumGameRadius(forScreenPoints: 22)
         let radiusX = max(34.0, minRadius)
         let radiusY = max(58.0, minRadius * 1.35)
-        for npc in worldState.npcs {
+        for npc in worldState.npcs where isNPCInActiveVisualRange(npc) {
             guard let p = projectedScreenPoint(tileX: npc.interpolatedX, tileZ: npc.interpolatedY) else { continue }
             // Feet are anchored at p.y; mobile taps often land on the lower
             // half of the visible sprite. Use a slightly taller ellipse than
@@ -2074,7 +2086,7 @@ final class RSCGameEngine: ObservableObject {
     private func nearestNPC(toX x: Int, z: Int, maxDistanceSquared: Int = 4) -> RSCNPC? {
         var nearest: RSCNPC? = nil
         var nearestDist = Int.max
-        for npc in worldState.npcs {
+        for npc in worldState.npcs where isNPCInActiveVisualRange(npc) {
             let dx = npc.x - x
             let dz = npc.y - z
             let dist = dx * dx + dz * dz
@@ -2166,7 +2178,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func npc(atX x: Int, z: Int) -> RSCNPC? {
-        worldState.npcs.first { $0.x == x && $0.y == z }
+        worldState.npcs.first { isNPCInActiveVisualRange($0) && $0.x == x && $0.y == z }
     }
 
     private func player(atX x: Int, z: Int) -> RSCPlayer? {
@@ -2741,7 +2753,7 @@ final class RSCGameEngine: ObservableObject {
             }
         }
         func npcStillCurrent(_ npc: RSCNPC) -> Bool {
-            worldState.npcs.contains { $0.id == npc.id && $0.npcId == npc.npcId }
+            worldState.npcs.contains { isNPCInActiveVisualRange($0) && $0.id == npc.id && $0.npcId == npc.npcId }
         }
         func playerStillCurrent(_ player: RSCPlayer) -> Bool {
             worldState.players.contains { $0.id == player.id }
@@ -2777,7 +2789,8 @@ final class RSCGameEngine: ObservableObject {
 
         // Check NPCs (within 2 tiles). Always offer Examine; offer Attack only
         // for combat-eligible NPCs (NPCDef.attackable == true).
-        for npc in targetNPC.map({ [$0] }) ?? worldState.npcs {
+        let menuNPCs = targetNPC.map { [$0] } ?? worldState.npcs.filter { isNPCInActiveVisualRange($0) }
+        for npc in menuNPCs {
             let dx: Int = npc.x - worldX; let dz: Int = npc.y - worldZ
             let distSq: Int = dx * dx + dz * dz
             if targetNPC?.id == npc.id || (targetNPC == nil && distSq <= 1) {
@@ -2989,12 +3002,12 @@ final class RSCGameEngine: ObservableObject {
 
     func attackNPC(serverIndex: Int) {
         Task {
-            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+            guard let npc = worldState.npcs.first(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("npc-attack")
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-attack") else { return }
-            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("npc-attack")
                 return
             }
@@ -3051,12 +3064,12 @@ final class RSCGameEngine: ObservableObject {
 
     func talkToNPC(serverIndex: Int) {
         Task {
-            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+            guard let npc = worldState.npcs.first(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("npc-talk")
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-talk") else { return }
-            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("npc-talk")
                 return
             }
@@ -3427,12 +3440,12 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnNPC(slot: Int, serverIndex: Int) {
         Task {
-            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+            guard let npc = worldState.npcs.first(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("item-on-npc")
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "item-on-npc") else { return }
-            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("item-on-npc")
                 return
             }
@@ -3835,12 +3848,12 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnNPC(spellId: Int, npcServerIndex: Int) {
         Task {
-            guard let npc = worldState.npcs.first(where: { $0.id == npcServerIndex }) else {
+            guard let npc = worldState.npcs.first(where: { isNPCInActiveVisualRange($0) && $0.id == npcServerIndex }) else {
                 actionTargetUnavailable("spell-on-npc")
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "spell-on-npc") else { return }
-            guard worldState.npcs.contains(where: { $0.id == npcServerIndex }) else {
+            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == npcServerIndex }) else {
                 actionTargetUnavailable("spell-on-npc")
                 return
             }
@@ -4180,12 +4193,12 @@ final class RSCGameEngine: ObservableObject {
 
     func npcCommand(serverIndex: Int) {
         Task {
-            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+            guard let npc = worldState.npcs.first(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("npc-command-1")
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-1") else { return }
-            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("npc-command-1")
                 return
             }
@@ -4199,12 +4212,12 @@ final class RSCGameEngine: ObservableObject {
 
     func npcCommand2(serverIndex: Int) {
         Task {
-            guard let npc = worldState.npcs.first(where: { $0.id == serverIndex }) else {
+            guard let npc = worldState.npcs.first(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("npc-command-2")
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-2") else { return }
-            guard worldState.npcs.contains(where: { $0.id == serverIndex }) else {
+            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("npc-command-2")
                 return
             }

@@ -934,6 +934,86 @@ final class RenderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func test_rsc_dynamic_npc_definition_merges_partial_sprite_updates() {
+        let existingSprites = Array(10..<22)
+        NPCDefinitions.upsert(NPCDefinition(
+            id: 700,
+            name: "Existing",
+            description: "Existing definition",
+            command: "talk",
+            command2: "trade",
+            attack: 1,
+            strength: 2,
+            hits: 3,
+            defense: 4,
+            combatLevel: 3,
+            attackable: false,
+            aggressive: false,
+            respawnTime: 0,
+            sprites: existingSprites,
+            hairColour: 1,
+            topColour: 2,
+            bottomColour: 3,
+            skinColour: 4,
+            camera1: 145,
+            camera2: 220,
+            walkModel: 6,
+            combatModel: 6,
+            combatSprite: 5
+        ))
+
+        var payload: [UInt8] = []
+        func byte(_ value: Int) { payload.append(UInt8(value & 0xFF)) }
+        func short(_ value: Int) {
+            byte(value >> 8)
+            byte(value)
+        }
+        func int(_ value: Int) {
+            byte(value >> 24)
+            byte(value >> 16)
+            byte(value >> 8)
+            byte(value)
+        }
+        func string(_ value: String) {
+            payload.append(contentsOf: value.utf8)
+            payload.append(0x0A)
+        }
+
+        short(700)
+        string("Patched")
+        string("Updated definition")
+        byte(1)
+        string("talk")
+        byte(5)  // attack
+        byte(6)  // strength
+        byte(7)  // defense
+        byte(8)  // hits
+        byte(1)  // attackable
+        byte(2)  // only two sprite layers are present in this dynamic update
+        int(101)
+        int(102)
+        int(0x112233)
+        int(0x223344)
+        int(0x334455)
+        int(0x445566)
+        short(150)
+        short(230)
+        byte(6)
+        byte(6)
+        byte(5)
+
+        let ws = RSCWorldState()
+        let handler = RSCPacketHandler()
+        handler.worldState = ws
+        handler.handlePacket(opcode: 88, payload: Data(payload))
+
+        let updated = try! XCTUnwrap(NPCDefinitions.get(700))
+        XCTAssertEqual(updated.sprites[0], 101)
+        XCTAssertEqual(updated.sprites[1], 102)
+        XCTAssertEqual(Array(updated.sprites.dropFirst(2)), Array(existingSprites.dropFirst(2)))
+    }
+
+    @MainActor
     func test_rsc_player_known_count_prunes_stale_players_and_appearances() {
         let ws = RSCWorldState()
         ws.playerServerIndex = 7

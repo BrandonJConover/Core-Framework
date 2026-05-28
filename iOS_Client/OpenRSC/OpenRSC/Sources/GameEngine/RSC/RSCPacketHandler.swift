@@ -777,7 +777,7 @@ final class RSCPacketHandler {
         let attackable = buf.getUnsignedByte() == 1
 
         let spriteCount = buf.getUnsignedByte()
-        var sprites = Array(repeating: 0, count: 12)
+        var sprites = existing?.sprites ?? Array(repeating: -1, count: 12)
         for i in 0..<spriteCount {
             let sprite = buf.bytesRemaining >= 4 ? buf.get32() : 0
             if i < sprites.count { sprites[i] = sprite }
@@ -794,7 +794,7 @@ final class RSCPacketHandler {
         let combatModel = buf.getUnsignedByte()
         let combatSprite = buf.getUnsignedByte()
 
-        let spritesToUse = spriteCount > 0 ? sprites : (existing?.sprites ?? sprites)
+        let spritesToUse = sprites
         let combatLevel = RSCWorldState.rscCombatLevel(
             attack: attack,
             defense: defense,
