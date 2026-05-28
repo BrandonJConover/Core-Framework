@@ -555,7 +555,7 @@ final class RSCGameEngine: ObservableObject {
             // Per-player avatar: prefer the real appearance from opcode 234
             // case 5 when we've received it; else fall back to the starter
             // palette + sprite triplet so the slot still renders something.
-            for player in worldState.players {
+            for player in worldState.players where isPlayerInActiveVisualRange(player) {
                 let appearance = worldState.playerAppearances[player.id]
                 let sprites: [Int] = appearance.map { app in
                     app.layerSprites.map(Self.appearanceAnimationIndex)
@@ -922,7 +922,7 @@ final class RSCGameEngine: ObservableObject {
             )
         }
 
-        for player in worldState.players where player.messageTimeout > 0 && !player.message.isEmpty {
+        for player in worldState.players where isPlayerInActiveVisualRange(player) && player.messageTimeout > 0 && !player.message.isEmpty {
             drawCharacterChatBubble(
                 scene: scene,
                 tileX: player.x - px,
@@ -1037,7 +1037,7 @@ final class RSCGameEngine: ObservableObject {
             drawSkullMarker(centerX: Int(proj.screenX), centerY: Int(proj.screenY) - 12, red: npc.skullVisible == 2)
         }
 
-        for player in worldState.players {
+        for player in worldState.players where isPlayerInActiveVisualRange(player) {
             guard let appearance = worldState.playerAppearances[player.id],
                   appearance.skulled,
                   player.bubbleTimeout == 0 else { continue }
@@ -1119,7 +1119,7 @@ final class RSCGameEngine: ObservableObject {
     private func drawProjectiles() {
         guard let scene = self.scene else { return }
 
-        for player in worldState.players where player.projectileRange > 0 && player.projectileSprite >= 0 {
+        for player in worldState.players where isPlayerInActiveVisualRange(player) && player.projectileRange > 0 && player.projectileSprite >= 0 {
             guard let source = projectileSourcePosition(
                 serverIndex: player.projectileSourceServerIndex,
                 isNpc: player.projectileSourceIsNpc
@@ -1169,7 +1169,7 @@ final class RSCGameEngine: ObservableObject {
         if serverIndex == worldState.playerServerIndex {
             return (worldState.localPlayerX, worldState.localPlayerY)
         }
-        return worldState.players.first(where: { $0.id == serverIndex }).map { ($0.x, $0.y) }
+        return worldState.players.first(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }).map { ($0.x, $0.y) }
     }
 
     private func drawProjectile(sprite: Int,
@@ -1258,7 +1258,7 @@ final class RSCGameEngine: ObservableObject {
             drawItemBubble(itemId: npc.bubbleItem, centerX: Int(proj.screenX), topY: Int(proj.screenY) - 20)
         }
 
-        for player in worldState.players where player.bubbleTimeout > 0 && player.bubbleItem >= 0 {
+        for player in worldState.players where isPlayerInActiveVisualRange(player) && player.bubbleTimeout > 0 && player.bubbleItem >= 0 {
             let dx = player.x - px
             let dz = player.y - pz
             guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
@@ -1347,7 +1347,7 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Remote players
-        for player in worldState.players where player.damageTaken > 0 && player.damageTimeout > 150 {
+        for player in worldState.players where isPlayerInActiveVisualRange(player) && player.damageTaken > 0 && player.damageTimeout > 150 {
             let dx = player.x - px
             let dz = player.y - pz
             guard abs(dx) <= 32 && abs(dz) <= 32 else { continue }
@@ -1736,7 +1736,7 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Draw other players with labels
-        for player in worldState.players {
+        for player in worldState.players where isPlayerInActiveVisualRange(player) {
             let plSX = centerX + (player.x - px) * tp
             let plSY = centerY + (player.y - pz) * tp
             guard plSX > -tp*3 && plSX < w + tp*3 && plSY > -tp*3 && plSY < h + tp*3 else { continue }
@@ -1947,6 +1947,12 @@ final class RSCGameEngine: ObservableObject {
         return max(dx, dz) <= 32
     }
 
+    private func isPlayerInActiveVisualRange(_ player: RSCPlayer) -> Bool {
+        let dx = abs(player.x - worldState.localPlayerX)
+        let dz = abs(player.y - worldState.localPlayerY)
+        return max(dx, dz) <= 32
+    }
+
     private func minimumGameRadius(forScreenPoints points: CGFloat) -> Double {
         let viewSize = touchTranslator.viewSize
         guard viewSize.width > 0, viewSize.height > 0 else {
@@ -1987,7 +1993,7 @@ final class RSCGameEngine: ObservableObject {
         let minRadius = minimumGameRadius(forScreenPoints: 22)
         let radiusX = max(34.0, minRadius)
         let radiusY = max(58.0, minRadius * 1.35)
-        for player in worldState.players {
+        for player in worldState.players where isPlayerInActiveVisualRange(player) {
             guard let p = projectedScreenPoint(tileX: player.interpolatedX, tileZ: player.interpolatedY) else { continue }
             let dx = (p.x - gameX) / radiusX
             let dy = (p.y - 36.0 - gameY) / radiusY
@@ -2112,7 +2118,7 @@ final class RSCGameEngine: ObservableObject {
     private func nearestPlayer(toX x: Int, z: Int, maxDistanceSquared: Int = 4) -> RSCPlayer? {
         var nearest: RSCPlayer? = nil
         var nearestDist = Int.max
-        for player in worldState.players {
+        for player in worldState.players where isPlayerInActiveVisualRange(player) {
             let dx = player.x - x
             let dz = player.y - z
             let dist = dx * dx + dz * dz
@@ -2193,7 +2199,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func player(atX x: Int, z: Int) -> RSCPlayer? {
-        worldState.players.first { $0.x == x && $0.y == z }
+        worldState.players.first { isPlayerInActiveVisualRange($0) && $0.x == x && $0.y == z }
     }
 
     private func gameObject(containingX x: Int, z: Int) -> RSCGameObject? {
@@ -2788,7 +2794,7 @@ final class RSCGameEngine: ObservableObject {
             worldState.npcs.contains { isNPCInActiveVisualRange($0) && $0.id == npc.id && $0.npcId == npc.npcId }
         }
         func playerStillCurrent(_ player: RSCPlayer) -> Bool {
-            worldState.players.contains { $0.id == player.id }
+            worldState.players.contains { isPlayerInActiveVisualRange($0) && $0.id == player.id }
         }
         func groundItemStillCurrent(_ item: RSCGroundItem) -> Bool {
             worldState.groundItems.contains {
@@ -2869,7 +2875,7 @@ final class RSCGameEngine: ObservableObject {
         }
 
         // Check players (within 2 tiles). Add Trade + Duel + Follow + Examine.
-        for player in targetPlayer.map({ [$0] }) ?? worldState.players {
+        for player in targetPlayer.map({ [$0] }) ?? worldState.players.filter({ isPlayerInActiveVisualRange($0) }) {
             let pdx: Int = player.x - worldX; let pdz: Int = player.y - worldZ
             if targetPlayer?.id == player.id || (targetPlayer == nil && pdx * pdx + pdz * pdz <= 1) {
                 title = player.name
@@ -3051,12 +3057,12 @@ final class RSCGameEngine: ObservableObject {
 
     func attackPlayer(serverIndex: Int) {
         Task {
-            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+            guard let player = worldState.players.first(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("player-attack")
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-attack") else { return }
-            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+            if !worldState.players.contains(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) {
                 logTargetChurn("player-attack", serverIndex: serverIndex)
             }
             let data = Self.makeMobTargetPacket(opcode: .playerAttack, serverIndex: serverIndex)
@@ -3533,12 +3539,12 @@ final class RSCGameEngine: ObservableObject {
 
     func useItemOnPlayer(slot: Int, serverIndex: Int) {
         Task {
-            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+            guard let player = worldState.players.first(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("item-on-player")
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "item-on-player") else { return }
-            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+            if !worldState.players.contains(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) {
                 logTargetChurn("item-on-player", serverIndex: serverIndex)
             }
             try? await connection.send(Self.makeItemUseOnPlayerPacket(serverIndex: serverIndex, slot: slot))
@@ -3931,12 +3937,12 @@ final class RSCGameEngine: ObservableObject {
 
     func castSpellOnPlayer(spellId: Int, playerServerIndex: Int) {
         Task {
-            guard let player = worldState.players.first(where: { $0.id == playerServerIndex }) else {
+            guard let player = worldState.players.first(where: { isPlayerInActiveVisualRange($0) && $0.id == playerServerIndex }) else {
                 actionTargetUnavailable("spell-on-player")
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "spell-on-player") else { return }
-            if !worldState.players.contains(where: { $0.id == playerServerIndex }) {
+            if !worldState.players.contains(where: { isPlayerInActiveVisualRange($0) && $0.id == playerServerIndex }) {
                 logTargetChurn("spell-on-player", serverIndex: playerServerIndex)
             }
             try? await connection.send(Self.makeSpellOnPlayerPacket(spellId: spellId, serverIndex: playerServerIndex))
@@ -4194,12 +4200,12 @@ final class RSCGameEngine: ObservableObject {
 
     func followPlayer(serverIndex: Int) {
         Task {
-            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+            guard let player = worldState.players.first(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("player-follow")
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-follow") else { return }
-            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+            if !worldState.players.contains(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) {
                 logTargetChurn("player-follow", serverIndex: serverIndex)
             }
             let data = Self.makeMobTargetPacket(opcode: .playerFollow, serverIndex: serverIndex)
@@ -4214,12 +4220,12 @@ final class RSCGameEngine: ObservableObject {
     /// accepts (TradePanel opens) or declines.
     func requestTrade(serverIndex: Int) {
         Task {
-            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+            guard let player = worldState.players.first(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("player-trade")
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-trade") else { return }
-            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+            if !worldState.players.contains(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) {
                 logTargetChurn("player-trade", serverIndex: serverIndex)
             }
             let data = Self.makeMobTargetPacket(opcode: .playerTrade, serverIndex: serverIndex)
@@ -4233,12 +4239,12 @@ final class RSCGameEngine: ObservableObject {
     /// confirms, the DuelPanel opens for both sides.
     func requestDuel(serverIndex: Int) {
         Task {
-            guard let player = worldState.players.first(where: { $0.id == serverIndex }) else {
+            guard let player = worldState.players.first(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) else {
                 actionTargetUnavailable("player-duel")
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-duel") else { return }
-            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+            if !worldState.players.contains(where: { isPlayerInActiveVisualRange($0) && $0.id == serverIndex }) {
                 logTargetChurn("player-duel", serverIndex: serverIndex)
             }
             let data = Self.makeMobTargetPacket(opcode: .playerDuel, serverIndex: serverIndex)
