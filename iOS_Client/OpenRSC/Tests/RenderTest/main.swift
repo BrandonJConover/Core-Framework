@@ -60,6 +60,21 @@ final class RenderPipelineTests: XCTestCase {
 
     func test_custom10009_item_action_packets_match_server_parser_lengths() {
         XCTAssertEqual(
+            Array(RSCGameEngine.makeItemEquipPacket(slot: 5)),
+            [0x00, 0x03, RSCOutOpcode.itemEquip.rawValue,
+             0x00, 0x05]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeItemUnequipPacket(slot: 5)),
+            [0x00, 0x03, RSCOutOpcode.itemUnequip.rawValue,
+             0x00, 0x05]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeEquipmentUnequipPacket(slot: 4)),
+            [0x00, 0x02, RSCOutOpcode.itemUnequipFromEquipment.rawValue,
+             0x04]
+        )
+        XCTAssertEqual(
             Array(RSCGameEngine.makeItemDropPacket(slot: 3, amount: 12)),
             [0x00, 0x07, RSCOutOpcode.itemDrop.rawValue,
              0x00, 0x03, 0x00, 0x00, 0x00, 0x0C]

@@ -3170,35 +3170,51 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func equipItem(slot: Int) {
+        worldState.clearPendingTargetMode()
         Task {
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemEquip.rawValue))
-            buf.putShort(slot)
-            let data = buf.finishPacket()
+            let data = Self.makeItemEquipPacket(slot: slot)
             logAction("equip", opcode: RSCOutOpcode.itemEquip, payload: data, details: "slot=\(slot)")
             try? await connection.send(data)
         }
     }
 
     func unequipItem(slot: Int) {
+        worldState.clearPendingTargetMode()
         Task {
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemUnequip.rawValue))
-            buf.putShort(slot)
-            let data = buf.finishPacket()
+            let data = Self.makeItemUnequipPacket(slot: slot)
             logAction("unequip", opcode: RSCOutOpcode.itemUnequip, payload: data, details: "slot=\(slot)")
             try? await connection.send(data)
         }
     }
 
     func unequipEquipmentSlot(_ slot: Int) {
+        worldState.clearPendingTargetMode()
         Task {
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.itemUnequipFromEquipment.rawValue))
-            buf.putByte(slot)
-            let data = buf.finishPacket()
+            let data = Self.makeEquipmentUnequipPacket(slot: slot)
+            logAction("unequip-equipment", opcode: RSCOutOpcode.itemUnequipFromEquipment, payload: data, details: "slot=\(slot)")
             try? await connection.send(data)
         }
+    }
+
+    static func makeItemEquipPacket(slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.itemEquip.rawValue))
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
+    static func makeItemUnequipPacket(slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.itemUnequip.rawValue))
+        buf.putShort(slot)
+        return buf.finishPacket()
+    }
+
+    static func makeEquipmentUnequipPacket(slot: Int) -> Data {
+        let buf = ByteBuffer()
+        buf.newPacket(opcode: Int(RSCOutOpcode.itemUnequipFromEquipment.rawValue))
+        buf.putByte(slot)
+        return buf.finishPacket()
     }
 
     static func makeItemDropPacket(slot: Int, amount: Int) -> Data {
@@ -3367,6 +3383,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func dropItem(slot: Int) {
+        worldState.clearPendingTargetMode()
         Task {
             let amount = worldState.inventory.indices.contains(slot) ? worldState.inventory[slot].amount : 1
             let packet = Self.makeItemDropPacket(slot: slot, amount: amount)
@@ -3395,6 +3412,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func itemCommand(slot: Int, commandIndex: Int, amount: Int = 1) {
+        worldState.clearPendingTargetMode()
         Task {
             let packet = Self.makeItemCommandPacket(
                 slot: slot,
