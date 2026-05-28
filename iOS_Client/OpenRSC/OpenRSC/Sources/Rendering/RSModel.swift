@@ -65,6 +65,11 @@ final class RSModel {
     /// Object and boundary models keep the default `true`, letting Scene build
     /// a coarse depth mask before billboard layers are composited.
     var occludesBillboards: Bool = true
+    /// Placed scenery is already culled by tile footprint in RSCGameEngine.
+    /// Let those models bypass the broad model-bounds frustum reject and rely
+    /// on per-face screen culling; otherwise many real object models are
+    /// skipped before their visible faces can be considered.
+    var bypassFrustumBoundsCull: Bool = false
 
     // MARK: - Internal flags (matching Java obfuscated names)
     var m_cb: Bool = false
@@ -409,6 +414,7 @@ final class RSModel {
         copy.m_Yb = m_Yb
         copy.m_dc = m_dc
         copy.occludesBillboards = occludesBillboards
+        copy.bypassFrustumBoundsCull = bypassFrustumBoundsCull
 
         // Deep-copy arrays
         copy.vertX = vertX; copy.vertY = vertY; copy.vertZ = vertZ
@@ -517,13 +523,15 @@ final class RSModel {
                           rotY: Int32, rotZ: Int32, rotX: Int32, zTop: Int32) {
         resetTransformCache()
 
-        // Frustum / bounding-box visibility cull
-        guard minZ <= Scene.frustumMinX && maxZ >= Scene.frustumMaxX
-           && minX <= Scene.frustumMinY && maxX >= Scene.frustumMaxY
-           && minY <= Scene.frustumNearZ && maxY >= Scene.frustumFarZ
-        else {
-            m_dc = false
-            return
+        // Frustum / bounding-box visibility cull.
+        if !bypassFrustumBoundsCull {
+            guard minZ <= Scene.frustumMinX && maxZ >= Scene.frustumMaxX
+               && minX <= Scene.frustumMinY && maxX >= Scene.frustumMaxY
+               && minY <= Scene.frustumNearZ && maxY >= Scene.frustumFarZ
+            else {
+                m_dc = false
+                return
+            }
         }
 
         m_dc = true

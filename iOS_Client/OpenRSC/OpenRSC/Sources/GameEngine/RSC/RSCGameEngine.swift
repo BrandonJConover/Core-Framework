@@ -454,6 +454,7 @@ final class RSCGameEngine: ObservableObject {
                     elevation: elevation,
                     scene: scene
                 )
+                model.bypassFrustumBoundsCull = true
                 Self.applyJavaObjectLighting(to: model)
                 // Java mudclient.java:14361 applies a special vertical offset
                 // to object id 74 after placement. Keep this outside
@@ -711,6 +712,7 @@ final class RSCGameEngine: ObservableObject {
                          texFront: resources.front, texBack: resources.back)
         model.setDiffuseLightAndColor(-50, -10, -50, 60, 24, false, -95)
         model.m_Yb = 1
+        model.bypassFrustumBoundsCull = true
         return model
     }
 
