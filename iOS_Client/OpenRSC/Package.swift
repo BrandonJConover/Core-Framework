@@ -23,6 +23,10 @@ let package = Package(
                 .process("Rendering/Shaders.metal"),
                 .copy("WebClient"),
                 .copy("../GameObjectDef.xml"),
+                .copy("../DoorDef.xml"),
+                .copy("../TileDef.xml"),
+                .copy("../NpcDefs.json"),
+                .copy("../ItemDefs.json"),
                 .copy("../Resources")
             ]
         ),
