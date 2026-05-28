@@ -3052,9 +3052,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-attack") else { return }
-            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
-                actionTargetUnavailable("player-attack")
-                return
+            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+                logTargetChurn("player-attack", serverIndex: serverIndex)
             }
             let data = Self.makeMobTargetPacket(opcode: .playerAttack, serverIndex: serverIndex)
             logAction("player-attack", opcode: RSCOutOpcode.playerAttack, payload: data, details: "serverIndex=\(serverIndex)")
@@ -3535,9 +3534,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "item-on-player") else { return }
-            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
-                actionTargetUnavailable("item-on-player")
-                return
+            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+                logTargetChurn("item-on-player", serverIndex: serverIndex)
             }
             try? await connection.send(Self.makeItemUseOnPlayerPacket(serverIndex: serverIndex, slot: slot))
             clearPendingItemUse()
@@ -3942,9 +3940,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "spell-on-player") else { return }
-            guard worldState.players.contains(where: { $0.id == playerServerIndex }) else {
-                actionTargetUnavailable("spell-on-player")
-                return
+            if !worldState.players.contains(where: { $0.id == playerServerIndex }) {
+                logTargetChurn("spell-on-player", serverIndex: playerServerIndex)
             }
             try? await connection.send(Self.makeSpellOnPlayerPacket(spellId: spellId, serverIndex: playerServerIndex))
             worldState.clearPendingTargetMode()
@@ -4209,9 +4206,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-follow") else { return }
-            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
-                actionTargetUnavailable("player-follow")
-                return
+            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+                logTargetChurn("player-follow", serverIndex: serverIndex)
             }
             let data = Self.makeMobTargetPacket(opcode: .playerFollow, serverIndex: serverIndex)
             logAction("player-follow", opcode: RSCOutOpcode.playerFollow, payload: data, details: "serverIndex=\(serverIndex)")
@@ -4230,9 +4226,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-trade") else { return }
-            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
-                actionTargetUnavailable("player-trade")
-                return
+            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+                logTargetChurn("player-trade", serverIndex: serverIndex)
             }
             let data = Self.makeMobTargetPacket(opcode: .playerTrade, serverIndex: serverIndex)
             logAction("player-trade", opcode: RSCOutOpcode.playerTrade, payload: data, details: "serverIndex=\(serverIndex)")
@@ -4250,9 +4245,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: player.x, z: player.y, action: "player-duel") else { return }
-            guard worldState.players.contains(where: { $0.id == serverIndex }) else {
-                actionTargetUnavailable("player-duel")
-                return
+            if !worldState.players.contains(where: { $0.id == serverIndex }) {
+                logTargetChurn("player-duel", serverIndex: serverIndex)
             }
             let data = Self.makeMobTargetPacket(opcode: .playerDuel, serverIndex: serverIndex)
             logAction("player-duel", opcode: RSCOutOpcode.playerDuel, payload: data, details: "serverIndex=\(serverIndex)")
