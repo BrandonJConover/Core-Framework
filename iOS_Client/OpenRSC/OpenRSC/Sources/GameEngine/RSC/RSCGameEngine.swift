@@ -3056,10 +3056,8 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("player-attack")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.playerAttack.rawValue))
-            buf.putShort(serverIndex)
-            let data = buf.finishPacket()
+            let data = Self.makeMobTargetPacket(opcode: .playerAttack, serverIndex: serverIndex)
+            logAction("player-attack", opcode: RSCOutOpcode.playerAttack, payload: data, details: "serverIndex=\(serverIndex)")
             try? await connection.send(data)
             worldState.clearPendingTargetMode()
         }
@@ -3301,6 +3299,10 @@ final class RSCGameEngine: ObservableObject {
     }
 
     static func makeNpcTargetPacket(opcode: RSCOutOpcode, serverIndex: Int) -> Data {
+        makeMobTargetPacket(opcode: opcode, serverIndex: serverIndex)
+    }
+
+    static func makeMobTargetPacket(opcode: RSCOutOpcode, serverIndex: Int) -> Data {
         let buf = ByteBuffer()
         buf.newPacket(opcode: Int(opcode.rawValue))
         buf.putShort(serverIndex)
@@ -4211,10 +4213,9 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("player-follow")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.playerFollow.rawValue))
-            buf.putShort(serverIndex)
-            try? await connection.send(buf.finishPacket())
+            let data = Self.makeMobTargetPacket(opcode: .playerFollow, serverIndex: serverIndex)
+            logAction("player-follow", opcode: RSCOutOpcode.playerFollow, payload: data, details: "serverIndex=\(serverIndex)")
+            try? await connection.send(data)
             worldState.clearPendingTargetMode()
         }
     }
@@ -4233,10 +4234,9 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("player-trade")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.playerTrade.rawValue))
-            buf.putShort(serverIndex)
-            try? await connection.send(buf.finishPacket())
+            let data = Self.makeMobTargetPacket(opcode: .playerTrade, serverIndex: serverIndex)
+            logAction("player-trade", opcode: RSCOutOpcode.playerTrade, payload: data, details: "serverIndex=\(serverIndex)")
+            try? await connection.send(data)
             worldState.clearPendingTargetMode()
         }
     }
@@ -4254,10 +4254,9 @@ final class RSCGameEngine: ObservableObject {
                 actionTargetUnavailable("player-duel")
                 return
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.playerDuel.rawValue))
-            buf.putShort(serverIndex)
-            try? await connection.send(buf.finishPacket())
+            let data = Self.makeMobTargetPacket(opcode: .playerDuel, serverIndex: serverIndex)
+            logAction("player-duel", opcode: RSCOutOpcode.playerDuel, payload: data, details: "serverIndex=\(serverIndex)")
+            try? await connection.send(data)
             worldState.clearPendingTargetMode()
         }
     }
@@ -4272,10 +4271,9 @@ final class RSCGameEngine: ObservableObject {
             if !worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) {
                 logTargetChurn("npc-command-1", serverIndex: serverIndex)
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand.rawValue))
-            buf.putShort(serverIndex)
-            try? await connection.send(buf.finishPacket())
+            let data = Self.makeMobTargetPacket(opcode: .npcCommand, serverIndex: serverIndex)
+            logAction("npc-command-1", opcode: RSCOutOpcode.npcCommand, payload: data, details: "serverIndex=\(serverIndex)")
+            try? await connection.send(data)
             worldState.clearPendingTargetMode()
         }
     }
@@ -4290,10 +4288,9 @@ final class RSCGameEngine: ObservableObject {
             if !worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) {
                 logTargetChurn("npc-command-2", serverIndex: serverIndex)
             }
-            let buf = ByteBuffer()
-            buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand2.rawValue))
-            buf.putShort(serverIndex)
-            try? await connection.send(buf.finishPacket())
+            let data = Self.makeMobTargetPacket(opcode: .npcCommand2, serverIndex: serverIndex)
+            logAction("npc-command-2", opcode: RSCOutOpcode.npcCommand2, payload: data, details: "serverIndex=\(serverIndex)")
+            try? await connection.send(data)
             worldState.clearPendingTargetMode()
         }
     }

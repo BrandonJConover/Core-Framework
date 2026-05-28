@@ -156,6 +156,36 @@ final class RenderPipelineTests: XCTestCase {
              0x01, 0x41]
         )
         XCTAssertEqual(
+            Array(RSCGameEngine.makeMobTargetPacket(opcode: .npcCommand, serverIndex: 321)),
+            [0x00, 0x03, RSCOutOpcode.npcCommand.rawValue,
+             0x01, 0x41]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeMobTargetPacket(opcode: .npcCommand2, serverIndex: 321)),
+            [0x00, 0x03, RSCOutOpcode.npcCommand2.rawValue,
+             0x01, 0x41]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeMobTargetPacket(opcode: .playerAttack, serverIndex: 321)),
+            [0x00, 0x03, RSCOutOpcode.playerAttack.rawValue,
+             0x01, 0x41]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeMobTargetPacket(opcode: .playerFollow, serverIndex: 321)),
+            [0x00, 0x03, RSCOutOpcode.playerFollow.rawValue,
+             0x01, 0x41]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeMobTargetPacket(opcode: .playerTrade, serverIndex: 321)),
+            [0x00, 0x03, RSCOutOpcode.playerTrade.rawValue,
+             0x01, 0x41]
+        )
+        XCTAssertEqual(
+            Array(RSCGameEngine.makeMobTargetPacket(opcode: .playerDuel, serverIndex: 321)),
+            [0x00, 0x03, RSCOutOpcode.playerDuel.rawValue,
+             0x01, 0x41]
+        )
+        XCTAssertEqual(
             Array(RSCGameEngine.makeGroundItemTakePacket(x: 180, z: 260, itemId: 77)),
             [0x00, 0x07, RSCOutOpcode.groundItemTake.rawValue,
              0x00, 0xB4, 0x01, 0x04, 0x00, 0x4D]
