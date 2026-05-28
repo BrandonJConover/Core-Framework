@@ -1304,7 +1304,7 @@ final class RSCPacketHandler {
     // Format: BYTE count, then per item: SHORT itemID-with-equipped-bit, [ushort/int amount if stackable]
     private func handleUpdateInventory(buf: ByteBuffer, ws: RSCWorldState) {
         let count = buf.getUnsignedByte()
-        let previousEquipped = ws.inventory.map { ($0.itemId, $0.equipped) }
+        let previousEquipped = ws.inventory.map { "\($0.itemId):\($0.equipped ? 1 : 0)" }
         var items: [RSCInventoryItem] = []
         for i in 0..<count {
             let rawItemId = buf.getUnsignedShort()
@@ -1318,7 +1318,7 @@ final class RSCPacketHandler {
            pendingSlot >= items.count || items[pendingSlot].itemId == 0 {
             ws.clearPendingTargetMode()
         }
-        if previousEquipped != items.map({ ($0.itemId, $0.equipped) }) {
+        if previousEquipped != items.map({ "\($0.itemId):\($0.equipped ? 1 : 0)" }) {
             ws.localAppearanceAwaitingRefresh = true
         }
         print("[Packet] Inventory: \(count) items")
