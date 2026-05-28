@@ -91,7 +91,7 @@ final class Shader {
         var lVar7  = var7
         var lVar8  = var8
         var lVar9  = var9
-        var lVar11 = var11 &<< 2
+        let lVar11 = var11 &<< 2
         var lVar12 = var12
         var lVar16: Int32 = 0
         var lVar17: Int32 = 0
@@ -246,17 +246,17 @@ final class Shader {
         guard var14 > 0 && var2 == 50 else { return }
 
         var lVar0  = var0
-        var lVar1  = var1
+        let lVar1  = var1
         var lVar3  = var3
         var lVal   = val
-        var lValStep = valStep
+        let lValStep = valStep
         var lDH    = dH
         var lVar8  = var8
-        var lVar9  = var9
+        let lVar9  = var9
         var lHigh  = high
         var lLow   = low
-        var lVar13 = var13
-        var lVar14 = var14
+        let lVar13 = var13
+        let lVar14 = var14
 
         var lVar15: Int32 = 0
         var lVar16: Int32 = 0
@@ -402,13 +402,13 @@ final class Shader {
         var lVar2  = var2
         var lVar3  = var3
         var lVar4  = var4
-        var lVar5  = var5
+        let lVar5  = var5
         var lVar6  = var6
         var lVar7  = var7
-        var lVar8  = var8
-        var lVar9  = var9
-        var lVar11 = var11
-        var lVar12 = var12
+        let lVar8  = var8
+        let lVar9  = var9
+        let lVar11 = var11
+        let lVar12 = var12
 
         var lVar15: Int32 = 0
         var lVar16: Int32 = 0
@@ -573,16 +573,15 @@ final class Shader {
     ) {
         guard var7 > 0 else { return }
 
-        var lVar1  = var1
-        var lVar2  = var2
+        let lVar1  = var1
+        let lVar2  = var2
         var lVar3  = var3
-        var lVar4  = var4 &<< 2     // Java: var4 <<= 2
+        let lVar4  = var4 &<< 2     // Java: var4 <<= 2
         var lVar5  = var5
         var lVar6  = var6
-        var lVar7  = var7
+        let lVar7  = var7
         var lVar8  = var8
-        var lVar9  = var9
-        var lVar12 = var12
+        let lVar12 = var12
         var lVar13 = var13
         var lVar14 = var14
 
@@ -727,17 +726,15 @@ final class Shader {
     ) {
         guard var14 > 0 else { return }
 
-        var lVar0  = var0 &<< 2
-        var lVar1  = var1
-        var lVar2  = var2
+        let lVar0  = var0 &<< 2
+        let lVar2  = var2
         var lVar3  = var3
-        var lVar4  = var4
+        let lVar4  = var4
         var lVar6  = var6
-        var lVar7  = var7
         var lVar8  = var8
         var lVar11 = var11
         var lVar12 = var12
-        var lVar13 = var13
+        let lVar13 = var13
 
         var lVar15: Int32 = 0
         var lVar16: Int32 = 0
@@ -872,16 +869,14 @@ final class Shader {
     ) {
         guard var0 > 0 && var3 == 25 else { return }
 
-        var lVar0  = var0
+        let lVar0  = var0
         var lVar1  = var1
-        var lVar4  = var4
-        var lVar5  = var5
-        var lVar6  = var6
-        var lVar7  = var7 &<< 2
+        let lVar5  = var5
+        let lVar6  = var6
+        let lVar7  = var7 &<< 2
         var lVar10 = var10
         var lVar11 = var11
-        var lVar12 = var12
-        var lVar13 = var13
+        let lVar13 = var13
         var lVar14 = var14
         var lVar15 = var15
 
