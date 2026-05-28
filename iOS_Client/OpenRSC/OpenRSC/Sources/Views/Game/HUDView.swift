@@ -940,14 +940,12 @@ private struct MagicPanelView: View {
             engine.castSpellOnSelf(spellId: spell.0)
         case .combat, .ground:
             // Arm the engine — the next world tap routes through pendingSpellId.
-            worldState.pendingSpellId = spell.0
-            worldState.addChat(sender: "[Magic]", text: "Select a target for \(spell.1).")
+            engine.armSpellTarget(spellId: spell.0, prompt: "Select a target for \(spell.1).")
         case .invItem:
             // TODO: present an inventory-slot picker. For now we surface a
             // chat hint — the user can fall back to the long-press menu on
             // an inventory item once that's wired up.
-            worldState.addChat(sender: "[Magic]", text: "\(spell.1): tap an inventory item to cast on.")
-            worldState.pendingSpellId = spell.0
+            engine.armSpellTarget(spellId: spell.0, prompt: "\(spell.1): tap an inventory item to cast on.")
         }
     }
 

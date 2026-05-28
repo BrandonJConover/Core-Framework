@@ -2456,7 +2456,19 @@ final class RSCGameEngine: ObservableObject {
         }
         let path = await sendWalkPath(toX: destX, toZ: destZ, walkToEntity: true, showFailureMessage: false)
         guard !path.isEmpty else {
-            print("[Action] local-path-miss action=\"\(action)\" approach=(\(destX),\(destZ)); sending action for server authority")
+            let directPath = [(x: serverTileX(destX), z: serverTileZ(destZ))]
+            let packet = Self.makeWalkPacket(serverPath: directPath, walkToEntity: true)
+            logAction(
+                "walk-entity-direct",
+                opcode: RSCOutOpcode.walkToEntity,
+                payload: packet,
+                details: "action=\(action) dest=(\(destX),\(destZ)) server=(\(directPath[0].x),\(directPath[0].z))"
+            )
+            try? await connection.send(packet)
+            worldState.walkTargetX = destX
+            worldState.walkTargetY = destZ
+            worldState.walkTargetTimeout = 80
+            print("[Action] local-path-miss action=\"\(action)\" approach=(\(destX),\(destZ)); sent direct walk and continuing")
             return true
         }
         return true
@@ -2474,6 +2486,30 @@ final class RSCGameEngine: ObservableObject {
     private func actionTargetUnavailable(_ action: String) {
         print("[Action] blocked action=\"\(action)\" reason=stale-target")
         worldState.addChat(sender: "[Action]", text: "That target is no longer available.")
+    }
+
+    private func pendingItemSlotStillArmed(expectedSlot: Int?, expectedItemId: Int?) -> Int? {
+        guard let expectedSlot,
+              let currentSlot = worldState.pendingItemUseSlot,
+              currentSlot == expectedSlot,
+              worldState.inventory.indices.contains(currentSlot),
+              worldState.inventory[currentSlot].itemId != 0 else {
+            worldState.addChat(sender: "[Use]", text: "That item is no longer selected.")
+            return nil
+        }
+
+        if let expectedItemId, worldState.inventory[currentSlot].itemId != expectedItemId {
+            worldState.addChat(sender: "[Use]", text: "That item changed before the action was sent.")
+            return nil
+        }
+
+        return currentSlot
+    }
+
+    func armSpellTarget(spellId: Int, prompt: String) {
+        worldState.pendingItemUseSlot = nil
+        worldState.pendingSpellId = spellId
+        worldState.addChat(sender: "[Magic]", text: prompt)
     }
 
     static func makeWalkPacket(serverPath: [(x: Int, z: Int)], walkToEntity: Bool) -> Data {
@@ -2680,8 +2716,10 @@ final class RSCGameEngine: ObservableObject {
         var actions: [(label: String, icon: String, action: () -> Void)] = []
         var title = "(\(worldX), \(worldZ))"
         let pendingItemSlot = worldState.pendingItemUseSlot
-        let pendingItemName = pendingItemSlot
+        let pendingItemId = pendingItemSlot
             .flatMap { slot in worldState.inventory.first(where: { $0.id == slot })?.itemId }
+        let pendingItemName = pendingItemSlot
+            .flatMap { _ in pendingItemId }
             .map { ItemNames.name(for: $0) } ?? "item"
         let pendingSpellId = worldState.pendingSpellId
         let staleTargetAction: () -> Void = { [weak self] in
@@ -2746,7 +2784,8 @@ final class RSCGameEngine: ObservableObject {
                 title = npc.name
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(npc.name)", "hand.point.up.left", guardedAction(isCurrent: { npcStillCurrent(npc) }, clearPendingTarget: false, action: { [weak self] in
-                        self?.useItemOnNPC(slot: pendingItemSlot, serverIndex: npc.id)
+                        guard let slot = self?.pendingItemSlotStillArmed(expectedSlot: pendingItemSlot, expectedItemId: pendingItemId) else { return }
+                        self?.useItemOnNPC(slot: slot, serverIndex: npc.id)
                     })))
                 }
                 if let pendingSpellId {
@@ -2791,7 +2830,8 @@ final class RSCGameEngine: ObservableObject {
                 title = player.name
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(player.name)", "hand.point.up.left", guardedAction(isCurrent: { playerStillCurrent(player) }, clearPendingTarget: false, action: { [weak self] in
-                        self?.useItemOnPlayer(slot: pendingItemSlot, serverIndex: player.id)
+                        guard let slot = self?.pendingItemSlotStillArmed(expectedSlot: pendingItemSlot, expectedItemId: pendingItemId) else { return }
+                        self?.useItemOnPlayer(slot: slot, serverIndex: player.id)
                     })))
                 }
                 if let pendingSpellId {
@@ -2827,7 +2867,8 @@ final class RSCGameEngine: ObservableObject {
                 title = itemName
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(itemName)", "hand.point.up.left", guardedAction(isCurrent: { groundItemStillCurrent(item) }, clearPendingTarget: false, action: { [weak self] in
-                        self?.useItemOnGroundItem(slot: pendingItemSlot, x: item.x, z: item.y, itemId: item.itemId)
+                        guard let slot = self?.pendingItemSlotStillArmed(expectedSlot: pendingItemSlot, expectedItemId: pendingItemId) else { return }
+                        self?.useItemOnGroundItem(slot: slot, x: item.x, z: item.y, itemId: item.itemId)
                     })))
                 }
                 if let pendingSpellId {
@@ -2853,7 +2894,8 @@ final class RSCGameEngine: ObservableObject {
                 title = wallName
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(wallName)", "hand.point.up.left", guardedAction(isCurrent: { wallStillCurrent(wall) }, clearPendingTarget: false, action: { [weak self] in
-                        self?.useItemOnWall(slot: pendingItemSlot, x: wall.x, z: wall.y, direction: wall.direction)
+                        guard let slot = self?.pendingItemSlotStillArmed(expectedSlot: pendingItemSlot, expectedItemId: pendingItemId) else { return }
+                        self?.useItemOnWall(slot: slot, x: wall.x, z: wall.y, direction: wall.direction)
                     })))
                 }
                 if let pendingSpellId {
@@ -2902,7 +2944,8 @@ final class RSCGameEngine: ObservableObject {
                 let command2 = def?.command2.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 if let pendingItemSlot {
                     actions.append(("Use \(pendingItemName) with \(objName)", "hand.point.up.left", guardedAction(isCurrent: { objectStillCurrent(obj) }, clearPendingTarget: false, action: { [weak self] in
-                        self?.useItemOnObject(slot: pendingItemSlot, x: obj.x, z: obj.y)
+                        guard let slot = self?.pendingItemSlotStillArmed(expectedSlot: pendingItemSlot, expectedItemId: pendingItemId) else { return }
+                        self?.useItemOnObject(slot: slot, x: obj.x, z: obj.y)
                     })))
                 }
                 if let pendingSpellId {
