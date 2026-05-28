@@ -2511,6 +2511,10 @@ final class RSCGameEngine: ObservableObject {
         worldState.addChat(sender: "[Action]", text: "That target is no longer available.")
     }
 
+    private func logTargetChurn(_ action: String, serverIndex: Int) {
+        print("[Action] local-target-churn action=\"\(action)\" serverIndex=\(serverIndex); sending for server authority")
+    }
+
     private func inventoryItem(atSlot slot: Int) -> RSCInventoryItem? {
         if worldState.inventory.indices.contains(slot),
            worldState.inventory[slot].id == slot,
@@ -3031,9 +3035,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-attack") else { return }
-            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
-                actionTargetUnavailable("npc-attack")
-                return
+            if !worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) {
+                logTargetChurn("npc-attack", serverIndex: serverIndex)
             }
             let data = Self.makeNpcTargetPacket(opcode: .npcAttack, serverIndex: serverIndex)
             logAction("npc-attack", opcode: RSCOutOpcode.npcAttack, payload: data, details: "serverIndex=\(serverIndex)")
@@ -3093,9 +3096,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-talk") else { return }
-            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
-                actionTargetUnavailable("npc-talk")
-                return
+            if !worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) {
+                logTargetChurn("npc-talk", serverIndex: serverIndex)
             }
             let data = Self.makeNpcTargetPacket(opcode: .npcTalkTo, serverIndex: serverIndex)
             logAction("npc-talk", opcode: RSCOutOpcode.npcTalkTo, payload: data, details: "serverIndex=\(serverIndex)")
@@ -3516,9 +3518,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "item-on-npc") else { return }
-            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
-                actionTargetUnavailable("item-on-npc")
-                return
+            if !worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) {
+                logTargetChurn("item-on-npc", serverIndex: serverIndex)
             }
             try? await connection.send(Self.makeItemUseOnNpcPacket(serverIndex: serverIndex, slot: slot))
             clearPendingItemUse()
@@ -3924,9 +3925,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "spell-on-npc") else { return }
-            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == npcServerIndex }) else {
-                actionTargetUnavailable("spell-on-npc")
-                return
+            if !worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == npcServerIndex }) {
+                logTargetChurn("spell-on-npc", serverIndex: npcServerIndex)
             }
             try? await connection.send(Self.makeSpellOnNpcPacket(spellId: spellId, serverIndex: npcServerIndex))
             worldState.clearPendingTargetMode()
@@ -4269,9 +4269,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-1") else { return }
-            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
-                actionTargetUnavailable("npc-command-1")
-                return
+            if !worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) {
+                logTargetChurn("npc-command-1", serverIndex: serverIndex)
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand.rawValue))
@@ -4288,9 +4287,8 @@ final class RSCGameEngine: ObservableObject {
                 return
             }
             guard await queueEntityApproach(toX: npc.x, z: npc.y, action: "npc-command-2") else { return }
-            guard worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) else {
-                actionTargetUnavailable("npc-command-2")
-                return
+            if !worldState.npcs.contains(where: { isNPCInActiveVisualRange($0) && $0.id == serverIndex }) {
+                logTargetChurn("npc-command-2", serverIndex: serverIndex)
             }
             let buf = ByteBuffer()
             buf.newPacket(opcode: Int(RSCOutOpcode.npcCommand2.rawValue))
