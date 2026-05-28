@@ -2515,6 +2515,10 @@ final class RSCGameEngine: ObservableObject {
         print("[Action] local-target-churn action=\"\(action)\" serverIndex=\(serverIndex); sending for server authority")
     }
 
+    private func logTileTargetChurn(_ action: String, x: Int, z: Int) {
+        print("[Action] local-target-churn action=\"\(action)\" tile=(\(x),\(z)); sending for server authority")
+    }
+
     private func inventoryItem(atSlot slot: Int) -> RSCInventoryItem? {
         if worldState.inventory.indices.contains(slot),
            worldState.inventory[slot].id == slot,
@@ -3550,9 +3554,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForGroundItem(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "item-on-ground") else { return }
-            guard worldState.groundItems.contains(where: { $0.x == x && $0.y == z && $0.itemId == itemId }) else {
-                actionTargetUnavailable("item-on-ground")
-                return
+            if !worldState.groundItems.contains(where: { $0.x == x && $0.y == z && $0.itemId == itemId }) {
+                logTileTargetChurn("item-on-ground", x: x, z: z)
             }
             try? await connection.send(Self.makeItemUseOnGroundPacket(
                 x: serverTileX(x),
@@ -3572,9 +3575,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForObject(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "item-on-object") else { return }
-            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
-                actionTargetUnavailable("item-on-object")
-                return
+            if !worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) {
+                logTileTargetChurn("item-on-object", x: x, z: z)
             }
             try? await connection.send(Self.makeItemUseOnObjectPacket(
                 x: serverTileX(x),
@@ -3593,9 +3595,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "item-on-wall") else { return }
-            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
-                actionTargetUnavailable("item-on-wall")
-                return
+            if !worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) {
+                logTileTargetChurn("item-on-wall", x: x, z: z)
             }
             try? await connection.send(Self.makeItemUseOnWallPacket(
                 x: serverTileX(x),
@@ -3615,9 +3616,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForGroundItem(x: x, z: y)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "ground-take") else { return }
-            guard worldState.groundItems.contains(where: { $0.x == x && $0.y == y && $0.itemId == itemId }) else {
-                actionTargetUnavailable("ground-take")
-                return
+            if !worldState.groundItems.contains(where: { $0.x == x && $0.y == y && $0.itemId == itemId }) {
+                logTileTargetChurn("ground-take", x: x, z: y)
             }
             let packet = Self.makeGroundItemTakePacket(x: serverTileX(x), z: serverTileZ(y), itemId: itemId)
             logAction("ground-take", opcode: RSCOutOpcode.groundItemTake, payload: packet, details: "item=\(itemId) tile=(\(x),\(y)) server=(\(serverTileX(x)),\(serverTileZ(y)))")
@@ -3838,9 +3838,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForObject(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "object-1") else { return }
-            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
-                actionTargetUnavailable("object-1")
-                return
+            if !worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) {
+                logTileTargetChurn("object-1", x: x, z: z)
             }
             let packet = Self.makeObjectActionPacket(opcode: .objectCommand1, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-1", opcode: RSCOutOpcode.objectCommand1, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
@@ -3857,9 +3856,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForObject(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "object-2") else { return }
-            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
-                actionTargetUnavailable("object-2")
-                return
+            if !worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) {
+                logTileTargetChurn("object-2", x: x, z: z)
             }
             let packet = Self.makeObjectActionPacket(opcode: .objectCommand2, x: serverTileX(x), z: serverTileZ(z))
             logAction("object-2", opcode: RSCOutOpcode.objectCommand2, payload: packet, details: "tile=(\(x),\(z)) server=(\(serverTileX(x)),\(serverTileZ(z)))")
@@ -3876,9 +3874,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "wall-1") else { return }
-            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
-                actionTargetUnavailable("wall-1")
-                return
+            if !worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) {
+                logTileTargetChurn("wall-1", x: x, z: z)
             }
             let packet = Self.makeWallActionPacket(opcode: .wallCommand1, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-1", opcode: RSCOutOpcode.wallCommand1, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
@@ -3895,9 +3892,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "wall-2") else { return }
-            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
-                actionTargetUnavailable("wall-2")
-                return
+            if !worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) {
+                logTileTargetChurn("wall-2", x: x, z: z)
             }
             let packet = Self.makeWallActionPacket(opcode: .wallCommand2, x: serverTileX(x), z: serverTileZ(z), direction: direction)
             logAction("wall-2", opcode: RSCOutOpcode.wallCommand2, payload: packet, details: "tile=(\(x),\(z)) dir=\(direction) server=(\(serverTileX(x)),\(serverTileZ(z)))")
@@ -3956,9 +3952,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForGroundItem(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "spell-on-ground") else { return }
-            guard worldState.groundItems.contains(where: { $0.x == x && $0.y == z && $0.itemId == itemId }) else {
-                actionTargetUnavailable("spell-on-ground")
-                return
+            if !worldState.groundItems.contains(where: { $0.x == x && $0.y == z && $0.itemId == itemId }) {
+                logTileTargetChurn("spell-on-ground", x: x, z: z)
             }
             try? await connection.send(Self.makeSpellOnGroundItemPacket(
                 spellId: spellId,
@@ -3978,9 +3973,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForObject(x: x, z: z)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "spell-on-object") else { return }
-            guard worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) else {
-                actionTargetUnavailable("spell-on-object")
-                return
+            if !worldState.gameObjects.contains(where: { $0.x == x && $0.y == z }) {
+                logTileTargetChurn("spell-on-object", x: x, z: z)
             }
             try? await connection.send(Self.makeSpellOnObjectPacket(spellId: spellId, x: serverTileX(x), z: serverTileZ(z)))
             worldState.clearPendingTargetMode()
@@ -3995,9 +3989,8 @@ final class RSCGameEngine: ObservableObject {
             }
             let approach = approachTileForWall(x: x, z: z, direction: direction)
             guard await queueApproach(toX: approach.x, z: approach.z, action: "spell-on-wall") else { return }
-            guard worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) else {
-                actionTargetUnavailable("spell-on-wall")
-                return
+            if !worldState.wallObjects.contains(where: { $0.x == x && $0.y == z && $0.direction == direction }) {
+                logTileTargetChurn("spell-on-wall", x: x, z: z)
             }
             try? await connection.send(Self.makeSpellOnWallPacket(
                 spellId: spellId,
