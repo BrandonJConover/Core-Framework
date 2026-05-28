@@ -2511,17 +2511,30 @@ final class RSCGameEngine: ObservableObject {
         worldState.addChat(sender: "[Action]", text: "That target is no longer available.")
     }
 
+    private func inventoryItem(atSlot slot: Int) -> RSCInventoryItem? {
+        if worldState.inventory.indices.contains(slot),
+           worldState.inventory[slot].id == slot,
+           worldState.inventory[slot].itemId != 0 {
+            return worldState.inventory[slot]
+        }
+        return worldState.inventory.first { $0.id == slot && $0.itemId != 0 }
+    }
+
+    private func inventorySlotUnavailable(_ action: String, slot: Int) {
+        print("[Action] blocked action=\"\(action)\" reason=stale-inventory-slot slot=\(slot)")
+        worldState.addChat(sender: "[Action]", text: "That inventory slot is empty.")
+    }
+
     private func pendingItemSlotStillArmed(expectedSlot: Int?, expectedItemId: Int?) -> Int? {
         guard let expectedSlot,
               let currentSlot = worldState.pendingItemUseSlot,
               currentSlot == expectedSlot,
-              worldState.inventory.indices.contains(currentSlot),
-              worldState.inventory[currentSlot].itemId != 0 else {
+              let currentItem = inventoryItem(atSlot: currentSlot) else {
             worldState.addChat(sender: "[Use]", text: "That item is no longer selected.")
             return nil
         }
 
-        if let expectedItemId, worldState.inventory[currentSlot].itemId != expectedItemId {
+        if let expectedItemId, currentItem.itemId != expectedItemId {
             worldState.addChat(sender: "[Use]", text: "That item changed before the action was sent.")
             return nil
         }
@@ -3179,6 +3192,10 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func equipItem(slot: Int) {
+        guard inventoryItem(atSlot: slot) != nil else {
+            inventorySlotUnavailable("equip", slot: slot)
+            return
+        }
         worldState.clearPendingTargetMode()
         Task {
             let data = Self.makeItemEquipPacket(slot: slot)
@@ -3188,6 +3205,10 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func unequipItem(slot: Int) {
+        guard inventoryItem(atSlot: slot) != nil else {
+            inventorySlotUnavailable("unequip", slot: slot)
+            return
+        }
         worldState.clearPendingTargetMode()
         Task {
             let data = Self.makeItemUnequipPacket(slot: slot)
@@ -3392,9 +3413,13 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func dropItem(slot: Int) {
+        guard let item = inventoryItem(atSlot: slot) else {
+            inventorySlotUnavailable("drop", slot: slot)
+            return
+        }
         worldState.clearPendingTargetMode()
         Task {
-            let amount = worldState.inventory.indices.contains(slot) ? worldState.inventory[slot].amount : 1
+            let amount = item.amount
             let packet = Self.makeItemDropPacket(slot: slot, amount: amount)
             logAction("drop", opcode: RSCOutOpcode.itemDrop, payload: packet, details: "slot=\(slot) amount=\(max(1, amount))")
             try? await connection.send(packet)
@@ -3421,6 +3446,10 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func itemCommand(slot: Int, commandIndex: Int, amount: Int = 1) {
+        guard inventoryItem(atSlot: slot) != nil else {
+            inventorySlotUnavailable("item-command", slot: slot)
+            return
+        }
         worldState.clearPendingTargetMode()
         Task {
             let packet = Self.makeItemCommandPacket(
@@ -3434,7 +3463,7 @@ final class RSCGameEngine: ObservableObject {
     }
 
     func itemCommandAll(slot: Int, commandIndex: Int) {
-        let amount = worldState.inventory.indices.contains(slot) ? worldState.inventory[slot].amount : 1
+        let amount = inventoryItem(atSlot: slot)?.amount ?? 1
         itemCommand(slot: slot, commandIndex: commandIndex, amount: amount)
     }
 
@@ -3454,11 +3483,13 @@ final class RSCGameEngine: ObservableObject {
         }
 
         worldState.pendingSpellId = nil
-        worldState.pendingItemUseSlot = slot
-        if let item = worldState.inventory.first(where: { $0.id == slot }) {
-            print("[Action] use-arm slot=\(slot) item=\(item.itemId)")
-            worldState.addChat(sender: "[Use]", text: "Select a target for \(ItemNames.name(for: item.itemId))")
+        guard let item = inventoryItem(atSlot: slot) else {
+            inventorySlotUnavailable("use-arm", slot: slot)
+            return
         }
+        worldState.pendingItemUseSlot = slot
+        print("[Action] use-arm slot=\(slot) item=\(item.itemId)")
+        worldState.addChat(sender: "[Use]", text: "Select a target for \(ItemNames.name(for: item.itemId))")
     }
 
     func cancelItemUse() {
@@ -3472,7 +3503,7 @@ final class RSCGameEngine: ObservableObject {
 
     func itemUseLabel(for slot: Int?) -> String {
         guard let slot,
-              let item = worldState.inventory.first(where: { $0.id == slot }) else {
+              let item = inventoryItem(atSlot: slot) else {
             return "item"
         }
         return ItemNames.name(for: item.itemId)
