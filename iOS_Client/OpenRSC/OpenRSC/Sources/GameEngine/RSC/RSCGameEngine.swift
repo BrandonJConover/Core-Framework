@@ -2345,6 +2345,10 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func approachTileForGroundItem(x: Int, z: Int) -> (x: Int, z: Int) {
+        if worldState.localPlayerX == x && worldState.localPlayerY == z {
+            return (x, z)
+        }
+
         let pathfinder = Pathfinder(landscapeLoader: landscapeLoader, worldState: worldState)
         if !pathfinder.findPath(
             fromX: worldState.localPlayerX,
@@ -2391,7 +2395,12 @@ final class RSCGameEngine: ObservableObject {
     }
 
     @discardableResult
-    private func sendWalkPath(toX destX: Int, toZ destZ: Int, walkToEntity: Bool) async -> [(x: Int, z: Int)] {
+    private func sendWalkPath(
+        toX destX: Int,
+        toZ destZ: Int,
+        walkToEntity: Bool,
+        showFailureMessage: Bool = true
+    ) async -> [(x: Int, z: Int)] {
         if worldState.localPlayerX == destX && worldState.localPlayerY == destZ {
             return []
         }
@@ -2408,7 +2417,9 @@ final class RSCGameEngine: ObservableObject {
         let encodedPath: [(x: Int, z: Int)]
         if path.isEmpty {
             worldState.walkTargetTimeout = 0
-            worldState.addChat(sender: "[Path]", text: "I can't reach that.")
+            if showFailureMessage {
+                worldState.addChat(sender: "[Path]", text: "I can't reach that.")
+            }
             return []
         } else {
             encodedPath = path
@@ -2440,13 +2451,13 @@ final class RSCGameEngine: ObservableObject {
     }
 
     private func queueApproach(toX destX: Int, z destZ: Int, action: String) async -> Bool {
-        let path = await sendWalkPath(toX: destX, toZ: destZ, walkToEntity: true)
         if worldState.localPlayerX == destX && worldState.localPlayerY == destZ {
             return true
         }
+        let path = await sendWalkPath(toX: destX, toZ: destZ, walkToEntity: true, showFailureMessage: false)
         guard !path.isEmpty else {
-            print("[Action] blocked action=\"\(action)\" approach=(\(destX),\(destZ))")
-            return false
+            print("[Action] local-path-miss action=\"\(action)\" approach=(\(destX),\(destZ)); sending action for server authority")
+            return true
         }
         return true
     }
