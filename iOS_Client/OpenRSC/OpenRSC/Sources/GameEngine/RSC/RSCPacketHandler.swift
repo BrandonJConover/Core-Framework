@@ -1328,7 +1328,7 @@ final class RSCPacketHandler {
         let count = buf.getUnsignedByte()
         let previousEquipment = ws.equipment
             .sorted { $0.id < $1.id }
-            .map { ($0.id, $0.itemId, $0.amount) }
+            .map { "\($0.id):\($0.itemId):\($0.amount)" }
         var slots: [RSCEquipmentSlot] = []
         for _ in 0..<count {
             guard buf.bytesRemaining >= 3 else { break }
@@ -1339,7 +1339,7 @@ final class RSCPacketHandler {
             slots.append(RSCEquipmentSlot(id: slot, itemId: itemId, amount: amount))
         }
         ws.equipment = slots.sorted { $0.id < $1.id }
-        if previousEquipment != ws.equipment.map({ ($0.id, $0.itemId, $0.amount) }) {
+        if previousEquipment != ws.equipment.map({ "\($0.id):\($0.itemId):\($0.amount)" }) {
             ws.localAppearanceAwaitingRefresh = true
         }
         print("[Packet] Equipment: \(ws.equipment.count) items")

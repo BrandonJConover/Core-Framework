@@ -227,10 +227,7 @@ final class World {
 
     func addGameObject_UpdateCollisionMap(_ tileX: Int, _ tileZ: Int, _ objectId: Int, _ unknown: Bool) {
         // Add game object to scene and update collision flags
-        guard let objectDef = EntityDefinitions.getObjectDef(objectId) else { return }
-
-        let worldX = tileX * 128
-        let worldZ = tileZ * 128
+        guard EntityDefinitions.getObjectDef(objectId) != nil else { return }
 
         // Mark collision flags
         if tileX >= 0 && tileX < 96 && tileZ >= 0 && tileZ < 96 {
