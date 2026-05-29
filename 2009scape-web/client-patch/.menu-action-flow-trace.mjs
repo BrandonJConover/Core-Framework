@@ -51,6 +51,7 @@ function loadTsModule(relativePath, extraRequire = {}) {
 }
 
 const gameSource = fs.readFileSync(path.join(__dirname, "osrs/Game.ts"), "utf8");
+const smokeSource = fs.readFileSync(path.join(__dirname, "..", "e2e", "smoke-test.js"), "utf8");
 const packetConstants = loadTsModule("osrs/net/PacketConstants.ts");
 const { ClientOpcode } = packetConstants;
 const { Outgoing530 } = loadTsModule("osrs/net/Outgoing530.ts", {
@@ -149,6 +150,17 @@ assertBlockContains("settings toggle", "Actions.TOGGLE_SETTING_WIDGET", "Outgoin
 assertBlockContains("settings reset", "Actions.RESET_SETTING_WIDGET", "Outgoing530.ifCs2");
 assertBytes("settings component click", encode((buf) => Outgoing530.ifCs2(buf, component)), [
     ClientOpcode.IF_CS2, 0x12, 0x34, 0x56, 0x78,
+]);
+assertSourceContains("native IF button helper", "sendNativeIfButtonAction(action: number, componentId: number, slot: number");
+assertSourceContains("native IF button helper encoder", "Outgoing530.ifButton(this.outBuffer, action | 0, componentId | 0, slot | 0)");
+if (!smokeSource.includes("g.sendNativeIfButtonAction(option, chosen.componentId, chosen.slot)")) {
+    trace.push("[MenuActionFlow] bank IF smoke helper call FAILED");
+    failures++;
+} else {
+    trace.push("[MenuActionFlow] bank IF smoke helper call OK");
+}
+assertBytes("IF action 1 bank-style click", encode((buf) => Outgoing530.ifButton(buf, 1, component, slot)), [
+    ClientOpcode.IF_ACTION_1, 0x12, 0x34, 0x56, 0x78, 0x01, 0x02,
 ]);
 
 assertBlockContains("inventory operate", "225", "Outgoing530.objOperate");

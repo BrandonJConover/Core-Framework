@@ -25,6 +25,44 @@ mod tests {
         Packet::new(wire_opcode, payload)
     }
 
+    fn read_lf_string(payload: &[u8], offset: &mut usize) -> String {
+        let start = *offset;
+        while *offset < payload.len() && payload[*offset] != b'\n' {
+            *offset += 1;
+        }
+        assert!(
+            *offset < payload.len(),
+            "fixture string is not LF terminated"
+        );
+        let value = String::from_utf8(payload[start..*offset].to_vec()).unwrap();
+        *offset += 1;
+        value
+    }
+
+    fn assert_custom_v235_projectile_fixture(
+        fixture: serde_json::Value,
+        entry: state_updater::CustomV235ProjectileUpdate,
+        expected_update_type: u8,
+        expected_target_index: u16,
+    ) {
+        assert_eq!(fixture["opcode_enum"], "SEND_UPDATE_PLAYERS");
+        assert_eq!(fixture["wire_opcode"], 234);
+        assert_eq!(OpcodeOut::SEND_UPDATE_PLAYERS.wire(), 234);
+
+        let expected_payload = hex::decode(fixture["payload_hex"].as_str().unwrap()).unwrap();
+        let packet = state_updater::build_custom_v235_player_projectile_update_packet(&[entry]);
+
+        assert_eq!(packet.payload.as_ref(), expected_payload.as_slice());
+
+        let mut reader = PacketReader::new(&packet);
+        assert_eq!(reader.read_short().unwrap(), 1);
+        assert_eq!(reader.read_short().unwrap(), entry.caster_index);
+        assert_eq!(reader.read_byte().unwrap(), expected_update_type);
+        assert_eq!(reader.read_short().unwrap(), entry.projectile_type);
+        assert_eq!(reader.read_short().unwrap(), expected_target_index);
+        assert_eq!(reader.remaining(), 0);
+    }
+
     #[test]
     fn v177_selected_wire_opcodes_match_java_parser_table() {
         let cases = [
@@ -240,6 +278,86 @@ mod tests {
     }
 
     #[test]
+    fn friend_update_online_fixture_matches_java_custom_payload_shape() {
+        let fixture = load_fixture(include_str!(
+            "../../../protocol-golden/custom-v235/out_friend_update_online_java_custom.json"
+        ));
+        assert_eq!(fixture["opcode_enum"], "SEND_FRIEND_UPDATE");
+        assert_eq!(fixture["wire_opcode"], 149);
+        assert_eq!(OpcodeOut::SEND_FRIEND_UPDATE.wire(), 149);
+
+        let payload = hex::decode(fixture["payload_hex"].as_str().unwrap()).unwrap();
+        let mut offset = 0;
+
+        assert_eq!(read_lf_string(&payload, &mut offset), "Alice");
+        assert_eq!(read_lf_string(&payload, &mut offset), "");
+        assert_eq!(payload[offset], 1);
+        offset += 1;
+        assert_eq!(read_lf_string(&payload, &mut offset), "main");
+        assert_eq!(offset, payload.len());
+    }
+
+    #[test]
+    fn ignore_list_one_renamed_fixture_matches_java_custom_payload_shape() {
+        let fixture = load_fixture(include_str!(
+            "../../../protocol-golden/custom-v235/out_ignore_list_one_renamed_java_custom.json"
+        ));
+        assert_eq!(fixture["opcode_enum"], "SEND_IGNORE_LIST");
+        assert_eq!(fixture["wire_opcode"], 109);
+        assert_eq!(OpcodeOut::SEND_IGNORE_LIST.wire(), 109);
+
+        let payload = hex::decode(fixture["payload_hex"].as_str().unwrap()).unwrap();
+        let mut offset = 0;
+
+        assert_eq!(payload[offset], 1);
+        offset += 1;
+        assert_eq!(read_lf_string(&payload, &mut offset), "Eve");
+        assert_eq!(read_lf_string(&payload, &mut offset), "Eve");
+        assert_eq!(read_lf_string(&payload, &mut offset), "Evie");
+        assert_eq!(read_lf_string(&payload, &mut offset), "Evie");
+        assert_eq!(offset, payload.len());
+    }
+
+    #[test]
+    fn private_message_sent_fixture_matches_java_custom_payload_shape() {
+        let fixture = load_fixture(include_str!(
+            "../../../protocol-golden/custom-v235/out_private_message_sent_java_custom.json"
+        ));
+        assert_eq!(fixture["opcode_enum"], "SEND_PRIVATE_MESSAGE_SENT");
+        assert_eq!(fixture["wire_opcode"], 87);
+        assert_eq!(OpcodeOut::SEND_PRIVATE_MESSAGE_SENT.wire(), 87);
+
+        let payload = hex::decode(fixture["payload_hex"].as_str().unwrap()).unwrap();
+        let mut offset = 0;
+
+        assert_eq!(read_lf_string(&payload, &mut offset), "Alice");
+        assert_eq!(payload[offset], 5);
+        offset += 1;
+        assert_eq!(&payload[offset..], &[0x83, 0x8c, 0x70]);
+    }
+
+    #[test]
+    fn private_message_received_fixture_matches_java_custom_payload_shape() {
+        let fixture = load_fixture(include_str!(
+            "../../../protocol-golden/custom-v235/out_private_message_received_java_custom.json"
+        ));
+        assert_eq!(fixture["opcode_enum"], "SEND_PRIVATE_MESSAGE");
+        assert_eq!(fixture["wire_opcode"], 120);
+        assert_eq!(OpcodeOut::SEND_PRIVATE_MESSAGE.wire(), 120);
+
+        let payload = hex::decode(fixture["payload_hex"].as_str().unwrap()).unwrap();
+        let mut offset = 0;
+
+        assert_eq!(read_lf_string(&payload, &mut offset), "Alice");
+        assert_eq!(read_lf_string(&payload, &mut offset), "Alicia");
+        assert_eq!(&payload[offset..offset + 4], &[0, 0, 0, 0]);
+        offset += 4;
+        assert_eq!(payload[offset], 5);
+        offset += 1;
+        assert_eq!(&payload[offset..], &[0x83, 0x8c, 0x70]);
+    }
+
+    #[test]
     fn update_players_chat_fixture_matches_java_custom_entity_writer() {
         let fixture = load_fixture(include_str!(
             "../../../protocol-golden/custom-v235/out_update_players_chat.json"
@@ -354,26 +472,49 @@ mod tests {
         let fixture = load_fixture(include_str!(
             "../../../protocol-golden/custom-v235/out_update_players_projectile_java_custom.json"
         ));
-        assert_eq!(fixture["opcode_enum"], "SEND_UPDATE_PLAYERS");
-        assert_eq!(fixture["wire_opcode"], 234);
-        assert_eq!(OpcodeOut::SEND_UPDATE_PLAYERS.wire(), 234);
-
-        let expected_payload = hex::decode(fixture["payload_hex"].as_str().unwrap()).unwrap();
         let entry = state_updater::CustomV235ProjectileUpdate {
             caster_index: 42,
             projectile_type: 2,
             target: state_updater::CustomV235ProjectileTarget::Npc(37),
         };
-        let packet = state_updater::build_custom_v235_player_projectile_update_packet(&[entry]);
+        assert_custom_v235_projectile_fixture(fixture, entry, 3, 37);
+    }
+
+    #[test]
+    fn update_players_projectile_player_java_custom_fixture_matches_entity_writer() {
+        let fixture = load_fixture(include_str!(
+            "../../../protocol-golden/custom-v235/out_update_players_projectile_player_java_custom.json"
+        ));
+        let entry = state_updater::CustomV235ProjectileUpdate {
+            caster_index: 42,
+            projectile_type: 2,
+            target: state_updater::CustomV235ProjectileTarget::Player(84),
+        };
+        assert_custom_v235_projectile_fixture(fixture, entry, 4, 84);
+    }
+
+    #[test]
+    fn update_players_damage_java_custom_fixture_matches_entity_writer() {
+        let fixture = load_fixture(include_str!(
+            "../../../protocol-golden/custom-v235/out_update_players_damage_java_custom.json"
+        ));
+        assert_eq!(fixture["opcode_enum"], "SEND_UPDATE_PLAYERS");
+        assert_eq!(fixture["wire_opcode"], 234);
+        assert_eq!(OpcodeOut::SEND_UPDATE_PLAYERS.wire(), 234);
+
+        let expected_payload = hex::decode(fixture["payload_hex"].as_str().unwrap()).unwrap();
+        let packet =
+            state_updater::build_custom_v235_player_damage_update_packet(&[(42, 6, 8, 12)]);
 
         assert_eq!(packet.payload.as_ref(), expected_payload.as_slice());
 
         let mut reader = PacketReader::new(&packet);
         assert_eq!(reader.read_short().unwrap(), 1);
         assert_eq!(reader.read_short().unwrap(), 42);
-        assert_eq!(reader.read_byte().unwrap(), 3);
-        assert_eq!(reader.read_short().unwrap(), 2);
-        assert_eq!(reader.read_short().unwrap(), 37);
+        assert_eq!(reader.read_byte().unwrap(), 2);
+        assert_eq!(reader.read_byte().unwrap(), 6);
+        assert_eq!(reader.read_byte().unwrap(), 8);
+        assert_eq!(reader.read_byte().unwrap(), 12);
         assert_eq!(reader.remaining(), 0);
     }
 

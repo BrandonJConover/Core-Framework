@@ -21,6 +21,8 @@ JSON
 cat > "$PUBLIC_DIR/wrapper-config.js" <<'JS'
 window.RT4_WRAPPER_CONFIG = {
   debug: false,
+  clientJar: "/client-1.0.0-mobile2.jar",
+  launcherJar: "/rt4-spike-launcher-mobile2.jar",
   websocketUrl: "ws://127.0.0.1:{port}",
   tailscaleControlUrl: "",
   tailscaleAuthKey: "",

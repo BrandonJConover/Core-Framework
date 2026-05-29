@@ -1,0 +1,35 @@
+{
+  "id": "out_update_players_projectile_player_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_UPDATE_PLAYERS",
+  "wire_opcode": 234,
+  "payload_hex": "0001002a0400020054",
+  "fields": {
+    "count": 1,
+    "entries": [
+      {
+        "caster_player_index": 42,
+        "update_type": 4,
+        "projectile_type": 2,
+        "projectile_type_semantics": "ranged",
+        "victim_kind": "player",
+        "victim_index": 84
+      }
+    ]
+  },
+  "java_reference": {
+    "generator": "server-java-modern/src/com/openrsc/server/net/rsc/generators/impl/PayloadCustomGenerator.java",
+    "source": "server-java-modern/src/com/openrsc/server/GameStateUpdater.java#issuePlayerAppearanceUpdatePacket",
+    "source_struct": "server-java-modern/src/com/openrsc/server/net/rsc/struct/outgoing/AppearanceUpdateStruct.java",
+    "projectile_source": "server-java-modern/src/com/openrsc/server/model/entity/update/Projectile.java",
+    "info_sequence": [
+      "Short(count)",
+      "Short(caster_player_index)",
+      "Byte(update_type=4)",
+      "Short(projectile_type)",
+      "Short(victim_player_index)"
+    ]
+  },
+  "notes": "Payload only, without transport framing. This Java custom-client SEND_UPDATE_PLAYERS type-4 fixture covers a ranged projectile fired by player index 42 at player index 84; Java uses type 3 for NPC victims."
+}

@@ -1,0 +1,34 @@
+{
+  "id": "out_update_players_damage_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_UPDATE_PLAYERS",
+  "wire_opcode": 234,
+  "payload_hex": "0001002a0206080c",
+  "fields": {
+    "count": 1,
+    "entries": [
+      {
+        "player_index": 42,
+        "update_type": 2,
+        "damage": 6,
+        "current_hits": 8,
+        "maximum_hits": 12
+      }
+    ]
+  },
+  "java_reference": {
+    "generator": "server-java-modern/src/com/openrsc/server/net/rsc/generators/impl/PayloadCustomGenerator.java",
+    "source": "server-java-modern/src/com/openrsc/server/GameStateUpdater.java#issuePlayerAppearanceUpdatePacket",
+    "source_struct": "server-java-modern/src/com/openrsc/server/net/rsc/struct/outgoing/AppearanceUpdateStruct.java",
+    "info_sequence": [
+      "Short(count)",
+      "Short(player_index)",
+      "Byte(update_type=2)",
+      "Byte(damage)",
+      "Byte(current_hits)",
+      "Byte(maximum_hits)"
+    ]
+  },
+  "notes": "Payload only, without transport framing. This Java custom-client SEND_UPDATE_PLAYERS type-2 fixture covers a player damage hit update for player index 42 taking 6 damage and reporting 8/12 hits."
+}

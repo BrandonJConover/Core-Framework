@@ -5,6 +5,10 @@
 [MenuActionFlow] settings toggle dispatch OK (Actions.TOGGLE_SETTING_WIDGET -> Outgoing530.ifCs2)
 [MenuActionFlow] settings reset dispatch OK (Actions.RESET_SETTING_WIDGET -> Outgoing530.ifCs2)
 [MenuActionFlow] settings component click bytes OK 0a 12 34 56 78
+[MenuActionFlow] native IF button helper source OK (sendNativeIfButtonAction(action: number, componentId: number, slot: number)
+[MenuActionFlow] native IF button helper encoder source OK (Outgoing530.ifButton(this.outBuffer, action | 0, componentId | 0, slot | 0))
+[MenuActionFlow] bank IF smoke helper call OK
+[MenuActionFlow] IF action 1 bank-style click bytes OK 9b 12 34 56 78 01 02
 [MenuActionFlow] inventory operate dispatch OK (225 -> Outgoing530.objOperate)
 [MenuActionFlow] inventory operate bytes OK ce 03 84 02 01 78 56 34 12
 [MenuActionFlow] bank component options source source OK (if (child.options != null))

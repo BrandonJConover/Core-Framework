@@ -1,0 +1,18 @@
+{
+  "id": "out_ignore_list_one_renamed_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_IGNORE_LIST",
+  "wire_opcode": 109,
+  "payload_hex": "014576650a4576650a457669650a457669650a",
+  "fields": {
+    "list_size": 1,
+    "ignored": [
+      {
+        "name": "Eve",
+        "former_name": "Evie"
+      }
+    ]
+  },
+  "notes": "Payload only. Java PayloadCustomGenerator writes SEND_IGNORE_LIST as one count byte, then for each ignored player LF-terminated current name twice and LF-terminated former name twice."
+}

@@ -132,6 +132,7 @@ pub enum ContentEvent {
     },
     DialogueAnswer {
         player_id: u64,
+        active_dialogue_id: Option<String>,
         option: i8,
     },
     EnterArea {
@@ -251,9 +252,21 @@ pub enum ContentEffect {
         player_id: u64,
         shop_id: u32,
     },
+    OpenBank {
+        player_id: u64,
+    },
     StartDialogue {
         player_id: u64,
         dialogue_id: String,
+    },
+    NpcDialogue {
+        player_id: u64,
+        npc_name: String,
+        lines: Vec<String>,
+    },
+    DialogueOptions {
+        player_id: u64,
+        options: Vec<String>,
     },
     SetQuestStage {
         player_id: u64,
@@ -284,10 +297,36 @@ impl ContentEffect {
         Self::OpenShop { player_id, shop_id }
     }
 
+    pub fn open_bank(player_id: u64) -> Self {
+        Self::OpenBank { player_id }
+    }
+
     pub fn start_dialogue(player_id: u64, dialogue_id: impl Into<String>) -> Self {
         Self::StartDialogue {
             player_id,
             dialogue_id: dialogue_id.into(),
+        }
+    }
+
+    pub fn npc_dialogue(
+        player_id: u64,
+        npc_name: impl Into<String>,
+        lines: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        Self::NpcDialogue {
+            player_id,
+            npc_name: npc_name.into(),
+            lines: lines.into_iter().map(Into::into).collect(),
+        }
+    }
+
+    pub fn dialogue_options(
+        player_id: u64,
+        options: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        Self::DialogueOptions {
+            player_id,
+            options: options.into_iter().map(Into::into).collect(),
         }
     }
 
@@ -592,7 +631,9 @@ mod tests {
 
         fn handle(&self, event: &ContentEvent) -> ContentResult {
             match event {
-                ContentEvent::DialogueAnswer { player_id, option } => {
+                ContentEvent::DialogueAnswer {
+                    player_id, option, ..
+                } => {
                     vec![ContentEffect::Message {
                         player_id: *player_id,
                         text: format!("selected option {option}"),
@@ -708,6 +749,7 @@ mod tests {
 
         let effects = registry.dispatch(&ContentEvent::DialogueAnswer {
             player_id: 42,
+            active_dialogue_id: Some("test.dialogue".to_string()),
             option: 2,
         });
 

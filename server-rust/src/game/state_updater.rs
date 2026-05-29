@@ -981,6 +981,37 @@ pub fn build_custom_v235_player_projectile_update_packet(
     )
 }
 
+/// Build a custom-v235 `SEND_UPDATE_PLAYERS` type-2 damage payload.
+///
+/// Each entry is `(player_index, damage, current_hits, maximum_hits)`.
+pub fn build_custom_v235_player_damage_update_payload(entries: &[(u16, u8, u8, u8)]) -> Vec<u8> {
+    let count = entries.len().min(u16::MAX as usize) as u16;
+    let mut payload = Vec::with_capacity(2 + entries.len() * 6);
+    payload.push((count >> 8) as u8);
+    payload.push(count as u8);
+
+    for (player_index, damage, current_hits, maximum_hits) in entries.iter().take(count as usize) {
+        payload.push((player_index >> 8) as u8);
+        payload.push(*player_index as u8);
+        payload.push(2);
+        payload.push(*damage);
+        payload.push(*current_hits);
+        payload.push(*maximum_hits);
+    }
+
+    payload
+}
+
+/// Build a custom-v235 `SEND_UPDATE_PLAYERS` type-2 damage packet.
+pub fn build_custom_v235_player_damage_update_packet(
+    entries: &[(u16, u8, u8, u8)],
+) -> crate::protocol::Packet {
+    crate::protocol::Packet::new(
+        crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_PLAYERS.wire(),
+        build_custom_v235_player_damage_update_payload(entries),
+    )
+}
+
 /// Build a custom-v235 `SEND_UPDATE_NPC` type-2 damage payload.
 ///
 /// Each entry is `(npc_index, damage, current_hits, maximum_hits)`.
@@ -1266,25 +1297,60 @@ mod tests {
 
     #[test]
     fn custom_v235_player_projectile_update_matches_java_entity_layout() {
-        let entry = CustomV235ProjectileUpdate {
+        let npc_target = CustomV235ProjectileUpdate {
             caster_index: 42,
             projectile_type: 2,
             target: CustomV235ProjectileTarget::Npc(37),
         };
-        let payload = build_custom_v235_player_projectile_update_payload(&[entry]);
+        let player_target = CustomV235ProjectileUpdate {
+            caster_index: 42,
+            projectile_type: 2,
+            target: CustomV235ProjectileTarget::Player(84),
+        };
+        let payload =
+            build_custom_v235_player_projectile_update_payload(&[npc_target, player_target]);
+
+        assert_eq!(
+            payload,
+            vec![
+                0x00, 0x02, // count
+                0x00, 0x2a, // caster player index
+                0x03, // update type: projectile targeting NPC
+                0x00, 0x02, // projectile type: ranged
+                0x00, 0x25, // victim NPC index
+                0x00, 0x2a, // caster player index
+                0x04, // update type: projectile targeting player
+                0x00, 0x02, // projectile type: ranged
+                0x00, 0x54, // victim player index
+            ]
+        );
+
+        let packet =
+            build_custom_v235_player_projectile_update_packet(&[npc_target, player_target]);
+        assert_eq!(
+            packet.opcode,
+            crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_PLAYERS.wire()
+        );
+        assert_eq!(packet.payload.as_ref(), payload.as_slice());
+    }
+
+    #[test]
+    fn custom_v235_player_damage_update_matches_java_entity_layout() {
+        let payload = build_custom_v235_player_damage_update_payload(&[(42, 6, 8, 12)]);
 
         assert_eq!(
             payload,
             vec![
                 0x00, 0x01, // count
-                0x00, 0x2a, // caster player index
-                0x03, // update type: projectile targeting NPC
-                0x00, 0x02, // projectile type: ranged
-                0x00, 0x25, // victim NPC index
+                0x00, 0x2a, // player index
+                0x02, // update type: damage
+                0x06, // damage
+                0x08, // current hits
+                0x0c, // maximum hits
             ]
         );
 
-        let packet = build_custom_v235_player_projectile_update_packet(&[entry]);
+        let packet = build_custom_v235_player_damage_update_packet(&[(42, 6, 8, 12)]);
         assert_eq!(
             packet.opcode,
             crate::protocol::opcodes::OpcodeOut::SEND_UPDATE_PLAYERS.wire()

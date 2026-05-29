@@ -11,6 +11,7 @@ use crate::game::combat::CombatStyle;
 use crate::game::combat_event::{CombatManager, CombatType, Combatant, RoundResult};
 use crate::game::content::runtime::{ContentRuntimePlan, ContentRuntimeSink};
 use crate::game::content::{ContentEvent, ContentRegistry};
+use crate::game::dialogue_handler::{build_npc_message_packet, build_option_menu_packet};
 use crate::game::entity::Direction;
 use crate::game::item::ItemRepository;
 use crate::game::player::SkillId;
@@ -22,6 +23,7 @@ use crate::protocol::opcodes::{OpcodeIn, OpcodeOut};
 use crate::protocol::packets::{LoginRequest, LoginResponse};
 use crate::protocol::{Packet, PacketBuilder, PacketReader};
 use crate::session::{Session, SessionManager, SessionState};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
@@ -58,6 +60,8 @@ pub struct ServerState {
     pub shop: ShopHandler,
     /// Compiled Rust content trigger registry.
     pub content: ContentRegistry,
+    /// Active compiled-content dialogue id per player, scoped to menu answers.
+    pub content_dialogues: HashMap<u64, String>,
     /// One-shot ticket store shared with the HTTP API. The LOGIN packet
     /// handler consumes a ticket here when the password starts with "t".
     pub tickets: LoginTicketService,
@@ -77,6 +81,7 @@ impl ServerState {
             bank: BankHandler::new(),
             shop: ShopHandler::with_default_shops(ItemRepository::new()),
             content: crate::game::content::default_content_registry(),
+            content_dialogues: HashMap::new(),
             tickets: LoginTicketService::new(),
         }
     }
@@ -1642,13 +1647,28 @@ impl ServerState {
             }
         };
 
-        let (messages, packets, error_message) = {
+        let (player_id, messages, packets, started_dialogue, error_message) = {
             let mut player = player_arc.write().await;
-            let mut sink =
-                LiveContentRuntimeSink::new(&mut player, &mut self.shop, self.tick_count);
+            let player_id = player.id;
+            let mut sink = LiveContentRuntimeSink::new(
+                &mut player,
+                &mut self.bank,
+                &mut self.shop,
+                self.tick_count,
+            );
             let error_message = plan.apply_to(&mut sink).err().map(|e| e.to_string());
-            (sink.messages, sink.packets, error_message)
+            (
+                player_id,
+                sink.messages,
+                sink.packets,
+                sink.started_dialogue,
+                error_message,
+            )
         };
+
+        if let Some(dialogue_id) = started_dialogue {
+            self.content_dialogues.insert(player_id, dialogue_id);
+        }
 
         let s = session.read().await;
         for message in messages {
@@ -1735,19 +1755,25 @@ impl ServerState {
             Ok(request) => request,
             Err(_) => return HandleResult::Continue,
         };
-        let player_id = {
+        let (player_id, active_dialogue_id) = {
             let s = session.read().await;
             match s.player.as_ref() {
-                Some(player) => player.read().await.id,
+                Some(player) => {
+                    let player_id = player.read().await.id;
+                    (player_id, self.content_dialogues.get(&player_id).cloned())
+                }
                 None => return HandleResult::Continue,
             }
         };
         let event = ContentEvent::DialogueAnswer {
             player_id,
+            active_dialogue_id,
             option: request.option,
         };
         let plan = ContentRuntimePlan::from_event(&self.content, &event);
-        let _ = self.apply_content_plan(session, plan).await;
+        if self.apply_content_plan(session, plan).await {
+            self.content_dialogues.remove(&player_id);
+        }
 
         HandleResult::Continue
     }
@@ -3202,20 +3228,29 @@ impl ServerState {
 
 struct LiveContentRuntimeSink<'a> {
     player: &'a mut Player,
+    bank: &'a mut BankHandler,
     shop: &'a mut ShopHandler,
     tick_count: u64,
     messages: Vec<String>,
     packets: Vec<Packet>,
+    started_dialogue: Option<String>,
 }
 
 impl<'a> LiveContentRuntimeSink<'a> {
-    fn new(player: &'a mut Player, shop: &'a mut ShopHandler, tick_count: u64) -> Self {
+    fn new(
+        player: &'a mut Player,
+        bank: &'a mut BankHandler,
+        shop: &'a mut ShopHandler,
+        tick_count: u64,
+    ) -> Self {
         Self {
             player,
+            bank,
             shop,
             tick_count,
             messages: Vec::new(),
             packets: Vec::new(),
+            started_dialogue: None,
         }
     }
 
@@ -3248,8 +3283,42 @@ impl ContentRuntimeSink for LiveContentRuntimeSink<'_> {
         Ok(())
     }
 
-    fn start_dialogue(&mut self, player_id: u64, _dialogue_id: &str) -> Result<(), String> {
-        self.ensure_player(player_id)
+    fn open_bank(&mut self, player_id: u64) -> Result<(), String> {
+        self.ensure_player(player_id)?;
+        let packets = self
+            .bank
+            .open_bank(player_id, &self.player.bank)
+            .map_err(|e| e.to_string())?;
+        self.packets.extend(packets);
+        Ok(())
+    }
+
+    fn start_dialogue(&mut self, player_id: u64, dialogue_id: &str) -> Result<(), String> {
+        self.ensure_player(player_id)?;
+        self.started_dialogue = Some(dialogue_id.to_string());
+        Ok(())
+    }
+
+    fn send_npc_dialogue(
+        &mut self,
+        player_id: u64,
+        npc_name: &str,
+        lines: &[String],
+    ) -> Result<(), String> {
+        self.ensure_player(player_id)?;
+        self.packets.extend(lines.iter().map(|line| {
+            let packet = build_npc_message_packet(npc_name, line);
+            Packet::new(packet.opcode, packet.payload)
+        }));
+        Ok(())
+    }
+
+    fn show_dialogue_options(&mut self, player_id: u64, options: &[String]) -> Result<(), String> {
+        self.ensure_player(player_id)?;
+        let packet = build_option_menu_packet(options);
+        self.packets
+            .push(Packet::new(packet.opcode, packet.payload));
+        Ok(())
     }
 
     fn set_quest_stage(
@@ -3919,6 +3988,7 @@ fn bank_error_message(error: &BankError) -> Option<&'static str> {
 mod packet_adapter_tests {
     use super::*;
     use crate::game::content::{ContentEffect, ContentTrigger, TriggerKind};
+    use crate::game::protocol::ServerOpcode;
     use crate::game::world::GameObject;
     use std::path::PathBuf;
 
@@ -4078,7 +4148,9 @@ mod packet_adapter_tests {
 
         fn handle(&self, event: &ContentEvent) -> Vec<ContentEffect> {
             match event {
-                ContentEvent::DialogueAnswer { player_id, option } => vec![ContentEffect::message(
+                ContentEvent::DialogueAnswer {
+                    player_id, option, ..
+                } => vec![ContentEffect::message(
                     *player_id,
                     format!("dialogue option {option}"),
                 )],
@@ -4792,6 +4864,56 @@ mod packet_adapter_tests {
         let message_packet = rx.recv().await.unwrap();
         assert_eq!(message_packet.opcode, OpcodeOut::ServerMessage.wire());
         assert_eq!(message_packet.payload, b"dialogue option 2\0".to_vec());
+    }
+
+    #[tokio::test]
+    async fn bank_assistant_opens_bank_only_after_matching_dialogue_answer() {
+        let mut state = ServerState::new();
+        state.initialize().await.unwrap();
+        let npc_index = {
+            let world = state.game.get_world("main").unwrap();
+            let mut world = world.write().await;
+            let entity_id = world.spawn_npc_at(
+                crate::game::content::beginner::BANK_ASSISTANT_NPC_ID,
+                Position::new(124, 647),
+            );
+            world.npcs.get(&entity_id).unwrap().npc_index
+        };
+        let (mut rx, _player) = logged_in_test_session(&mut state).await;
+
+        let talk_packet = PacketBuilder::new(153).write_short(npc_index).build();
+        assert!(matches!(
+            state.handle_packet(1, talk_packet).await,
+            HandleResult::Continue
+        ));
+
+        let mut talk_packets = Vec::new();
+        while let Ok(packet) = rx.try_recv() {
+            talk_packets.push(packet);
+        }
+        assert_eq!(talk_packets.len(), 8);
+        assert!(talk_packets
+            .iter()
+            .any(|packet| packet.opcode == ServerOpcode::DialogueOptions as u8));
+        assert!(!talk_packets
+            .iter()
+            .any(|packet| packet.opcode == OpcodeOut::SEND_BANK_OPEN.wire()));
+
+        assert!(matches!(
+            state.handle_packet(1, Packet::new(116, vec![1])).await,
+            HandleResult::Continue
+        ));
+        assert!(rx.try_recv().is_err());
+        assert!(state.content_dialogues.contains_key(&1));
+
+        assert!(matches!(
+            state.handle_packet(1, Packet::new(116, vec![0])).await,
+            HandleResult::Continue
+        ));
+
+        let bank_packet = rx.recv().await.unwrap();
+        assert_eq!(bank_packet.opcode, OpcodeOut::SEND_BANK_OPEN.wire());
+        assert!(!state.content_dialogues.contains_key(&1));
     }
 
     #[tokio::test]

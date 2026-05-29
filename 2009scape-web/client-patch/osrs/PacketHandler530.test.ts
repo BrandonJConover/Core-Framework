@@ -144,6 +144,56 @@ describe("PacketHandler530 inventory containers", () => {
         expect(game.containerAmounts[32770]).toEqual([3]);
     });
 
+    test("bank full container snapshots preserve raw container id 95", () => {
+        const componentHash = (762 << 16) | 64000;
+        const game: any = {};
+        const bytes = [
+            0x02, 0xfa, 0xfa, 0x00, // bank component 762:64000
+            0x00, 0x5f,             // bank container id 95
+            0x00, 0x02,             // total slots
+            0x7f, 0x03, 0xe4,       // count 1, item 995
+            0x80, 0x00, 0x00,       // empty slot
+        ];
+
+        expect(PacketHandler530.handleUpdateInvFull(packet(bytes), bytes.length, game)).toBe(true);
+
+        expect(game.containerComponents[95]).toBe(componentHash);
+        expect(game.containerItems[95]).toEqual([995, -1]);
+        expect(game.containerAmounts[95]).toEqual([1, 0]);
+        expect(game.containerItems[94]).toBeUndefined();
+        expect(game.containerTrace530.slice(-1)[0]).toMatchObject({
+            opcode: 105,
+            rawContainerId: 95,
+            containerId: 95,
+            total: 2,
+        });
+    });
+
+    test("bank partial container updates preserve raw container id 95", () => {
+        const componentHash = (762 << 16) | 64000;
+        const game: any = {};
+        const bytes = [
+            0x02, 0xfa, 0xfa, 0x00, // bank component 762:64000
+            0x00, 0x5f,             // bank container id 95
+            0x01,                   // slot 1
+            0x00, 0x34,             // item 51
+            0x03,                   // count 3
+        ];
+
+        expect(PacketHandler530.handleUpdateInvPartial(packet(bytes), bytes.length, game)).toBe(true);
+
+        expect(game.containerComponents[95]).toBe(componentHash);
+        expect(game.containerItems[95][1]).toBe(51);
+        expect(game.containerAmounts[95][1]).toBe(3);
+        expect(game.containerItems[94]).toBeUndefined();
+        expect(game.containerTrace530.slice(-1)[0]).toMatchObject({
+            opcode: 22,
+            rawContainerId: 95,
+            containerId: 95,
+            slots: 1,
+        });
+    });
+
     test("open-top packets queue a legacy widget bridge for the opened 530 interface", async () => {
         const interfaceId = 762;
         const childA = new Component();
@@ -168,9 +218,51 @@ describe("PacketHandler530 inventory containers", () => {
         expect(PacketHandler530.handleIfOpenTop(packet(bytes), game)).toBe(true);
         await Promise.resolve();
 
-        expect(game.topInterface).toEqual({ type: 0, pointer: 0, component: interfaceId, tracknum: 0 });
+        expect(game.topInterface).toEqual({ type: 0, pointer: 0, component: interfaceId, tracknum: 0, parentInterfaceId: 0, childId: 0 });
         expect(InterfaceList.openModalStack).toEqual([{ parentInterfaceId: interfaceId, rootCompId: 0 }]);
         expect(InterfaceList.componentsForInterface(interfaceId).map((c) => c.id & 0xffff)).toEqual([1, 3]);
+        expect(bridged).toEqual([{ openedInterfaceId: interfaceId, rootWidgetId: interfaceId }]);
+    });
+
+    test("chatbox dialogue open packets mirror Java CHATTOP_752 child 12 into legacy dialogue state", async () => {
+        const interfaceId = 241;
+        const bridged: any[] = [];
+        const game: any = {
+            backDialogueId: 64,
+            dialogueId: -1,
+            redrawChatbox: false,
+            interfaceUpdates: [],
+            syncLegacyInterfaceWidgets(openedInterfaceId: number, rootWidgetId: number) {
+                bridged.push({ openedInterfaceId, rootWidgetId });
+            },
+        };
+        const bytes = [
+            0x00,                         // type
+            0xf0, 0x02, 0x0c, 0x00,       // mg4 pointer: parent 752, child 12
+            0x00, 0x80,                   // tracknum 0, g2add
+            0x00, 0xf1,                   // component/interface 241
+        ];
+
+        expect(PacketHandler530.handleIfOpenTop(packet(bytes), game)).toBe(true);
+        await Promise.resolve();
+
+        expect(game.topInterface).toMatchObject({
+            type: 0,
+            pointer: (752 << 16) | 12,
+            component: interfaceId,
+            tracknum: 0,
+            parentInterfaceId: 752,
+            childId: 12,
+        });
+        expect(game.dialogueId).toBe(interfaceId);
+        expect(game.backDialogueId).toBe(-1);
+        expect(game.redrawChatbox).toBe(true);
+        expect(game.chatboxInterfaceOpen).toMatchObject({ component: interfaceId, parentInterfaceId: 752, childId: 12 });
+        expect(game.interfaceUpdates.slice(-1)[0]).toMatchObject({
+            kind: "IF_OPENTOP",
+            compId: (752 << 16) | 12,
+            payload: { component: interfaceId, parentInterfaceId: 752, childId: 12 },
+        });
         expect(bridged).toEqual([{ openedInterfaceId: interfaceId, rootWidgetId: interfaceId }]);
     });
 });

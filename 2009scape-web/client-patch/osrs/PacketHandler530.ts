@@ -18,6 +18,8 @@ import { InterfaceList } from "./InterfaceList";
 import { runClientScript, ClientScript530Data, Cs2Hooks } from "./script/ClientScript530";
 import { HuffmanCodec530, decodeQuickChatString } from "./util/HuffmanCodec530";
 import { applyAppearanceMask } from "./media/renderable/PlayerAppearance530";
+import { LinkedList } from "./util/LinkedList";
+import { Item } from "./media/renderable/Item";
 import Long from "long";
 
 export class PacketHandler530 {
@@ -73,6 +75,14 @@ export class PacketHandler530 {
         if (!game.containerTrace530) game.containerTrace530 = [];
         const trace = game.containerTrace530;
         trace.push({ ...entry, cycle: game.pulseCycle ?? game.loopCycle ?? 0 });
+        if (trace.length > 100) trace.splice(0, trace.length - 100);
+    }
+
+    private static traceCombat(game: any, entry: any) {
+        if (!game) return;
+        if (!game.combatTrace530) game.combatTrace530 = [];
+        const trace = game.combatTrace530;
+        trace.push({ ...entry, cycle: game.constructor?.pulseCycle ?? game.pulseCycle ?? game.loopCycle ?? 0 });
         if (trace.length > 100) trace.splice(0, trace.length - 100);
     }
 
@@ -700,6 +710,26 @@ export class PacketHandler530 {
         return game.groundObjects?.[plane]?.[x]?.[z] || null;
     }
 
+    static syncLegacyGroundItems(game: any, plane: number, x: number, z: number): void {
+        if (!game || !game.groundItems || !this.inBounds(x, z)) return;
+        const stack = game.groundObjects?.[plane]?.[x]?.[z] || null;
+        if (!stack || stack.length === 0) {
+            game.groundItems[plane][x][z] = null;
+        } else {
+            const list = new LinkedList();
+            for (const obj of stack) {
+                const item = new Item();
+                item.itemId = obj.type;
+                item.itemCount = obj.amount;
+                list.insertBack(item);
+            }
+            game.groundItems[plane][x][z] = list;
+        }
+        if (game.plane === plane && typeof game.processGroundItems === "function") {
+            game.processGroundItems(x, z);
+        }
+    }
+
     static tileHeight(game: any, plane: number, x: number, z: number): number {
         if (game && typeof game.getTileHeight === "function") {
             return game.getTileHeight(z, x, 9, plane) || 0;
@@ -747,7 +777,9 @@ export class PacketHandler530 {
         const local19 = (local23 >> 4 & 0x7) + game.chunkX;
         const local31 = this.g2add(buf);
         if (this.inBounds(local19, local27)) {
-            this.ensureGroundStack(game, this.currentPlane(game), local19, local27).push(new ObjStack(local15, local31));
+            const plane = this.currentPlane(game);
+            this.ensureGroundStack(game, plane, local19, local27).push(new ObjStack(local15, local31));
+            this.syncLegacyGroundItems(game, plane, local19, local27);
         }
         return true;
     }
@@ -857,10 +889,12 @@ export class PacketHandler530 {
         const local31 = this.g2(buf);
         const local39 = this.g2(buf);
         if (this.inBounds(local23, local19)) {
-            const stack = this.getGroundStack(game, this.currentPlane(game), local23, local19);
+            const plane = this.currentPlane(game);
+            const stack = this.getGroundStack(game, plane, local23, local19);
             if (stack) {
                 const obj = stack.find((o) => (local27 & 0x7FFF) === o.type && local31 === o.amount);
                 if (obj) obj.amount = local39;
+                this.syncLegacyGroundItems(game, plane, local23, local19);
             }
         }
         return true;
@@ -874,7 +908,9 @@ export class PacketHandler530 {
         const local31 = this.ig2(buf);
         const local39 = this.ig2(buf);
         if (this.inBounds(local19, local27) && game.thisPlayerServerId !== local15) {
-            this.ensureGroundStack(game, this.currentPlane(game), local19, local27).push(new ObjStack(local39, local31));
+            const plane = this.currentPlane(game);
+            this.ensureGroundStack(game, plane, local19, local27).push(new ObjStack(local39, local31));
+            this.syncLegacyGroundItems(game, plane, local19, local27);
         }
         return true;
     }
@@ -944,11 +980,13 @@ export class PacketHandler530 {
         const local23 = (local15 >> 4 & 0x7) + game.chunkX;
         const local27 = this.g2(buf);
         if (this.inBounds(local23, local19)) {
-            const stack = this.getGroundStack(game, this.currentPlane(game), local23, local19);
+            const plane = this.currentPlane(game);
+            const stack = this.getGroundStack(game, plane, local23, local19);
             if (stack) {
                 const idx = stack.findIndex((obj) => obj.type === (local27 & 0x7FFF));
                 if (idx >= 0) stack.splice(idx, 1);
-                if (stack.length === 0) game.groundObjects[this.currentPlane(game)][local23][local19] = null;
+                if (stack.length === 0) game.groundObjects[plane][local23][local19] = null;
+                this.syncLegacyGroundItems(game, plane, local23, local19);
             }
         }
         return true;
@@ -1846,6 +1884,10 @@ export class PacketHandler530 {
         if (!updating) return;
         const subOpcode = buf.getBits(2);
         const localPlayer = this.ensureLocalPlayer(game);
+        if (localPlayer) {
+            localPlayer.visible = true;
+            localPlayer.pulseCycle = game.constructor.pulseCycle;
+        }
         if (subOpcode === 3) {
             // Teleport: sceneY(7) + teleport(1) + z(2) + maskRequired(1) + sceneX(7)
             const sceneY = buf.getBits(7);
@@ -2026,8 +2068,10 @@ export class PacketHandler530 {
             buf.currentPosition += length;
         }
         if ((flags & 0x1) !== 0) {
-            this.skipSmart(buf);
-            buf.currentPosition += 2; // hit type + hp ratio
+            const damage = this.getSmart(buf);
+            const type = this.g1(buf);
+            const ratio = this.g1(buf);
+            this.traceCombat(game, { kind: "playerHit", id, target: id === 2047 ? "local" : "player", type, damage, ratio });
         }
         if ((flags & 0x8) !== 0) {
             const animation = this.g2(buf);
@@ -2039,6 +2083,7 @@ export class PacketHandler530 {
                 player.anInt1626 = 0;
                 player.anInt1628 = 0;
             }
+            this.traceCombat(game, { kind: "playerAnimation", id, animation: animation === 65535 ? -1 : animation, delay });
         }
         if ((flags & 0x4) !== 0) {
             this.parseAppearanceMask(buf, id, player, game);
@@ -2047,6 +2092,7 @@ export class PacketHandler530 {
             if (player) {
                 player.anInt1609 = this.g2add(buf);
                 if (player.anInt1609 === 65535) player.anInt1609 = -1;
+                this.traceCombat(game, { kind: "playerTarget", id, target: player.anInt1609 });
             } else {
                 buf.currentPosition += 2;
             }
@@ -2065,8 +2111,9 @@ export class PacketHandler530 {
             }
         }
         if ((flags & 0x200) !== 0) {
-            this.skipSmart(buf);
-            buf.currentPosition += 1; // secondary hit type
+            const damage = this.getSmart(buf);
+            const type = this.g1(buf);
+            this.traceCombat(game, { kind: "playerSecondaryHit", id, target: id === 2047 ? "local" : "player", type, damage });
         }
         if ((flags & 0x800) !== 0) {
             // 2009scape's 530 AnimationSequence mask is still TODO server-side.
@@ -2080,6 +2127,7 @@ export class PacketHandler530 {
                 player.currentAnimation = player.anInt1617 > game.constructor.pulseCycle ? -1 : 0;
                 player.anInt1616 = 0;
                 if (player.graphic === 65535) player.graphic = -1;
+                this.traceCombat(game, { kind: "playerSpotAnim", id, graphic: player.graphic, height: heightAndDelay >> 16, delay: heightAndDelay & 65535 });
             } else {
                 buf.currentPosition += 6;
             }
@@ -2254,9 +2302,13 @@ export class PacketHandler530 {
 
     static readonly ANGLES: number[] = [768, 1024, 1280, 512, 1536, 256, 0, 1792];
 
-    static skipSmart(buf: Buffer): void {
+    static getSmart(buf: Buffer): number {
         const peek = buf.buffer[buf.currentPosition] & 0xFF;
-        buf.currentPosition += peek < 128 ? 1 : 2;
+        return peek < 128 ? buf.getUnsignedByte() : buf.getUnsignedLEShort() - 32768;
+    }
+
+    static skipSmart(buf: Buffer): void {
+        this.getSmart(buf);
     }
 
     static skipRenderBlock(buf: Buffer): void {
@@ -2397,13 +2449,15 @@ export class PacketHandler530 {
             if ((flags & 0x40) !== 0) {
                 const damage = this.g1(buf);
                 const type = this.g1neg(buf);
+                const ratio = this.g1(buf);
                 if (npc) npc.updateHits(type, damage, game.constructor.pulseCycle);
-                buf.currentPosition += 1; // hp ratio
+                this.traceCombat(game, { kind: "npcHit", id, type, damage, ratio });
             }
             if ((flags & 0x2) !== 0) {
                 const damage = this.g1neg(buf);
                 const type = this.g1sub(buf);
                 if (npc) npc.updateHits(type, damage, game.constructor.pulseCycle);
+                this.traceCombat(game, { kind: "npcSecondaryHit", id, type, damage });
             }
             if ((flags & 0x10) !== 0) {
                 const animation = this.g2(buf);
@@ -2415,11 +2469,13 @@ export class PacketHandler530 {
                     npc.anInt1626 = 0;
                     npc.anInt1628 = 0;
                 }
+                this.traceCombat(game, { kind: "npcAnimation", id, animation: animation === 65535 ? -1 : animation, delay });
             }
             if ((flags & 0x4) !== 0) {
                 if (npc) {
                     npc.anInt1609 = this.g2add(buf);
                     if (npc.anInt1609 === 65535) npc.anInt1609 = -1;
+                    this.traceCombat(game, { kind: "npcTarget", id, target: npc.anInt1609 });
                 } else {
                     buf.currentPosition += 2;
                 }
@@ -2433,6 +2489,7 @@ export class PacketHandler530 {
                     npc.currentAnimation = npc.anInt1617 > game.constructor.pulseCycle ? -1 : 0;
                     npc.anInt1616 = 0;
                     if (npc.graphic === 65535) npc.graphic = -1;
+                    this.traceCombat(game, { kind: "npcSpotAnim", id, graphic: npc.graphic, height: heightAndDelay >> 16, delay: heightAndDelay & 65535 });
                 } else {
                     buf.currentPosition += 6;
                 }
@@ -2851,14 +2908,32 @@ export class PacketHandler530 {
 
     static handleIfOpenTop(buf: Buffer, game: any): boolean {
         // rt4 IF_OPENTOP: g1(type) + mg4(pointer) + g2add(tracknum) + g2(component). 9 bytes.
+        // The local 2009scape Java Interface packet also uses this shape for
+        // CHATTOP_752 children. 435 is only advisory here: it confirms the old
+        // client state split between a regular chatbox widget and permanent
+        // dialogue; the parent/child ids below come from 2009scape Java.
         const type = this.g1(buf);
         const pointer = this.mg4(buf);
         const tracknum = this.g2add(buf);
         const component = this.g2(buf);
+        const parentInterfaceId = pointer >>> 16;
+        const childId = pointer & 0xFFFF;
         if (game) {
-            game.topInterface = { type, pointer, component, tracknum };
+            game.topInterface = { type, pointer, component, tracknum, parentInterfaceId, childId };
+            if (parentInterfaceId === 752) {
+                game.chatboxInterfaceOpen = { type, pointer, component, tracknum, parentInterfaceId, childId };
+                if (childId === 12) {
+                    game.dialogueId = component;
+                    game.backDialogueId = -1;
+                    game.redrawChatbox = true;
+                } else if (childId === 6 || childId === 8) {
+                    game.backDialogueId = component;
+                    game.redrawChatbox = true;
+                }
+            }
         }
         InterfaceList.openModal(component, pointer);
+        this.recordIfUpdate(game, "IF_OPENTOP", pointer, { type, component, tracknum, parentInterfaceId, childId });
         this.syncLegacyInterfaceWidgets(game, component, component);
         return true;
     }

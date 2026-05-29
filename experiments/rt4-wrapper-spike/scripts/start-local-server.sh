@@ -16,6 +16,10 @@ if [[ ! -f "$SERVER_JAR" ]]; then
   bash "$SCRIPT_DIR/build-local-server.sh"
 fi
 
+if [[ "${RT4_SEED_BANK_FIXTURE:-1}" != "0" ]]; then
+  bash "$SCRIPT_DIR/seed-local-bank-fixture.sh"
+fi
+
 if [[ "$SERVER_CONFIG" == "$GENERATED_CONFIG" ]]; then
   mkdir -p "$(dirname "$GENERATED_CONFIG")"
   cp "$SERVER_DIR/worldprops/default.conf" "$GENERATED_CONFIG"

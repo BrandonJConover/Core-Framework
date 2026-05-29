@@ -1,0 +1,15 @@
+{
+  "id": "out_friend_update_online_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_FRIEND_UPDATE",
+  "wire_opcode": 149,
+  "payload_hex": "416c6963650a0a016d61696e0a",
+  "fields": {
+    "name": "Alice",
+    "former_name": "",
+    "online_status": 1,
+    "world_name": "main"
+  },
+  "notes": "Payload only. Java PayloadCustomGenerator writes SEND_FRIEND_UPDATE as LF-terminated name, LF-terminated formerName, one online-status byte, and an optional LF-terminated worldName when non-empty."
+}

@@ -335,6 +335,26 @@ export class Game extends GameShell {
     secondLastOpcode: number = 0;
     thirdLastOpcode: number = 0;
     timeoutCounter: number = 0;
+    lastDropClientReason: string = "";
+    lastDropClientTimeoutCounter: number = 0;
+    rt4KeepaliveTimer: any = null;
+    rt4KeepaliveActive: boolean = false;
+    rt4KeepaliveSendCount: number = 0;
+    lastRt4KeepaliveAt: number = 0;
+    lastRt4KeepaliveError: string = "";
+    lastRt4KeepaliveReason: string = "";
+    lastFlushOutgoingAt: number = 0;
+    lastFlushOutgoingError: string = "";
+    lastFlushOutgoingOpcodeCount: number = 0;
+    lastIncomingOpcode530: number = -1;
+    lastIncomingPacketSize: number = -1;
+    lastIncomingAvailable: number = 0;
+    partialPacketWaitCount: number = 0;
+    lastPartialPacketReason: string = "";
+    lastPartialPacketOpcode530: number = -1;
+    lastPartialPacketExpected: number = -1;
+    lastPartialPacketAvailable: number = -1;
+    lastIncomingPacketAt: number = 0;
     systemUpdateTime: number = 0;
     anInt873: number = 0;
     anInt1197: number = 0;
@@ -4183,6 +4203,7 @@ export class Game extends GameShell {
                 this.awtFocus = true;
                 this.aBoolean1275 = true;
                 this.loggedIn = true;
+                this.startRt4Keepalive();
                 this.outBuffer.currentPosition = 0;
                 this.buffer.currentPosition = 0;
                 this.opcode = -1;
@@ -4345,6 +4366,7 @@ export class Game extends GameShell {
             }
             if (responseCode === 15) {
                 this.loggedIn = true;
+                this.startRt4Keepalive();
                 this.outBuffer.currentPosition = 0;
                 this.buffer.currentPosition = 0;
                 this.opcode = -1;
@@ -4597,8 +4619,9 @@ export class Game extends GameShell {
         this.method36(16220);
         this.method152();
         this.timeoutCounter++;
-        if (this.timeoutCounter > 750) {
-            this.dropClient();
+        const receiveTimeoutLimit = this.isNativeRt4Dialect() ? 60000 : 750;
+        if (this.timeoutCounter > receiveTimeoutLimit) {
+            this.dropClient("receive-timeout-" + this.timeoutCounter);
         }
         this.method100(0);
         this.method67(-37214);
@@ -4828,19 +4851,23 @@ export class Game extends GameShell {
     private async flushOutgoingPackets() {
         try {
             if (this.gameConnection != null && this.outBuffer.currentPosition > 0) {
+                this.lastFlushOutgoingOpcodeCount = this.outBuffer.currentPosition;
                 this.gameConnection.write(this.outBuffer.currentPosition, 0, this.outBuffer.buffer);
+                this.lastFlushOutgoingAt = Date.now();
+                this.lastFlushOutgoingError = "";
                 this.outBuffer.currentPosition = 0;
                 this.anInt872 = 0;
             }
         } catch (__e) {
+            this.lastFlushOutgoingError = String((__e as any)?.message || (__e as any)?.reason || __e);
             if (__e != null && (((__e as any).type === "close") || (((__e as any).code != null) && ((__e as any).reason != null)))) {
-                await this.dropClient();
+                await this.dropClient("flush-close-event");
                 return;
             }
             if (__e != null && ((__e instanceof Error) as any)) {
                 const exception: Error = __e as Error;
                 if (exception.message === "Not connected.") {
-                    await this.dropClient();
+                    await this.dropClient("flush-not-connected");
                     return;
                 }
                 this.logout();
@@ -6617,6 +6644,27 @@ export class Game extends GameShell {
             this.addSceneLocMenuRows(best.hash, best.x, best.y);
             return;
         }
+        let bestGroundItem: { x: number; y: number; distance: number } = null;
+        for (let radius = 0; radius <= 8 && bestGroundItem == null; radius++) {
+            for (let x = Math.max(0, wantX - radius); x <= Math.min(103, wantX + radius); x++) {
+                for (let y = Math.max(0, wantY - radius); y <= Math.min(103, wantY + radius); y++) {
+                    if (Math.abs(x - wantX) !== radius && Math.abs(y - wantY) !== radius) {
+                        continue;
+                    }
+                    if (this.groundItems?.[this.plane]?.[x]?.[y] == null) {
+                        continue;
+                    }
+                    const distance = Math.abs(x - wantX) + Math.abs(y - wantY);
+                    if (bestGroundItem == null || distance < bestGroundItem.distance) {
+                        bestGroundItem = { x, y, distance };
+                    }
+                }
+            }
+        }
+        if (bestGroundItem != null) {
+            this.addSceneGroundItemMenuRows(bestGroundItem.x, bestGroundItem.y);
+            return;
+        }
         let bestNpc: { index: number; x: number; y: number; distance: number } = null;
         for (let i = 0; i < this.anInt1133; i++) {
             const index = this.anIntArray1134[i];
@@ -6689,6 +6737,74 @@ export class Game extends GameShell {
         this.firstMenuOperand[this.menuActionRow] = x;
         this.secondMenuOperand[this.menuActionRow] = y;
         this.menuActionRow++;
+    }
+
+    private addSceneGroundItemMenuRows(x: number, y: number) {
+        const items: LinkedList = this.groundItems?.[this.plane]?.[x]?.[y];
+        if (items == null) {
+            return;
+        }
+        for (let item: Item = items.last() as Item; item != null; item = items.previous() as Item) {
+            const definition: ItemDefinition = ItemDefinition.lookup(item.itemId);
+            if (this.itemSelected === 1) {
+                this.menuActionTexts[this.menuActionRow] = "Use " + this.aString1150 + " with @lre@" + definition.name;
+                this.menuActionTypes[this.menuActionRow] = 100;
+                this.selectedMenuActions[this.menuActionRow] = item.itemId;
+                this.firstMenuOperand[this.menuActionRow] = x;
+                this.secondMenuOperand[this.menuActionRow] = y;
+                this.menuActionRow++;
+                continue;
+            }
+            if (this.widgetSelected === 1) {
+                if ((this.anInt1173 & 1) === 1) {
+                    this.menuActionTexts[this.menuActionRow] = this.selectedWidgetName + " @lre@" + definition.name;
+                    this.menuActionTypes[this.menuActionRow] = 199;
+                    this.selectedMenuActions[this.menuActionRow] = item.itemId;
+                    this.firstMenuOperand[this.menuActionRow] = x;
+                    this.secondMenuOperand[this.menuActionRow] = y;
+                    this.menuActionRow++;
+                }
+                continue;
+            }
+            for (let option = 4; option >= 0; option--) {
+                if (definition.groundActions != null && definition.groundActions[option] != null) {
+                    this.menuActionTexts[this.menuActionRow] = definition.groundActions[option] + " @lre@" + definition.name;
+                    if (option === 0) this.menuActionTypes[this.menuActionRow] = 68;
+                    if (option === 1) this.menuActionTypes[this.menuActionRow] = 26;
+                    if (option === 2) this.menuActionTypes[this.menuActionRow] = 684;
+                    if (option === 3) this.menuActionTypes[this.menuActionRow] = 930;
+                    if (option === 4) this.menuActionTypes[this.menuActionRow] = 270;
+                    this.selectedMenuActions[this.menuActionRow] = item.itemId;
+                    this.firstMenuOperand[this.menuActionRow] = x;
+                    this.secondMenuOperand[this.menuActionRow] = y;
+                    this.menuActionRow++;
+                } else if (option === 2) {
+                    this.menuActionTexts[this.menuActionRow] = "Take @lre@" + definition.name;
+                    this.menuActionTypes[this.menuActionRow] = 684;
+                    this.selectedMenuActions[this.menuActionRow] = item.itemId;
+                    this.firstMenuOperand[this.menuActionRow] = x;
+                    this.secondMenuOperand[this.menuActionRow] = y;
+                    this.menuActionRow++;
+                }
+            }
+            this.menuActionTexts[this.menuActionRow] = "Examine @lre@" + definition.name;
+            this.menuActionTypes[this.menuActionRow] = 1564;
+            this.selectedMenuActions[this.menuActionRow] = item.itemId;
+            this.firstMenuOperand[this.menuActionRow] = x;
+            this.secondMenuOperand[this.menuActionRow] = y;
+            this.menuActionRow++;
+        }
+    }
+
+    public async sendNativeIfButtonAction(action: number, componentId: number, slot: number, flush: boolean = true): Promise<boolean> {
+        if (!this.outBuffer || action < 1 || action > 10 || !Number.isFinite(componentId) || !Number.isFinite(slot)) {
+            return false;
+        }
+        Outgoing530.ifButton(this.outBuffer, action | 0, componentId | 0, slot | 0);
+        if (flush) {
+            await this.flushOutgoingPackets();
+        }
+        return true;
     }
 
     public method38(i: number, j: number, k: number, class50_sub1_sub4_sub3_sub2: Player, l: number) {
@@ -7770,7 +7886,10 @@ export class Game extends GameShell {
         }
     }
 
-    public async dropClient() {
+    public async dropClient(reason: string = "unspecified") {
+        this.lastDropClientReason = reason;
+        this.lastDropClientTimeoutCounter = this.timeoutCounter;
+        this.stopRt4Keepalive();
         if (this.anInt873 > 0) {
             this.logout();
             return;
@@ -8028,13 +8147,15 @@ export class Game extends GameShell {
         try {
             const socketClient = (this.gameConnection as any)?.socket?.client;
             if (this.loggedIn && socketClient != null && socketClient.connected === false) {
-                await this.dropClient();
+                await this.dropClient("socket-disconnected");
                 return false;
             }
             let available: number = this.gameConnection.getAvailable();
+            this.lastIncomingAvailable = available;
             if (available === 0) {
                 return false;
             }
+            this.timeoutCounter = 0;
             let originalOpcode530 = this.opcode;
             if (this.opcode === -1) {
                 await this.gameConnection.read$byte_A$int$int(this.buffer.buffer, 0, 1);
@@ -8047,14 +8168,24 @@ export class Game extends GameShell {
                 // Save original 530 opcode and use 530 size table
                 originalOpcode530 = this.opcode;
                 this.packetSize = PacketConstants.PACKET_SIZES[originalOpcode530];
+                this.lastIncomingOpcode530 = originalOpcode530;
+                this.lastIncomingPacketSize = this.packetSize;
                 available--;
+                this.lastIncomingAvailable = available;
             }
             if (this.packetSize === -1) {
                 if (available > 0) {
                     await this.gameConnection.read$byte_A$int$int(this.buffer.buffer, 0, 1);
                     this.packetSize = this.buffer.buffer[0] & 255;
+                    this.lastIncomingPacketSize = this.packetSize;
                     available--;
+                    this.lastIncomingAvailable = available;
                 } else {
+                    this.partialPacketWaitCount++;
+                    this.lastPartialPacketReason = "size-byte";
+                    this.lastPartialPacketOpcode530 = originalOpcode530;
+                    this.lastPartialPacketExpected = 1;
+                    this.lastPartialPacketAvailable = available;
                     return false;
                 }
             }
@@ -8063,17 +8194,33 @@ export class Game extends GameShell {
                     await this.gameConnection.read$byte_A$int$int(this.buffer.buffer, 0, 2);
                     this.buffer.currentPosition = 0;
                     this.packetSize = this.buffer.getUnsignedLEShort();
+                    this.lastIncomingPacketSize = this.packetSize;
                     available -= 2;
+                    this.lastIncomingAvailable = available;
                 } else {
+                    this.partialPacketWaitCount++;
+                    this.lastPartialPacketReason = "size-short";
+                    this.lastPartialPacketOpcode530 = originalOpcode530;
+                    this.lastPartialPacketExpected = 2;
+                    this.lastPartialPacketAvailable = available;
                     return false;
                 }
             }
             if (available < this.packetSize) {
+                this.timeoutCounter = 0;
+                this.partialPacketWaitCount++;
+                this.lastIncomingAvailable = available;
+                this.lastIncomingPacketSize = this.packetSize;
+                this.lastPartialPacketReason = "body";
+                this.lastPartialPacketOpcode530 = originalOpcode530;
+                this.lastPartialPacketExpected = this.packetSize;
+                this.lastPartialPacketAvailable = available;
                 return false;
             }
             this.buffer.currentPosition = 0;
             await this.gameConnection.read$byte_A$int$int(this.buffer.buffer, 0, this.packetSize);
             this.timeoutCounter = 0;
+            this.lastIncomingPacketAt = Date.now();
 
             // Try native 530 handler first
             if (PacketHandler530.handle(originalOpcode530, this.buffer, this.packetSize, this)) {
@@ -9669,6 +9816,26 @@ export class Game extends GameShell {
             loadedInterfaces,
             recentPackets530: (self.packetTrace530 || []).slice(-40),
             recentContainers530: (self.containerTrace530 || []).slice(-40),
+            recentCombat530: (self.combatTrace530 || []).slice(-40),
+            transport: {
+                rt4KeepaliveActive: self.rt4KeepaliveActive ?? null,
+                rt4KeepaliveSendCount: self.rt4KeepaliveSendCount ?? null,
+                lastRt4KeepaliveAt: self.lastRt4KeepaliveAt ?? null,
+                lastRt4KeepaliveReason: self.lastRt4KeepaliveReason || "",
+                lastRt4KeepaliveError: self.lastRt4KeepaliveError || "",
+                lastFlushOutgoingAt: self.lastFlushOutgoingAt ?? null,
+                lastFlushOutgoingError: self.lastFlushOutgoingError || "",
+                lastFlushOutgoingOpcodeCount: self.lastFlushOutgoingOpcodeCount ?? null,
+                lastIncomingOpcode530: self.lastIncomingOpcode530 ?? null,
+                lastIncomingPacketSize: self.lastIncomingPacketSize ?? null,
+                lastIncomingAvailable: self.lastIncomingAvailable ?? null,
+                lastIncomingPacketAt: self.lastIncomingPacketAt ?? null,
+                partialPacketWaitCount: self.partialPacketWaitCount ?? null,
+                lastPartialPacketReason: self.lastPartialPacketReason || "",
+                lastPartialPacketOpcode530: self.lastPartialPacketOpcode530 ?? null,
+                lastPartialPacketExpected: self.lastPartialPacketExpected ?? null,
+                lastPartialPacketAvailable: self.lastPartialPacketAvailable ?? null,
+            },
         };
     }
 
@@ -10544,6 +10711,7 @@ export class Game extends GameShell {
     }
 
     public logout() {
+        this.stopRt4Keepalive();
         try {
             if (this.gameConnection != null) {
                 this.gameConnection.close();
@@ -10572,6 +10740,42 @@ export class Game extends GameShell {
         this.currentSong = -1;
         this.nextSong = -1;
         this.previousSong = 0;
+    }
+
+    private startRt4Keepalive(): void {
+        if (!this.isNativeRt4Dialect()) return;
+        this.stopRt4Keepalive();
+        this.rt4KeepaliveActive = true;
+        this.sendRt4Keepalive("login");
+        this.rt4KeepaliveTimer = setInterval(() => {
+            this.sendRt4Keepalive("interval");
+        }, 1700);
+    }
+
+    private stopRt4Keepalive(): void {
+        if (this.rt4KeepaliveTimer != null) {
+            clearInterval(this.rt4KeepaliveTimer);
+            this.rt4KeepaliveTimer = null;
+        }
+        this.rt4KeepaliveActive = false;
+    }
+
+    private sendRt4Keepalive(reason: string): void {
+        try {
+            if (!this.loggedIn || this.gameConnection == null) return;
+            this.gameConnection.write(1, 0, new Int8Array([93]));
+            this.rt4KeepaliveSendCount++;
+            this.lastRt4KeepaliveAt = Date.now();
+            this.lastRt4KeepaliveReason = reason;
+            this.lastRt4KeepaliveError = "";
+        } catch (ex) {
+            this.lastRt4KeepaliveReason = reason;
+            this.lastRt4KeepaliveError = String((ex as any)?.message || ex);
+        }
+    }
+
+    private isNativeRt4Dialect(): boolean {
+        return Configuration.OUTGOING_DIALECT === "530" || Configuration.OUTGOING_DIALECT === "rt4";
     }
 
     public method143(byte0: number) {

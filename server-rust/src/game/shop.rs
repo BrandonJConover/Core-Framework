@@ -313,6 +313,127 @@ impl Shop {
         shop
     }
 
+    /// Java/OpenRSC authentic Flynn's Mace Market catalog.
+    ///
+    /// Java reference: `plugins/authentic/npcs/falador/FlynnMaces.java`.
+    pub fn java_flynns_mace_market(id: u32, name: &str) -> Self {
+        let mut shop = Self::new(id, name).with_modifiers(60, 100, 1);
+        shop.restock_rate = 25_000;
+        shop.add_stock(ItemId(94), 5); // Bronze mace
+        shop.add_stock(ItemId(0), 4); // Iron mace
+        shop.add_stock(ItemId(95), 4); // Steel mace
+        shop.add_stock(ItemId(96), 3); // Mithril mace
+        shop.add_stock(ItemId(97), 2); // Adamantite mace
+        shop
+    }
+
+    /// Java/OpenRSC authentic Nurmof's Pickaxe Shop catalog.
+    ///
+    /// Java reference: `plugins/authentic/npcs/dwarvenmine/NurmofPickaxe.java`.
+    pub fn java_nurmofs_pickaxe_shop(id: u32, name: &str) -> Self {
+        let mut shop = Self::new(id, name).with_modifiers(60, 100, 2);
+        shop.restock_rate = 25_000;
+        shop.add_stock(ItemId(156), 6); // Bronze pickaxe
+        shop.add_stock(ItemId(1258), 5); // Iron pickaxe
+        shop.add_stock(ItemId(1259), 4); // Steel pickaxe
+        shop.add_stock(ItemId(1260), 3); // Mithril pickaxe
+        shop.add_stock(ItemId(1261), 2); // Adamantite pickaxe
+        shop.add_stock(ItemId(1262), 1); // Rune pickaxe
+        shop
+    }
+
+    /// Java/OpenRSC authentic Drogo's mining store catalog.
+    ///
+    /// Java reference: `plugins/authentic/npcs/dwarvenmine/Drogo.java`.
+    pub fn java_drogos_mining_store(id: u32, name: &str) -> Self {
+        let mut shop = Self::new(id, name).with_modifiers(70, 100, 2);
+        shop.restock_rate = 30_000;
+        shop.add_stock(ItemId(168), 4); // Hammer
+        shop.add_stock(ItemId(156), 4); // Bronze pickaxe
+        shop.add_stock(ItemId(150), 0); // Copper ore
+        shop.add_stock(ItemId(202), 0); // Tin ore
+        shop.add_stock(ItemId(151), 0); // Iron ore
+        shop.add_stock(ItemId(155), 0); // Coal
+        shop.add_stock(ItemId(169), 0); // Bronze bar
+        shop.add_stock(ItemId(170), 0); // Iron bar
+        shop.add_stock(ItemId(172), 0); // Gold bar
+        shop
+    }
+
+    /// Java/OpenRSC authentic Gerrant's Fishy Business catalog.
+    ///
+    /// Java reference: `plugins/authentic/npcs/portsarim/GerrantsFishingGear.java`.
+    pub fn java_gerrants_fishy_business(id: u32, name: &str) -> Self {
+        let mut shop = Self::new(id, name).with_modifiers(70, 100, 3);
+        shop.restock_rate = 12_000;
+        shop.add_stock(ItemId(376), 5); // Net
+        shop.add_stock(ItemId(377), 5); // Fishing rod
+        shop.add_stock(ItemId(378), 5); // Fly fishing rod
+        shop.add_stock(ItemId(379), 2); // Harpoon
+        shop.add_stock(ItemId(375), 2); // Lobster pot
+        shop.add_stock(ItemId(380), 200); // Fishing bait
+        shop.add_stock(ItemId(381), 200); // Feather
+        shop.add_stock(ItemId(349), 0); // Raw shrimp
+        shop.add_stock(ItemId(354), 0); // Raw sardine
+        shop.add_stock(ItemId(361), 0); // Raw herring
+        shop.add_stock(ItemId(351), 0); // Raw anchovies
+        shop.add_stock(ItemId(358), 0); // Raw trout
+        shop.add_stock(ItemId(363), 0); // Raw pike
+        shop.add_stock(ItemId(356), 0); // Raw salmon
+        shop.add_stock(ItemId(366), 0); // Raw tuna
+        shop.add_stock(ItemId(372), 0); // Raw lobster
+        shop.add_stock(ItemId(369), 0); // Raw swordfish
+        shop
+    }
+
+    /// Java/OpenRSC authentic Grum's Gold Shop catalog.
+    ///
+    /// Java reference: `plugins/authentic/npcs/portsarim/GrumsGoldShop.java`.
+    pub fn java_grums_gold_shop(id: u32, name: &str) -> Self {
+        let mut shop = Self::new(id, name).with_modifiers(70, 100, 2);
+        shop.restock_rate = 30_000;
+        shop.add_stock(ItemId(283), 0); // Gold ring
+        shop.add_stock(ItemId(284), 0); // Sapphire ring
+        shop.add_stock(ItemId(285), 0); // Emerald ring
+        shop.add_stock(ItemId(286), 0); // Ruby ring
+        shop.add_stock(ItemId(287), 0); // Diamond ring
+        shop.add_stock(ItemId(288), 0); // Gold necklace
+        shop.add_stock(ItemId(289), 0); // Sapphire necklace
+        shop.add_stock(ItemId(290), 0); // Emerald necklace
+        shop.add_stock(ItemId(291), 0); // Ruby necklace
+        shop.add_stock(ItemId(292), 0); // Diamond necklace
+        shop.add_stock(ItemId(301), 0); // Gold amulet
+        shop.add_stock(ItemId(302), 0); // Sapphire amulet
+        shop
+    }
+
+    /// Java/OpenRSC authentic Tea Seller catalog.
+    ///
+    /// Java reference: `plugins/authentic/npcs/varrock/TeaSeller.java`.
+    pub fn java_tea_seller(id: u32, name: &str) -> Self {
+        let mut shop = Self::new(id, name).with_modifiers(60, 100, 2);
+        shop.restock_rate = 30_000;
+        shop.add_stock(ItemId(739), 20); // Cup of tea
+        shop
+    }
+
+    /// Java/OpenRSC authentic Gem Trader catalog.
+    ///
+    /// Java reference: `plugins/authentic/npcs/alkharid/GemTrader.java`.
+    pub fn java_gem_trader(id: u32, name: &str) -> Self {
+        let mut shop = Self::new(id, name).with_modifiers(70, 100, 3);
+        shop.restock_rate = 600_000;
+        shop.add_stock(ItemId(160), 1); // Uncut sapphire
+        shop.add_stock(ItemId(159), 1); // Uncut emerald
+        shop.add_stock(ItemId(158), 0); // Uncut ruby
+        shop.add_stock(ItemId(157), 0); // Uncut diamond
+        shop.add_stock(ItemId(164), 1); // Sapphire
+        shop.add_stock(ItemId(163), 1); // Emerald
+        shop.add_stock(ItemId(162), 0); // Ruby
+        shop.add_stock(ItemId(161), 0); // Diamond
+        shop
+    }
+
     /// Add an item to the shop.
     pub fn add_item(&mut self, item: ShopItem) {
         self.items.push(item);
@@ -559,6 +680,23 @@ impl ShopManager {
         ));
 
         self.register(Shop::java_horviks_armoury_openpk(8, "Horvik's Armoury"));
+
+        self.register(Shop::java_flynns_mace_market(9, "Flynn's Mace Market"));
+
+        self.register(Shop::java_nurmofs_pickaxe_shop(10, "Nurmof's Pickaxe Shop"));
+
+        self.register(Shop::java_drogos_mining_store(11, "Drogo's Mining Store"));
+
+        self.register(Shop::java_gerrants_fishy_business(
+            12,
+            "Gerrant's Fishy Business",
+        ));
+
+        self.register(Shop::java_grums_gold_shop(13, "Grum's Gold Exchange"));
+
+        self.register(Shop::java_tea_seller(14, "Tea Seller"));
+
+        self.register(Shop::java_gem_trader(15, "Gem Trader"));
 
         info!("Loaded {} shops", self.shops.len());
     }
@@ -855,6 +993,189 @@ mod tests {
                 (123, 100),
                 (131, 100),
                 (1006, 100)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_java_flynns_mace_market_catalog() {
+        let shop = Shop::java_flynns_mace_market(9, "Flynn's Mace Market");
+
+        assert!(!shop.is_general);
+        assert_eq!(shop.restock_rate, 25_000);
+        assert_eq!(shop.sell_modifier, 60);
+        assert_eq!(shop.buy_modifier, 100);
+        assert_eq!(shop.price_modifier, 1);
+        assert_eq!(
+            shop.items()
+                .iter()
+                .map(|item| (item.item_id.0, item.base_stock))
+                .collect::<Vec<_>>(),
+            vec![(94, 5), (0, 4), (95, 4), (96, 3), (97, 2)]
+        );
+    }
+
+    #[test]
+    fn test_java_nurmofs_pickaxe_shop_catalog() {
+        let shop = Shop::java_nurmofs_pickaxe_shop(10, "Nurmof's Pickaxe Shop");
+
+        assert!(!shop.is_general);
+        assert_eq!(shop.restock_rate, 25_000);
+        assert_eq!(shop.sell_modifier, 60);
+        assert_eq!(shop.buy_modifier, 100);
+        assert_eq!(shop.price_modifier, 2);
+        assert_eq!(
+            shop.items()
+                .iter()
+                .map(|item| (item.item_id.0, item.base_stock))
+                .collect::<Vec<_>>(),
+            vec![
+                (156, 6),
+                (1258, 5),
+                (1259, 4),
+                (1260, 3),
+                (1261, 2),
+                (1262, 1)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_java_drogos_mining_store_catalog() {
+        let shop = Shop::java_drogos_mining_store(11, "Drogo's Mining Store");
+
+        assert!(!shop.is_general);
+        assert_eq!(shop.restock_rate, 30_000);
+        assert_eq!(shop.sell_modifier, 70);
+        assert_eq!(shop.buy_modifier, 100);
+        assert_eq!(shop.price_modifier, 2);
+        assert_eq!(
+            shop.items()
+                .iter()
+                .map(|item| (item.item_id.0, item.base_stock))
+                .collect::<Vec<_>>(),
+            vec![
+                (168, 4),
+                (156, 4),
+                (150, 0),
+                (202, 0),
+                (151, 0),
+                (155, 0),
+                (169, 0),
+                (170, 0),
+                (172, 0)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_java_gerrants_fishy_business_catalog() {
+        let shop = Shop::java_gerrants_fishy_business(12, "Gerrant's Fishy Business");
+
+        assert!(!shop.is_general);
+        assert_eq!(shop.restock_rate, 12_000);
+        assert_eq!(shop.sell_modifier, 70);
+        assert_eq!(shop.buy_modifier, 100);
+        assert_eq!(shop.price_modifier, 3);
+        assert_eq!(
+            shop.items()
+                .iter()
+                .map(|item| (item.item_id.0, item.base_stock))
+                .collect::<Vec<_>>(),
+            vec![
+                (376, 5),
+                (377, 5),
+                (378, 5),
+                (379, 2),
+                (375, 2),
+                (380, 200),
+                (381, 200),
+                (349, 0),
+                (354, 0),
+                (361, 0),
+                (351, 0),
+                (358, 0),
+                (363, 0),
+                (356, 0),
+                (366, 0),
+                (372, 0),
+                (369, 0)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_java_grums_gold_shop_catalog() {
+        let shop = Shop::java_grums_gold_shop(13, "Grum's Gold Exchange");
+
+        assert!(!shop.is_general);
+        assert_eq!(shop.restock_rate, 30_000);
+        assert_eq!(shop.sell_modifier, 70);
+        assert_eq!(shop.buy_modifier, 100);
+        assert_eq!(shop.price_modifier, 2);
+        assert_eq!(
+            shop.items()
+                .iter()
+                .map(|item| (item.item_id.0, item.base_stock))
+                .collect::<Vec<_>>(),
+            vec![
+                (283, 0),
+                (284, 0),
+                (285, 0),
+                (286, 0),
+                (287, 0),
+                (288, 0),
+                (289, 0),
+                (290, 0),
+                (291, 0),
+                (292, 0),
+                (301, 0),
+                (302, 0)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_java_tea_seller_catalog() {
+        let shop = Shop::java_tea_seller(14, "Tea Seller");
+
+        assert!(!shop.is_general);
+        assert_eq!(shop.restock_rate, 30_000);
+        assert_eq!(shop.sell_modifier, 60);
+        assert_eq!(shop.buy_modifier, 100);
+        assert_eq!(shop.price_modifier, 2);
+        assert_eq!(
+            shop.items()
+                .iter()
+                .map(|item| (item.item_id.0, item.base_stock))
+                .collect::<Vec<_>>(),
+            vec![(739, 20)]
+        );
+    }
+
+    #[test]
+    fn test_java_gem_trader_catalog() {
+        let shop = Shop::java_gem_trader(15, "Gem Trader");
+
+        assert!(!shop.is_general);
+        assert_eq!(shop.restock_rate, 600_000);
+        assert_eq!(shop.sell_modifier, 70);
+        assert_eq!(shop.buy_modifier, 100);
+        assert_eq!(shop.price_modifier, 3);
+        assert_eq!(
+            shop.items()
+                .iter()
+                .map(|item| (item.item_id.0, item.base_stock))
+                .collect::<Vec<_>>(),
+            vec![
+                (160, 1),
+                (159, 1),
+                (158, 0),
+                (157, 0),
+                (164, 1),
+                (163, 1),
+                (162, 0),
+                (161, 0)
             ]
         );
     }

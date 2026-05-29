@@ -23,6 +23,7 @@ The repository is **not a single buildable project**. It is a polyglot collectio
 | `web-client/` | nginx config + Python | nginx template + worldlist patch script for hosting the upstream JS client |
 | `Deployment_Scripts/` | Bash + Playwright | Production deploy scripts and end-to-end smoke tests |
 | `reference/rt4-client/` | Java (read-only) | Authoritative rev-530 rt4 client source — reference only, do not edit |
+| `reference/refactored-client-435/` | Java (read-only) | Advisory nearby-era client architecture reference only; confirm all behavior against rt4 rev-530 and live Java output |
 
 ## Common Commands
 

@@ -1,4 +1,4 @@
-# Captured by .terrain-mesh-test.mjs at 2026-05-02T10:36:43.893Z
+# Captured by .terrain-mesh-test.mjs at 2026-05-28T12:01:38.246Z
 # All assertions passed: tile count, vertex count, triangle count, index range, distinct colors,
 # edge clamp (tiny mesh), overlay-priority routing, plane filter (excluded plane=1 tile)
 # Source: 4×4 tile zone, 3 floor types (grass/path/sand), one plane-1 tile excluded

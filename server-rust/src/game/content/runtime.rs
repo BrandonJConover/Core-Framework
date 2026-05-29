@@ -19,9 +19,21 @@ pub enum ContentRuntimeCommand {
         player_id: u64,
         shop_id: u32,
     },
+    OpenBank {
+        player_id: u64,
+    },
     StartDialogue {
         player_id: u64,
         dialogue_id: String,
+    },
+    SendNpcDialogue {
+        player_id: u64,
+        npc_name: String,
+        lines: Vec<String>,
+    },
+    ShowDialogueOptions {
+        player_id: u64,
+        options: Vec<String>,
     },
     SetQuestStage {
         player_id: u64,
@@ -60,7 +72,15 @@ impl std::error::Error for ContentRuntimeError {}
 pub trait ContentRuntimeSink {
     fn send_message(&mut self, player_id: u64, text: &str) -> Result<(), String>;
     fn open_shop(&mut self, player_id: u64, shop_id: u32) -> Result<(), String>;
+    fn open_bank(&mut self, player_id: u64) -> Result<(), String>;
     fn start_dialogue(&mut self, player_id: u64, dialogue_id: &str) -> Result<(), String>;
+    fn send_npc_dialogue(
+        &mut self,
+        player_id: u64,
+        npc_name: &str,
+        lines: &[String],
+    ) -> Result<(), String>;
+    fn show_dialogue_options(&mut self, player_id: u64, options: &[String]) -> Result<(), String>;
     fn set_quest_stage(&mut self, player_id: u64, quest_id: &str, stage: i32)
         -> Result<(), String>;
     fn add_inventory_item(
@@ -82,7 +102,10 @@ impl ContentRuntimeCommand {
         match self {
             Self::SendMessage { player_id, .. }
             | Self::OpenShop { player_id, .. }
+            | Self::OpenBank { player_id }
             | Self::StartDialogue { player_id, .. }
+            | Self::SendNpcDialogue { player_id, .. }
+            | Self::ShowDialogueOptions { player_id, .. }
             | Self::SetQuestStage { player_id, .. }
             | Self::AddInventoryItem { player_id, .. }
             | Self::RemoveInventoryItem { player_id, .. } => *player_id,
@@ -93,10 +116,19 @@ impl ContentRuntimeCommand {
         match self {
             Self::SendMessage { player_id, text } => sink.send_message(*player_id, text),
             Self::OpenShop { player_id, shop_id } => sink.open_shop(*player_id, *shop_id),
+            Self::OpenBank { player_id } => sink.open_bank(*player_id),
             Self::StartDialogue {
                 player_id,
                 dialogue_id,
             } => sink.start_dialogue(*player_id, dialogue_id),
+            Self::SendNpcDialogue {
+                player_id,
+                npc_name,
+                lines,
+            } => sink.send_npc_dialogue(*player_id, npc_name, lines),
+            Self::ShowDialogueOptions { player_id, options } => {
+                sink.show_dialogue_options(*player_id, options)
+            }
             Self::SetQuestStage {
                 player_id,
                 quest_id,
@@ -121,6 +153,7 @@ impl From<ContentEffect> for ContentRuntimeCommand {
         match effect {
             ContentEffect::Message { player_id, text } => Self::SendMessage { player_id, text },
             ContentEffect::OpenShop { player_id, shop_id } => Self::OpenShop { player_id, shop_id },
+            ContentEffect::OpenBank { player_id } => Self::OpenBank { player_id },
             ContentEffect::StartDialogue {
                 player_id,
                 dialogue_id,
@@ -128,6 +161,18 @@ impl From<ContentEffect> for ContentRuntimeCommand {
                 player_id,
                 dialogue_id,
             },
+            ContentEffect::NpcDialogue {
+                player_id,
+                npc_name,
+                lines,
+            } => Self::SendNpcDialogue {
+                player_id,
+                npc_name,
+                lines,
+            },
+            ContentEffect::DialogueOptions { player_id, options } => {
+                Self::ShowDialogueOptions { player_id, options }
+            }
             ContentEffect::SetQuestStage {
                 player_id,
                 quest_id,
@@ -225,17 +270,22 @@ mod tests {
     use super::*;
     use crate::game::content::{
         beginner::{
-            BeginnerTutorialPlugin, GUIDE_STARTING_DIALOGUE_ID, GUIDE_STARTING_NPC_ID,
-            TUTORIAL_QUEST_ID,
+            BeginnerTutorialPlugin, COMMUNITY_INSTRUCTOR_DIALOGUE_ID, COMMUNITY_INSTRUCTOR_NPC_ID,
+            GUIDE_STARTING_DIALOGUE_ID, GUIDE_STARTING_NPC_ID, TUTORIAL_QUEST_ID,
         },
         ContentPlugin,
     };
+    use crate::game::dialogue_handler::{build_npc_message_packet, build_option_menu_packet};
+    use crate::game::protocol::{Packet, ServerOpcode};
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum RecordedRuntimeAction {
         Message(u64, String),
         Shop(u64, u32),
+        Bank(u64),
         Dialogue(u64, String),
+        NpcDialogue(u64, String, Vec<String>),
+        DialogueOptions(u64, Vec<String>),
         QuestStage(u64, String, i32),
         AddItem(u64, u32, u32),
         RemoveItem(u64, u32, u32),
@@ -244,6 +294,7 @@ mod tests {
     #[derive(Debug, Default)]
     struct RecordingSink {
         actions: Vec<RecordedRuntimeAction>,
+        packets: Vec<Packet>,
         fail_on: Option<usize>,
     }
 
@@ -267,10 +318,44 @@ mod tests {
             self.record(RecordedRuntimeAction::Shop(player_id, shop_id))
         }
 
+        fn open_bank(&mut self, player_id: u64) -> Result<(), String> {
+            self.record(RecordedRuntimeAction::Bank(player_id))
+        }
+
         fn start_dialogue(&mut self, player_id: u64, dialogue_id: &str) -> Result<(), String> {
             self.record(RecordedRuntimeAction::Dialogue(
                 player_id,
                 dialogue_id.to_string(),
+            ))
+        }
+
+        fn send_npc_dialogue(
+            &mut self,
+            player_id: u64,
+            npc_name: &str,
+            lines: &[String],
+        ) -> Result<(), String> {
+            self.packets.extend(
+                lines
+                    .iter()
+                    .map(|line| build_npc_message_packet(npc_name, line)),
+            );
+            self.record(RecordedRuntimeAction::NpcDialogue(
+                player_id,
+                npc_name.to_string(),
+                lines.to_vec(),
+            ))
+        }
+
+        fn show_dialogue_options(
+            &mut self,
+            player_id: u64,
+            options: &[String],
+        ) -> Result<(), String> {
+            self.packets.push(build_option_menu_packet(options));
+            self.record(RecordedRuntimeAction::DialogueOptions(
+                player_id,
+                options.to_vec(),
             ))
         }
 
@@ -313,7 +398,10 @@ mod tests {
         let effects = vec![
             ContentEffect::message(7, "Hello."),
             ContentEffect::open_shop(7, 3),
+            ContentEffect::open_bank(7),
             ContentEffect::start_dialogue(7, "authentic.dialogue"),
+            ContentEffect::npc_dialogue(7, "Guide", ["Welcome to the world of runescape"]),
+            ContentEffect::dialogue_options(7, ["Who are you?", "Where am I?"]),
             ContentEffect::set_quest_stage(7, "tutorial", 15),
             ContentEffect::give_item(7, 10, 2),
             ContentEffect::take_item(7, 20, 5),
@@ -332,9 +420,19 @@ mod tests {
                     player_id: 7,
                     shop_id: 3,
                 },
+                ContentRuntimeCommand::OpenBank { player_id: 7 },
                 ContentRuntimeCommand::StartDialogue {
                     player_id: 7,
                     dialogue_id: "authentic.dialogue".to_string(),
+                },
+                ContentRuntimeCommand::SendNpcDialogue {
+                    player_id: 7,
+                    npc_name: "Guide".to_string(),
+                    lines: vec!["Welcome to the world of runescape".to_string()],
+                },
+                ContentRuntimeCommand::ShowDialogueOptions {
+                    player_id: 7,
+                    options: vec!["Who are you?".to_string(), "Where am I?".to_string()],
                 },
                 ContentRuntimeCommand::SetQuestStage {
                     player_id: 7,
@@ -456,11 +554,55 @@ mod tests {
     }
 
     #[test]
+    fn runtime_plan_can_be_created_from_content_dialogue_menu_event() {
+        let mut registry = ContentRegistry::new();
+        BeginnerTutorialPlugin.register(&mut registry);
+
+        let plan = ContentRuntimePlan::from_event(
+            &registry,
+            &ContentEvent::TalkNpc {
+                player_id: 42,
+                npc_id: COMMUNITY_INSTRUCTOR_NPC_ID,
+                npc_index: 14,
+            },
+        );
+
+        assert_eq!(
+            plan.commands(),
+            &[
+                ContentRuntimeCommand::StartDialogue {
+                    player_id: 42,
+                    dialogue_id: COMMUNITY_INSTRUCTOR_DIALOGUE_ID.to_string(),
+                },
+                ContentRuntimeCommand::SendNpcDialogue {
+                    player_id: 42,
+                    npc_name: "Community Instructor".to_string(),
+                    lines: vec![
+                        "You're almost ready to go out into the main game area".to_string(),
+                        "When you get out there".to_string(),
+                        "You will be able to interact with thousands of other players".to_string(),
+                    ],
+                },
+                ContentRuntimeCommand::ShowDialogueOptions {
+                    player_id: 42,
+                    options: vec![
+                        "How can I communicate with other players?".to_string(),
+                        "Are there rules on ingame behaviour?".to_string(),
+                    ],
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn runtime_plan_applies_commands_to_sink_in_order() {
         let plan = ContentRuntimePlan::from_effects(vec![
             ContentEffect::message(7, "Hello."),
             ContentEffect::open_shop(7, 3),
+            ContentEffect::open_bank(7),
             ContentEffect::start_dialogue(7, "authentic.dialogue"),
+            ContentEffect::npc_dialogue(7, "Guide", ["Welcome to the world of runescape"]),
+            ContentEffect::dialogue_options(7, ["Who are you?", "Where am I?"]),
             ContentEffect::set_quest_stage(7, "tutorial", 15),
             ContentEffect::give_item(7, 10, 2),
             ContentEffect::take_item(7, 20, 5),
@@ -474,11 +616,32 @@ mod tests {
             vec![
                 RecordedRuntimeAction::Message(7, "Hello.".to_string()),
                 RecordedRuntimeAction::Shop(7, 3),
+                RecordedRuntimeAction::Bank(7),
                 RecordedRuntimeAction::Dialogue(7, "authentic.dialogue".to_string()),
+                RecordedRuntimeAction::NpcDialogue(
+                    7,
+                    "Guide".to_string(),
+                    vec!["Welcome to the world of runescape".to_string()]
+                ),
+                RecordedRuntimeAction::DialogueOptions(
+                    7,
+                    vec!["Who are you?".to_string(), "Where am I?".to_string()]
+                ),
                 RecordedRuntimeAction::QuestStage(7, "tutorial".to_string(), 15),
                 RecordedRuntimeAction::AddItem(7, 10, 2),
                 RecordedRuntimeAction::RemoveItem(7, 20, 5),
             ]
+        );
+        assert_eq!(sink.packets.len(), 2);
+        assert_eq!(sink.packets[0].opcode, ServerOpcode::NpcMessage as u8);
+        assert_eq!(
+            sink.packets[0].payload,
+            b"Guide\0Welcome to the world of runescape\0".to_vec()
+        );
+        assert_eq!(sink.packets[1].opcode, ServerOpcode::DialogueOptions as u8);
+        assert_eq!(
+            sink.packets[1].payload,
+            b"\x02Who are you?\0Where am I?\0".to_vec()
         );
     }
 

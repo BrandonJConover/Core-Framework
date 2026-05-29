@@ -31,10 +31,16 @@ type-5 player appearance/identity entry from `GameStateUpdater`: LF-terminated
 username/icon strings, custom short equipment ids, appearance color bytes,
 combat/skull bytes, optional clan marker, visibility flags, and group id.
 
+`out_update_players_damage_java_custom.json` documents a Java custom-client
+type-2 player damage entry from `GameStateUpdater`: player index, damage taken,
+current hits, and maximum hits.
+
 `out_update_players_projectile_java_custom.json` documents a Java custom-client
-type-3 player projectile entry from `GameStateUpdater`: caster player index,
-projectile sprite/type, and victim NPC index. Java uses type 4 with the same
-field widths when the victim is another player.
+type-3 player-to-NPC projectile entry from `GameStateUpdater`: caster player
+index, projectile sprite/type, and victim NPC index.
+`out_update_players_projectile_player_java_custom.json` covers the matching
+type-4 player-to-player variant with the same field widths and a victim player
+index.
 
 `out_player_coords_known_move_remove_java_custom.json` documents a Java
 custom-client `SEND_PLAYER_COORDS` known-player bitstream: viewer X/Y/sprite,
@@ -55,3 +61,23 @@ custom-client `SEND_NPC_COORDS` known-NPC bitstream: prior local-NPC count,
 one movement update using a 3-bit direction, one removal update, then byte
 padding. These known updates are positional in the viewer's local NPC cache
 and do not repeat NPC indices.
+
+## Social fixtures
+
+`out_friend_update_online_java_custom.json` documents a Java custom-client
+`SEND_FRIEND_UPDATE` payload: LF-terminated current name, LF-terminated former
+name, one online-status byte, and an optional LF-terminated world name when
+the Java struct's `worldName` field is non-empty.
+
+`out_ignore_list_one_renamed_java_custom.json` documents a Java custom-client
+`SEND_IGNORE_LIST` payload for one ignored player with a former name: one count
+byte, LF-terminated current name twice, and LF-terminated former name twice.
+
+`out_private_message_sent_java_custom.json` documents a Java custom-client
+`SEND_PRIVATE_MESSAGE_SENT` payload: LF-terminated recipient name followed by
+`PacketBuilder.writeRSCString` output for the sent message.
+
+`out_private_message_received_java_custom.json` documents a Java custom-client
+`SEND_PRIVATE_MESSAGE` payload: LF-terminated sender name, LF-terminated former
+name, four-byte icon sprite, then `PacketBuilder.writeRSCString` output for the
+received message.

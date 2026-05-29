@@ -143,7 +143,8 @@ def bridge_client(client: socket.socket, target_host: str, target_port: int, lab
         while True:
             opcode, payload = read_ws_frame(stream)
             if opcode == 8:
-                close_reason = "client closed"
+                if close_reason == "unknown":
+                    close_reason = "client closed"
                 break
             if opcode == 9:
                 write_ws_frame(stream, payload, opcode=10)

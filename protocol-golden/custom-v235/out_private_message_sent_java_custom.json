@@ -1,0 +1,18 @@
+{
+  "id": "out_private_message_sent_java_custom",
+  "protocol": "custom-v235",
+  "direction": "server_to_client",
+  "opcode_enum": "SEND_PRIVATE_MESSAGE_SENT",
+  "wire_opcode": 87,
+  "payload_hex": "416c6963650a05838c70",
+  "fields": {
+    "player_name": "Alice",
+    "message": "hello",
+    "rsc_string": {
+      "deciphered_length": 5,
+      "enciphered_length": 3,
+      "enciphered_hex": "838c70"
+    }
+  },
+  "notes": "Payload only. Java PayloadCustomGenerator writes SEND_PRIVATE_MESSAGE_SENT as LF-terminated playerName followed by PacketBuilder.writeRSCString(message). The RSC string bytes were produced by Java StringEncryption.encipher(\"hello\")."
+}

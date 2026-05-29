@@ -73,16 +73,45 @@ impl CollisionMap {
     }
 
     /// Apply Java/OpenRSC object-location collision for a single loaded loc.
-    ///
-    /// This first slice mirrors Java boundary registration. Scenery collision
-    /// needs object definitions for width/height/type, so it remains a later
-    /// data-loader step instead of guessing from loc coordinates alone.
     pub fn apply_java_object_spawn(&mut self, spawn: &ObjectSpawn) {
         if spawn.object_type != ObjectType::Boundary {
             return;
         }
 
         self.apply_java_boundary(spawn.position, spawn.direction);
+    }
+
+    /// Apply scenery-object collision from Java `GameObjectDef` fields.
+    ///
+    /// Java fully blocks every footprint tile for scenery definitions with
+    /// type 1. Direction values other than 0/4 rotate width and height.
+    pub fn apply_java_scenery(
+        &mut self,
+        position: Position,
+        direction: u8,
+        width: u8,
+        height: u8,
+        traversal_type: u8,
+    ) {
+        if traversal_type != 1 {
+            return;
+        }
+
+        let (world_width, world_height) = if direction == 0 || direction == 4 {
+            (width, height)
+        } else {
+            (height, width)
+        };
+
+        for dx in 0..world_width {
+            for dy in 0..world_height {
+                self.block_tile(Position::with_plane(
+                    position.x + dx as i32,
+                    position.y + dy as i32,
+                    position.plane,
+                ));
+            }
+        }
     }
 
     /// Apply Java/OpenRSC object-location collision for a batch of loaded locs.
@@ -439,6 +468,25 @@ mod tests {
 
         assert_eq!(map.get_flags(10, 10, 0), 0);
         assert!(map.can_move(Position::new(9, 10), Position::new(10, 10)));
+    }
+
+    #[test]
+    fn java_scenery_type_one_blocks_rotated_footprint() {
+        let mut map = CollisionMap::new();
+        map.apply_java_scenery(Position::new(10, 10), 1, 2, 3, 1);
+
+        for pos in [
+            Position::new(10, 10),
+            Position::new(10, 11),
+            Position::new(11, 10),
+            Position::new(11, 11),
+            Position::new(12, 10),
+            Position::new(12, 11),
+        ] {
+            assert!(map.is_blocked(pos), "{pos} should be blocked");
+        }
+        assert!(!map.is_blocked(Position::new(13, 10)));
+        assert!(!map.can_move(Position::new(9, 10), Position::new(10, 10)));
     }
 
     #[test]

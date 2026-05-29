@@ -156,6 +156,23 @@ impl ShopHandler {
 
         self.register_shop(Shop::java_horviks_armoury_openpk(8, "Horvik's Armoury"));
 
+        self.register_shop(Shop::java_flynns_mace_market(9, "Flynn's Mace Market"));
+
+        self.register_shop(Shop::java_nurmofs_pickaxe_shop(10, "Nurmof's Pickaxe Shop"));
+
+        self.register_shop(Shop::java_drogos_mining_store(11, "Drogo's Mining Store"));
+
+        self.register_shop(Shop::java_gerrants_fishy_business(
+            12,
+            "Gerrant's Fishy Business",
+        ));
+
+        self.register_shop(Shop::java_grums_gold_shop(13, "Grum's Gold Exchange"));
+
+        self.register_shop(Shop::java_tea_seller(14, "Tea Seller"));
+
+        self.register_shop(Shop::java_gem_trader(15, "Gem Trader"));
+
         info!("ShopHandler loaded {} default shops", self.shops.len());
     }
 
@@ -907,6 +924,169 @@ mod tests {
                 0, 123, 0, 100, 0, 100, // adamantite plate mail legs
                 0, 131, 0, 100, 0, 100, // adamantite kite shield
                 3, 238, 0, 100, 0, 100, // klank's gauntlets
+            ]
+        );
+    }
+
+    #[test]
+    fn test_default_flynns_mace_market_matches_java_catalog_packet() {
+        let handler = ShopHandler::with_default_shops(ItemRepository::new());
+        let shop = handler.get_shop(9).unwrap();
+        let packet = build_open_shop_packet(shop, &ItemRepository::new());
+
+        assert_eq!(shop.restock_rate, 25_000);
+        assert_eq!(
+            packet.payload.as_ref(),
+            &[
+                5, 0, 60, 100, 1, // count, specialty, sell, buy, price modifier
+                0, 94, 0, 5, 0, 5, // bronze mace
+                0, 0, 0, 4, 0, 4, // iron mace
+                0, 95, 0, 4, 0, 4, // steel mace
+                0, 96, 0, 3, 0, 3, // mithril mace
+                0, 97, 0, 2, 0, 2, // adamantite mace
+            ]
+        );
+    }
+
+    #[test]
+    fn test_default_nurmofs_pickaxe_shop_matches_java_catalog_packet() {
+        let handler = ShopHandler::with_default_shops(ItemRepository::new());
+        let shop = handler.get_shop(10).unwrap();
+        let packet = build_open_shop_packet(shop, &ItemRepository::new());
+
+        assert_eq!(shop.restock_rate, 25_000);
+        assert_eq!(
+            packet.payload.as_ref(),
+            &[
+                6, 0, 60, 100, 2, // count, specialty, sell, buy, price modifier
+                0, 156, 0, 6, 0, 6, // bronze pickaxe
+                4, 234, 0, 5, 0, 5, // iron pickaxe
+                4, 235, 0, 4, 0, 4, // steel pickaxe
+                4, 236, 0, 3, 0, 3, // mithril pickaxe
+                4, 237, 0, 2, 0, 2, // adamantite pickaxe
+                4, 238, 0, 1, 0, 1, // rune pickaxe
+            ]
+        );
+    }
+
+    #[test]
+    fn test_default_drogos_mining_store_matches_java_catalog_packet() {
+        let handler = ShopHandler::with_default_shops(ItemRepository::new());
+        let shop = handler.get_shop(11).unwrap();
+        let packet = build_open_shop_packet(shop, &ItemRepository::new());
+
+        assert_eq!(shop.restock_rate, 30_000);
+        assert_eq!(
+            packet.payload.as_ref(),
+            &[
+                9, 0, 70, 100, 2, // count, specialty, sell, buy, price modifier
+                0, 168, 0, 4, 0, 4, // hammer
+                0, 156, 0, 4, 0, 4, // bronze pickaxe
+                0, 150, 0, 0, 0, 0, // copper ore
+                0, 202, 0, 0, 0, 0, // tin ore
+                0, 151, 0, 0, 0, 0, // iron ore
+                0, 155, 0, 0, 0, 0, // coal
+                0, 169, 0, 0, 0, 0, // bronze bar
+                0, 170, 0, 0, 0, 0, // iron bar
+                0, 172, 0, 0, 0, 0, // gold bar
+            ]
+        );
+    }
+
+    #[test]
+    fn test_default_gerrants_fishy_business_matches_java_catalog_packet() {
+        let handler = ShopHandler::with_default_shops(ItemRepository::new());
+        let shop = handler.get_shop(12).unwrap();
+        let packet = build_open_shop_packet(shop, &ItemRepository::new());
+
+        assert_eq!(shop.restock_rate, 12_000);
+        assert_eq!(
+            packet.payload.as_ref(),
+            &[
+                17, 0, 70, 100, 3, // count, specialty, sell, buy, price modifier
+                1, 120, 0, 5, 0, 5, // net
+                1, 121, 0, 5, 0, 5, // fishing rod
+                1, 122, 0, 5, 0, 5, // fly fishing rod
+                1, 123, 0, 2, 0, 2, // harpoon
+                1, 119, 0, 2, 0, 2, // lobster pot
+                1, 124, 0, 200, 0, 200, // fishing bait
+                1, 125, 0, 200, 0, 200, // feather
+                1, 93, 0, 0, 0, 0, // raw shrimp
+                1, 98, 0, 0, 0, 0, // raw sardine
+                1, 105, 0, 0, 0, 0, // raw herring
+                1, 95, 0, 0, 0, 0, // raw anchovies
+                1, 102, 0, 0, 0, 0, // raw trout
+                1, 107, 0, 0, 0, 0, // raw pike
+                1, 100, 0, 0, 0, 0, // raw salmon
+                1, 110, 0, 0, 0, 0, // raw tuna
+                1, 116, 0, 0, 0, 0, // raw lobster
+                1, 113, 0, 0, 0, 0, // raw swordfish
+            ]
+        );
+    }
+
+    #[test]
+    fn test_default_grums_gold_shop_matches_java_catalog_packet() {
+        let handler = ShopHandler::with_default_shops(ItemRepository::new());
+        let shop = handler.get_shop(13).unwrap();
+        let packet = build_open_shop_packet(shop, &ItemRepository::new());
+
+        assert_eq!(shop.restock_rate, 30_000);
+        assert_eq!(
+            packet.payload.as_ref(),
+            &[
+                12, 0, 70, 100, 2, // count, specialty, sell, buy, price modifier
+                1, 27, 0, 0, 0, 0, // gold ring
+                1, 28, 0, 0, 0, 0, // sapphire ring
+                1, 29, 0, 0, 0, 0, // emerald ring
+                1, 30, 0, 0, 0, 0, // ruby ring
+                1, 31, 0, 0, 0, 0, // diamond ring
+                1, 32, 0, 0, 0, 0, // gold necklace
+                1, 33, 0, 0, 0, 0, // sapphire necklace
+                1, 34, 0, 0, 0, 0, // emerald necklace
+                1, 35, 0, 0, 0, 0, // ruby necklace
+                1, 36, 0, 0, 0, 0, // diamond necklace
+                1, 45, 0, 0, 0, 0, // gold amulet
+                1, 46, 0, 0, 0, 0, // sapphire amulet
+            ]
+        );
+    }
+
+    #[test]
+    fn test_default_tea_seller_matches_java_catalog_packet() {
+        let handler = ShopHandler::with_default_shops(ItemRepository::new());
+        let shop = handler.get_shop(14).unwrap();
+        let packet = build_open_shop_packet(shop, &ItemRepository::new());
+
+        assert_eq!(shop.restock_rate, 30_000);
+        assert_eq!(
+            packet.payload.as_ref(),
+            &[
+                1, 0, 60, 100, 2, // count, specialty, sell, buy, price modifier
+                2, 227, 0, 20, 0, 20, // cup of tea
+            ]
+        );
+    }
+
+    #[test]
+    fn test_default_gem_trader_matches_java_catalog_packet() {
+        let handler = ShopHandler::with_default_shops(ItemRepository::new());
+        let shop = handler.get_shop(15).unwrap();
+        let packet = build_open_shop_packet(shop, &ItemRepository::new());
+
+        assert_eq!(shop.restock_rate, 600_000);
+        assert_eq!(
+            packet.payload.as_ref(),
+            &[
+                8, 0, 70, 100, 3, // count, specialty, sell, buy, price modifier
+                0, 160, 0, 1, 0, 1, // uncut sapphire
+                0, 159, 0, 1, 0, 1, // uncut emerald
+                0, 158, 0, 0, 0, 0, // uncut ruby
+                0, 157, 0, 0, 0, 0, // uncut diamond
+                0, 164, 0, 1, 0, 1, // sapphire
+                0, 163, 0, 1, 0, 1, // emerald
+                0, 162, 0, 0, 0, 0, // ruby
+                0, 161, 0, 0, 0, 0, // diamond
             ]
         );
     }

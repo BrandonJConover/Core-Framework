@@ -8,6 +8,14 @@ but new packet/cache/render behavior should be copied from `reference/rt4-client
 where possible. Backwards compatibility with 377 data is welcome when it stays
 cheap, but it should not block getting the mobile web client playable on 530.
 
+`reference/refactored-client-435` is available as a read-only advisory source
+for nearby-era client architecture, especially chatbox/interface state and menu
+flow. Do not copy 435 opcodes, packet sizes, cache layouts, interface ids,
+update masks, or combat packet details unless they are confirmed against
+`reference/rt4-client` and live 2009scape Java output. See
+`docs/rt4-435-reference-leverage.md` and run
+`node .reference-435-advisory-test.mjs` before landing 435-informed work.
+
 ## Layout
 
 Files mirror the path they overlay in the upstream client. `setup.sh` does a

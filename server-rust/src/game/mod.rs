@@ -75,6 +75,7 @@ use tracing::{info, warn};
 
 pub use entity::{Entity, EntityId, Position};
 pub use player::Player;
+use world::load_java_object_collision_defs;
 pub use world::World;
 
 /// Environment variable that opts the main world into Java/OpenRSC loc spawns.
@@ -127,6 +128,29 @@ impl GameState {
                 summary.objects,
                 summary.ground_items
             );
+            let object_defs_path = locs_dir
+                .parent()
+                .map(|defs_dir| defs_dir.join("GameObjectDef.xml"));
+            if let Some(object_defs_path) = object_defs_path {
+                match load_java_object_collision_defs(&object_defs_path) {
+                    Ok(object_defs) => {
+                        let count = object_defs.len();
+                        default_world.set_java_object_collision_defs(object_defs);
+                        info!(
+                            "Loaded {} Java object collision definitions from {}",
+                            count,
+                            object_defs_path.display()
+                        );
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        warn!(
+                            "Java loc spawns configured without {}: scenery collision falls back to boundary-only Java loc collision",
+                            object_defs_path.display()
+                        );
+                    }
+                    Err(error) => return Err(error.into()),
+                }
+            }
         }
 
         self.worlds
@@ -384,6 +408,48 @@ mod tests {
         );
 
         fs::remove_dir_all(locs_dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn initialize_loads_java_object_defs_next_to_locs_for_runtime_collision() {
+        let base_dir =
+            std::env::temp_dir().join(format!("openrsc-game-state-defs-{}", std::process::id()));
+        let locs_dir = base_dir.join("locs");
+        let _ = fs::remove_dir_all(&base_dir);
+        fs::create_dir_all(&locs_dir).unwrap();
+
+        fs::write(
+            &base_dir.join("GameObjectDef.xml"),
+            r#"<GameObjectDef-array>
+  <GameObjectDef><type>0</type><width>1</width><height>1</height></GameObjectDef>
+  <GameObjectDef><type>0</type><width>1</width><height>1</height></GameObjectDef>
+  <GameObjectDef><type>0</type><width>1</width><height>1</height></GameObjectDef>
+  <GameObjectDef><type>1</type><width>1</width><height>1</height></GameObjectDef>
+</GameObjectDef-array>"#,
+        )
+        .unwrap();
+        fs::write(locs_dir.join("NpcLocs.json"), r#"{"npclocs":[]}"#).unwrap();
+        fs::write(
+            locs_dir.join("SceneryLocs.json"),
+            r#"{"sceneries":[{"id":3,"pos":{"X":426,"Y":15},"direction":0}]}"#,
+        )
+        .unwrap();
+        fs::write(locs_dir.join("BoundaryLocs.json"), r#"{"boundaries":[]}"#).unwrap();
+        fs::write(locs_dir.join("GroundItems.json"), r#"{"grounditems":[]}"#).unwrap();
+
+        let mut state = GameState::new(1).with_java_locs_dir(locs_dir.clone());
+        state.initialize().await.unwrap();
+
+        let world = state.get_world("main").unwrap();
+        let world = world.read().await;
+        assert_eq!(world.java_object_collision_def_count(), 4);
+        assert!(!world.can_move_with_collision(
+            entity::Position::new(425, 15),
+            entity::Position::new(426, 15),
+            world::MovementCollisionPolicy::JavaLocs,
+        ));
+
+        fs::remove_dir_all(base_dir).unwrap();
     }
 
     #[tokio::test]

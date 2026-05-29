@@ -6,9 +6,28 @@ use super::region::{ObjectSpawn, SpawnManager};
 use super::walking::CollisionMap as WalkingCollisionMap;
 use super::world_loader::load_base_java_locs_dir;
 use std::collections::HashMap;
+use std::fs;
 use std::io;
 use std::path::Path;
 use tracing::{debug, info};
+
+/// Java `GameObjectDef` movement fields needed for scenery collision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JavaObjectCollisionDef {
+    pub traversal_type: u8,
+    pub width: u8,
+    pub height: u8,
+}
+
+impl JavaObjectCollisionDef {
+    pub fn new(traversal_type: u8, width: u8, height: u8) -> Self {
+        Self {
+            traversal_type,
+            width,
+            height,
+        }
+    }
+}
 
 /// Counts returned when static spawn definitions are applied to a live world.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -39,6 +58,7 @@ pub struct World {
     pub npcs: HashMap<EntityId, Npc>,
     pub ground_items: HashMap<Position, Vec<GroundItem>>,
     pub game_objects: HashMap<Position, GameObject>,
+    java_object_collision_defs: HashMap<u32, JavaObjectCollisionDef>,
     tick_count: u64,
     next_npc_entity_id: u64,
     next_npc_index: u16,
@@ -54,6 +74,7 @@ impl World {
             npcs: HashMap::new(),
             ground_items: HashMap::new(),
             game_objects: HashMap::new(),
+            java_object_collision_defs: HashMap::new(),
             tick_count: 0,
             next_npc_entity_id: 1,
             next_npc_index: 1,
@@ -120,6 +141,19 @@ impl World {
     ) -> io::Result<WorldSpawnApplySummary> {
         let spawns = load_base_java_locs_dir(locs_dir)?;
         Ok(self.apply_spawn_manager(&spawns))
+    }
+
+    /// Store Java `GameObjectDef` collision fields for runtime Java-loc movement checks.
+    pub fn set_java_object_collision_defs(
+        &mut self,
+        object_defs: HashMap<u32, JavaObjectCollisionDef>,
+    ) {
+        self.java_object_collision_defs = object_defs;
+    }
+
+    /// Number of loaded Java object collision definitions.
+    pub fn java_object_collision_def_count(&self) -> usize {
+        self.java_object_collision_defs.len()
     }
 
     /// Read the current world tick. Used by other systems (combat, etc.) to
@@ -264,6 +298,33 @@ impl World {
         collision
     }
 
+    /// Build Java-loc collision using object definitions for scenery footprint
+    /// blocking in addition to boundary-wall locs.
+    pub fn java_loc_collision_map_with_object_defs(
+        &self,
+        object_defs: &HashMap<u32, JavaObjectCollisionDef>,
+    ) -> WalkingCollisionMap {
+        let mut collision = WalkingCollisionMap::new();
+        for obj in self.game_objects.values() {
+            match obj.obj_type {
+                1 => collision.apply_java_boundary(obj.position, obj.direction),
+                0 => {
+                    if let Some(def) = object_defs.get(&obj.id) {
+                        collision.apply_java_scenery(
+                            obj.position,
+                            obj.direction,
+                            def.width,
+                            def.height,
+                            def.traversal_type,
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
+        collision
+    }
+
     /// Build the movement collision map a live movement adapter can consume.
     pub fn movement_collision_map(&self, policy: MovementCollisionPolicy) -> WalkingCollisionMap {
         let mut collision = WalkingCollisionMap::new();
@@ -296,11 +357,80 @@ impl World {
 
     fn apply_java_locs_to_collision_map(&self, collision: &mut WalkingCollisionMap) {
         for obj in self.game_objects.values() {
-            if obj.obj_type == 1 {
-                collision.apply_java_boundary(obj.position, obj.direction);
+            match obj.obj_type {
+                1 => collision.apply_java_boundary(obj.position, obj.direction),
+                0 => {
+                    if let Some(def) = self.java_object_collision_defs.get(&obj.id) {
+                        collision.apply_java_scenery(
+                            obj.position,
+                            obj.direction,
+                            def.width,
+                            def.height,
+                            def.traversal_type,
+                        );
+                    }
+                }
+                _ => {}
             }
         }
     }
+}
+
+/// Load Java/OpenRSC `GameObjectDef.xml` movement fields keyed by object id.
+///
+/// Java treats the object's array index as the stable object id used by locs,
+/// so the Rust map preserves that index while reading only collision fields.
+pub fn load_java_object_collision_defs(
+    path: &Path,
+) -> io::Result<HashMap<u32, JavaObjectCollisionDef>> {
+    let source = fs::read_to_string(path)?;
+    let mut defs = HashMap::new();
+
+    for (object_id, block) in source
+        .split("<GameObjectDef>")
+        .skip(1)
+        .filter_map(|tail| tail.split("</GameObjectDef>").next())
+        .enumerate()
+    {
+        let traversal_type = read_required_u8_tag(block, "type", object_id)?;
+        let width = read_required_u8_tag(block, "width", object_id)?;
+        let height = read_required_u8_tag(block, "height", object_id)?;
+        defs.insert(
+            object_id as u32,
+            JavaObjectCollisionDef::new(traversal_type, width, height),
+        );
+    }
+
+    if defs.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("no GameObjectDef entries found in {}", path.display()),
+        ));
+    }
+
+    Ok(defs)
+}
+
+fn read_required_u8_tag(block: &str, tag: &str, object_id: usize) -> io::Result<u8> {
+    let open = format!("<{tag}>");
+    let close = format!("</{tag}>");
+    let value = block
+        .split(&open)
+        .nth(1)
+        .and_then(|tail| tail.split(&close).next())
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("missing {tag} for GameObjectDef index {object_id}"),
+            )
+        })?;
+
+    value.trim().parse().map_err(|error| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("invalid {tag} for GameObjectDef index {object_id}: {error}"),
+        )
+    })
 }
 
 fn npc_spawn_wander_radius(spawn: &super::region::NpcSpawn) -> u32 {
@@ -521,6 +651,28 @@ mod tests {
     use crate::game::item::ItemId;
     use crate::game::region::{GroundItemSpawn, NpcSpawn, ObjectSpawn};
     use std::fs;
+    use std::path::Path;
+
+    fn java_locs_dir() -> &'static Path {
+        Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../server-java-modern/conf/server/defs/locs"
+        ))
+    }
+
+    fn java_game_object_defs_path() -> &'static Path {
+        Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../server-java-modern/conf/server/defs/GameObjectDef.xml"
+        ))
+    }
+
+    fn read_java_game_object_collision_def(object_id: usize) -> JavaObjectCollisionDef {
+        load_java_object_collision_defs(java_game_object_defs_path())
+            .unwrap()
+            .remove(&(object_id as u32))
+            .unwrap()
+    }
 
     #[test]
     fn apply_spawn_manager_adds_runtime_entities_without_clearing_seeded_state() {
@@ -636,6 +788,144 @@ mod tests {
         assert_eq!(world.ground_items[&Position::new(24, 25)][0].amount, 99);
 
         fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn base_java_locs_first_area_spawn_slice_drives_boundary_collision() {
+        let mut world = World::new("test".to_string(), 2000);
+        let summary = world.apply_base_java_locs_dir(java_locs_dir()).unwrap();
+
+        assert_eq!(
+            summary,
+            WorldSpawnApplySummary {
+                npcs: 3608,
+                objects: 27781,
+                ground_items: 1019,
+            }
+        );
+
+        let in_first_area =
+            |pos: Position| (384..=430).contains(&pos.x) && (0..=32).contains(&pos.y);
+
+        assert_eq!(
+            world
+                .npcs
+                .values()
+                .filter(|npc| in_first_area(npc.position))
+                .count(),
+            5
+        );
+        assert_eq!(
+            world
+                .game_objects
+                .values()
+                .filter(|obj| obj.obj_type == 0 && in_first_area(obj.position))
+                .count(),
+            36
+        );
+        assert_eq!(
+            world
+                .game_objects
+                .values()
+                .filter(|obj| obj.obj_type == 1 && in_first_area(obj.position))
+                .count(),
+            1
+        );
+        assert_eq!(
+            world
+                .ground_items
+                .iter()
+                .filter(|(pos, _items)| in_first_area(**pos))
+                .map(|(_pos, items)| items.len())
+                .sum::<usize>(),
+            2
+        );
+
+        let boundary_pos = Position::new(424, 18);
+        let boundary = world.game_objects.get(&boundary_pos).unwrap();
+        assert_eq!(boundary.id, 1);
+        assert_eq!(boundary.obj_type, 1);
+        assert_eq!(boundary.direction, 1);
+        assert!(!world.can_move_with_collision(
+            boundary_pos,
+            Position::new(425, 18),
+            MovementCollisionPolicy::JavaLocs,
+        ));
+        assert!(world.can_move_with_collision(
+            boundary_pos,
+            Position::new(424, 19),
+            MovementCollisionPolicy::JavaLocs,
+        ));
+
+        let scenery_pos = Position::new(426, 15);
+        let scenery = world.game_objects.get(&scenery_pos).unwrap();
+        assert_eq!(scenery.id, 3);
+        assert_eq!(scenery.obj_type, 0);
+        assert!(world.can_move_with_collision(
+            Position::new(425, 15),
+            scenery_pos,
+            MovementCollisionPolicy::JavaLocs,
+        ));
+    }
+
+    #[test]
+    fn base_java_locs_first_area_scenery_def_blocks_table_tile() {
+        let mut world = World::new("test".to_string(), 2000);
+        world.apply_base_java_locs_dir(java_locs_dir()).unwrap();
+
+        let table_pos = Position::new(426, 15);
+        let table = world.game_objects.get(&table_pos).unwrap();
+        assert_eq!(table.id, 3);
+        assert_eq!(table.obj_type, 0);
+        assert_eq!(table.direction, 0);
+
+        let table_def = read_java_game_object_collision_def(table.id as usize);
+        assert_eq!(table_def, JavaObjectCollisionDef::new(1, 1, 1));
+
+        let object_defs = HashMap::from([(table.id, table_def)]);
+        let collision = world.java_loc_collision_map_with_object_defs(&object_defs);
+
+        assert!(collision.is_blocked(table_pos));
+        assert!(!collision.is_blocked(Position::new(427, 15)));
+        assert!(!collision.can_move(Position::new(425, 15), table_pos));
+        assert!(collision.can_move(Position::new(425, 15), Position::new(425, 16)));
+    }
+
+    #[test]
+    fn loads_java_game_object_collision_defs_by_object_index() {
+        let defs = load_java_object_collision_defs(java_game_object_defs_path()).unwrap();
+
+        assert!(defs.len() > 1_000);
+        assert_eq!(defs.get(&2), Some(&JavaObjectCollisionDef::new(1, 2, 2)));
+        assert_eq!(defs.get(&3), Some(&JavaObjectCollisionDef::new(1, 1, 1)));
+    }
+
+    #[test]
+    fn movement_policy_uses_loaded_java_object_defs_for_scenery_collision() {
+        let mut world = World::new("test".to_string(), 2000);
+        let table_pos = Position::new(426, 15);
+        world.game_objects.insert(
+            table_pos,
+            GameObject::new(3, table_pos).with_type(0).with_direction(0),
+        );
+
+        assert!(world.can_move_with_collision(
+            Position::new(425, 15),
+            table_pos,
+            MovementCollisionPolicy::JavaLocs,
+        ));
+
+        world.set_java_object_collision_defs(HashMap::from([(
+            3,
+            JavaObjectCollisionDef::new(1, 1, 1),
+        )]));
+
+        assert_eq!(world.java_object_collision_def_count(), 1);
+        assert!(!world.can_move_with_collision(
+            Position::new(425, 15),
+            table_pos,
+            MovementCollisionPolicy::JavaLocs,
+        ));
     }
 
     #[test]
