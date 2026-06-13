@@ -1,0 +1,10 @@
+{
+  "ip_management": "192.168.0.30",
+  "ip_address": "192.168.0.30",
+  "world": 1,
+  "server_port": 43600,
+  "wl_port": 43600,
+  "js5_port": 43600,
+  "mouseWheelZoom": true,
+  "pluginsFolder": "plugins"
+}

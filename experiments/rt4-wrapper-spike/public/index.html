@@ -9,6 +9,13 @@
     <script src="wrapper-config.js"></script>
     <script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
     <style>
+      :root {
+        --rt4-safe-area-top: env(safe-area-inset-top, 0px);
+        --rt4-safe-area-right: env(safe-area-inset-right, 0px);
+        --rt4-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+        --rt4-safe-area-left: env(safe-area-inset-left, 0px);
+      }
+
       html,
       body {
         width: 100%;
@@ -41,6 +48,24 @@
         touch-action: none;
       }
 
+      #touch-capture-layer {
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 5;
+        display: none;
+        width: 0;
+        height: 0;
+        background: transparent;
+        pointer-events: none;
+        touch-action: none;
+      }
+
+      body.touch-capture-active #touch-capture-layer {
+        display: block;
+        pointer-events: auto;
+      }
+
       #cheerpjDisplay {
         width: 100% !important;
         height: 100% !important;
@@ -60,6 +85,9 @@
         max-width: none !important;
         max-height: none !important;
         transform-origin: top left !important;
+        image-rendering: auto;
+        image-rendering: crisp-edges;
+        image-rendering: pixelated;
       }
 
       #panel {
@@ -254,6 +282,7 @@
   </head>
   <body>
     <div id="display" tabindex="-1"></div>
+    <div id="touch-capture-layer" aria-hidden="true"></div>
     <div id="panel" class="collapsed">
       <div id="status">Loading CheerpJ...</div>
       <div class="actions">
@@ -280,6 +309,7 @@
       const logEl = document.getElementById("log");
       const loginLink = document.getElementById("login-link");
       const displayEl = document.getElementById("display");
+      const touchCaptureLayerEl = document.getElementById("touch-capture-layer");
       const touchControlsEl = document.getElementById("touch-controls");
       const keyboardProxyEl = document.getElementById("keyboard-proxy");
       const inputDebugLayerEl = document.getElementById("input-debug-layer");
@@ -291,16 +321,70 @@
       const inputDebugEnabled = wrapperConfig.inputDebug === true || queryParams.has("inputdebug");
       const gestureDebugEnabled = wrapperConfig.gestureDebug === true || queryParams.has("gesturedebug");
       const layoutDebugEnabled = wrapperConfig.layoutDebug === true || queryParams.has("layoutdebug");
-      const layoutBadgeEnabled = wrapperConfig.layoutBadge === true || queryParams.has("layoutbadge");
+      const layoutBadgeEnabled = wrapperConfig.layoutBadge === true || queryParams.has("showlayoutbadge");
       const mouseDebugEnabled = wrapperConfig.mouseDebug === true || queryParams.has("mousedebug");
       const wheelDebugEnabled = wrapperConfig.wheelDebug === true || queryParams.has("wheeldebug");
       const wrapperDebugEnabled = wrapperConfig.debug === true || queryParams.has("debug");
+      const serverLogEnabled = wrapperConfig.serverLog === true || queryParams.has("serverlog");
+      const serverLogUrl = wrapperConfig.serverLogUrl || "/rt4-wrapper-diag";
       const wrapperLogEnabled = wrapperConfig.log === true || queryParams.has("log") || wrapperDebugEnabled || tapDebugEnabled || inputDebugEnabled || gestureDebugEnabled || layoutDebugEnabled || mouseDebugEnabled || wheelDebugEnabled || wrapperConfig.showLogByDefault === true;
+      const logPanelEnabled = wrapperConfig.showLogButton === true || wrapperConfig.showLogByDefault === true || queryParams.has("log") || queryParams.has("showlogbutton");
       const maxLogLines = Math.max(20, Number(wrapperConfig.maxLogLines || 120));
       const loginKeyboardFallbackEnabled = wrapperConfig.loginKeyboardFallback !== false;
       const loginKeyboardFallbackStates = new Set(wrapperConfig.loginKeyboardFallbackStates || [10, 20]);
-      const rt4ClientJar = wrapperConfig.clientJar || "/app/rt4-wrapper/client-1.0.0-mobile15.jar";
-      const rt4LauncherJar = wrapperConfig.launcherJar || "/app/rt4-wrapper/rt4-spike-launcher-mobile15.jar";
+
+      function appAssetPath(configValue, fallbackFile) {
+        const value = String(configValue || "").trim();
+        const pageBase = window.location.pathname.replace(/\/[^/]*$/, "/");
+        const normalizedBase = pageBase.endsWith("/") ? pageBase : pageBase + "/";
+
+        if (!value) return "/app" + normalizedBase + fallbackFile;
+        if (value.startsWith("/app/")) return value;
+        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return value;
+
+        if (value.startsWith("/")) {
+          const filenameOnly = value === "/" + fallbackFile;
+          return "/app" + (filenameOnly ? normalizedBase + fallbackFile : value);
+        }
+
+        return "/app" + normalizedBase + value.replace(/^\.?\//, "");
+      }
+
+      function runtimePrefersMobileJars() {
+        if (queryParams.has("mobilejars")) return true;
+        if (queryParams.has("desktopjars")) return false;
+        if (wrapperConfig.forceMobileJars === true) return true;
+        if (wrapperConfig.forceDesktopJars === true) return false;
+        if (queryParams.has("forcetouch") || wrapperConfig.forceTouchHarness === true) return true;
+        const coarse = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+        const fineDesktop = window.matchMedia("(any-hover: hover) and (any-pointer: fine)").matches;
+        return coarse && !fineDesktop;
+      }
+
+      function selectRuntimeAsset(defaultName, desktopName, mobileName) {
+        if (runtimePrefersMobileJars()) return mobileName || defaultName;
+        return desktopName || defaultName;
+      }
+
+      const rt4ClientJarName = selectRuntimeAsset(
+        wrapperConfig.clientJar,
+        wrapperConfig.desktopClientJar,
+        wrapperConfig.mobileClientJar
+      );
+      const rt4LauncherJarName = selectRuntimeAsset(
+        wrapperConfig.launcherJar,
+        wrapperConfig.desktopLauncherJar,
+        wrapperConfig.mobileLauncherJar
+      );
+      const rt4ClientJar = appAssetPath(rt4ClientJarName, "client-1.0.0.jar");
+      const rt4LauncherJar = appAssetPath(rt4LauncherJarName, "rt4-spike-launcher.jar");
+      window.__rt4SelectedJars = {
+        mobile: runtimePrefersMobileJars(),
+        clientJar: rt4ClientJarName,
+        launcherJar: rt4LauncherJarName,
+        clientPath: rt4ClientJar,
+        launcherPath: rt4LauncherJar,
+      };
       let initialized = false;
       let displayCreated = false;
       let running = false;
@@ -311,11 +395,17 @@
       let lastPreloadDone = -1;
       let lastDesktopPrimaryMouseDownAt = 0;
       let lastDesktopSecondaryMouseDownAt = 0;
+      let lastDesktopPrimaryMouseUpAt = 0;
+      let lastDesktopSecondaryMouseUpAt = 0;
+      let desktopMouseBridgeActive = false;
+      let desktopSuppressClickUntil = 0;
       let browserResizeVersion = 1;
       let lastLogicalSizeKey = "";
       let lastViewportSizeKey = "";
+      let lastServerLayoutLogAt = 0;
       let nextSocketId = 1;
       const browserSockets = new Map();
+      let pageLifecycleClosing = false;
       const browserInputKeyQueue = [];
       const browserInputCharQueue = [];
       const browserInputKeyDownQueue = [];
@@ -324,8 +414,14 @@
       let browserInputMouseEvent = null;
       let browserInputWheelRotation = 0;
       let browserInputCameraZoom = 0;
+      let browserInputCameraYaw = 0;
+      let browserInputCameraPitch = 0;
       let browserGameState = 0;
       let browserGameplayLayoutActive = false;
+      let keyboardViewportLock = null;
+      let lastStableKeyboardViewport = null;
+      let keyboardViewportUnlockTimer = 0;
+      let keyboardActiveField = null;
       let browserLoginState = {
         valid: false,
         loginStep: 0,
@@ -336,8 +432,10 @@
         topLevelInterface: -1,
       };
       let keyboardProxyActive = false;
+      let keyboardProxyHandledBeforeInput = false;
       let pendingKeyboardRefocus = null;
       let loginFallbackSuppressedUntil = 0;
+      let loginFallbackArmedUntil = 0;
       let browserInputFrame = {
         gameState: 0,
         canvasWidth: 0,
@@ -349,6 +447,8 @@
       const touchState = {
         enabled: wrapperConfig.mobileTouch !== false,
         fitScale: 1,
+        fitScaleX: 1,
+        fitScaleY: 1,
         userScale: Number(wrapperConfig.initialScale || 1),
         minUserScale: Number(wrapperConfig.minScale || 1),
         maxUserScale: Number(wrapperConfig.maxScale || 2.5),
@@ -356,17 +456,31 @@
         logicalHeight: window.innerHeight,
         offsetX: 0,
         offsetY: 0,
+        keyboardLiftY: 0,
+        keyboardManualOffsetX: 0,
+        keyboardManualOffsetY: 0,
         rotated: false,
         rotatePortrait: wrapperConfig.rotatePortrait === true,
         activeMouse: false,
+        mouseDownSent: false,
+        tapCanceled: false,
         singleTouchId: null,
         inputHit: null,
         pinch: null,
         longPressTimer: null,
         longPressFired: false,
+        keyboardPanMode: false,
+        keyboardPanMoved: false,
+        keyboardPanStartOffsetX: 0,
+        keyboardPanStartOffsetY: 0,
+        contextMenuSelecting: false,
+        scrollMode: false,
         swipeMode: false,
         swipeKey: null,
+        touchStartInScrollZone: false,
+        swipeReleaseTimer: 0,
         swipeLastKeyAt: 0,
+        scrollRemainderY: 0,
         swipeRemainderX: 0,
         swipeRemainderY: 0,
         swipeLastX: 0,
@@ -377,6 +491,7 @@
         lastY: 0,
         lastTapAt: 0,
         lastTouchEndAt: 0,
+        suppressClickUntil: 0,
       };
       window.__rt4TouchState = touchState;
 
@@ -403,9 +518,81 @@
         }
       }
 
+      const rt4ConsoleLogLines = [];
+      window.__rt4ConsoleLog = rt4ConsoleLogLines;
+      let capturingRt4ConsoleLine = false;
+
+      function captureRt4ConsoleLine(level, args) {
+        if (capturingRt4ConsoleLine) return;
+        let text = "";
+        try {
+          text = args.map(arg => {
+            if (arg instanceof Error) return arg.stack || arg.message;
+            if (typeof arg === "string") return arg;
+            return JSON.stringify(arg);
+          }).join(" ");
+        } catch (_) {
+          text = args.map(String).join(" ");
+        }
+        if (!/(Clientscript|CS2 - scr:|ScriptRunner|NullPointerException|RuntimeException|^Error:)/i.test(text)) {
+          return;
+        }
+        const line = level + " " + text;
+        rt4ConsoleLogLines.push(new Date().toISOString() + " " + line);
+        while (rt4ConsoleLogLines.length > 80) {
+          rt4ConsoleLogLines.shift();
+        }
+        capturingRt4ConsoleLine = true;
+        try {
+          writeLog(line, { important: true });
+        } finally {
+          capturingRt4ConsoleLine = false;
+        }
+      }
+
+      for (const level of ["log", "warn", "error"]) {
+        const original = console[level] && console[level].bind(console);
+        if (!original) continue;
+        console[level] = (...args) => {
+          captureRt4ConsoleLine(level, args);
+          original(...args);
+        };
+      }
+
       function setStatus(message) {
         statusEl.textContent = message;
         writeLog(message, { important: true });
+      }
+
+      function sendServerDiagnostic(kind, payload = {}) {
+        if (!serverLogEnabled) return;
+        const params = new URLSearchParams();
+        params.set("kind", kind);
+        params.set("t", String(Date.now()));
+        const version = queryParams.get("v");
+        if (version) params.set("v", version);
+        for (const [key, value] of Object.entries(payload)) {
+          if (value === undefined || value === null) continue;
+          let out;
+          if (typeof value === "object") {
+            out = JSON.stringify(value);
+          } else {
+            out = String(value);
+          }
+          params.set(key, out.slice(0, 240));
+        }
+        const url = serverLogUrl + "?" + params.toString();
+        try {
+          fetch(url, {
+            method: "GET",
+            cache: "no-store",
+            credentials: "same-origin",
+            keepalive: true,
+          }).catch(() => {});
+        } catch (_) {
+          const image = new Image();
+          image.src = url;
+        }
       }
 
       window.addEventListener("error", event => {
@@ -434,7 +621,12 @@
         document.getElementById("toggle-panel").textContent = visible ? "Hide log" : "Show log";
       }
 
-      setPanelVisible(wrapperConfig.showLogByDefault === true || tapDebugEnabled);
+      function setPanelAvailable(available) {
+        document.getElementById("panel").style.display = available ? "" : "none";
+      }
+
+      setPanelAvailable(logPanelEnabled);
+      setPanelVisible(wrapperConfig.showLogByDefault === true || queryParams.has("log"));
       if (tapDebugEnabled) {
         writeLog("Tap debug enabled.");
       }
@@ -472,12 +664,333 @@
         return fallback;
       }
 
+      function cssPixelVariable(name) {
+        const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+        const value = parseFloat(raw);
+        return Number.isFinite(value) ? value : 0;
+      }
+
+      function safeAreaInsets() {
+        if (!shouldUseTouchHarness() || booleanOption("mobileSafeArea", true) === false) {
+          return { top: 0, right: 0, bottom: 0, left: 0 };
+        }
+        const padding = clamp(numberOption("mobileSafeAreaPadding", 4), 0, 32);
+        return {
+          top: cssPixelVariable("--rt4-safe-area-top") + padding,
+          right: cssPixelVariable("--rt4-safe-area-right") + padding,
+          bottom: cssPixelVariable("--rt4-safe-area-bottom") + padding,
+          left: cssPixelVariable("--rt4-safe-area-left") + padding,
+        };
+      }
+
+      function suppressCompatibilityClick(reason, durationMs = 220) {
+        touchState.suppressClickUntil = Math.max(touchState.suppressClickUntil, Date.now() + durationMs);
+        if (gestureDebugEnabled) {
+          recordGesture("compat-click-suppress", { reason, durationMs });
+        }
+      }
+
+      function suppressDesktopCompatibilityClick(reason, durationMs = 350) {
+        desktopSuppressClickUntil = Math.max(desktopSuppressClickUntil, Date.now() + durationMs);
+        if (gestureDebugEnabled) {
+          recordGesture("desktop-compat-click-suppress", { reason, durationMs });
+        }
+      }
+
+      const audioUnlockState = {
+        context: null,
+        unlocked: false,
+        lastResumeAt: 0,
+        silentStarted: false,
+        recreatedOnGesture: false,
+      };
+
+      const browserAudioState = {
+        channels: new Map(),
+        sampleRate: 22050,
+        stereo: false,
+        gain: null,
+        supported: false,
+        writes: 0,
+        dropped: 0,
+        silentWrites: 0,
+        nonSilentWrites: 0,
+        lastWriteAt: 0,
+        lastWriteChannel: null,
+        lastFrameCount: 0,
+        lastSampleCount: 0,
+        lastNonZeroSamples: 0,
+        lastPeakRaw: 0,
+        lastPeakFloat: 0,
+        lastRmsRaw: 0,
+        lastRmsFloat: 0,
+        maxPeakRaw: 0,
+        maxPeakFloat: 0,
+        maxRmsFloat: 0,
+        lastScale: 0,
+        lastTestToneAt: 0,
+      };
+
+      function resetBrowserAudioTiming(leadSeconds = 0.03) {
+        const context = audioUnlockState.context;
+        for (const channel of browserAudioState.channels.values()) {
+          channel.nextTime = context ? context.currentTime + leadSeconds : 0;
+        }
+      }
+
+      function canUseBrowserAudio() {
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        return Boolean(AudioContextCtor);
+      }
+
+      function audioContext(forceNew = false, createIfMissing = true) {
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextCtor) return null;
+        if (forceNew && audioUnlockState.context) {
+          try {
+            audioUnlockState.context.close();
+          } catch (_) {
+          }
+          audioUnlockState.context = null;
+          audioUnlockState.silentStarted = false;
+          browserAudioState.gain = null;
+        }
+        if (!createIfMissing && !audioUnlockState.context) return null;
+        if (!audioUnlockState.context) {
+          try {
+            audioUnlockState.context = new AudioContextCtor({ latencyHint: "interactive" });
+          } catch (_) {
+            audioUnlockState.context = new AudioContextCtor();
+          }
+          resetBrowserAudioTiming();
+        }
+        browserAudioState.supported = true;
+        return audioUnlockState.context;
+      }
+
+      function publishBrowserAudioState(reason) {
+        const context = audioUnlockState.context;
+        const channels = {};
+        for (const [id, channel] of browserAudioState.channels.entries()) {
+          channels[id] = {
+            queuedFrames: queuedBrowserAudioFrames(channel),
+            queuedSeconds: queuedBrowserAudioSeconds(channel),
+            nextTime: channel.nextTime,
+          };
+        }
+        window.__rt4AudioState = {
+          reason,
+          supported: browserAudioState.supported,
+          unlocked: audioUnlockState.unlocked,
+          contextState: context ? context.state || "unknown" : "none",
+          contextSampleRate: context ? context.sampleRate || 0 : 0,
+          baseLatency: context && Number.isFinite(context.baseLatency) ? context.baseLatency : 0,
+          outputLatency: context && Number.isFinite(context.outputLatency) ? context.outputLatency : 0,
+          sampleRate: browserAudioState.sampleRate,
+          stereo: browserAudioState.stereo,
+          gain: browserAudioState.gain ? browserAudioState.gain.gain.value : null,
+          writes: browserAudioState.writes,
+          dropped: browserAudioState.dropped,
+          silentWrites: browserAudioState.silentWrites,
+          nonSilentWrites: browserAudioState.nonSilentWrites,
+          lastWriteAt: browserAudioState.lastWriteAt,
+          lastWriteChannel: browserAudioState.lastWriteChannel,
+          lastFrameCount: browserAudioState.lastFrameCount,
+          lastSampleCount: browserAudioState.lastSampleCount,
+          lastNonZeroSamples: browserAudioState.lastNonZeroSamples,
+          lastPeakRaw: browserAudioState.lastPeakRaw,
+          lastPeakFloat: browserAudioState.lastPeakFloat,
+          lastRmsRaw: browserAudioState.lastRmsRaw,
+          lastRmsFloat: browserAudioState.lastRmsFloat,
+          maxPeakRaw: browserAudioState.maxPeakRaw,
+          maxPeakFloat: browserAudioState.maxPeakFloat,
+          maxRmsFloat: browserAudioState.maxRmsFloat,
+          lastScale: browserAudioState.lastScale,
+          lastTestToneAt: browserAudioState.lastTestToneAt,
+          channels,
+          at: Date.now(),
+        };
+      }
+      publishBrowserAudioState("startup");
+
+      function resumeAudioContextIfNeeded(reason = "resume") {
+        const context = audioContext(false, false);
+        if (!context || typeof context.resume !== "function") return;
+        const now = Date.now();
+        if (now - audioUnlockState.lastResumeAt < 250) return;
+        audioUnlockState.lastResumeAt = now;
+        try {
+          const resumed = context.resume();
+          if (resumed && typeof resumed.then === "function") {
+            resumed.catch(() => {});
+          }
+          window.__rt4AudioResume = { reason, state: context.state || "unknown", at: now };
+          publishBrowserAudioState(reason);
+        } catch (_) {
+        }
+      }
+
+      function startSilentAudioUnlockSource(context, reason) {
+        if (!context || audioUnlockState.silentStarted) return;
+        try {
+          const buffer = context.createBuffer(1, 1, Math.max(8000, context.sampleRate || 44100));
+          const source = context.createBufferSource();
+          const gain = context.createGain();
+          gain.gain.value = 0;
+          source.buffer = buffer;
+          source.connect(gain);
+          gain.connect(context.destination);
+          source.start(0);
+          audioUnlockState.silentStarted = true;
+          window.__rt4AudioSilentUnlock = { reason, state: context.state || "unknown", at: Date.now() };
+        } catch (error) {
+          window.__rt4AudioSilentUnlock = {
+            reason,
+            error: error && error.message ? error.message : String(error),
+            state: context.state || "unknown",
+            at: Date.now(),
+          };
+        }
+      }
+
+      function unlockAudioOnGesture(reason = "gesture") {
+        let context = audioContext();
+        if (!context) return;
+        browserAudioState.supported = true;
+        try {
+          if (
+            shouldUseTouchHarness() &&
+            context.state === "suspended" &&
+            !audioUnlockState.recreatedOnGesture &&
+            browserAudioState.writes === 0
+          ) {
+            audioUnlockState.recreatedOnGesture = true;
+            context = audioContext(true) || context;
+          }
+          startSilentAudioUnlockSource(context, reason);
+          if (!audioUnlockState.unlocked) {
+            audioUnlockState.unlocked = true;
+            window.__rt4AudioUnlocked = true;
+          }
+          const finishUnlock = () => {
+            try {
+              const oscillator = context.createOscillator();
+              const gain = context.createGain();
+              gain.gain.value = 0;
+              oscillator.connect(gain);
+              gain.connect(context.destination);
+              oscillator.start();
+              oscillator.stop(context.currentTime + 0.01);
+            } catch (_) {
+            }
+            audioUnlockState.unlocked = true;
+            window.__rt4AudioUnlocked = true;
+            publishBrowserAudioState(reason);
+          };
+          if (context.state === "suspended" && typeof context.resume === "function") {
+            const resumed = context.resume();
+            if (resumed && typeof resumed.then === "function") {
+              resumed.then(finishUnlock).catch(finishUnlock);
+              return;
+            }
+          }
+          finishUnlock();
+        } catch (_) {
+        }
+      }
+
+      window.__rt4UnlockAudio = function(reason = "manual") {
+        unlockAudioOnGesture(reason);
+        resumeAudioContextIfNeeded(reason);
+        return window.__rt4AudioState || null;
+      };
+
+      window.__rt4ResetAudioContext = function(reason = "manual-reset") {
+        audioContext(true);
+        ensureBrowserAudioOutput(reason);
+        publishBrowserAudioState(reason);
+        return window.__rt4AudioState || null;
+      };
+
+      window.__rt4PlayAudioTestTone = function(reason = "manual-tone") {
+        const context = ensureBrowserAudioOutput(reason);
+        if (!context) return window.__rt4AudioState || null;
+        unlockAudioOnGesture(reason);
+        resumeAudioContextIfNeeded(reason);
+        try {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.value = 440;
+          gain.gain.value = 0.18;
+          oscillator.connect(gain);
+          gain.connect(browserAudioState.gain || context.destination);
+          oscillator.start(context.currentTime + 0.01);
+          oscillator.stop(context.currentTime + 0.35);
+          browserAudioState.lastTestToneAt = Date.now();
+          publishBrowserAudioState(reason);
+        } catch (error) {
+          window.__rt4AudioToneError = error && error.message ? error.message : String(error);
+          publishBrowserAudioState(reason + "-error");
+        }
+        return window.__rt4AudioState || null;
+      };
+
+      function browserAudioChannel(channelId) {
+        const id = Number(channelId) || 0;
+        let channel = browserAudioState.channels.get(id);
+        if (!channel) {
+          channel = { nextTime: 0 };
+          browserAudioState.channels.set(id, channel);
+        }
+        return channel;
+      }
+
+      function queuedBrowserAudioFrames(channel) {
+        return Math.floor(queuedBrowserAudioSeconds(channel) * browserAudioState.sampleRate);
+      }
+
+      function queuedBrowserAudioSeconds(channel) {
+        const context = audioUnlockState.context;
+        if (!context || !channel) return 0;
+        return Math.max(0, channel.nextTime - context.currentTime);
+      }
+
+      function ensureBrowserAudioOutput(reason) {
+        const context = audioContext();
+        if (!context) {
+          browserAudioState.supported = false;
+          publishBrowserAudioState(reason);
+          return null;
+        }
+        browserAudioState.supported = true;
+        if (!browserAudioState.gain || browserAudioState.gain.context !== context) {
+          browserAudioState.gain = context.createGain();
+          browserAudioState.gain.gain.value = 1;
+          browserAudioState.gain.connect(context.destination);
+        }
+        publishBrowserAudioState(reason);
+        return context;
+      }
+
+      function placeDisplay(viewport, left, top, width, height) {
+        displayEl.style.inset = "auto";
+        displayEl.style.width = width + "px";
+        displayEl.style.height = height + "px";
+        displayEl.style.left = viewport.left + left + "px";
+        displayEl.style.top = viewport.top + top + "px";
+      }
+
       function applyDisplayTransform() {
         touchState.userScale = clamp(touchState.userScale, touchState.minUserScale, touchState.maxUserScale);
-        const totalScale = touchState.fitScale * touchState.userScale;
+        const totalScaleX = (touchState.fitScaleX || touchState.fitScale) * touchState.userScale;
+        const totalScaleY = (touchState.fitScaleY || touchState.fitScale) * touchState.userScale;
+        const liftY = Number(touchState.keyboardLiftY) || 0;
+        const keyboardOffsetX = isKeyboardProxyActive() ? Number(touchState.keyboardManualOffsetX) || 0 : 0;
+        const keyboardOffsetY = isKeyboardProxyActive() ? Number(touchState.keyboardManualOffsetY) || 0 : 0;
         const transforms = [
-          "translate(" + touchState.offsetX + "px, " + touchState.offsetY + "px)",
-          "scale(" + totalScale + ")",
+          "translate(" + (touchState.offsetX + keyboardOffsetX) + "px, " + (touchState.offsetY + liftY + keyboardOffsetY) + "px)",
+          "scale(" + totalScaleX + ", " + totalScaleY + ")",
         ];
         if (touchState.rotated) {
           transforms.push("rotate(90deg)");
@@ -485,8 +998,60 @@
         displayEl.style.transform = transforms.join(" ");
       }
 
+      function setDisplayFitScale(scaleX, scaleY = scaleX) {
+        touchState.fitScale = scaleX;
+        touchState.fitScaleX = scaleX;
+        touchState.fitScaleY = scaleY;
+      }
+
+      function gameSurfaceElement() {
+        const canvases = Array.from(displayEl.querySelectorAll("#cheerpjDisplay canvas"));
+        const candidates = canvases.length > 0
+          ? canvases
+          : Array.from(displayEl.querySelectorAll("#cheerpjDisplay .cjWindow"));
+        let best = null;
+        let bestArea = 0;
+        for (const element of candidates) {
+          const rect = element.getBoundingClientRect();
+          const area = rect.width * rect.height;
+          if (rect.width > 2 && rect.height > 2 && area > bestArea) {
+            best = element;
+            bestArea = area;
+          }
+        }
+        return best || displayEl;
+      }
+
+      function gameSurfaceRect() {
+        const rect = gameSurfaceElement().getBoundingClientRect();
+        if (rect.width > 2 && rect.height > 2) return rect;
+        return displayEl.getBoundingClientRect();
+      }
+
+      function renderedDisplayScale() {
+        const rect = gameSurfaceRect();
+        return {
+          x: Math.max(0.001, rect.width / Math.max(1, touchState.logicalWidth || rect.width || 1)),
+          y: Math.max(0.001, rect.height / Math.max(1, touchState.logicalHeight || rect.height || 1)),
+        };
+      }
+
       function isCoarsePointer() {
         return window.matchMedia("(hover: none), (pointer: coarse)").matches;
+      }
+
+      function hasDesktopFinePointer() {
+        return window.matchMedia("(any-hover: hover) and (any-pointer: fine)").matches;
+      }
+
+      function browserFpsTarget() {
+        const coarse = isCoarsePointer();
+        const configured = coarse
+          ? (wrapperConfig.mobileBrowserFps !== undefined ? wrapperConfig.mobileBrowserFps : wrapperConfig.browserFps)
+          : (wrapperConfig.desktopBrowserFps !== undefined ? wrapperConfig.desktopBrowserFps : wrapperConfig.browserFps);
+        const raw = queryParams.has("browserFps") ? queryParams.get("browserFps") : configured;
+        const value = Number(raw);
+        return Number.isFinite(value) ? clamp(Math.round(value), 10, 30) : (coarse ? 18 : 24);
       }
 
       function shouldShowTouchControls() {
@@ -494,7 +1059,9 @@
       }
 
       function shouldUseTouchHarness() {
-        return touchState.enabled && isCoarsePointer();
+        if (!touchState.enabled) return false;
+        if (queryParams.has("forcetouch") || wrapperConfig.forceTouchHarness === true) return true;
+        return isCoarsePointer() && !hasDesktopFinePointer();
       }
 
       function shouldUseNativeTouchMouseEvents() {
@@ -503,6 +1070,37 @@
 
       function shouldUseBrowserMouseBridge() {
         return shouldUseTouchHarness() && booleanOption("mobileDirectMouse", true);
+      }
+
+      function shouldUseDesktopMouseBridge() {
+        return !shouldUseTouchHarness() && booleanOption("desktopDirectMouse", true);
+      }
+
+      function isTouchCaptureTarget(target) {
+        return Boolean(
+          touchCaptureLayerEl &&
+          target &&
+          (target === touchCaptureLayerEl || (target.closest && target.closest("#touch-capture-layer")))
+        );
+      }
+
+      function isGameInputSurfaceTarget(target) {
+        return Boolean(target && (isTouchCaptureTarget(target) || (target.nodeType && displayEl.contains(target))));
+      }
+
+      function syncTouchCaptureLayer() {
+        const active = shouldUseTouchHarness();
+        document.body.classList.toggle("touch-capture-active", active);
+        if (!active) {
+          touchCaptureLayerEl.style.width = "0";
+          touchCaptureLayerEl.style.height = "0";
+          return;
+        }
+        const rect = displayEl.getBoundingClientRect();
+        touchCaptureLayerEl.style.left = Math.round(rect.left) + "px";
+        touchCaptureLayerEl.style.top = Math.round(rect.top) + "px";
+        touchCaptureLayerEl.style.width = Math.max(0, Math.round(rect.width)) + "px";
+        touchCaptureLayerEl.style.height = Math.max(0, Math.round(rect.height)) + "px";
       }
 
       function shouldUseDesktopTrackpadGestures() {
@@ -518,7 +1116,7 @@
       }
 
       function shouldUseResizableGameSurface() {
-        if (shouldUseTouchHarness()) return booleanOption("mobileResizable", false);
+        if (shouldUseTouchHarness()) return booleanOption("mobileResizable", true);
         if (queryParams.has("resizable")) return true;
         return booleanOption("desktopResizable", false);
       }
@@ -546,40 +1144,54 @@
 
       function mobileFitMode(portrait) {
         const mode = queryParams.get("mobileFitMode") || wrapperConfig.mobileFitMode;
-        if (mode === "cover" || mode === "contain" || mode === "aspect" || mode === "balanced") return mode;
+        if (mode === "cover" || mode === "contain" || mode === "aspect" || mode === "balanced" || mode === "fill") return mode;
         if (isGameplayLayoutActive()) {
           const gameplayMode = portrait
             ? wrapperConfig.mobileGameplayPortraitFitMode || wrapperConfig.mobileGameplayFitMode
             : wrapperConfig.mobileGameplayLandscapeFitMode || wrapperConfig.mobileGameplayFitMode;
-          if (gameplayMode === "cover" || gameplayMode === "contain" || gameplayMode === "aspect" || gameplayMode === "balanced") return gameplayMode;
+          if (gameplayMode === "cover" || gameplayMode === "contain" || gameplayMode === "aspect" || gameplayMode === "balanced" || gameplayMode === "fill") return gameplayMode;
           return "aspect";
         }
         const portraitMode = wrapperConfig.mobilePortraitFitMode;
-        if (portrait && (portraitMode === "cover" || portraitMode === "contain" || portraitMode === "aspect" || portraitMode === "balanced")) return portraitMode;
+        if (portrait && (portraitMode === "cover" || portraitMode === "contain" || portraitMode === "aspect" || portraitMode === "balanced" || portraitMode === "fill")) return portraitMode;
+        const landscapeMode = wrapperConfig.mobileLandscapeFitMode;
+        if (!portrait && (landscapeMode === "cover" || landscapeMode === "contain" || landscapeMode === "aspect" || landscapeMode === "balanced" || landscapeMode === "fill")) return landscapeMode;
         return portrait ? "balanced" : "aspect";
       }
 
       function normalizedFitMode(mode, fallback) {
-        return mode === "cover" || mode === "contain" || mode === "aspect" || mode === "balanced" ? mode : fallback;
+        return mode === "cover" || mode === "contain" || mode === "aspect" || mode === "balanced" || mode === "fill" ? mode : fallback;
       }
 
       function mobileFixedFitMode(portrait) {
         const queryMode = queryParams.get("mobileFixedFitMode");
-        if (queryMode) return normalizedFitMode(queryMode, portrait ? "balanced" : "contain");
+        if (queryMode) return normalizedFitMode(queryMode, portrait ? "contain" : "cover");
         const configured = portrait
           ? wrapperConfig.mobileFixedPortraitFitMode || wrapperConfig.mobileFixedFitMode
           : wrapperConfig.mobileFixedLandscapeFitMode || wrapperConfig.mobileFixedFitMode;
-        return normalizedFitMode(configured, portrait ? "balanced" : "contain");
+        return normalizedFitMode(configured, portrait ? "contain" : "cover");
       }
 
       function mobileBalancedScale(portrait) {
         const viewport = viewportSize();
-        const targetVisibleWidth = clamp(
-          numberOption("mobilePortraitVisibleWidth", Number(wrapperConfig.mobilePortraitVisibleWidth || 520)),
-          220,
-          765
-        );
-        const fallback = portrait ? viewport.width / targetVisibleWidth : 1;
+        const configuredVisibleWidth = isGameplayLayoutActive()
+          ? wrapperConfig.mobileGameplayPortraitVisibleWidth || wrapperConfig.mobilePortraitVisibleWidth
+          : wrapperConfig.mobilePortraitVisibleWidth;
+        const targetVisibleWidth = clamp(numberOption(
+          isGameplayLayoutActive() ? "mobileGameplayPortraitVisibleWidth" : "mobilePortraitVisibleWidth",
+          Number(configuredVisibleWidth || 520)
+        ), 220, 765);
+        let fallback = portrait ? viewport.width / targetVisibleWidth : 1;
+        if (portrait && isGameplayLayoutActive()) {
+          const heightFill = clamp(numberOption("mobileGameplayPortraitHeightFill", Number(wrapperConfig.mobileGameplayPortraitHeightFill || 0)), 0, 0.95);
+          if (heightFill > 0) {
+            fallback = Math.max(fallback, viewport.height * heightFill / mobileMinGameHeight());
+          }
+          const minVisibleWidth = clamp(numberOption("mobileGameplayPortraitMinVisibleWidth", Number(wrapperConfig.mobileGameplayPortraitMinVisibleWidth || 0)), 0, 765);
+          if (minVisibleWidth > 0) {
+            fallback = Math.min(fallback, viewport.width / Math.max(220, minVisibleWidth));
+          }
+        }
         const raw = queryParams.has("mobilePortraitScale")
           ? queryParams.get("mobilePortraitScale")
           : queryParams.has("mobileBalancedScale")
@@ -592,7 +1204,13 @@
       function mobileViewportCenter(portrait, axis, fallback) {
         const queryName = axis === "x" ? "mobilePortraitCenterX" : "mobilePortraitCenterY";
         const configName = axis === "x" ? "mobilePortraitCenterX" : "mobilePortraitCenterY";
-        const raw = portrait && queryParams.has(queryName)
+        const gameplayQueryName = axis === "x" ? "mobileGameplayPortraitCenterX" : "mobileGameplayPortraitCenterY";
+        const gameplayConfigName = axis === "x" ? "mobileGameplayPortraitCenterX" : "mobileGameplayPortraitCenterY";
+        const raw = portrait && isGameplayLayoutActive() && queryParams.has(gameplayQueryName)
+          ? queryParams.get(gameplayQueryName)
+          : portrait && isGameplayLayoutActive() && wrapperConfig[gameplayConfigName] !== undefined
+            ? wrapperConfig[gameplayConfigName]
+            : portrait && queryParams.has(queryName)
           ? queryParams.get(queryName)
           : portrait
             ? wrapperConfig[configName]
@@ -604,28 +1222,288 @@
       function positionDisplayForGameCenter(viewport, width, height, scale, centerX, centerY) {
         const left = viewport.width / 2 - centerX * scale;
         const top = viewport.height / 2 - centerY * scale;
-        displayEl.style.left = left + "px";
-        displayEl.style.top = top + "px";
+        displayEl.style.left = (viewport.left || 0) + left + "px";
+        displayEl.style.top = (viewport.top || 0) + top + "px";
       }
 
-      function mobileMinGameWidth() {
-        return Math.max(320, Math.round(Number(wrapperConfig.mobileMinGameWidth || wrapperConfig.gameWidth || 765)));
+      function mobileMinGameWidth(portrait = false) {
+        const configValue = portrait && isGameplayLayoutActive()
+          ? wrapperConfig.mobileGameplayPortraitMinGameWidth || wrapperConfig.mobileMinGameWidth
+          : wrapperConfig.mobileMinGameWidth;
+        const queryName = portrait && isGameplayLayoutActive() && queryParams.has("mobileGameplayPortraitMinGameWidth")
+          ? "mobileGameplayPortraitMinGameWidth"
+          : "mobileMinGameWidth";
+        return Math.max(320, Math.round(numberOption(queryName, Number(configValue || wrapperConfig.gameWidth || 765))));
       }
 
       function mobileMinGameHeight() {
-        return Math.max(240, Math.round(Number(wrapperConfig.mobileMinGameHeight || wrapperConfig.gameHeight || 503)));
+        return Math.max(240, Math.round(numberOption("mobileMinGameHeight", Number(wrapperConfig.mobileMinGameHeight || wrapperConfig.gameHeight || 503))));
       }
 
-      function viewportSize() {
+      function rawViewportSize() {
+        let width;
+        let height;
+        if (window.visualViewport) {
+          width = Math.max(1, Math.round(window.visualViewport.width));
+          height = Math.max(1, Math.round(window.visualViewport.height));
+        } else {
+          width = Math.max(1, Math.round(window.innerWidth));
+          height = Math.max(1, Math.round(window.innerHeight));
+        }
+        const insets = safeAreaInsets();
         return {
-          width: Math.max(1, Math.round(window.innerWidth)),
-          height: Math.max(1, Math.round(window.innerHeight)),
+          width: Math.max(1, Math.round(width - insets.left - insets.right)),
+          height: Math.max(1, Math.round(height - insets.top - insets.bottom)),
+          left: Math.round(insets.left),
+          top: Math.round(insets.top),
+          right: Math.round(insets.right),
+          bottom: Math.round(insets.bottom),
+          outerWidth: width,
+          outerHeight: height,
         };
+      }
+
+      function keyboardViewportLockEnabled() {
+        return booleanOption("lockLayoutDuringKeyboard", true) && shouldUseTouchHarness() && isCoarsePointer();
+      }
+
+      function keyboardViewportSnapshot(viewport, reason, extra = {}) {
+        return {
+          ...viewport,
+          portrait: viewport.height > viewport.width,
+          reason,
+          capturedAt: Date.now(),
+          ...extra,
+        };
+      }
+
+      function rememberStableKeyboardViewport(reason = "stable") {
+        if (!keyboardViewportLockEnabled() || isKeyboardProxyActive()) return;
+        const viewport = rawViewportSize();
+        lastStableKeyboardViewport = keyboardViewportSnapshot(viewport, reason);
+        window.__rt4StableKeyboardViewport = lastStableKeyboardViewport;
+      }
+
+      function keyboardViewportWidthTolerance(viewport) {
+        return Math.max(48, Math.round(Number(viewport && (viewport.outerWidth || viewport.width) || 0) * 0.12));
+      }
+
+      function isCompatibleKeyboardViewport(raw, lock) {
+        if (!raw || !lock) return false;
+        const sameInnerOrientation = (raw.height > raw.width) === lock.portrait;
+        const sameOuterOrientation = (raw.outerHeight > raw.outerWidth) === lock.portrait;
+        const sameOrientation = sameInnerOrientation || sameOuterOrientation;
+        const sameWidth = Math.abs((raw.outerWidth || raw.width) - (lock.outerWidth || lock.width)) <= keyboardViewportWidthTolerance(lock);
+        return sameOrientation && sameWidth;
+      }
+
+      function keyboardViewportDelta(raw, lock) {
+        if (!raw || !lock) return 0;
+        return Math.max(
+          0,
+          Number(lock.outerHeight || lock.height || 0) - Number(raw.outerHeight || raw.height || 0),
+          Number(lock.height || 0) - Number(raw.height || 0)
+        );
+      }
+
+      function keyboardShrinkThreshold(lock) {
+        const height = Number(lock && (lock.outerHeight || lock.height)) || window.innerHeight || 0;
+        return Math.max(80, Math.round(height * 0.14));
+      }
+
+      function keyboardLockViewportFor(raw, reason) {
+        const stable = lastStableKeyboardViewport;
+        const stableFresh = stable && Date.now() - stable.capturedAt < 5 * 60 * 1000;
+        const stableLooksFullSize = stable && (
+          stable.outerHeight >= raw.outerHeight - 2 ||
+          stable.height >= raw.height - 2
+        );
+        if (stableFresh && stableLooksFullSize && isCompatibleKeyboardViewport(raw, stable)) {
+          return keyboardViewportSnapshot(stable, reason, {
+            restoredFromStable: true,
+            stableCapturedAt: stable.capturedAt,
+            rawOuterWidth: raw.outerWidth,
+            rawOuterHeight: raw.outerHeight,
+          });
+        }
+        return keyboardViewportSnapshot(raw, reason, { restoredFromStable: false });
+      }
+
+      function shouldUseKeyboardViewportLock(rawViewport) {
+        if (!keyboardViewportLockEnabled() || !keyboardViewportLock || !isKeyboardProxyActive()) return false;
+        const raw = rawViewport || rawViewportSize();
+        return isCompatibleKeyboardViewport(raw, keyboardViewportLock) &&
+          keyboardViewportDelta(raw, keyboardViewportLock) >= keyboardShrinkThreshold(keyboardViewportLock);
+      }
+
+      function viewportSize(options = {}) {
+        const raw = rawViewportSize();
+        if (!options.ignoreKeyboardLock && shouldUseKeyboardViewportLock(raw)) {
+          return {
+            ...keyboardViewportLock,
+            keyboardLocked: true,
+            keyboardHeight: keyboardViewportDelta(raw, keyboardViewportLock),
+            rawWidth: raw.width,
+            rawHeight: raw.height,
+            rawOuterWidth: raw.outerWidth,
+            rawOuterHeight: raw.outerHeight,
+          };
+        }
+        return raw;
+      }
+
+      function captureKeyboardViewportLock(reason = "keyboard") {
+        if (!keyboardViewportLockEnabled()) return;
+        if (keyboardViewportUnlockTimer) {
+          window.clearTimeout(keyboardViewportUnlockTimer);
+          keyboardViewportUnlockTimer = 0;
+        }
+        const raw = viewportSize({ ignoreKeyboardLock: true });
+        if (keyboardViewportLock && isCompatibleKeyboardViewport(raw, keyboardViewportLock) && keyboardViewportDelta(raw, keyboardViewportLock) > 40) {
+          return;
+        }
+        keyboardViewportLock = keyboardLockViewportFor(raw, reason);
+        window.__rt4KeyboardViewportLock = keyboardViewportLock;
+        recordGesture("keyboard-viewport-lock", {
+          reason,
+          viewport: keyboardViewportLock.width + "x" + keyboardViewportLock.height,
+          outer: keyboardViewportLock.outerWidth + "x" + keyboardViewportLock.outerHeight,
+          restoredFromStable: Boolean(keyboardViewportLock.restoredFromStable),
+          rawOuter: raw.outerWidth + "x" + raw.outerHeight,
+        });
+      }
+
+      function releaseKeyboardViewportLock(reason = "keyboard-hide") {
+        if (keyboardViewportUnlockTimer) {
+          window.clearTimeout(keyboardViewportUnlockTimer);
+        }
+        keyboardViewportUnlockTimer = window.setTimeout(() => {
+          keyboardViewportUnlockTimer = 0;
+          keyboardViewportLock = null;
+          window.__rt4KeyboardViewportLock = null;
+          recordGesture("keyboard-viewport-unlock", { reason });
+          syncOrientationLayout(true);
+        }, 180);
+      }
+
+      function isKeyboardDrivenResize() {
+        return shouldUseKeyboardViewportLock(viewportSize({ ignoreKeyboardLock: true }));
+      }
+
+      function keyboardPanToFocusedFieldEnabled() {
+        return booleanOption("keyboardPanToFocusedField", true) && shouldUseTouchHarness() && isCoarsePointer();
+      }
+
+      function keyboardVisibleViewport() {
+        return rawViewportSize();
+      }
+
+      function keyboardManualPanEnabled() {
+        return booleanOption("keyboardManualPan", true) && keyboardPanToFocusedFieldEnabled();
+      }
+
+      function resetManualKeyboardPan(reason = "keyboard-manual-reset") {
+        if (touchState.keyboardManualOffsetX === 0 && touchState.keyboardManualOffsetY === 0) return;
+        touchState.keyboardManualOffsetX = 0;
+        touchState.keyboardManualOffsetY = 0;
+        window.__rt4KeyboardManualPan = { reason, x: 0, y: 0, at: Date.now() };
+        applyDisplayTransform();
+        if (keyboardActiveField) setKeyboardProxyRectForField(keyboardActiveField);
+        renderInputDebugOverlay();
+      }
+
+      function resetKeyboardPan(reason = "keyboard-reset") {
+        if (touchState.keyboardLiftY === 0) return;
+        touchState.keyboardLiftY = 0;
+        window.__rt4KeyboardPan = { reason, liftY: 0, at: Date.now() };
+        applyDisplayTransform();
+      }
+
+      function setKeyboardProxyRectForField(field) {
+        const rect = clientRectForInputField(field);
+        keyboardProxyEl.style.left = Math.round(rect.left) + "px";
+        keyboardProxyEl.style.top = Math.round(rect.top) + "px";
+        keyboardProxyEl.style.width = Math.max(48, Math.round(rect.width)) + "px";
+        keyboardProxyEl.style.height = Math.max(32, Math.round(rect.height)) + "px";
+        keyboardProxyEl.style.bottom = "auto";
+        return rect;
+      }
+
+      function syncKeyboardPan(reason = "keyboard") {
+        const field = keyboardActiveField;
+        if (!keyboardPanToFocusedFieldEnabled() || !isKeyboardProxyActive() || !field) {
+          resetKeyboardPan(reason);
+          return;
+        }
+
+        const viewport = keyboardVisibleViewport();
+        const margin = clamp(numberOption("keyboardFieldMarginPx", 18), 4, 96);
+        const keyboardVisible = keyboardViewportLock
+          ? keyboardViewportDelta(viewport, keyboardViewportLock) >= keyboardShrinkThreshold(keyboardViewportLock)
+          : false;
+        if (!keyboardVisible) {
+          resetKeyboardPan(reason);
+          setKeyboardProxyRectForField(field);
+          return;
+        }
+
+        const manualX = Number(touchState.keyboardManualOffsetX) || 0;
+        const manualY = Number(touchState.keyboardManualOffsetY) || 0;
+        touchState.keyboardLiftY = 0;
+        touchState.keyboardManualOffsetX = 0;
+        touchState.keyboardManualOffsetY = 0;
+        applyDisplayTransform();
+        const baseRect = clientRectForInputField(field);
+        const visibleTop = (viewport.top || 0) + margin;
+        const visibleBottom = (viewport.top || 0) + viewport.height - margin;
+        const fieldBottom = baseRect.top + baseRect.height;
+        let liftY = 0;
+        if (fieldBottom > visibleBottom) {
+          liftY = visibleBottom - fieldBottom;
+        }
+        if (baseRect.top + liftY < visibleTop) {
+          liftY = Math.min(0, visibleTop - baseRect.top);
+        }
+
+        touchState.keyboardManualOffsetX = manualX;
+        touchState.keyboardManualOffsetY = manualY;
+        touchState.keyboardLiftY = Math.round(liftY);
+        applyDisplayTransform();
+        const rect = setKeyboardProxyRectForField(field);
+        window.__rt4KeyboardPan = {
+          reason,
+          liftY: touchState.keyboardLiftY,
+          manualX: Math.round(manualX),
+          manualY: Math.round(manualY),
+          field: {
+            id: field.id,
+            name: field.name || null,
+            fallback: Boolean(field.fallback),
+          },
+          viewport: viewport.width + "x" + viewport.height,
+          keyboardHeight: keyboardViewportLock ? keyboardViewportDelta(viewport, keyboardViewportLock) : 0,
+          rect: {
+            left: Math.round(rect.left),
+            top: Math.round(rect.top),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          },
+          at: Date.now(),
+        };
+        recordGesture("keyboard-pan", window.__rt4KeyboardPan);
+      }
+
+      function viewportRight(viewport) {
+        return (viewport.left || 0) + viewport.width;
+      }
+
+      function viewportBottom(viewport) {
+        return (viewport.top || 0) + viewport.height;
       }
 
       function currentViewportSizeKey() {
         const viewport = viewportSize();
-        return viewport.width + "x" + viewport.height + ":" + (shouldUseResizableGameSurface() ? "resizable" : "fixed") + ":" + (shouldUseMobileFitSurface() ? "fit" : "raw") + ":" + (touchState.rotatePortrait ? "rotate" : "normal");
+        return viewport.left + "," + viewport.top + ":" + viewport.width + "x" + viewport.height + ":" + (shouldUseResizableGameSurface() ? "resizable" : "fixed") + ":" + (shouldUseMobileFitSurface() ? "fit" : "raw") + ":" + (touchState.rotatePortrait ? "rotate" : "normal");
       }
 
       function ensureLayoutFresh() {
@@ -637,6 +1515,9 @@
 
       function syncOrientationLayout(forceCheerpJSize = false) {
         const viewport = viewportSize();
+        if (!viewport.keyboardLocked) {
+          rememberStableKeyboardViewport("layout");
+        }
         const portrait = viewport.height > viewport.width;
         const resizableSurface = shouldUseResizableGameSurface();
         const shouldRotate = resizableSurface && touchState.enabled && touchState.rotatePortrait && isCoarsePointer() && portrait;
@@ -645,25 +1526,25 @@
         document.body.classList.toggle("is-landscape", !portrait);
         document.body.classList.toggle("is-rotated", shouldRotate);
         touchControlsEl.classList.toggle("visible", shouldShowTouchControls());
+        let activeFitMode = shouldUseMobileFitSurface() ? mobileFitMode(portrait) : null;
 
         if (shouldRotate) {
+          activeFitMode = "rotated";
           const width = viewport.height;
           const height = viewport.width;
           touchState.logicalWidth = width;
           touchState.logicalHeight = height;
-          touchState.fitScale = 1;
-          displayEl.style.inset = "auto";
-          displayEl.style.width = width + "px";
-          displayEl.style.height = height + "px";
-          displayEl.style.left = (viewport.width - width) / 2 + "px";
-          displayEl.style.top = (viewport.height - height) / 2 + "px";
+          setDisplayFitScale(1);
+          placeDisplay(viewport, (viewport.width - width) / 2, (viewport.height - height) / 2, width, height);
         } else if (shouldUseMobileFitSurface()) {
           const fixedMobileSurface = shouldUseTouchHarness() && !resizableSurface;
-          const minWidth = fixedMobileSurface ? fixedGameWidth() : mobileMinGameWidth();
+          const minWidth = fixedMobileSurface ? fixedGameWidth() : mobileMinGameWidth(portrait);
           const minHeight = fixedMobileSurface ? fixedGameHeight() : mobileMinGameHeight();
           const fitMode = fixedMobileSurface ? mobileFixedFitMode(portrait) : mobileFitMode(portrait);
+          activeFitMode = fitMode;
           let width = minWidth;
           let height = minHeight;
+          let forcedFitScale = null;
 
           if (!fixedMobileSurface && fitMode === "aspect") {
             const aspect = viewport.width / viewport.height;
@@ -678,6 +1559,30 @@
                 width = Math.round(height * aspect);
               }
             }
+
+            if (portrait && isGameplayLayoutActive()) {
+              const viewWidth = clamp(
+                numberOption("mobileGameplayPortraitViewWidth", Number(wrapperConfig.mobileGameplayPortraitViewWidth || 0)),
+                0,
+                minWidth
+              );
+              if (viewWidth > 0 && viewWidth < minWidth) {
+                forcedFitScale = viewport.width / viewWidth;
+                width = minWidth;
+                height = Math.max(minHeight, Math.round(viewport.height / forcedFitScale));
+              }
+            } else if (!portrait && isGameplayLayoutActive()) {
+              const viewWidth = clamp(
+                numberOption("mobileGameplayLandscapeViewWidth", Number(wrapperConfig.mobileGameplayLandscapeViewWidth || 0)),
+                0,
+                1800
+              );
+              if (viewWidth > width) {
+                forcedFitScale = viewport.width / viewWidth;
+                width = Math.round(viewWidth);
+                height = Math.max(minHeight, Math.round(width / aspect));
+              }
+            }
           }
 
           const fitPadding = clamp(Number(wrapperConfig.fitPadding || 1), 0.8, 1);
@@ -685,57 +1590,72 @@
           const coverScale = Math.max(viewport.width / width, viewport.height / height);
           const rawScale = fitMode === "cover"
             ? coverScale
-            : fitMode === "balanced"
-              ? clamp(mobileBalancedScale(portrait), containScale, coverScale)
-              : containScale;
-          const fitScale = rawScale * fitPadding;
+            : fitMode === "fill"
+              ? null
+              : forcedFitScale !== null
+                ? forcedFitScale
+              : fitMode === "balanced"
+                ? clamp(mobileBalancedScale(portrait), containScale, coverScale)
+                : containScale;
+          const fitScale = rawScale === null ? 1 : rawScale * fitPadding;
           touchState.logicalWidth = Math.max(minWidth, Math.round(width));
           touchState.logicalHeight = Math.max(minHeight, Math.round(height));
-          touchState.fitScale = fitScale;
+          setDisplayFitScale(
+            fitMode === "fill" ? viewport.width / touchState.logicalWidth : fitScale,
+            fitMode === "fill" ? viewport.height / touchState.logicalHeight : fitScale
+          );
           displayEl.style.inset = "auto";
           displayEl.style.width = touchState.logicalWidth + "px";
           displayEl.style.height = touchState.logicalHeight + "px";
-          positionDisplayForGameCenter(
-            viewport,
-            touchState.logicalWidth,
-            touchState.logicalHeight,
-            fitScale,
-            mobileViewportCenter(portrait, "x", touchState.logicalWidth / 2),
-            mobileViewportCenter(portrait, "y", touchState.logicalHeight / 2)
-          );
+          if (fitMode === "fill") {
+            displayEl.style.left = (viewport.left || 0) + "px";
+            displayEl.style.top = (viewport.top || 0) + "px";
+          } else {
+            positionDisplayForGameCenter(
+              viewport,
+              touchState.logicalWidth,
+              touchState.logicalHeight,
+              fitScale,
+              mobileViewportCenter(portrait, "x", touchState.logicalWidth / 2),
+              mobileViewportCenter(portrait, "y", touchState.logicalHeight / 2)
+            );
+          }
         } else if (resizableSurface) {
+          activeFitMode = "resizable";
           touchState.logicalWidth = viewport.width;
           touchState.logicalHeight = viewport.height;
-          touchState.fitScale = 1;
-          displayEl.style.inset = "0";
+          setDisplayFitScale(1);
+          displayEl.style.inset = "auto";
           displayEl.style.width = viewport.width + "px";
           displayEl.style.height = viewport.height + "px";
-          displayEl.style.left = "";
-          displayEl.style.top = "";
+          displayEl.style.left = (viewport.left || 0) + "px";
+          displayEl.style.top = (viewport.top || 0) + "px";
         } else if (shouldUseDesktopFitSurface()) {
+          activeFitMode = "desktop-fit";
           const width = fixedGameWidth();
           const height = fixedGameHeight();
           const fitPadding = clamp(Number(wrapperConfig.desktopFitPadding || wrapperConfig.fitPadding || 1), 0.75, 1);
           const fitScale = Math.min(viewport.width / width, viewport.height / height) * fitPadding;
           touchState.logicalWidth = width;
           touchState.logicalHeight = height;
-          touchState.fitScale = fitScale;
+          setDisplayFitScale(fitScale);
           displayEl.style.inset = "auto";
           displayEl.style.width = width + "px";
           displayEl.style.height = height + "px";
-          displayEl.style.left = Math.round((viewport.width - width * fitScale) / 2) + "px";
-          displayEl.style.top = Math.round((viewport.height - height * fitScale) / 2) + "px";
+          displayEl.style.left = Math.round((viewport.left || 0) + (viewport.width - width * fitScale) / 2) + "px";
+          displayEl.style.top = Math.round((viewport.top || 0) + (viewport.height - height * fitScale) / 2) + "px";
         } else {
+          activeFitMode = "fixed";
           const width = fixedGameWidth();
           const height = fixedGameHeight();
           touchState.logicalWidth = width;
           touchState.logicalHeight = height;
-          touchState.fitScale = 1;
+          setDisplayFitScale(1);
           displayEl.style.inset = "auto";
           displayEl.style.width = width + "px";
           displayEl.style.height = height + "px";
-          displayEl.style.left = Math.max(0, Math.round((viewport.width - width) / 2)) + "px";
-          displayEl.style.top = Math.max(0, Math.round((viewport.height - height) / 2)) + "px";
+          displayEl.style.left = Math.max(0, Math.round((viewport.left || 0) + (viewport.width - width) / 2)) + "px";
+          displayEl.style.top = Math.max(0, Math.round((viewport.top || 0) + (viewport.height - height) / 2)) + "px";
         }
 
         if (touchState.userScale <= touchState.minUserScale + 0.001) {
@@ -743,6 +1663,8 @@
           touchState.offsetY = 0;
         }
         applyDisplayTransform();
+        syncTouchCaptureLayer();
+        touchState.fitMode = activeFitMode;
         const logicalSizeKey = Math.round(touchState.logicalWidth) + "x" + Math.round(touchState.logicalHeight) + ":" + Number(touchState.fitScale).toFixed(4) + ":" + (touchState.rotated ? "rotated" : "normal");
         const viewportKey = currentViewportSizeKey();
         let layoutChanged = false;
@@ -751,6 +1673,26 @@
           lastLogicalSizeKey = logicalSizeKey;
           lastViewportSizeKey = viewportKey;
           layoutChanged = true;
+          const now = Date.now();
+          if (serverLogEnabled && now - lastServerLayoutLogAt > 500) {
+            lastServerLayoutLogAt = now;
+            const rect = displayEl.getBoundingClientRect();
+            const scale = renderedDisplayScale();
+            sendServerDiagnostic("layout", {
+              viewport: viewport.width + "x" + viewport.height,
+              visualViewport: window.visualViewport ? Math.round(window.visualViewport.width) + "x" + Math.round(window.visualViewport.height) : "",
+              logical: Math.round(touchState.logicalWidth) + "x" + Math.round(touchState.logicalHeight),
+              display: Math.round(rect.width) + "x" + Math.round(rect.height),
+              displayRect: Math.round(rect.left) + "," + Math.round(rect.top),
+              fitMode: touchState.fitMode || activeFitMode,
+              fitScaleX: Number(touchState.fitScaleX || touchState.fitScale).toFixed(3),
+              fitScaleY: Number(touchState.fitScaleY || touchState.fitScale).toFixed(3),
+              renderedScaleX: scale.x.toFixed(3),
+              renderedScaleY: scale.y.toFixed(3),
+              userScale: Number(touchState.userScale).toFixed(2),
+              rotated: touchState.rotated ? 1 : 0,
+            });
+          }
         }
         syncCheerpJDisplaySize(forceCheerpJSize || layoutChanged);
       }
@@ -805,12 +1747,17 @@
         window.__rt4LayoutState = {
           width,
           height,
-          fitMode: shouldUseMobileFitSurface() ? mobileFitMode(viewport.height > viewport.width) : null,
+          fitMode: touchState.fitMode || (shouldUseMobileFitSurface() ? mobileFitMode(viewport.height > viewport.width) : null),
           rotated: touchState.rotated,
           fitScale: touchState.fitScale,
+          fitScaleX: touchState.fitScaleX || touchState.fitScale,
+          fitScaleY: touchState.fitScaleY || touchState.fitScale,
           userScale: touchState.userScale,
           totalScale: touchState.fitScale * touchState.userScale,
+          totalScaleX: (touchState.fitScaleX || touchState.fitScale) * touchState.userScale,
+          totalScaleY: (touchState.fitScaleY || touchState.fitScale) * touchState.userScale,
           viewport: viewportSize(),
+          stableKeyboardViewport: lastStableKeyboardViewport,
           displayRect: (() => {
             const rect = displayEl.getBoundingClientRect();
             return {
@@ -850,17 +1797,17 @@
         }
         const state = window.__rt4LayoutState;
         if (!state) return;
-        const rect = displayEl.getBoundingClientRect();
-        const scale = Math.max(0.001, touchState.fitScale * touchState.userScale);
+        const rect = gameSurfaceRect();
+        const scale = renderedDisplayScale();
         const viewport = viewportSize();
-        const visibleLeft = clamp((0 - rect.left) / scale, 0, state.width);
-        const visibleRight = clamp((viewport.width - rect.left) / scale, 0, state.width);
-        const visibleTop = clamp((0 - rect.top) / scale, 0, state.height);
-        const visibleBottom = clamp((viewport.height - rect.top) / scale, 0, state.height);
+        const visibleLeft = clamp(((viewport.left || 0) - rect.left) / scale.x, 0, state.width);
+        const visibleRight = clamp((viewportRight(viewport) - rect.left) / scale.x, 0, state.width);
+        const visibleTop = clamp(((viewport.top || 0) - rect.top) / scale.y, 0, state.height);
+        const visibleBottom = clamp((viewportBottom(viewport) - rect.top) / scale.y, 0, state.height);
         layoutDebugBadgeEl.style.display = "block";
         layoutDebugBadgeEl.textContent = [
-          "fit " + state.fitMode + " scale " + state.totalScale.toFixed(3),
-          "view " + viewport.width + "x" + viewport.height + " game " + state.width + "x" + state.height,
+          "fit " + state.fitMode + " scale " + scale.x.toFixed(3) + "x" + scale.y.toFixed(3),
+          "view " + viewport.width + "x" + viewport.height + " safe " + (viewport.left || 0) + "," + (viewport.top || 0) + " game " + state.width + "x" + state.height,
           "visible x " + Math.round(visibleLeft) + "-" + Math.round(visibleRight) + " y " + Math.round(visibleTop) + "-" + Math.round(visibleBottom),
         ].join("\n");
       }
@@ -903,7 +1850,11 @@
         recordGesture("keyboard-hide", { active: document.activeElement === keyboardProxyEl });
         keyboardProxyActive = false;
         window.__rt4KeyboardProxyActive = keyboardProxyActive;
+        keyboardActiveField = null;
         pendingKeyboardRefocus = null;
+        resetKeyboardPan("hideKeyboard");
+        resetManualKeyboardPan("hideKeyboard");
+        releaseKeyboardViewportLock("hideKeyboard");
         keyboardProxyEl.style.pointerEvents = "none";
         keyboardProxyEl.style.width = "48px";
         keyboardProxyEl.style.height = "32px";
@@ -998,6 +1949,83 @@
         browserInputCharQueue.push(charCode);
       }
 
+      function keyboardEventKeyCode(key) {
+        switch (key) {
+          case "Backspace": return 8;
+          case "Enter": return 13;
+          case "Tab": return 9;
+          case "Escape": return 27;
+          case "ArrowLeft": return 37;
+          case "ArrowRight": return 39;
+          case "ArrowUp": return 38;
+          case "ArrowDown": return 40;
+          default: return -1;
+        }
+      }
+
+      function isPrintableKeyboardKey(event) {
+        return typeof event.key === "string" &&
+          event.key.length === 1 &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.isComposing;
+      }
+
+      function shouldIgnoreGlobalKeyboardEvent(event) {
+        if (isKeyboardProxyActive()) return true;
+        if (event.defaultPrevented || event.isComposing) return true;
+        if (event.ctrlKey || event.metaKey || event.altKey) return true;
+        const target = event.target;
+        if (!target) return false;
+        if (target === document.body || target === document.documentElement || target === window) return false;
+        if (target === keyboardProxyEl) return true;
+        if (typeof target.closest === "function") {
+          return Boolean(target.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']"));
+        }
+        return false;
+      }
+
+      function forwardGlobalKeyboardEvent(event) {
+        if (event.__rt4GlobalHandled) return;
+        event.__rt4GlobalHandled = true;
+        if (shouldIgnoreGlobalKeyboardEvent(event)) return;
+        const keyCode = keyboardEventKeyCode(event.key);
+        const printable = isPrintableKeyboardKey(event);
+        try {
+          if (event.type === "keydown") {
+            if (keyCode < 0 && !printable) return;
+            window.__rt4LastKeyboardEvent = {
+              type: "keydown",
+              key: event.key,
+              code: event.code,
+              keyCode,
+              printable,
+              active: document.activeElement && document.activeElement.id,
+              at: Date.now(),
+            };
+            unlockAudioOnGesture();
+            focusGameTarget();
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === "function") {
+              event.stopImmediatePropagation();
+            }
+            if (keyCode >= 0) {
+              dispatchKeyboard("keydown", event.key, event.code, keyCode);
+            } else if (printable) {
+              queueRt4Char(event.key.charCodeAt(0));
+            }
+            return;
+          }
+        } catch (error) {
+          window.__rt4LastKeyboardError = String(error && error.message ? error.message : error);
+        }
+      }
+
+      window.addEventListener("keydown", forwardGlobalKeyboardEvent, true);
+      document.addEventListener("keydown", forwardGlobalKeyboardEvent, true);
+
       function queueBrowserMouse(type, clientX, clientY, button = 1) {
         const point = gamePointFromClient(clientX, clientY);
         const event = {
@@ -1033,6 +2061,8 @@
           keyUpQueue: browserInputKeyUpQueue.length,
           wheelRotation: browserInputWheelRotation,
           cameraZoom: browserInputCameraZoom,
+          cameraYaw: Math.round(browserInputCameraYaw),
+          cameraPitch: Math.round(browserInputCameraPitch),
           ...details,
         };
         window.__rt4LastGesture = payload;
@@ -1042,6 +2072,7 @@
       }
 
       function dispatchKeyboard(type, key, code, keyCode) {
+        unlockAudioOnGesture();
         focusGameTarget();
         const rt4Code = rt4KeyCodeForDomKeyCode(keyCode);
         if (type === "keydown" && rt4Code >= 0) {
@@ -1068,6 +2099,8 @@
       }
 
       function showKeyboard(x, y) {
+        unlockAudioOnGesture();
+        captureKeyboardViewportLock("showKeyboard");
         keyboardProxyActive = true;
         window.__rt4KeyboardProxyActive = keyboardProxyActive;
         recordGesture("keyboard-show", { x: Math.round(Number(x) || 0), y: Math.round(Number(y) || 0) });
@@ -1100,6 +2133,9 @@
           }
         } catch (_) {
         }
+        [0, 80, 220, 420].forEach(delay => {
+          window.setTimeout(() => syncKeyboardPan("showKeyboard"), delay);
+        });
         return document.activeElement === keyboardProxyEl;
       }
 
@@ -1128,35 +2164,61 @@
       }
 
       function holdSwipeKey(keyInfo) {
-        if (!keyInfo) return;
+        if (!keyInfo) return false;
+        window.clearTimeout(touchState.swipeReleaseTimer);
+        touchState.swipeReleaseTimer = 0;
         const nextCode = rt4KeyCodeForDomKeyCode(keyInfo.keyCode);
         const currentCode = touchState.swipeKey ? rt4KeyCodeForDomKeyCode(touchState.swipeKey.keyCode) : -1;
-        if (nextCode === currentCode) return;
+        if (nextCode === currentCode) return false;
         if (currentCode >= 0) queueRt4KeyUp(currentCode);
         queueRt4KeyDown(nextCode);
         touchState.swipeKey = keyInfo;
         recordGesture("swipe-key-down", { key: keyInfo.key, code: nextCode });
+        return true;
       }
 
       function releaseSwipeKey(delayMs = 0) {
         if (!touchState.swipeKey) return;
+        window.clearTimeout(touchState.swipeReleaseTimer);
+        touchState.swipeReleaseTimer = 0;
         const code = rt4KeyCodeForDomKeyCode(touchState.swipeKey.keyCode);
         const key = touchState.swipeKey.key;
         touchState.swipeKey = null;
         if (delayMs > 0) {
-          window.setTimeout(() => queueRt4KeyUp(code), delayMs);
+          touchState.swipeReleaseTimer = window.setTimeout(() => {
+            touchState.swipeReleaseTimer = 0;
+            queueRt4KeyUp(code);
+          }, delayMs);
         } else {
           queueRt4KeyUp(code);
         }
         recordGesture("swipe-key-up", { key, code, delayMs });
       }
 
+      function keyInfoForSwipeAxis(axis, delta, fallbackDx, fallbackDy) {
+        if (axis === "x") {
+          const value = Math.abs(delta) > 0.5 ? delta : fallbackDx;
+          return value < 0
+            ? { key: "ArrowLeft", code: "ArrowLeft", keyCode: 37 }
+            : { key: "ArrowRight", code: "ArrowRight", keyCode: 39 };
+        }
+        const value = Math.abs(delta) > 0.5 ? delta : fallbackDy;
+        return value < 0
+          ? { key: "ArrowUp", code: "ArrowUp", keyCode: 38 }
+          : { key: "ArrowDown", code: "ArrowDown", keyCode: 40 };
+      }
+
       function queueTouchSwipe(dx, dy, deltaX, deltaY, clientX, clientY) {
+        if (shouldUseDirectTouchCamera()) {
+          releaseSwipeKey();
+          queueDirectTouchCamera(deltaX, deltaY, clientX, clientY);
+          return;
+        }
         const axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
         const axisDelta = axis === "x" ? deltaX : deltaY;
-        const stepPx = clamp(numberOption("touchSwipeStepPx", 20), 6, 120);
-        const sensitivity = clamp(numberOption("touchSwipeSensitivity", 1.45), 0.25, 12);
-        const maxSteps = clamp(Math.round(numberOption("touchSwipeMaxSteps", 6)), 1, 16);
+        const stepPx = clamp(numberOption("touchSwipeStepPx", 14), 6, 120);
+        const sensitivity = clamp(numberOption("touchSwipeSensitivity", 1.25), 0.25, 12);
+        const maxSteps = clamp(Math.round(numberOption("touchSwipeMaxSteps", 8)), 1, 16);
         const scaledDelta = axisDelta * sensitivity;
         if (axis === "x") {
           touchState.swipeRemainderX += scaledDelta;
@@ -1165,7 +2227,7 @@
         }
         const remainder = axis === "x" ? touchState.swipeRemainderX : touchState.swipeRemainderY;
         const steps = clamp(Math.trunc(remainder / stepPx), -maxSteps, maxSteps);
-        let keyInfo = keyInfoForDirection(dx, dy);
+        let keyInfo = keyInfoForSwipeAxis(axis, axisDelta, dx, dy);
         if (steps !== 0) {
           if (axis === "x") {
             touchState.swipeRemainderX -= steps * stepPx;
@@ -1179,10 +2241,15 @@
               : { key: "ArrowDown", code: "ArrowDown", keyCode: 40 };
           }
         }
-        holdSwipeKey(keyInfo);
+        const directionChanged = holdSwipeKey(keyInfo);
         const now = Date.now();
-        if (steps !== 0 || now - touchState.swipeLastKeyAt > Number(wrapperConfig.swipeKeyIntervalMs || 120)) {
-          queueRt4KeyCode(rt4KeyCodeForDomKeyCode(keyInfo.keyCode), Math.max(1, Math.min(Math.abs(steps), 3)));
+        const isFirstSwipePulse = touchState.swipeLastKeyAt === 0;
+        const configuredPulseMs = wrapperConfig.touchSwipePulseMs !== undefined ? wrapperConfig.touchSwipePulseMs : wrapperConfig.swipeKeyIntervalMs;
+        const pulseIntervalMs = Math.max(0, Number(configuredPulseMs || 0));
+        if (isFirstSwipePulse || directionChanged || (pulseIntervalMs > 0 && steps !== 0 && now - touchState.swipeLastKeyAt > pulseIntervalMs)) {
+          const initialPulse = Math.round(numberOption("touchSwipeInitialPulse", 1));
+          const repeat = isFirstSwipePulse || directionChanged ? clamp(initialPulse, 1, 3) : 1;
+          queueRt4KeyCode(rt4KeyCodeForDomKeyCode(keyInfo.keyCode), repeat);
           touchState.swipeLastKeyAt = now;
         }
         recordGesture("touch-swipe", {
@@ -1196,23 +2263,16 @@
           sensitivity,
           stepPx,
           steps,
+          directionChanged,
+          pulseIntervalMs,
+          firstPulse: isFirstSwipePulse,
           key: keyInfo.key,
         });
       }
 
       keyboardProxyEl.addEventListener("keydown", event => {
-        const specialKeys = {
-          Backspace: 8,
-          Enter: 13,
-          Tab: 9,
-          Escape: 27,
-          ArrowLeft: 37,
-          ArrowRight: 39,
-          ArrowUp: 38,
-          ArrowDown: 40,
-        };
-        const keyCode = specialKeys[event.key];
-        if (keyCode) {
+        const keyCode = keyboardEventKeyCode(event.key);
+        if (keyCode >= 0) {
           event.preventDefault();
           queueRt4KeyCode(rt4KeyCodeForDomKeyCode(keyCode));
           keyboardProxyEl.value = "";
@@ -1228,14 +2288,17 @@
       keyboardProxyEl.addEventListener("beforeinput", event => {
         if (typeof event.data === "string" && event.data.length > 0) {
           event.preventDefault();
+          keyboardProxyHandledBeforeInput = true;
           for (const char of event.data) {
             queueRt4Char(char.charCodeAt(0));
           }
         } else if (event.inputType === "deleteContentBackward") {
           event.preventDefault();
+          keyboardProxyHandledBeforeInput = true;
           queueRt4KeyCode(rt4KeyCodeForDomKeyCode(8));
         } else if (event.inputType === "insertLineBreak") {
           event.preventDefault();
+          keyboardProxyHandledBeforeInput = true;
           queueRt4KeyCode(rt4KeyCodeForDomKeyCode(13));
           suppressLoginFallback("line-break");
           hideKeyboard();
@@ -1245,6 +2308,10 @@
       keyboardProxyEl.addEventListener("input", () => {
         const text = keyboardProxyEl.value;
         keyboardProxyEl.value = "";
+        if (keyboardProxyHandledBeforeInput) {
+          keyboardProxyHandledBeforeInput = false;
+          return;
+        }
         for (const char of text) {
           queueRt4Char(char.charCodeAt(0));
         }
@@ -1259,29 +2326,33 @@
 
       function gameTargetAt(x, y) {
         const previousPointerEvents = touchControlsEl.style.pointerEvents;
+        const previousCapturePointerEvents = touchCaptureLayerEl.style.pointerEvents;
         touchControlsEl.style.pointerEvents = "none";
+        touchCaptureLayerEl.style.pointerEvents = "none";
         const target = document.elementFromPoint(x, y) || displayEl;
         touchControlsEl.style.pointerEvents = previousPointerEvents;
-        if (target.closest("#panel, #touch-controls")) return gameEventTarget();
+        touchCaptureLayerEl.style.pointerEvents = previousCapturePointerEvents;
+        if (target.closest("#panel, #touch-controls, #touch-capture-layer")) return gameEventTarget();
         if (target === displayEl && displayEl.firstElementChild) return displayEl.firstElementChild;
         if (displayEl.contains(target)) return target;
         return displayEl.firstElementChild || displayEl;
       }
 
       function gamePointFromClient(x, y) {
-        const rect = displayEl.getBoundingClientRect();
-        const scale = Math.max(0.001, touchState.fitScale * touchState.userScale);
+        const rect = gameSurfaceRect();
+        const scale = renderedDisplayScale();
         let gameX;
         let gameY;
 
         if (touchState.rotated) {
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
-          gameX = touchState.logicalWidth / 2 + (y - centerY) / scale;
-          gameY = touchState.logicalHeight / 2 - (x - centerX) / scale;
+          const rotatedScale = Math.max(0.001, (scale.x + scale.y) / 2);
+          gameX = touchState.logicalWidth / 2 + (y - centerY) / rotatedScale;
+          gameY = touchState.logicalHeight / 2 - (x - centerX) / rotatedScale;
         } else {
-          gameX = (x - rect.left) / scale;
-          gameY = (y - rect.top) / scale;
+          gameX = (x - rect.left) / scale.x;
+          gameY = (y - rect.top) / scale.y;
         }
 
         return {
@@ -1307,8 +2378,37 @@
           }
         }
         const fallbackField = loginFallbackFieldAtGamePoint(point);
-        return { field: fallbackField, point, source: fallbackField ? "login-fallback" : null };
+        if (fallbackField) return { field: fallbackField, point, source: "login-fallback" };
+        const chatField = chatFallbackFieldAtGamePoint(point);
+        return { field: chatField, point, source: chatField ? "chat-fallback" : null };
       }
+
+      window.__rt4FieldAtClientPoint = function(x, y) {
+        const hit = fieldAtClientPoint(Number(x) || 0, Number(y) || 0);
+        return {
+          source: hit.source || null,
+          point: {
+            x: Math.round(hit.point.x),
+            y: Math.round(hit.point.y),
+          },
+          field: hit.field ? {
+            id: hit.field.id,
+            name: hit.field.name || null,
+            fallback: Boolean(hit.field.fallback),
+            x: hit.field.x,
+            y: hit.field.y,
+            width: hit.field.width,
+            height: hit.field.height,
+          } : null,
+        };
+      };
+
+      window.__rt4OpenKeyboardForClientPoint = function(x, y) {
+        const hit = fieldAtClientPoint(Number(x) || 0, Number(y) || 0);
+        if (!hit.field) return false;
+        positionKeyboardProxyForField(hit.field);
+        return showKeyboard(Number(x) || 0, Number(y) || 0);
+      };
 
       function isRealTextInputField(field) {
         const width = Number(browserInputFrame.canvasWidth) || touchState.logicalWidth || 765;
@@ -1319,9 +2419,42 @@
         return true;
       }
 
+      function isInitialLoginOptionsState() {
+        if (!browserLoginState.valid) return false;
+        return browserLoginState.topLevelInterface === 744 &&
+          browserLoginState.loginStep === 0 &&
+          browserLoginState.loginAutoStep === 0 &&
+          browserLoginState.createStep === 0 &&
+          browserLoginState.worldListStep === 0 &&
+          browserLoginState.loginReply === -2;
+      }
+
+      function isLoginFallbackArmed() {
+        return Date.now() < loginFallbackArmedUntil;
+      }
+
+      function armLoginFallback(reason, durationMs = 120000) {
+        loginFallbackArmedUntil = Math.max(loginFallbackArmedUntil, Date.now() + durationMs);
+        recordGesture("login-fallback-arm", { reason, until: loginFallbackArmedUntil });
+        renderInputDebugOverlay();
+      }
+
+      function maybeArmLoginFallbackFromTap(x, y) {
+        if (!isInitialLoginOptionsState()) return false;
+        const point = gamePointFromClient(x, y);
+        const width = Number(browserInputFrame.canvasWidth) || touchState.logicalWidth || 765;
+        const height = Number(browserInputFrame.canvasHeight) || touchState.logicalHeight || 503;
+        const inMenuColumn = point.x >= width * 0.32 && point.x <= width * 0.68;
+        const inLoginOrCreateRows = point.y >= height * 0.29 && point.y <= height * 0.49;
+        if (!inMenuColumn || !inLoginOrCreateRows) return false;
+        armLoginFallback("initial-login-menu-tap");
+        return true;
+      }
+
       function isLoginKeyboardFallbackState() {
         if (!loginKeyboardFallbackEnabled) return false;
         if (isGameplayLayoutActive()) return false;
+        if (isInitialLoginOptionsState() && !isLoginFallbackArmed()) return false;
         if (browserLoginState.valid) {
           const idleLoginForm =
             browserLoginState.loginStep === 0 &&
@@ -1372,43 +2505,100 @@
         return null;
       }
 
+      function chatFallbackFields() {
+        if (!booleanOption("mobileChatKeyboardFallback", true)) return [];
+        if (!shouldUseTouchHarness() || !isGameplayLayoutActive()) return [];
+        const width = Math.max(Number(browserInputFrame.canvasWidth) || 0, touchState.logicalWidth || 0, 765);
+        const height = Math.max(Number(browserInputFrame.canvasHeight) || 0, touchState.logicalHeight || 0, 503);
+        const chatWidth = Math.round(Math.min(width * 0.78, 560));
+        const fieldHeight = clamp(Math.round(height * 0.14), 56, 96);
+        const promptHeight = clamp(Math.round(height * 0.22), 88, 126);
+        return [
+          {
+            id: -2001,
+            x: 0,
+            y: Math.max(0, height - fieldHeight),
+            width: chatWidth,
+            height: fieldHeight,
+            fallback: true,
+            name: "chat",
+          },
+          {
+            id: -2002,
+            x: 0,
+            y: Math.max(0, height - promptHeight - 28),
+            width: chatWidth,
+            height: promptHeight,
+            fallback: true,
+            name: "chat-prompt",
+          },
+        ];
+      }
+
+      function chatFallbackFieldAtGamePoint(point) {
+        for (const field of chatFallbackFields()) {
+          if (point.x >= field.x && point.x < field.x + field.width && point.y >= field.y && point.y < field.y + field.height) {
+            return field;
+          }
+        }
+        return null;
+      }
+
+      function allowsFallbackKeyboardRefocus(field) {
+        if (!field || !field.fallback) return true;
+        if (field.name === "chat" || field.name === "chat-prompt") return isGameplayLayoutActive();
+        return isLoginKeyboardFallbackState();
+      }
+
       function clientRectForInputField(field) {
-        const rect = displayEl.getBoundingClientRect();
-        const scale = Math.max(0.001, touchState.fitScale * touchState.userScale);
+        const rect = gameSurfaceRect();
+        const scale = renderedDisplayScale();
         if (touchState.rotated) {
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
-          const left = centerX - (field.y + field.height - touchState.logicalHeight / 2) * scale;
-          const top = centerY + (field.x - touchState.logicalWidth / 2) * scale;
+          const rotatedScale = Math.max(0.001, (scale.x + scale.y) / 2);
+          const left = centerX - (field.y + field.height - touchState.logicalHeight / 2) * rotatedScale;
+          const top = centerY + (field.x - touchState.logicalWidth / 2) * rotatedScale;
           return {
             left,
             top,
-            width: field.height * scale,
-            height: field.width * scale,
+            width: field.height * rotatedScale,
+            height: field.width * rotatedScale,
           };
         }
         return {
-          left: rect.left + field.x * scale,
-          top: rect.top + field.y * scale,
-          width: field.width * scale,
-          height: field.height * scale,
+          left: rect.left + field.x * scale.x,
+          top: rect.top + field.y * scale.y,
+          width: field.width * scale.x,
+          height: field.height * scale.y,
         };
       }
 
       function positionKeyboardProxyForField(field) {
-        const rect = clientRectForInputField(field);
-        keyboardProxyEl.style.left = Math.round(rect.left) + "px";
-        keyboardProxyEl.style.top = Math.round(rect.top) + "px";
-        keyboardProxyEl.style.width = Math.max(48, Math.round(rect.width)) + "px";
-        keyboardProxyEl.style.height = Math.max(32, Math.round(rect.height)) + "px";
-        keyboardProxyEl.style.bottom = "auto";
+        const previousId = keyboardActiveField && keyboardActiveField.id;
+        keyboardActiveField = field || null;
+        window.__rt4KeyboardActiveField = keyboardActiveField ? {
+          id: keyboardActiveField.id,
+          name: keyboardActiveField.name || null,
+          fallback: Boolean(keyboardActiveField.fallback),
+          x: keyboardActiveField.x,
+          y: keyboardActiveField.y,
+          width: keyboardActiveField.width,
+          height: keyboardActiveField.height,
+        } : null;
+        if (!field) return;
+        if (previousId !== undefined && previousId !== field.id) {
+          resetManualKeyboardPan("field-change");
+        }
+        setKeyboardProxyRectForField(field);
+        syncKeyboardPan("position-field");
       }
 
       function renderInputDebugOverlay() {
         if (!inputDebugEnabled) return;
         inputDebugLayerEl.textContent = "";
         const realFields = browserInputFrame.fields.filter(isRealTextInputField);
-        const fields = realFields.length > 0 ? realFields : loginFallbackFields();
+        const fields = realFields.length > 0 ? realFields : [...loginFallbackFields(), ...chatFallbackFields()];
         for (const field of fields) {
           const rect = clientRectForInputField(field);
           const el = document.createElement("div");
@@ -1423,11 +2613,13 @@
       }
 
       function inspectTap(label, x, y, inputHit, proxyFocused) {
-        if (!tapDebugEnabled) return;
+        if (!tapDebugEnabled && !serverLogEnabled) return;
         const point = gamePointFromClient(x, y);
-        const rect = displayEl.getBoundingClientRect();
+        const rect = gameSurfaceRect();
         const target = gameTargetAt(x, y);
         const viewport = viewportSize();
+        const renderedScale = renderedDisplayScale();
+        const displayRect = displayEl.getBoundingClientRect();
         const payload = {
           label,
           clientX: Math.round(x),
@@ -1449,31 +2641,71 @@
           reportedInputFields: browserInputFrame.fields.length,
           loginState: { ...browserLoginState },
           loginKeyboardFallbackState: isLoginKeyboardFallbackState(),
+          loginFallbackArmed: isLoginFallbackArmed(),
+          loginFallbackArmedMs: Math.max(0, Math.round(loginFallbackArmedUntil - Date.now())),
           loginFallbackSuppressed: Date.now() < loginFallbackSuppressedUntil,
           loginFallbackSuppressedMs: Math.max(0, Math.round(loginFallbackSuppressedUntil - Date.now())),
           proxyFocused: Boolean(proxyFocused),
           target: describeElement(target),
           viewport: viewport.width + "x" + viewport.height,
           logical: Math.round(touchState.logicalWidth) + "x" + Math.round(touchState.logicalHeight),
-          display: Math.round(rect.width) + "x" + Math.round(rect.height),
-          displayRect: Math.round(rect.left) + "," + Math.round(rect.top),
+          display: Math.round(displayRect.width) + "x" + Math.round(displayRect.height),
+          displayRect: Math.round(displayRect.left) + "," + Math.round(displayRect.top),
+          surface: Math.round(rect.width) + "x" + Math.round(rect.height),
+          surfaceRect: Math.round(rect.left) + "," + Math.round(rect.top),
           displayStyle: displayEl.style.left + "," + displayEl.style.top,
           transformOrigin: getComputedStyle(displayEl).transformOrigin,
           fitScale: Number(touchState.fitScale).toFixed(3),
+          fitScaleX: Number(touchState.fitScaleX || touchState.fitScale).toFixed(3),
+          fitScaleY: Number(touchState.fitScaleY || touchState.fitScale).toFixed(3),
+          renderedScaleX: renderedScale.x.toFixed(3),
+          renderedScaleY: renderedScale.y.toFixed(3),
           userScale: Number(touchState.userScale).toFixed(2),
-          totalScale: Number(touchState.fitScale * touchState.userScale).toFixed(3),
+          totalScale: Number(((renderedScale.x + renderedScale.y) / 2)).toFixed(3),
           rotated: touchState.rotated,
         };
         window.__rt4LastTap = payload;
-        writeLog("tap " + JSON.stringify(payload));
-        console.table(payload);
-        tapMarkerEl.style.display = "block";
-        tapMarkerEl.style.left = Math.round(x) + "px";
-        tapMarkerEl.style.top = Math.round(y) + "px";
-        window.clearTimeout(tapMarkerEl._hideTimer);
-        tapMarkerEl._hideTimer = window.setTimeout(() => {
-          tapMarkerEl.style.display = "none";
-        }, 1400);
+        sendServerDiagnostic("tap", {
+          label: payload.label,
+          client: payload.clientX + "," + payload.clientY,
+          game: payload.gameX + "," + payload.gameY,
+          gameState: payload.gameState,
+          inputHit: payload.inputFieldHit ? 1 : 0,
+          inputSource: payload.inputFieldSource || "",
+          inputId: payload.inputField ? payload.inputField.id : "",
+          fallback: payload.inputField && payload.inputField.fallback ? 1 : 0,
+          reportedFields: payload.reportedInputFields,
+          proxyFocused: payload.proxyFocused ? 1 : 0,
+          target: payload.target,
+          viewport: payload.viewport,
+          logical: payload.logical,
+          display: payload.display,
+          displayRect: payload.displayRect,
+          surface: payload.surface,
+          surfaceRect: payload.surfaceRect,
+          fitScaleX: payload.fitScaleX,
+          fitScaleY: payload.fitScaleY,
+          renderedScaleX: payload.renderedScaleX,
+          renderedScaleY: payload.renderedScaleY,
+          userScale: payload.userScale,
+          rotated: payload.rotated ? 1 : 0,
+          loginStep: browserLoginState.loginStep,
+          loginReply: browserLoginState.loginReply,
+          loginAutoStep: browserLoginState.loginAutoStep,
+          loginFallbackArmed: payload.loginFallbackArmed ? 1 : 0,
+          loginFallbackArmedMs: payload.loginFallbackArmedMs,
+        });
+        if (tapDebugEnabled) {
+          writeLog("tap " + JSON.stringify(payload));
+          console.table(payload);
+          tapMarkerEl.style.display = "block";
+          tapMarkerEl.style.left = Math.round(x) + "px";
+          tapMarkerEl.style.top = Math.round(y) + "px";
+          window.clearTimeout(tapMarkerEl._hideTimer);
+          tapMarkerEl._hideTimer = window.setTimeout(() => {
+            tapMarkerEl.style.display = "none";
+          }, 1400);
+        }
       }
 
       function decorateGameCoordinates(event, point) {
@@ -1496,23 +2728,25 @@
       }
 
       function clientPointForGame(point) {
-        const rect = displayEl.getBoundingClientRect();
-        const scale = Math.max(0.001, touchState.fitScale * touchState.userScale);
+        const rect = gameSurfaceRect();
+        const scale = renderedDisplayScale();
         if (touchState.rotated) {
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
+          const rotatedScale = Math.max(0.001, (scale.x + scale.y) / 2);
           return {
-            x: centerX - (point.y - touchState.logicalHeight / 2) * scale,
-            y: centerY + (point.x - touchState.logicalWidth / 2) * scale,
+            x: centerX - (point.y - touchState.logicalHeight / 2) * rotatedScale,
+            y: centerY + (point.x - touchState.logicalWidth / 2) * rotatedScale,
           };
         }
         return {
-          x: rect.left + point.x * scale,
-          y: rect.top + point.y * scale,
+          x: rect.left + point.x * scale.x,
+          y: rect.top + point.y * scale.y,
         };
       }
 
       function dispatchPointer(type, x, y, button = 0, buttons = 0) {
+        unlockAudioOnGesture();
         if (typeof PointerEvent !== "function") return;
         const target = gameTargetAt(x, y);
         const point = gamePointFromClient(x, y);
@@ -1535,10 +2769,15 @@
           pressure: buttons ? 0.5 : 0,
         });
         decorateGameCoordinates(event, point);
+        Object.defineProperty(event, "__rt4SyntheticMouse", {
+          value: true,
+          configurable: true,
+        });
         target.dispatchEvent(event);
       }
 
       function dispatchMouse(type, x, y, button = 0, buttons = 0) {
+        unlockAudioOnGesture();
         const target = gameTargetAt(x, y);
         const point = gamePointFromClient(x, y);
         const client = clientPointForGame(point);
@@ -1554,6 +2793,10 @@
           buttons,
         });
         decorateGameCoordinates(event, point);
+        Object.defineProperty(event, "__rt4SyntheticMouse", {
+          value: true,
+          configurable: true,
+        });
         target.dispatchEvent(event);
       }
 
@@ -1592,16 +2835,153 @@
       }
 
       function wheelGame(deltaY, x = window.innerWidth / 2, y = window.innerHeight / 2) {
+        unlockAudioOnGesture();
         dispatchWheel(x, y, deltaY);
+      }
+
+      function isGamePointInInterfaceScrollZone(point) {
+        const width = Number(touchState.logicalWidth) || 765;
+        const height = Number(touchState.logicalHeight) || 503;
+        if (!isGameplayLayoutActive()) return true;
+        if (touchCameraOrientation() === "portrait" && shouldUseDirectTouchCamera()) {
+          const sidePanelX = Math.min(width * 0.78, 610);
+          const chatPanelY = Math.max(0, height - 120);
+          const menuPanelX = clamp(numberOption("mobilePortraitInterfaceScrollX", width * 0.42), 0, width);
+          const menuPanelTop = clamp(numberOption("mobilePortraitInterfaceScrollTop", height * 0.16), 0, height);
+          const inMenuPanel = point.x >= menuPanelX && point.y >= menuPanelTop && point.y < chatPanelY;
+          return point.x >= sidePanelX || point.y >= chatPanelY || inMenuPanel;
+        }
+        const sidePanelX = Math.min(width * 0.68, 515);
+        const chatPanelY = Math.min(height * 0.67, 330);
+        return point.x >= sidePanelX || point.y >= chatPanelY;
+      }
+
+      function shouldUseScrollbarWheelAt(clientX, clientY, deltaX, deltaY) {
+        return isGamePointInInterfaceScrollZone(gamePointFromClient(clientX, clientY));
+      }
+
+      function queueScrollbarWheelSteps(steps, clientX, clientY, source) {
+        const count = Math.trunc(steps);
+        if (count === 0) return 0;
+        queueBrowserMouse(1, clientX, clientY, 1);
+        browserInputWheelRotation += count;
+        window.__rt4LastWheel = {
+          source,
+          x: Math.round(clientX),
+          y: Math.round(clientY),
+          wheelSteps: count,
+          wheelRotation: browserInputWheelRotation,
+        };
+        recordGesture("scrollbar-wheel", window.__rt4LastWheel);
+        return count;
+      }
+
+      function queueTouchScrollbarWheel(deltaY, clientX, clientY) {
+        const sensitivity = clamp(numberOption("touchScrollbarSensitivity", 1), 0.2, 8);
+        const stepPx = clamp(numberOption("touchScrollbarStepPx", 18), 4, 80);
+        touchState.scrollRemainderY += -deltaY * sensitivity;
+        const steps = clamp(Math.trunc(touchState.scrollRemainderY / stepPx), -8, 8);
+        if (steps === 0) return 0;
+        touchState.scrollRemainderY -= steps * stepPx;
+        return queueScrollbarWheelSteps(steps, clientX, clientY, "touch");
+      }
+
+      function queueDesktopScrollbarWheel(deltaY, clientX, clientY) {
+        const sensitivity = clamp(numberOption("trackpadScrollbarSensitivity", 1), 0.2, 8);
+        const stepPx = clamp(numberOption("trackpadScrollbarStepPx", 28), 4, 120);
+        desktopGestureState.scrollRemainderY += deltaY * sensitivity;
+        const steps = clamp(Math.trunc(desktopGestureState.scrollRemainderY / stepPx), -12, 12);
+        if (steps === 0) return 0;
+        desktopGestureState.scrollRemainderY -= steps * stepPx;
+        return queueScrollbarWheelSteps(steps, clientX, clientY, "desktop-trackpad");
       }
 
       function queueCameraZoom(steps) {
         browserInputCameraZoom += steps;
       }
 
+      function queueCameraPan(yawDelta, pitchDelta) {
+        browserInputCameraYaw += yawDelta;
+        browserInputCameraPitch += pitchDelta;
+      }
+
       function cameraZoomGame(steps, x = window.innerWidth / 2, y = window.innerHeight / 2) {
         queueCameraZoom(steps);
         recordGesture("camera-zoom", { x: Math.round(x), y: Math.round(y), zoomSteps: steps });
+      }
+
+      function touchCameraOrientation() {
+        if (window.matchMedia && window.matchMedia("(orientation: portrait)").matches) {
+          return "portrait";
+        }
+        if (document.body.classList.contains("is-portrait")) {
+          return "portrait";
+        }
+        const viewport = viewportSize();
+        return viewport.height > viewport.width ? "portrait" : "landscape";
+      }
+
+      function shouldUseDirectTouchCamera() {
+        if (!booleanOption("touchCameraDirect", true)) return false;
+        if (!isGameplayLayoutActive()) return false;
+        if (!shouldUseTouchHarness()) return false;
+        const portrait = touchCameraOrientation() === "portrait";
+        if (portrait) return booleanOption("touchCameraDirectPortrait", true);
+        if (wrapperConfig.touchCameraDirectLandscape !== undefined || queryParams.has("touchCameraDirectLandscape")) {
+          return booleanOption("touchCameraDirectLandscape", false);
+        }
+        return !booleanOption("touchCameraDirectPortraitOnly", true);
+      }
+
+      function orientationCameraOption(baseName, orientation, fallback) {
+        const suffix = orientation === "portrait" ? "Portrait" : "Landscape";
+        const orientedName = baseName.replace(/^touchCamera/, "touchCamera" + suffix);
+        if (queryParams.has(orientedName) || wrapperConfig[orientedName] !== undefined) {
+          return numberOption(orientedName, fallback);
+        }
+        return numberOption(baseName, fallback);
+      }
+
+      function orientationBooleanOption(baseName, orientation, fallback) {
+        const suffix = orientation === "portrait" ? "Portrait" : "Landscape";
+        const orientedName = baseName.replace(/^pinch/, "pinch" + suffix);
+        if (queryParams.has(orientedName) || wrapperConfig[orientedName] !== undefined) {
+          return booleanOption(orientedName, fallback);
+        }
+        return booleanOption(baseName, fallback);
+      }
+
+      function orientationPinchOption(baseName, orientation, fallback) {
+        const suffix = orientation === "portrait" ? "Portrait" : "Landscape";
+        const orientedName = baseName.replace(/^pinch/, "pinch" + suffix);
+        if (queryParams.has(orientedName) || wrapperConfig[orientedName] !== undefined) {
+          return numberOption(orientedName, fallback);
+        }
+        return numberOption(baseName, fallback);
+      }
+
+      function queueDirectTouchCamera(deltaX, deltaY, clientX, clientY) {
+        const orientation = touchCameraOrientation();
+        const deadzone = clamp(orientationCameraOption("touchCameraDirectDeadzonePx", orientation, 0.75), 0, 8);
+        const yawSensitivity = clamp(orientationCameraOption("touchCameraYawSensitivity", orientation, 2), 0.1, 12);
+        const pitchSensitivity = clamp(orientationCameraOption("touchCameraPitchSensitivity", orientation, 0.75), 0.05, 8);
+        const activeDeltaX = Math.abs(deltaX) >= deadzone ? deltaX : 0;
+        const activeDeltaY = Math.abs(deltaY) >= deadzone ? deltaY : 0;
+        const yawDelta = activeDeltaX * yawSensitivity;
+        const pitchDelta = -activeDeltaY * pitchSensitivity;
+        if (yawDelta === 0 && pitchDelta === 0) return;
+        queueCameraPan(yawDelta, pitchDelta);
+        recordGesture("touch-camera-direct", {
+          x: Math.round(clientX),
+          y: Math.round(clientY),
+          deltaX: Math.round(deltaX),
+          deltaY: Math.round(deltaY),
+          yawDelta: Math.round(yawDelta),
+          pitchDelta: Math.round(pitchDelta),
+          yawSensitivity,
+          pitchSensitivity,
+          orientation,
+        });
       }
 
       function setBrowserGameState(state) {
@@ -1637,6 +3017,7 @@
         zoomRemainder: 0,
         swipeRemainderX: 0,
         swipeRemainderY: 0,
+        scrollRemainderY: 0,
         activeKey: null,
         releaseTimer: null,
         lastPulseAt: 0,
@@ -1773,6 +3154,13 @@
           queueDesktopTrackpadZoom(-deltaY, event.clientX, event.clientY);
           return true;
         }
+        if (shouldUseScrollbarWheelAt(event.clientX, event.clientY, deltaX, deltaY)) {
+          markTrackpadWheelHandled(event);
+          event.preventDefault();
+          event.stopPropagation();
+          queueDesktopScrollbarWheel(deltaY, event.clientX, event.clientY);
+          return true;
+        }
         const horizontal = Math.abs(deltaX);
         const vertical = Math.abs(deltaY);
         if (vertical >= Math.max(4, horizontal * 1.2)) {
@@ -1859,6 +3247,8 @@
       }
 
       function beginMouseTouch(touch, inputHit = null) {
+        unlockAudioOnGesture();
+        suppressCompatibilityClick("touchstart");
         const hasInputHit = Boolean(inputHit && inputHit.field);
         if (!hasInputHit) {
           pendingKeyboardRefocus = null;
@@ -1875,9 +3265,15 @@
         touchState.inputHit = inputHit;
         touchState.singleTouchId = touch.identifier;
         touchState.activeMouse = true;
+        touchState.mouseDownSent = false;
+        touchState.tapCanceled = false;
         touchState.longPressFired = false;
+        touchState.contextMenuSelecting = false;
+        touchState.scrollMode = false;
         touchState.swipeMode = false;
         touchState.swipeKey = null;
+        touchState.touchStartInScrollZone = isGamePointInInterfaceScrollZone(gamePointFromClient(touch.clientX, touch.clientY));
+        touchState.scrollRemainderY = 0;
         touchState.swipeRemainderX = 0;
         touchState.swipeRemainderY = 0;
         touchState.startX = touch.clientX;
@@ -1886,76 +3282,178 @@
         touchState.lastY = touch.clientY;
         touchState.swipeLastX = touch.clientX;
         touchState.swipeLastY = touch.clientY;
-        const directMouseBridge = shouldUseBrowserMouseBridge();
-        if (directMouseBridge) {
-          queueBrowserMouse(1, touch.clientX, touch.clientY, 1);
-          queueBrowserMouse(2, touch.clientX, touch.clientY, 1);
-        } else if (!shouldUseNativeTouchMouseEvents()) {
-          dispatchMouse("mouseover", touch.clientX, touch.clientY);
-          dispatchMouse("mouseenter", touch.clientX, touch.clientY);
-          dispatchMouse("mousemove", touch.clientX, touch.clientY);
-          dispatchMouse("mousedown", touch.clientX, touch.clientY, 0, 1);
-        }
         clearLongPress();
         touchState.longPressTimer = window.setTimeout(() => {
           const moved = Math.hypot(touchState.lastX - touchState.startX, touchState.lastY - touchState.startY);
           if (!touchState.activeMouse || moved > 10) return;
           touchState.longPressFired = true;
+          touchState.contextMenuSelecting = booleanOption("longPressMenuSelectOnRelease", true);
+          touchState.tapCanceled = true;
+          suppressCompatibilityClick("long-press", 260);
           recordGesture("long-press", { x: Math.round(touchState.lastX), y: Math.round(touchState.lastY) });
           if (shouldUseBrowserMouseBridge()) {
-            queueBrowserMouse(3, touchState.lastX, touchState.lastY, 1);
             queueBrowserMouse(2, touchState.lastX, touchState.lastY, 2);
             queueBrowserMouse(3, touchState.lastX, touchState.lastY, 2);
           } else {
-            dispatchMouse("mouseup", touchState.lastX, touchState.lastY, 0, 0);
             dispatchMouse("mousedown", touchState.lastX, touchState.lastY, 2, 2);
             dispatchMouse("mouseup", touchState.lastX, touchState.lastY, 2, 0);
             dispatchMouse("contextmenu", touchState.lastX, touchState.lastY, 2, 0);
+          }
+          touchState.mouseDownSent = false;
+          if (touchState.contextMenuSelecting) {
+            hoverContextMenuSelection("long-press-open");
           }
         }, Number(wrapperConfig.longPressMs || 550));
         return proxyFocused;
       }
 
+      function beginKeyboardPanTouch(touch) {
+        unlockAudioOnGesture();
+        suppressCompatibilityClick("keyboard-pan-start", 220);
+        pendingKeyboardRefocus = null;
+        touchState.inputHit = null;
+        touchState.singleTouchId = touch.identifier;
+        touchState.activeMouse = true;
+        touchState.mouseDownSent = false;
+        touchState.tapCanceled = true;
+        touchState.longPressFired = false;
+        touchState.keyboardPanMode = true;
+        touchState.keyboardPanMoved = false;
+        touchState.keyboardPanStartOffsetX = Number(touchState.keyboardManualOffsetX) || 0;
+        touchState.keyboardPanStartOffsetY = Number(touchState.keyboardManualOffsetY) || 0;
+        touchState.contextMenuSelecting = false;
+        touchState.scrollMode = false;
+        touchState.swipeMode = false;
+        touchState.swipeKey = null;
+        touchState.touchStartInScrollZone = false;
+        touchState.startX = touch.clientX;
+        touchState.startY = touch.clientY;
+        touchState.lastX = touch.clientX;
+        touchState.lastY = touch.clientY;
+        touchState.swipeLastX = touch.clientX;
+        touchState.swipeLastY = touch.clientY;
+        clearLongPress();
+        recordGesture("keyboard-pan-start", {
+          x: Math.round(touch.clientX),
+          y: Math.round(touch.clientY),
+          offsetX: Math.round(touchState.keyboardPanStartOffsetX),
+          offsetY: Math.round(touchState.keyboardPanStartOffsetY),
+        });
+      }
+
+      function updateKeyboardPanTouch(touch) {
+        const dx = touch.clientX - touchState.startX;
+        const dy = touch.clientY - touchState.startY;
+        touchState.lastX = touch.clientX;
+        touchState.lastY = touch.clientY;
+        const moved = Math.hypot(dx, dy);
+        if (moved <= Number(wrapperConfig.keyboardPanThreshold || 6)) return;
+        touchState.keyboardPanMoved = true;
+        const sensitivity = clamp(numberOption("keyboardPanSensitivity", 1), 0.25, 3);
+        const limit = clamp(numberOption("keyboardPanLimitPx", 280), 40, 800);
+        touchState.keyboardManualOffsetX = Math.round(clamp(touchState.keyboardPanStartOffsetX + dx * sensitivity, -limit, limit));
+        touchState.keyboardManualOffsetY = Math.round(clamp(touchState.keyboardPanStartOffsetY + dy * sensitivity, -limit, limit));
+        applyDisplayTransform();
+        if (keyboardActiveField) setKeyboardProxyRectForField(keyboardActiveField);
+        syncTouchCaptureLayer();
+        renderInputDebugOverlay();
+        window.__rt4KeyboardManualPan = {
+          reason: "drag",
+          x: touchState.keyboardManualOffsetX,
+          y: touchState.keyboardManualOffsetY,
+          moved: Math.round(moved),
+          at: Date.now(),
+        };
+        recordGesture("keyboard-pan-drag", window.__rt4KeyboardManualPan);
+      }
+
+      function hoverContextMenuSelection(reason) {
+        const directMouseBridge = shouldUseBrowserMouseBridge();
+        if (directMouseBridge) {
+          queueBrowserMouse(1, touchState.lastX, touchState.lastY, 1);
+        } else {
+          dispatchMouse("mousemove", touchState.lastX, touchState.lastY, 0, 0);
+        }
+        recordGesture("long-press-menu-hover", {
+          reason,
+          x: Math.round(touchState.lastX),
+          y: Math.round(touchState.lastY),
+        });
+      }
+
+      function selectContextMenuOption() {
+        const directMouseBridge = shouldUseBrowserMouseBridge();
+        if (directMouseBridge) {
+          queueBrowserMouse(1, touchState.lastX, touchState.lastY, 1);
+          queueBrowserMouse(2, touchState.lastX, touchState.lastY, 1);
+          queueBrowserMouse(3, touchState.lastX, touchState.lastY, 1);
+        } else {
+          dispatchMouse("mousemove", touchState.lastX, touchState.lastY, 0, 0);
+          dispatchMouse("mousedown", touchState.lastX, touchState.lastY, 0, 1);
+          dispatchMouse("mouseup", touchState.lastX, touchState.lastY, 0, 0);
+        }
+        recordGesture("long-press-menu-select", {
+          x: Math.round(touchState.lastX),
+          y: Math.round(touchState.lastY),
+        });
+      }
+
       function updateMouseTouch(touch) {
+        if (touchState.keyboardPanMode) {
+          updateKeyboardPanTouch(touch);
+          return;
+        }
         const nativeTouchMouseEvents = shouldUseNativeTouchMouseEvents();
         const directMouseBridge = shouldUseBrowserMouseBridge();
         touchState.lastX = touch.clientX;
         touchState.lastY = touch.clientY;
         const moved = Math.hypot(touchState.lastX - touchState.startX, touchState.lastY - touchState.startY);
+        if (touchState.contextMenuSelecting) {
+          suppressCompatibilityClick("long-press-menu-drag", 260);
+          hoverContextMenuSelection("drag");
+          return;
+        }
         if (moved > 10) clearLongPress();
-        if (moved > Number(wrapperConfig.swipeThreshold || 28)) {
+        if (moved > Number(wrapperConfig.swipeThreshold || 12)) {
           if (!touchState.swipeMode) {
-            if (directMouseBridge) {
+            suppressCompatibilityClick("swipe-start", 220);
+            touchState.tapCanceled = true;
+            const initialDx = touchState.lastX - touchState.startX;
+            const initialDy = touchState.lastY - touchState.startY;
+            const verticalIntent = Math.abs(initialDy) >= Math.abs(initialDx) * 0.75;
+            touchState.scrollMode = Boolean(touchState.touchStartInScrollZone && verticalIntent);
+            if (directMouseBridge && touchState.mouseDownSent) {
               queueBrowserMouse(3, touchState.lastX, touchState.lastY, 1);
               queueBrowserMouse(4, touchState.lastX, touchState.lastY, 1);
-            } else if (!nativeTouchMouseEvents) {
+              touchState.mouseDownSent = false;
+            } else if (!nativeTouchMouseEvents && touchState.mouseDownSent) {
               dispatchMouse("mouseup", touchState.lastX, touchState.lastY, 0, 0);
               dispatchMouse("mouseout", touchState.lastX, touchState.lastY, 0, 0);
               dispatchMouse("mouseleave", touchState.lastX, touchState.lastY, 0, 0);
+              touchState.mouseDownSent = false;
             }
             touchState.swipeLastKeyAt = 0;
+            touchState.scrollRemainderY = 0;
             touchState.swipeRemainderX = 0;
             touchState.swipeRemainderY = 0;
             touchState.swipeLastX = touchState.startX;
             touchState.swipeLastY = touchState.startY;
           }
           touchState.swipeMode = true;
-          queueTouchSwipe(
-            touchState.lastX - touchState.startX,
-            touchState.lastY - touchState.startY,
-            touchState.lastX - touchState.swipeLastX,
-            touchState.lastY - touchState.swipeLastY,
-            touchState.lastX,
-            touchState.lastY
-          );
+          if (touchState.scrollMode) {
+            queueTouchScrollbarWheel(touchState.lastY - touchState.swipeLastY, touchState.lastX, touchState.lastY);
+          } else {
+            queueTouchSwipe(
+              touchState.lastX - touchState.startX,
+              touchState.lastY - touchState.startY,
+              touchState.lastX - touchState.swipeLastX,
+              touchState.lastY - touchState.swipeLastY,
+              touchState.lastX,
+              touchState.lastY
+            );
+          }
           touchState.swipeLastX = touchState.lastX;
           touchState.swipeLastY = touchState.lastY;
-        }
-        if (directMouseBridge && !touchState.longPressFired && !touchState.swipeMode) {
-          queueBrowserMouse(1, touch.clientX, touch.clientY, 1);
-        } else if (!nativeTouchMouseEvents && !touchState.longPressFired && !touchState.swipeMode) {
-          dispatchMouse("mousemove", touch.clientX, touch.clientY, 0, 1);
-          dispatchMouse("drag", touch.clientX, touch.clientY, 0, 1);
         }
       }
 
@@ -1963,16 +3461,50 @@
         const nativeTouchMouseEvents = shouldUseNativeTouchMouseEvents();
         const directMouseBridge = shouldUseBrowserMouseBridge();
         clearLongPress();
-        if (touchState.activeMouse && touchState.swipeMode && touchState.swipeKey) {
-          releaseSwipeKey(120);
-        } else if (touchState.activeMouse && !touchState.longPressFired) {
+        if (touchState.activeMouse && touchState.keyboardPanMode) {
+          if (touchState.keyboardPanMoved) {
+            recordGesture("keyboard-pan-end", {
+              x: Math.round(touchState.lastX),
+              y: Math.round(touchState.lastY),
+              offsetX: Math.round(touchState.keyboardManualOffsetX),
+              offsetY: Math.round(touchState.keyboardManualOffsetY),
+            });
+          } else {
+            suppressLoginFallback("keyboard-pan-tap-close");
+            hideKeyboard();
+          }
+          touchState.mouseDownSent = false;
+        } else if (touchState.activeMouse && touchState.contextMenuSelecting) {
+          selectContextMenuOption();
+          touchState.mouseDownSent = false;
+        } else if (touchState.activeMouse && touchState.swipeMode) {
+          releaseSwipeKey(Number(wrapperConfig.touchSwipeReleaseMs || 18));
+          recordGesture("touch-end-no-click", {
+            reason: "swipe",
+            x: Math.round(touchState.lastX),
+            y: Math.round(touchState.lastY),
+          });
+        } else if (touchState.activeMouse && (touchState.longPressFired || touchState.tapCanceled)) {
+          recordGesture("touch-end-no-click", {
+            reason: touchState.longPressFired ? "long-press" : "canceled",
+            x: Math.round(touchState.lastX),
+            y: Math.round(touchState.lastY),
+          });
+        } else if (touchState.activeMouse && !touchState.longPressFired && !touchState.tapCanceled) {
           if (directMouseBridge) {
+            queueBrowserMouse(1, touchState.lastX, touchState.lastY, 1);
+            queueBrowserMouse(2, touchState.lastX, touchState.lastY, 1);
             queueBrowserMouse(3, touchState.lastX, touchState.lastY, 1);
           } else if (!nativeTouchMouseEvents) {
+            dispatchMouse("mouseover", touchState.lastX, touchState.lastY);
+            dispatchMouse("mouseenter", touchState.lastX, touchState.lastY);
+            dispatchMouse("mousemove", touchState.lastX, touchState.lastY);
+            dispatchMouse("mousedown", touchState.lastX, touchState.lastY, 0, 1);
             dispatchMouse("mouseup", touchState.lastX, touchState.lastY, 0, 0);
             dispatchMouse("mouseout", touchState.lastX, touchState.lastY, 0, 0);
             dispatchMouse("mouseleave", touchState.lastX, touchState.lastY, 0, 0);
           }
+          touchState.mouseDownSent = false;
           let proxyFocused = isKeyboardProxyActive();
           if (touchState.inputHit && touchState.inputHit.field) {
             pendingKeyboardRefocus = {
@@ -1984,6 +3516,7 @@
             proxyFocused = showKeyboard(touchState.lastX, touchState.lastY);
           } else {
             pendingKeyboardRefocus = null;
+            maybeArmLoginFallbackFromTap(touchState.lastX, touchState.lastY);
             if (proxyFocused) {
               suppressLoginFallback("touchend-outside-input");
               hideKeyboard();
@@ -1994,45 +3527,279 @@
         }
         touchState.lastTouchEndAt = Date.now();
         touchState.activeMouse = false;
+        touchState.mouseDownSent = false;
+        touchState.tapCanceled = false;
         touchState.singleTouchId = null;
+        touchState.keyboardPanMode = false;
+        touchState.keyboardPanMoved = false;
+        touchState.contextMenuSelecting = false;
+        touchState.scrollMode = false;
         touchState.swipeMode = false;
         releaseSwipeKey();
         touchState.swipeLastKeyAt = 0;
+        touchState.scrollRemainderY = 0;
         touchState.swipeRemainderX = 0;
         touchState.swipeRemainderY = 0;
+        touchState.touchStartInScrollZone = false;
+        touchState.inputHit = null;
+      }
+
+      function cancelMouseTouch(reason) {
+        const nativeTouchMouseEvents = shouldUseNativeTouchMouseEvents();
+        const directMouseBridge = shouldUseBrowserMouseBridge();
+        clearLongPress();
+        suppressCompatibilityClick(reason || "touch-cancel", 220);
+        if (touchState.activeMouse && touchState.mouseDownSent) {
+          if (directMouseBridge) {
+            queueBrowserMouse(3, touchState.lastX, touchState.lastY, 1);
+            queueBrowserMouse(4, touchState.lastX, touchState.lastY, 1);
+          } else if (!nativeTouchMouseEvents) {
+            dispatchMouse("mouseup", touchState.lastX, touchState.lastY, 0, 0);
+            dispatchMouse("mouseout", touchState.lastX, touchState.lastY, 0, 0);
+            dispatchMouse("mouseleave", touchState.lastX, touchState.lastY, 0, 0);
+          }
+        }
+        recordGesture("touch-cancel", { reason, x: Math.round(touchState.lastX), y: Math.round(touchState.lastY) });
+        touchState.activeMouse = false;
+        touchState.mouseDownSent = false;
+        touchState.tapCanceled = false;
+        touchState.singleTouchId = null;
+        touchState.keyboardPanMode = false;
+        touchState.keyboardPanMoved = false;
+        touchState.contextMenuSelecting = false;
+        touchState.scrollMode = false;
+        touchState.swipeMode = false;
+        releaseSwipeKey();
+        touchState.swipeLastKeyAt = 0;
+        touchState.scrollRemainderY = 0;
+        touchState.swipeRemainderX = 0;
+        touchState.swipeRemainderY = 0;
+        touchState.touchStartInScrollZone = false;
         touchState.inputHit = null;
       }
 
       function installDesktopMouseAndTrackpad() {
-        displayEl.addEventListener("mousedown", event => {
-          if (isCoarsePointer() || isWrapperChromeTarget(event.target)) return;
-          const payload = {
-            type: "mousedown",
+        function isActualMouseEvent(event) {
+          return event.pointerType === "mouse" || event.type.indexOf("mouse") === 0 || event.type === "contextmenu";
+        }
+
+        function stopNativeDesktopMouse(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+          }
+        }
+
+        function desktopMouseLooksSecondary(event) {
+          const button = Number(event.button);
+          const buttons = Number(event.buttons);
+          return (
+            button === 2 ||
+            buttons === 2 ||
+            buttons === 4 ||
+            event.ctrlKey ||
+            event.type === "contextmenu" ||
+            event.type === "auxclick"
+          );
+        }
+
+        function desktopMouseButton(event) {
+          return desktopMouseLooksSecondary(event) ? 2 : 1;
+        }
+
+        function desktopMousePayload(event, type) {
+          const point = gamePointFromClient(event.clientX, event.clientY);
+          const rect = gameSurfaceRect();
+          return {
+            type,
             button: event.button,
             buttons: event.buttons,
+            mappedButton: desktopMouseButton(event),
             ctrlKey: event.ctrlKey,
             metaKey: event.metaKey,
             altKey: event.altKey,
             shiftKey: event.shiftKey,
             clientX: Math.round(event.clientX),
             clientY: Math.round(event.clientY),
+            gameX: Math.round(point.x),
+            gameY: Math.round(point.y),
+            surface: {
+              left: Math.round(rect.left),
+              top: Math.round(rect.top),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+            },
           };
+        }
+
+        function forwardCaptureLayerMouse(event, type) {
+          if (!isActualMouseEvent(event) || !isTouchCaptureTarget(event.target)) return;
+          stopNativeDesktopMouse(event);
+          const button = desktopMouseButton(event);
+          desktopMouseBridgeActive = type !== "up";
+          if (type === "move") {
+            queueBrowserMouse(1, event.clientX, event.clientY, button);
+          } else if (type === "down") {
+            queueBrowserMouse(1, event.clientX, event.clientY, button);
+            queueBrowserMouse(2, event.clientX, event.clientY, button);
+            suppressDesktopCompatibilityClick("capture-down");
+          } else if (type === "up") {
+            queueBrowserMouse(3, event.clientX, event.clientY, button);
+            suppressDesktopCompatibilityClick("capture-up");
+          } else if (type === "context") {
+            queueBrowserMouse(1, event.clientX, event.clientY, 2);
+            queueBrowserMouse(2, event.clientX, event.clientY, 2);
+            queueBrowserMouse(3, event.clientX, event.clientY, 2);
+            suppressDesktopCompatibilityClick("capture-context");
+            desktopMouseBridgeActive = false;
+          }
+          const payload = desktopMousePayload(event, "capture-" + type);
+          window.__rt4LastDesktopMouse = payload;
+          recordGesture("desktop-capture-mouse", payload);
+        }
+
+        displayEl.addEventListener("mousedown", event => {
+          if (isCoarsePointer() || isWrapperChromeTarget(event.target)) return;
+          const payload = desktopMousePayload(event, "mousedown");
           window.__rt4LastDesktopMouse = payload;
           if (event.button === 0) {
             lastDesktopPrimaryMouseDownAt = Date.now();
           } else if (event.button === 2) {
             lastDesktopSecondaryMouseDownAt = Date.now();
           }
+          if (shouldUseDesktopMouseBridge()) {
+            stopNativeDesktopMouse(event);
+            desktopMouseBridgeActive = true;
+            const button = desktopMouseButton(event);
+            queueBrowserMouse(1, event.clientX, event.clientY, button);
+            queueBrowserMouse(2, event.clientX, event.clientY, button);
+            suppressDesktopCompatibilityClick("bridge-down");
+          }
           if (mouseDebugEnabled) {
             writeLog("mouse " + JSON.stringify(payload));
           }
         }, true);
 
+        displayEl.addEventListener("mousemove", event => {
+          if (isCoarsePointer() || isWrapperChromeTarget(event.target)) return;
+          if (!shouldUseDesktopMouseBridge()) return;
+          stopNativeDesktopMouse(event);
+          queueBrowserMouse(1, event.clientX, event.clientY, desktopMouseButton(event));
+          const payload = desktopMousePayload(event, "mousemove");
+          window.__rt4LastDesktopMouse = payload;
+          if (mouseDebugEnabled) {
+            writeLog("mouse " + JSON.stringify(payload));
+          }
+        }, true);
+
+        document.addEventListener("mouseup", event => {
+          if (isCoarsePointer() || !desktopMouseBridgeActive) return;
+          stopNativeDesktopMouse(event);
+          queueBrowserMouse(3, event.clientX, event.clientY, desktopMouseButton(event));
+          suppressDesktopCompatibilityClick("bridge-up");
+          desktopMouseBridgeActive = false;
+          if (event.button === 0) {
+            lastDesktopPrimaryMouseUpAt = Date.now();
+          } else if (event.button === 2) {
+            lastDesktopSecondaryMouseUpAt = Date.now();
+          }
+          const payload = desktopMousePayload(event, "mouseup");
+          window.__rt4LastDesktopMouse = payload;
+          if (mouseDebugEnabled) {
+            writeLog("mouse " + JSON.stringify(payload));
+          }
+        }, true);
+
+        displayEl.addEventListener("click", event => {
+          if (isCoarsePointer() || isWrapperChromeTarget(event.target)) return;
+          if (!shouldUseDesktopMouseBridge()) return;
+          const now = Date.now();
+          const sawPrimaryPress = now - lastDesktopPrimaryMouseDownAt < 250 || now - lastDesktopPrimaryMouseUpAt < 250;
+          const sawSecondaryPress = now - lastDesktopSecondaryMouseDownAt < 250 || now - lastDesktopSecondaryMouseUpAt < 250;
+          if (sawPrimaryPress || sawSecondaryPress || now < desktopSuppressClickUntil) {
+            stopNativeDesktopMouse(event);
+            const payload = desktopMousePayload(event, "click-suppressed");
+            window.__rt4LastDesktopMouse = payload;
+            recordGesture("desktop-click-suppressed", {
+              ...payload,
+              sawPrimaryPress,
+              sawSecondaryPress,
+              suppressRemainingMs: Math.max(0, desktopSuppressClickUntil - now),
+            });
+            return;
+          }
+          stopNativeDesktopMouse(event);
+          const button = desktopMouseButton(event);
+          queueBrowserMouse(1, event.clientX, event.clientY, button);
+          queueBrowserMouse(2, event.clientX, event.clientY, button);
+          queueBrowserMouse(3, event.clientX, event.clientY, button);
+          desktopMouseBridgeActive = false;
+          const payload = desktopMousePayload(event, "click");
+          window.__rt4LastDesktopMouse = payload;
+          recordGesture("desktop-click-fallback", payload);
+          if (mouseDebugEnabled) {
+            writeLog("mouse " + JSON.stringify(payload));
+          }
+        }, true);
+
+        displayEl.addEventListener("mouseleave", event => {
+          if (isCoarsePointer() || !shouldUseDesktopMouseBridge() || desktopMouseBridgeActive) return;
+          queueBrowserMouse(4, event.clientX, event.clientY, 1);
+        }, true);
+
+        touchCaptureLayerEl.addEventListener("mousedown", event => forwardCaptureLayerMouse(event, "down"), true);
+        touchCaptureLayerEl.addEventListener("mousemove", event => forwardCaptureLayerMouse(event, "move"), true);
+        touchCaptureLayerEl.addEventListener("contextmenu", event => forwardCaptureLayerMouse(event, "context"), true);
+        document.addEventListener("mouseup", event => forwardCaptureLayerMouse(event, "up"), true);
+
+        const suppressDesktopCompatibilityMouseEvent = event => {
+          if (isCoarsePointer() || !shouldUseDesktopMouseBridge()) return;
+          if (isWrapperChromeTarget(event.target) || !isGameInputSurfaceTarget(event.target)) return;
+          const now = Date.now();
+          if (now >= desktopSuppressClickUntil) return;
+          stopNativeDesktopMouse(event);
+          const payload = desktopMousePayload(event, event.type + "-document-suppressed");
+          window.__rt4LastDesktopMouse = payload;
+          recordGesture("desktop-compat-mouse-suppressed", {
+            ...payload,
+            suppressRemainingMs: Math.max(0, desktopSuppressClickUntil - now),
+          });
+        };
+
+        ["click", "auxclick"].forEach(type => {
+          document.addEventListener(type, suppressDesktopCompatibilityMouseEvent, true);
+        });
+
         displayEl.addEventListener("contextmenu", event => {
           if (isCoarsePointer()) return;
           const now = Date.now();
           const looksLikePrimaryClickMenu = now - lastDesktopPrimaryMouseDownAt < 450 && now - lastDesktopSecondaryMouseDownAt > 450;
+          const looksLikeSecondaryClickMenu = now - lastDesktopSecondaryMouseDownAt < 450 || now - lastDesktopSecondaryMouseUpAt < 450;
           event.preventDefault();
+          if (shouldUseDesktopMouseBridge() && looksLikeSecondaryClickMenu) {
+            stopNativeDesktopMouse(event);
+            const payload = desktopMousePayload(event, "contextmenu-suppressed");
+            window.__rt4LastDesktopMouse = payload;
+            recordGesture("desktop-contextmenu-suppressed", payload);
+            return;
+          }
+          if (shouldUseDesktopMouseBridge() && !looksLikePrimaryClickMenu) {
+            stopNativeDesktopMouse(event);
+            const button = desktopMouseButton(event);
+            queueBrowserMouse(1, event.clientX, event.clientY, button);
+            queueBrowserMouse(2, event.clientX, event.clientY, button);
+            queueBrowserMouse(3, event.clientX, event.clientY, button);
+            suppressDesktopCompatibilityClick("contextmenu");
+            desktopMouseBridgeActive = false;
+            const payload = desktopMousePayload(event, "contextmenu");
+            window.__rt4LastDesktopMouse = payload;
+            recordGesture("desktop-contextmenu-click", payload);
+            if (mouseDebugEnabled) {
+              writeLog("mouse " + JSON.stringify(payload));
+            }
+            return;
+          }
           if (looksLikePrimaryClickMenu) {
             event.stopPropagation();
             if (typeof event.stopImmediatePropagation === "function") {
@@ -2049,7 +3816,7 @@
         document.addEventListener("wheel", handleDesktopTrackpadWheel, { capture: true, passive: false });
         displayEl.addEventListener("wheel", handleDesktopTrackpadWheel, { passive: false });
 
-        displayEl.addEventListener("gesturestart", event => {
+        const handleGestureStart = event => {
           if (!shouldUseDesktopTrackpadGestures() || !eventIsInDisplay(event)) return;
           event.preventDefault();
           desktopGestureState.safariScale = Number(event.scale || 1);
@@ -2058,23 +3825,30 @@
             y: Math.round(event.clientY),
             scale: desktopGestureState.safariScale,
           });
-        }, { passive: false });
+        };
 
-        displayEl.addEventListener("gesturechange", event => {
+        const handleGestureChange = event => {
           if (!shouldUseDesktopTrackpadGestures() || !eventIsInDisplay(event)) return;
           event.preventDefault();
           const scale = Number(event.scale || 1);
           const delta = (scale - desktopGestureState.safariScale) * numberOption("trackpadSafariPinchMultiplier", 260);
           desktopGestureState.safariScale = scale;
           queueDesktopTrackpadZoom(delta, event.clientX, event.clientY);
-        }, { passive: false });
+        };
 
-        displayEl.addEventListener("gestureend", event => {
+        const handleGestureEnd = event => {
           if (!shouldUseDesktopTrackpadGestures()) return;
           event.preventDefault();
           desktopGestureState.safariScale = 1;
           recordGesture("trackpad-gesture-end");
-        }, { passive: false });
+        };
+
+        displayEl.addEventListener("gesturestart", handleGestureStart, { passive: false });
+        displayEl.addEventListener("gesturechange", handleGestureChange, { passive: false });
+        displayEl.addEventListener("gestureend", handleGestureEnd, { passive: false });
+        document.addEventListener("gesturestart", handleGestureStart, { capture: true, passive: false });
+        document.addEventListener("gesturechange", handleGestureChange, { capture: true, passive: false });
+        document.addEventListener("gestureend", handleGestureEnd, { capture: true, passive: false });
       }
 
       function installTouchControls() {
@@ -2084,17 +3858,78 @@
         document.getElementById("zoom-in").addEventListener("click", () => cameraZoomGame(-1));
         document.getElementById("zoom-reset").addEventListener("click", resetZoom);
         document.getElementById("show-keyboard").addEventListener("click", showKeyboard);
+        const pointerTouches = new Map();
+        let lastTouchHarnessEventAt = 0;
+        let lastPointerHarnessEventAt = 0;
+        let pointerGestureActive = false;
 
-        const onTouchStart = event => {
-          if (!isTouchEventInDisplay(event)) return;
-          const touches = activeTouches(event);
-          if (touches.length === 0) return;
+        const pointerGestureFallbackEnabled = () =>
+          shouldUseTouchHarness() &&
+          booleanOption("mobilePointerGestureFallback", true) &&
+          typeof window.PointerEvent !== "undefined";
 
-          if (touches.length >= 2) {
-            consumeGameTouchEvent(event);
-            if (isKeyboardProxyActive()) hideKeyboard();
-            if (touchState.activeMouse) endMouseTouch();
-            const center = midpoint(touches[0], touches[1]);
+        const isTouchPointerEvent = event =>
+          event && (event.pointerType === "touch" || event.pointerType === "pen");
+
+        const pointerTouchLike = event => ({
+          identifier: event.pointerId,
+          target: event.target,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          screenX: event.screenX,
+          screenY: event.screenY,
+          pageX: event.pageX,
+          pageY: event.pageY,
+        });
+
+        const activePointerTouches = () => {
+          const rect = displayEl.getBoundingClientRect();
+          return Array.from(pointerTouches.values()).filter(touch =>
+            touch.clientX >= rect.left &&
+            touch.clientX < rect.right &&
+            touch.clientY >= rect.top &&
+            touch.clientY < rect.bottom
+          );
+        };
+
+        const isPointerEventInDisplay = event => {
+          if (!isTouchPointerEvent(event) || isWrapperChromeTarget(event.target)) return false;
+          const rect = displayEl.getBoundingClientRect();
+          return event.clientX >= rect.left &&
+            event.clientX < rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY < rect.bottom;
+        };
+
+        const consumeGamePointerEvent = event => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+          }
+        };
+
+        const beginPinchGesture = touches => {
+          if (isKeyboardProxyActive()) hideKeyboard();
+          touchState.tapCanceled = true;
+          if (touchState.activeMouse) cancelMouseTouch("pinch-start");
+          const center = midpoint(touches[0], touches[1]);
+          touchState.pinch = {
+            distance: distance(touches[0], touches[1]),
+            remainder: 0,
+            centerX: center.x,
+            centerY: center.y,
+            startedAt: Date.now(),
+          };
+          recordGesture("pinch-start", { x: Math.round(center.x), y: Math.round(center.y), distance: Math.round(touchState.pinch.distance) });
+        };
+
+        const updatePinchGesture = touches => {
+          if (isKeyboardProxyActive()) hideKeyboard();
+          touchState.tapCanceled = true;
+          if (touchState.activeMouse) cancelMouseTouch(touchState.pinch ? "pinch-active-cancel" : "pinch-move-start");
+          const center = midpoint(touches[0], touches[1]);
+          if (!touchState.pinch) {
             touchState.pinch = {
               distance: distance(touches[0], touches[1]),
               remainder: 0,
@@ -2105,51 +3940,77 @@
             recordGesture("pinch-start", { x: Math.round(center.x), y: Math.round(center.y), distance: Math.round(touchState.pinch.distance) });
             return;
           }
+          const nextDistance = distance(touches[0], touches[1]);
+          const distanceDelta = nextDistance - touchState.pinch.distance;
+          touchState.pinch.distance = nextDistance;
+          touchState.pinch.centerX = center.x;
+          touchState.pinch.centerY = center.y;
+
+          if (Math.abs(distanceDelta) > 2) {
+            const orientation = touchCameraOrientation();
+            const defaultInvert = orientation === "portrait" ? false : true;
+            const pinchInvert = orientationBooleanOption("pinchInvert", orientation, defaultInvert);
+            const pinchSensitivity = clamp(orientationPinchOption("pinchSensitivity", orientation, 2), 0.25, 8);
+            const signedDistanceDelta = (pinchInvert ? -distanceDelta : distanceDelta) * pinchSensitivity;
+            touchState.pinch.remainder += signedDistanceDelta;
+            const pinchStepPx = clamp(orientationPinchOption("pinchStepPx", orientation, 3), 1, 40);
+            const zoomSteps = clamp(Math.trunc(touchState.pinch.remainder / pinchStepPx), -12, 12);
+            if (zoomSteps !== 0) {
+              touchState.pinch.remainder -= zoomSteps * pinchStepPx;
+              const deltaY = zoomSteps > 0 ? 180 : -180;
+              cameraZoomGame(zoomSteps, center.x, center.y);
+              recordGesture("pinch-zoom", {
+                x: Math.round(center.x),
+                y: Math.round(center.y),
+                distanceDelta: Math.round(distanceDelta),
+                signedDistanceDelta: Math.round(signedDistanceDelta),
+                pinchInvert,
+                pinchSensitivity,
+                pinchStepPx,
+                zoomSteps,
+                deltaY,
+                orientation,
+              });
+            }
+          }
+        };
+
+        const onTouchStart = event => {
+          lastTouchHarnessEventAt = Date.now();
+          if (pointerGestureActive && lastTouchHarnessEventAt - lastPointerHarnessEventAt < 750) return;
+          if (!isTouchEventInDisplay(event)) return;
+          const touches = activeTouches(event);
+          if (touches.length === 0) return;
+
+          if (touches.length >= 2) {
+            consumeGameTouchEvent(event);
+            beginPinchGesture(touches);
+            return;
+          }
 
           if (!touchState.pinch && !touchState.activeMouse) {
-            if (!shouldUseNativeTouchMouseEvents()) {
-              consumeGameTouchEvent(event);
-            }
+            consumeGameTouchEvent(event);
+            rememberStableKeyboardViewport("touchstart");
             const inputHit = fieldAtClientPoint(touches[0].clientX, touches[0].clientY);
             const matchedInput = inputHit.field ? inputHit : null;
-            const proxyFocused = beginMouseTouch(touches[0], matchedInput);
-            inspectTap("touchstart", touches[0].clientX, touches[0].clientY, matchedInput, proxyFocused || document.activeElement === keyboardProxyEl);
+            if (isKeyboardProxyActive() && !matchedInput && keyboardManualPanEnabled()) {
+              beginKeyboardPanTouch(touches[0]);
+            } else {
+              beginMouseTouch(touches[0], matchedInput);
+            }
           }
         };
 
         const onTouchMove = event => {
+          lastTouchHarnessEventAt = Date.now();
+          if (pointerGestureActive && lastTouchHarnessEventAt - lastPointerHarnessEventAt < 750) return;
           if (!isTouchEventInDisplay(event) && !touchState.activeMouse && !touchState.pinch) return;
           const touches = activeTouches(event);
           if (touches.length === 0 && !touchState.activeMouse && !touchState.pinch) return;
 
-          if (touches.length >= 2 && touchState.pinch) {
+          if (touches.length >= 2) {
             consumeGameTouchEvent(event);
-            const center = midpoint(touches[0], touches[1]);
-            const nextDistance = distance(touches[0], touches[1]);
-            const distanceDelta = nextDistance - touchState.pinch.distance;
-            touchState.pinch.distance = nextDistance;
-            touchState.pinch.centerX = center.x;
-            touchState.pinch.centerY = center.y;
-
-            if (Math.abs(distanceDelta) > 2) {
-              const pinchSensitivity = clamp(numberOption("pinchSensitivity", 2), 0.25, 8);
-              touchState.pinch.remainder += distanceDelta * pinchSensitivity;
-              const pinchStepPx = clamp(numberOption("pinchStepPx", 3), 1, 40);
-              const zoomSteps = clamp(Math.trunc(touchState.pinch.remainder / pinchStepPx), -12, 12);
-              if (zoomSteps !== 0) {
-                touchState.pinch.remainder -= zoomSteps * pinchStepPx;
-                const deltaY = zoomSteps > 0 ? 180 : -180;
-                cameraZoomGame(zoomSteps, center.x, center.y);
-                recordGesture("pinch-zoom", {
-                  x: Math.round(center.x),
-                  y: Math.round(center.y),
-                  distanceDelta: Math.round(distanceDelta),
-                  pinchSensitivity,
-                  zoomSteps,
-                  deltaY,
-                });
-              }
-            }
+            updatePinchGesture(touches);
             return;
           }
 
@@ -2157,23 +4018,27 @@
             const touch = touches.find(item => item.identifier === touchState.singleTouchId) || touches[0];
             if (!touch) return;
             updateMouseTouch(touch);
-            if (!shouldUseNativeTouchMouseEvents() || touchState.swipeMode || touchState.longPressFired) {
+            if (!shouldUseNativeTouchMouseEvents() || touchState.swipeMode || touchState.longPressFired || touchState.keyboardPanMode) {
               consumeGameTouchEvent(event);
             }
           }
         };
 
         const onTouchEnd = event => {
+          lastTouchHarnessEventAt = Date.now();
+          if (pointerGestureActive && lastTouchHarnessEventAt - lastPointerHarnessEventAt < 750) return;
           if (!isTouchEventInDisplay(event) && !touchState.activeMouse && !touchState.pinch) return;
           const touches = activeTouches(event);
           if (touchState.pinch && touches.length < 2) {
             consumeGameTouchEvent(event);
+            suppressCompatibilityClick("pinch-end", 220);
             recordGesture("pinch-end");
             touchState.pinch = null;
             return;
           }
           if (touchState.activeMouse && !touches.some(touch => touch.identifier === touchState.singleTouchId)) {
-            const consumeTouchEnd = !shouldUseNativeTouchMouseEvents() || touchState.swipeMode || touchState.longPressFired;
+            const consumeTouchEnd = !shouldUseNativeTouchMouseEvents() || touchState.swipeMode || touchState.longPressFired || touchState.keyboardPanMode;
+            suppressCompatibilityClick(touchState.swipeMode ? "swipe-end" : touchState.longPressFired ? "long-press-end" : "tap-end");
             endMouseTouch();
             if (consumeTouchEnd) {
               consumeGameTouchEvent(event);
@@ -2182,27 +4047,132 @@
         };
 
         const onTouchCancel = event => {
+          lastTouchHarnessEventAt = Date.now();
+          if (pointerGestureActive && lastTouchHarnessEventAt - lastPointerHarnessEventAt < 750) return;
           if (!isTouchEventInDisplay(event) && !touchState.activeMouse && !touchState.pinch) return;
           consumeGameTouchEvent(event);
           touchState.pinch = null;
-          endMouseTouch();
+          cancelMouseTouch("touchcancel");
+        };
+
+        const onPointerDown = event => {
+          if (!pointerGestureFallbackEnabled() || !isPointerEventInDisplay(event)) return;
+          const now = Date.now();
+          if (now - lastTouchHarnessEventAt < 750) return;
+          lastPointerHarnessEventAt = now;
+          pointerGestureActive = true;
+          pointerTouches.set(event.pointerId, pointerTouchLike(event));
+          consumeGamePointerEvent(event);
+          try {
+            if (event.target && typeof event.target.setPointerCapture === "function") {
+              event.target.setPointerCapture(event.pointerId);
+            }
+          } catch (_) {
+            // Some mobile browsers reject pointer capture on transformed targets.
+          }
+          const touches = activePointerTouches();
+          if (touches.length >= 2) {
+            beginPinchGesture(touches);
+            return;
+          }
+          if (!touchState.pinch && !touchState.activeMouse && touches.length === 1) {
+            rememberStableKeyboardViewport("pointerstart");
+            const inputHit = fieldAtClientPoint(touches[0].clientX, touches[0].clientY);
+            const matchedInput = inputHit.field ? inputHit : null;
+            if (isKeyboardProxyActive() && !matchedInput && keyboardManualPanEnabled()) {
+              beginKeyboardPanTouch(touches[0]);
+            } else {
+              beginMouseTouch(touches[0], matchedInput);
+            }
+          }
+        };
+
+        const onPointerMove = event => {
+          if (!pointerGestureFallbackEnabled() || !isTouchPointerEvent(event) || !pointerGestureActive) return;
+          if (!pointerTouches.has(event.pointerId) && !isPointerEventInDisplay(event)) return;
+          lastPointerHarnessEventAt = Date.now();
+          pointerTouches.set(event.pointerId, pointerTouchLike(event));
+          consumeGamePointerEvent(event);
+          const touches = activePointerTouches();
+          if (touches.length >= 2) {
+            updatePinchGesture(touches);
+            return;
+          }
+          if (touchState.activeMouse) {
+            const touch = touches.find(item => item.identifier === touchState.singleTouchId) || touches[0];
+            if (touch) updateMouseTouch(touch);
+          }
+        };
+
+        const onPointerEnd = event => {
+          if (!pointerGestureFallbackEnabled() || !isTouchPointerEvent(event) || !pointerGestureActive) return;
+          lastPointerHarnessEventAt = Date.now();
+          pointerTouches.delete(event.pointerId);
+          consumeGamePointerEvent(event);
+          const touches = activePointerTouches();
+          if (touchState.pinch && touches.length < 2) {
+            suppressCompatibilityClick("pointer-pinch-end", 220);
+            recordGesture("pinch-end", { source: "pointer" });
+            touchState.pinch = null;
+          }
+          if (touchState.activeMouse && event.pointerId === touchState.singleTouchId) {
+            suppressCompatibilityClick(touchState.swipeMode ? "pointer-swipe-end" : touchState.longPressFired ? "pointer-long-press-end" : "pointer-tap-end");
+            endMouseTouch();
+          }
+          if (pointerTouches.size === 0) {
+            pointerGestureActive = false;
+          }
+        };
+
+        const onPointerCancel = event => {
+          if (!pointerGestureFallbackEnabled() || !isTouchPointerEvent(event) || !pointerGestureActive) return;
+          lastPointerHarnessEventAt = Date.now();
+          pointerTouches.delete(event.pointerId);
+          consumeGamePointerEvent(event);
+          touchState.pinch = null;
+          cancelMouseTouch("pointercancel");
+          if (pointerTouches.size === 0) {
+            pointerGestureActive = false;
+          }
         };
 
         if (shouldUseTouchHarness()) {
+          syncTouchCaptureLayer();
           displayEl.addEventListener("contextmenu", event => event.preventDefault());
-          document.addEventListener("click", event => {
-            if (shouldUseNativeTouchMouseEvents() && displayEl.contains(event.target)) return;
-            if (!isWrapperChromeTarget(event.target) && Date.now() - touchState.lastTouchEndAt < 700) {
+          touchCaptureLayerEl.addEventListener("contextmenu", event => event.preventDefault());
+          document.addEventListener("pointerdown", onPointerDown, { capture: true, passive: false });
+          document.addEventListener("pointermove", onPointerMove, { capture: true, passive: false });
+          document.addEventListener("pointerup", onPointerEnd, { capture: true, passive: false });
+          document.addEventListener("pointercancel", onPointerCancel, { capture: true, passive: false });
+          const suppressCompatibilityMouseEvent = event => {
+            if (event.__rt4SyntheticMouse || isWrapperChromeTarget(event.target)) return;
+            if (!isGameInputSurfaceTarget(event.target)) return;
+            const now = Date.now();
+            const isTouchPointer = event.type.indexOf("pointer") === 0 && (!event.pointerType || event.pointerType === "touch");
+            if (isTouchPointer) return;
+            if (isTouchPointer || now < touchState.suppressClickUntil || now - touchState.lastTouchEndAt < 160) {
               event.preventDefault();
-              event.stopImmediatePropagation();
+              event.stopPropagation();
+              if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+              }
+              recordGesture("compat-mouse-suppressed", {
+                type: event.type,
+                pointerType: event.pointerType || "",
+                x: Math.round(event.clientX || 0),
+                y: Math.round(event.clientY || 0),
+              });
             }
-          }, true);
+          };
+          ["pointerdown", "pointermove", "pointerup", "pointercancel", "mousedown", "mouseup", "click", "auxclick", "contextmenu"].forEach(type => {
+            document.addEventListener(type, suppressCompatibilityMouseEvent, true);
+          });
           document.addEventListener("click", event => {
-            if (!shouldUseNativeTouchMouseEvents() || !displayEl.contains(event.target)) return;
-            if (!pendingKeyboardRefocus || Date.now() - pendingKeyboardRefocus.at > 900) return;
+            if (!shouldUseNativeTouchMouseEvents() || !isGameInputSurfaceTarget(event.target)) return;
+            if (!pendingKeyboardRefocus || Date.now() - pendingKeyboardRefocus.at > 220) return;
             const pending = pendingKeyboardRefocus;
             pendingKeyboardRefocus = null;
-            if (!isLoginKeyboardFallbackState() && pending.field && pending.field.fallback) return;
+            if (!allowsFallbackKeyboardRefocus(pending.field)) return;
             positionKeyboardProxyForField(pending.field);
             showKeyboard(pending.x, pending.y);
           }, false);
@@ -2218,17 +4188,30 @@
           layoutSyncRaf = window.requestAnimationFrame(() => {
             layoutSyncRaf = 0;
             syncOrientationLayout(true);
+            syncKeyboardPan("layout-sync");
           });
         }
 
+        window.__rt4RequestLayoutSync = requestLayoutSync;
+
         function scheduleLayoutSync() {
+          if (isKeyboardProxyActive()) {
+            captureKeyboardViewportLock("resize-active-keyboard");
+            requestLayoutSync();
+            [0, 40, 140].forEach(delay => window.setTimeout(() => syncKeyboardPan("resize-active-keyboard"), delay));
+            return;
+          }
+          if (isKeyboardDrivenResize()) {
+            requestLayoutSync();
+            return;
+          }
           hideKeyboard();
-          [0, 100, 300, 800, 1400].forEach(delay => window.setTimeout(requestLayoutSync, delay));
+          [0, 40, 120, 240].forEach(delay => window.setTimeout(requestLayoutSync, delay));
         }
 
         window.addEventListener("resize", scheduleLayoutSync);
         if (window.visualViewport) {
-          window.visualViewport.addEventListener("resize", requestLayoutSync);
+          window.visualViewport.addEventListener("resize", scheduleLayoutSync);
           window.visualViewport.addEventListener("scroll", requestLayoutSync);
         }
         window.addEventListener("orientationchange", () => {
@@ -2239,6 +4222,29 @@
 
       installDesktopMouseAndTrackpad();
       installTouchControls();
+
+      function installGlobalAudioUnlock() {
+        const unlock = event => {
+          if (event && event.type) {
+            unlockAudioOnGesture(event.type);
+          } else {
+            unlockAudioOnGesture("global");
+          }
+        };
+        ["pointerdown", "pointerup", "mousedown", "touchstart", "touchend", "click", "keydown"].forEach(type => {
+          window.addEventListener(type, unlock, { capture: true, passive: true });
+          document.addEventListener(type, unlock, { capture: true, passive: true });
+        });
+        window.addEventListener("pageshow", () => resumeAudioContextIfNeeded("pageshow"));
+        window.addEventListener("focus", () => resumeAudioContextIfNeeded("focus"));
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") {
+            resumeAudioContextIfNeeded("visible");
+          }
+        });
+      }
+
+      installGlobalAudioUnlock();
 
       function defaultWebSocketUrl() {
         if (wrapperConfig.websocketUrl) return wrapperConfig.websocketUrl;
@@ -2267,6 +4273,67 @@
         for (const resolve of readers) resolve();
       }
 
+      function closeAllBrowserSockets(reason) {
+        if (browserSockets.size === 0) return;
+        for (const [socketId, socket] of browserSockets) {
+          socket.closed = true;
+          browserSockets.delete(socketId);
+          wakeSocketReaders(socket);
+          try {
+            if (socket.ws.readyState === WebSocket.CONNECTING || socket.ws.readyState === WebSocket.OPEN) {
+              socket.ws.close(1001, reason);
+            }
+          } catch (error) {
+            // Page lifecycle cleanup should never block unload.
+          }
+        }
+      }
+
+      window.addEventListener("pagehide", event => {
+        if (wrapperConfig.closeSocketsOnPageHide === true && !event.persisted) {
+          pageLifecycleClosing = true;
+          closeAllBrowserSockets("pagehide");
+          return;
+        }
+        pageLifecycleClosing = false;
+      }, { capture: true });
+
+      window.addEventListener("pageshow", () => {
+        pageLifecycleClosing = false;
+        forceCheerpJDisplaySize("pageshow");
+        resumeAudioContextIfNeeded("pageshow");
+        if (typeof window.__rt4RequestLayoutSync === "function") {
+          window.__rt4RequestLayoutSync();
+        }
+      }, { capture: true });
+
+      window.addEventListener("focus", () => {
+        resumeAudioContextIfNeeded("focus");
+        if (typeof window.__rt4RequestLayoutSync === "function") {
+          window.__rt4RequestLayoutSync();
+        }
+      }, { capture: true });
+
+      window.addEventListener("beforeunload", () => {
+        pageLifecycleClosing = true;
+        closeAllBrowserSockets("beforeunload");
+      }, { capture: true });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+          if (wrapperConfig.closeSocketsOnHidden === true) {
+            closeAllBrowserSockets("hidden");
+          }
+          return;
+        }
+        pageLifecycleClosing = false;
+        forceCheerpJDisplaySize("visible");
+        resumeAudioContextIfNeeded("visible");
+        if (typeof window.__rt4RequestLayoutSync === "function") {
+          window.__rt4RequestLayoutSync();
+        }
+      }, { capture: true });
+
       function enqueueSocketBytes(socket, bytes) {
         socket.queue.push(bytes);
         wakeSocketReaders(socket);
@@ -2292,6 +4359,9 @@
       }
 
       async function Java_rt4_BrowserWebSocketNative_open(lib, hostname, port) {
+        if (pageLifecycleClosing) {
+          throw new Error("page lifecycle is closing");
+        }
         const url = resolveWebSocketUrl(String(hostname), Number(port));
         const socketId = nextSocketId++;
         writeLog("Opening browser WebSocket #" + socketId + " to " + url + " for " + hostname + ":" + port);
@@ -2424,6 +4494,133 @@
         return browserResizeVersion;
       }
 
+      function Java_rt4_BrowserAudioNative_init(lib, sampleRate, stereo) {
+        browserAudioState.sampleRate = Math.max(8000, Math.min(96000, Number(sampleRate) || 22050));
+        browserAudioState.stereo = Boolean(stereo);
+        if (shouldUseTouchHarness() && !audioUnlockState.unlocked && !audioUnlockState.context) {
+          const context = audioContext(false, true);
+          browserAudioState.supported = Boolean(context) || canUseBrowserAudio();
+          resetBrowserAudioTiming(0.03);
+          publishBrowserAudioState("native-init-deferred");
+          writeLog("Browser audio bridge initialized and waiting for mobile user gesture.");
+          return browserAudioState.supported;
+        }
+        const context = ensureBrowserAudioOutput("native-init");
+        resetBrowserAudioTiming(0.03);
+        publishBrowserAudioState("native-init");
+        writeLog("Browser audio bridge initialized at " + browserAudioState.sampleRate + " Hz " + (browserAudioState.stereo ? "stereo" : "mono") + ".");
+        return Boolean(context);
+      }
+
+      function Java_rt4_BrowserAudioNative_getQueuedFrames(lib, channelId) {
+        return queuedBrowserAudioFrames(browserAudioChannel(channelId));
+      }
+
+      function Java_rt4_BrowserAudioNative_write(lib, channelId, samples, length) {
+        if (shouldUseTouchHarness() && !audioUnlockState.unlocked && !audioUnlockState.context) {
+          browserAudioState.dropped++;
+          publishBrowserAudioState("native-write-deferred");
+          return;
+        }
+        const context = ensureBrowserAudioOutput("native-write");
+        const channel = browserAudioChannel(channelId);
+        const sampleCount = Number(length) || 0;
+        const channelCount = browserAudioState.stereo ? 2 : 1;
+        const frameCount = Math.floor(sampleCount / channelCount);
+        if (!context || frameCount <= 0) {
+          browserAudioState.dropped++;
+          publishBrowserAudioState("native-write-drop");
+          return;
+        }
+        if (context.state === "suspended" && !audioUnlockState.unlocked) {
+          browserAudioState.dropped++;
+          channel.nextTime = 0;
+          publishBrowserAudioState("native-write-locked");
+          return;
+        }
+        if (context.state === "suspended") {
+          resumeAudioContextIfNeeded("native-write");
+          browserAudioState.dropped++;
+          publishBrowserAudioState("native-write-suspended");
+          return;
+        }
+
+        const maxQueuedSeconds = numberOption("browserAudioMaxQueueSeconds", 0.5);
+        const leadSeconds = numberOption("browserAudioLeadSeconds", 0.025);
+        const lateResetSeconds = numberOption("browserAudioLateResetSeconds", 0.08);
+        const now = context.currentTime;
+        if (!Number.isFinite(channel.nextTime) || channel.nextTime < now - lateResetSeconds) {
+          channel.nextTime = now + leadSeconds;
+        } else if (channel.nextTime < now + leadSeconds) {
+          channel.nextTime = now + leadSeconds;
+        }
+        if (channel.nextTime - now > maxQueuedSeconds) {
+          browserAudioState.dropped++;
+          channel.nextTime = now + Math.min(leadSeconds * 2, 0.05);
+        }
+
+        try {
+          const buffer = context.createBuffer(channelCount, frameCount, browserAudioState.sampleRate);
+          const scale = 1 / 8388608;
+          let peakRaw = 0;
+          let sumSquaresRaw = 0;
+          let nonZeroSamples = 0;
+          for (let frame = 0; frame < frameCount; frame++) {
+            for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+              const raw = Number(samples[frame * channelCount + channelIndex]) || 0;
+              const absRaw = Math.abs(raw);
+              if (absRaw > peakRaw) peakRaw = absRaw;
+              if (raw !== 0) nonZeroSamples++;
+              sumSquaresRaw += raw * raw;
+              buffer.getChannelData(channelIndex)[frame] = clamp(raw * scale, -1, 1);
+            }
+          }
+          const source = context.createBufferSource();
+          source.buffer = buffer;
+          source.connect(browserAudioState.gain || context.destination);
+          source.start(channel.nextTime);
+          channel.nextTime += frameCount / browserAudioState.sampleRate;
+          browserAudioState.writes++;
+          browserAudioState.lastWriteAt = Date.now();
+          browserAudioState.lastWriteChannel = Number(channelId) || 0;
+          browserAudioState.lastFrameCount = frameCount;
+          browserAudioState.lastSampleCount = sampleCount;
+          browserAudioState.lastNonZeroSamples = nonZeroSamples;
+          browserAudioState.lastPeakRaw = peakRaw;
+          browserAudioState.lastPeakFloat = Math.min(1, peakRaw * scale);
+          browserAudioState.lastRmsRaw = Math.sqrt(sumSquaresRaw / Math.max(1, frameCount * channelCount));
+          browserAudioState.lastRmsFloat = Math.min(1, browserAudioState.lastRmsRaw * scale);
+          if (nonZeroSamples > 0) {
+            browserAudioState.nonSilentWrites++;
+          } else {
+            browserAudioState.silentWrites++;
+          }
+          if (peakRaw > browserAudioState.maxPeakRaw) {
+            browserAudioState.maxPeakRaw = peakRaw;
+            browserAudioState.maxPeakFloat = browserAudioState.lastPeakFloat;
+          }
+          if (browserAudioState.lastRmsFloat > browserAudioState.maxRmsFloat) {
+            browserAudioState.maxRmsFloat = browserAudioState.lastRmsFloat;
+          }
+          browserAudioState.lastScale = scale;
+          if (browserAudioState.writes === 1 || browserAudioState.writes % 128 === 0) {
+            publishBrowserAudioState("native-write");
+          }
+        } catch (error) {
+          browserAudioState.dropped++;
+          writeLog("Browser audio write failed: " + (error && error.message ? error.message : error));
+          publishBrowserAudioState("native-write-error");
+        }
+      }
+
+      function Java_rt4_BrowserAudioNative_close(lib, channelId) {
+        const channel = browserAudioState.channels.get(Number(channelId) || 0);
+        if (channel) {
+          channel.nextTime = 0;
+        }
+        publishBrowserAudioState("native-close");
+      }
+
       function Java_rt4_BrowserInputNative_pollWheelRotation() {
         const rotation = browserInputWheelRotation;
         browserInputWheelRotation = 0;
@@ -2434,6 +4631,18 @@
         const zoom = browserInputCameraZoom;
         browserInputCameraZoom = 0;
         return zoom;
+      }
+
+      function Java_rt4_BrowserInputNative_pollCameraYaw() {
+        const yaw = Math.trunc(browserInputCameraYaw);
+        browserInputCameraYaw -= yaw;
+        return yaw;
+      }
+
+      function Java_rt4_BrowserInputNative_pollCameraPitch() {
+        const pitch = Math.trunc(browserInputCameraPitch);
+        browserInputCameraPitch -= pitch;
+        return pitch;
       }
 
       function Java_rt4_BrowserInputNative_pollKeyCode() {
@@ -2530,7 +4739,8 @@
           browserLoginState.loginAutoStep === 0 &&
           browserLoginState.createStep === 0 &&
           browserLoginState.worldListStep === 0 &&
-          browserLoginState.loginReply !== 2
+          browserLoginState.loginReply !== 2 &&
+          !isInitialLoginOptionsState()
         ) {
           clearLoginFallbackSuppression("rt4-login-form-idle");
         }
@@ -2575,8 +4785,14 @@
               Java_rt4_BrowserViewportNative_isPageVisible,
               Java_rt4_BrowserViewportNative_isResizable,
               Java_rt4_BrowserViewportNative_getResizeVersion,
+              Java_rt4_BrowserAudioNative_init,
+              Java_rt4_BrowserAudioNative_getQueuedFrames,
+              Java_rt4_BrowserAudioNative_write,
+              Java_rt4_BrowserAudioNative_close,
               Java_rt4_BrowserInputNative_pollWheelRotation,
               Java_rt4_BrowserInputNative_pollCameraZoom,
+              Java_rt4_BrowserInputNative_pollCameraYaw,
+              Java_rt4_BrowserInputNative_pollCameraPitch,
               Java_rt4_BrowserInputNative_pollKeyCode,
               Java_rt4_BrowserInputNative_pollKeyChar,
               Java_rt4_BrowserInputNative_pollKeyDown,
@@ -2656,10 +4872,14 @@
         if (running) return;
         running = true;
         await ensureCheerpJ();
+        const fpsTarget = browserFpsTarget();
+        writeLog("Using RT4 browser FPS target " + fpsTarget + ".");
         setStatus("Starting RT4 via rt4.client main()...");
         const exitCode = await cheerpjRunMain(
           "spike.Rt4SpikeLauncher",
           rt4LauncherJar + ":" + rt4ClientJar,
+          "--browser-fps",
+          String(fpsTarget),
           "--config",
           "/app/config.json",
           "1",
