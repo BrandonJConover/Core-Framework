@@ -1172,6 +1172,22 @@
         return normalizedFitMode(configured, portrait ? "contain" : "cover");
       }
 
+      function shouldUseMobileLoginFixedSurface() {
+        return shouldUseTouchHarness() &&
+          shouldUseMobileFitSurface() &&
+          booleanOption("mobileLoginFixedSurface", true) &&
+          !isGameplayLayoutActive();
+      }
+
+      function mobileLoginFixedFitMode(portrait) {
+        const queryMode = queryParams.get("mobileLoginFitMode");
+        if (queryMode) return normalizedFitMode(queryMode, portrait ? "cover" : "contain");
+        const configured = portrait
+          ? wrapperConfig.mobileLoginPortraitFitMode || wrapperConfig.mobileLoginFitMode
+          : wrapperConfig.mobileLoginLandscapeFitMode || wrapperConfig.mobileLoginFitMode;
+        return normalizedFitMode(configured, portrait ? "cover" : "contain");
+      }
+
       function mobileBalancedScale(portrait) {
         const viewport = viewportSize();
         const configuredVisibleWidth = isGameplayLayoutActive()
@@ -1537,10 +1553,11 @@
           setDisplayFitScale(1);
           placeDisplay(viewport, (viewport.width - width) / 2, (viewport.height - height) / 2, width, height);
         } else if (shouldUseMobileFitSurface()) {
-          const fixedMobileSurface = shouldUseTouchHarness() && !resizableSurface;
+          const loginFixedSurface = portrait && shouldUseMobileLoginFixedSurface();
+          const fixedMobileSurface = loginFixedSurface || (shouldUseTouchHarness() && !resizableSurface);
           const minWidth = fixedMobileSurface ? fixedGameWidth() : mobileMinGameWidth(portrait);
           const minHeight = fixedMobileSurface ? fixedGameHeight() : mobileMinGameHeight();
-          const fitMode = fixedMobileSurface ? mobileFixedFitMode(portrait) : mobileFitMode(portrait);
+          const fitMode = loginFixedSurface ? mobileLoginFixedFitMode(portrait) : fixedMobileSurface ? mobileFixedFitMode(portrait) : mobileFitMode(portrait);
           activeFitMode = fitMode;
           let width = minWidth;
           let height = minHeight;

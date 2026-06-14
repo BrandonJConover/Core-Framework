@@ -393,7 +393,11 @@ test("mobile chat keyboard focus and text queue survive input changes", async ({
       window.Java_rt4_BrowserInputNative_setGameState(null, 30);
       window.__rt4RequestLayoutSync();
     });
-    await page.waitForFunction(() => window.__rt4LayoutState && window.__rt4LayoutState.width >= 765);
+    await page.waitForFunction(() =>
+      window.__rt4LayoutState &&
+      window.__rt4LayoutState.width >= 765 &&
+      window.__rt4LayoutState.fitMode !== "cover"
+    );
     const target = await page.evaluate(() => {
       const height = Math.max(window.__rt4InputFrame?.canvasHeight || 0, window.__rt4LayoutState?.height || 0, 503);
       const width = Math.max(window.__rt4InputFrame?.canvasWidth || 0, window.__rt4LayoutState?.width || 0, 765);
@@ -520,6 +524,8 @@ test("mobile portrait pre-game layout uses the available height without stretchi
       };
     });
     assert(frame.display.height >= frame.innerHeight * 0.9, `Portrait layout is still too short: ${JSON.stringify(frame)}`);
+    assert(frame.layout.width === 765 && frame.layout.height === 503, `Portrait pre-game should keep the classic login canvas size: ${JSON.stringify(frame)}`);
+    assert(frame.layout.fitMode === "cover", `Portrait pre-game should cover the viewport with the fixed login canvas: ${JSON.stringify(frame)}`);
     assert(Math.abs((frame.layout.totalScaleX || 1) - (frame.layout.totalScaleY || 1)) < 0.001, `Portrait layout should preserve aspect ratio: ${JSON.stringify(frame)}`);
   });
 });
