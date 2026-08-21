@@ -4,12 +4,12 @@ import launcher.Utils.Defaults;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Scanner;
-import java.util.regex.Pattern;
 
 public class Md5Handler {
 
@@ -57,9 +57,14 @@ public class Md5Handler {
         try {
             Scanner scanner = new Scanner(file);
             while (scanner.hasNextLine()) {
-                Entry newEntry = new Entry(scanner.nextLine(), this.configDir);
-                if (!newEntry.getRef().getName().equals(Defaults._MD5_TABLE_FILENAME))
-                    entries.add(newEntry);
+                try {
+                    Entry newEntry = new Entry(scanner.nextLine(), this.configDir);
+                    if (!newEntry.getRef().getName().equals(Defaults._MD5_TABLE_FILENAME))
+                        entries.add(newEntry);
+                } catch (IllegalArgumentException skip) {
+                    // Skip malicious / malformed manifest entries (e.g. path traversal) rather than aborting the load.
+                    System.err.println(skip.getMessage());
+                }
             }
         } catch (Exception error) {
             error.printStackTrace();
@@ -110,8 +115,20 @@ public class Md5Handler {
             this.configDir = configDir;
             sum = mixedLine.substring(0, 32);
             String path = mixedLine.substring(35);
-            path.replace(Pattern.quote("/"), File.separator);
-            ref = new File(configDir + path);
+            path = path.replace("/", File.separator);
+            File target = new File(configDir + path);
+            // Path traversal protection: reject manifest entries that resolve outside the config/game directory.
+            try {
+                String baseCanonical = new File(configDir).getCanonicalPath();
+                String targetCanonical = target.getCanonicalPath();
+                if (!targetCanonical.equals(baseCanonical)
+                        && !targetCanonical.startsWith(baseCanonical + File.separator)) {
+                    throw new IllegalArgumentException("Blocked MD5 manifest traversal entry: " + path);
+                }
+            } catch (IOException ioe) {
+                throw new IllegalArgumentException("Unable to validate MD5 manifest entry: " + path, ioe);
+            }
+            ref = target;
         }
 
         public Entry(File file) {
