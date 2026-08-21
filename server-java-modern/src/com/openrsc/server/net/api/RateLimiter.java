@@ -2,7 +2,9 @@ package com.openrsc.server.net.api;
 
 import io.netty.handler.codec.http.FullHttpRequest;
 
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -45,6 +47,12 @@ public final class RateLimiter {
     /** Stats: how many requests were rejected by this limiter (cumulative). */
     private final AtomicLong rejectedTotal = new AtomicLong();
 
+    /** Evict stale buckets when the map exceeds this many keys. */
+    private static final int EVICT_THRESHOLD = 50_000;
+    /** Minimum gap between eviction sweeps, ms. */
+    private static final long EVICT_INTERVAL_MS = 60_000L;
+    private final AtomicLong lastSweepMs = new AtomicLong();
+
     public RateLimiter(long windowMs, int maxRequests) {
         if (windowMs <= 0) throw new IllegalArgumentException("windowMs must be > 0");
         if (maxRequests <= 0) throw new IllegalArgumentException("maxRequests must be > 0");
@@ -58,6 +66,7 @@ public final class RateLimiter {
      */
     public boolean allow(String key) {
         long now = System.currentTimeMillis();
+        maybeEvict(now);
         Bucket b = buckets.computeIfAbsent(key, k -> new Bucket());
         synchronized (b) {
             if (now - b.windowStartMs >= windowMs) {
@@ -75,6 +84,25 @@ public final class RateLimiter {
         }
     }
 
+    /**
+     * Opportunistically drop buckets whose window has long since rolled over,
+     * so a caller rotating through many source IPs can't grow the map without
+     * bound. Runs at most once per {@link #EVICT_INTERVAL_MS} and only once the
+     * map is large enough to be worth sweeping.
+     */
+    private void maybeEvict(long now) {
+        if (buckets.size() < EVICT_THRESHOLD) return;
+        long last = lastSweepMs.get();
+        if (now - last < EVICT_INTERVAL_MS) return;
+        if (!lastSweepMs.compareAndSet(last, now)) return; // another thread is sweeping
+        buckets.entrySet().removeIf(e -> {
+            Bucket b = e.getValue();
+            synchronized (b) {
+                return now - b.windowStartMs >= windowMs;
+            }
+        });
+    }
+
     /** Number of requests rejected since process start. */
     public long getRejectedTotal() {
         return rejectedTotal.get();
@@ -90,16 +118,61 @@ public final class RateLimiter {
         }
     }
 
-    /** Extract a caller identity from the request, preferring forwarded headers. */
+    /**
+     * IPs of reverse proxies we trust to set X-Forwarded-For. Only when the
+     * direct TCP peer (fallbackRemoteAddr) is one of these do we consult XFF.
+     * Defaults to loopback (the nginx/Caddy-on-localhost topology this repo
+     * documents); override with -Dopenrsc.trustedProxies=ip1,ip2,...
+     */
+    private static final Set<String> TRUSTED_PROXIES = parseTrustedProxies(
+        System.getProperty("openrsc.trustedProxies", "127.0.0.1,::1,0:0:0:0:0:0:0:1"));
+
+    private static Set<String> parseTrustedProxies(String csv) {
+        Set<String> set = new LinkedHashSet<>();
+        for (String s : csv.split(",")) {
+            String t = s.trim();
+            if (!t.isEmpty()) set.add(t);
+        }
+        return set;
+    }
+
+    private static boolean isTrustedProxy(String ip) {
+        return ip != null && TRUSTED_PROXIES.contains(ip.trim());
+    }
+
+    /**
+     * Extract a caller identity from the request.
+     *
+     * X-Forwarded-For is client-controlled and must NOT be trusted unless the
+     * request actually arrived from one of our reverse proxies. Trusting it
+     * unconditionally (the previous behaviour) let any client defeat every
+     * per-IP limit by sending a random/rotating XFF header.
+     *
+     * When the direct peer is a trusted proxy we walk XFF right-to-left and
+     * return the first hop that is not itself a trusted proxy — that is the
+     * real client that connected to our edge. nginx's
+     * $proxy_add_x_forwarded_for APPENDS the connecting client, so the
+     * rightmost non-proxy entry is authoritative and the leftmost (which a
+     * client can pre-populate) is not.
+     */
     public static String identify(FullHttpRequest req, String fallbackRemoteAddr) {
-        // X-Forwarded-For isn't an enum constant in Netty 4.1's HttpHeaderNames
-        // (it's a non-standard header), so use the literal name. nginx + most
-        // CDNs set it; we trust the leftmost entry as the original client.
+        // Direct peer not a trusted proxy: ignore XFF entirely, use the socket peer.
+        if (!isTrustedProxy(fallbackRemoteAddr)) {
+            return fallbackRemoteAddr != null ? fallbackRemoteAddr : "unknown";
+        }
+
         String fwd = req.headers().get("X-Forwarded-For");
         if (fwd != null && !fwd.isBlank()) {
-            // X-Forwarded-For: client, proxy1, proxy2 — first entry is the original client.
-            int comma = fwd.indexOf(',');
-            return (comma > 0 ? fwd.substring(0, comma) : fwd).trim();
+            String[] hops = fwd.split(",");
+            for (int i = hops.length - 1; i >= 0; i--) {
+                String hop = hops[i].trim();
+                if (!hop.isEmpty() && !isTrustedProxy(hop)) {
+                    return hop;
+                }
+            }
+            // All hops were trusted proxies — fall back to the leftmost entry.
+            String leftmost = hops.length > 0 ? hops[0].trim() : "";
+            if (!leftmost.isEmpty()) return leftmost;
         }
         return fallbackRemoteAddr != null ? fallbackRemoteAddr : "unknown";
     }

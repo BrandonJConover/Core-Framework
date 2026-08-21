@@ -2,7 +2,9 @@ package com.openrsc.server.util;
 
 import com.openrsc.server.Server;
 import com.thoughtworks.xstream.XStream;
-import com.thoughtworks.xstream.security.AnyTypePermission;
+import com.thoughtworks.xstream.security.NoTypePermission;
+import com.thoughtworks.xstream.security.NullPermission;
+import com.thoughtworks.xstream.security.PrimitiveTypePermission;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -25,7 +27,18 @@ public final class PersistenceManager {
 
 	public PersistenceManager(Server server) {
 		this.server = server;
-		xstream.addPermission(AnyTypePermission.ANY);
+		// Restrict deserialization instead of the blanket AnyTypePermission.ANY
+		// (which re-enables XStream gadget-chain RCE). Permit nulls/primitives/
+		// String, this project's own types, and the standard collection/map
+		// hierarchies. Each type declared in aliases.xml is additionally
+		// allow-listed as it is registered in setupAliases().
+		xstream.addPermission(NoTypePermission.NONE);
+		xstream.addPermission(NullPermission.NULL);
+		xstream.addPermission(PrimitiveTypePermission.PRIMITIVES);
+		xstream.allowTypeHierarchy(String.class);
+		xstream.allowTypeHierarchy(java.util.Collection.class);
+		xstream.allowTypeHierarchy(java.util.Map.class);
+		xstream.allowTypesByWildcard(new String[]{"com.openrsc.**"});
 		setupAliases();
 	}
 
@@ -58,6 +71,10 @@ public final class PersistenceManager {
 			for (Enumeration<?> e = aliases.propertyNames(); e.hasMoreElements(); ) {
 				String alias = (String) e.nextElement();
 				Class<?> c = Class.forName((String) aliases.get(alias));
+				// Permit exactly the classes declared in aliases.xml, so any
+				// type outside the app package that is intentionally aliased is
+				// still deserializable while arbitrary gadget types are not.
+				xstream.allowTypes(new Class[]{c});
 				xstream.alias(alias, c);
 			}
 		} catch (Exception ioe) {

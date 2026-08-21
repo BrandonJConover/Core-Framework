@@ -18,10 +18,13 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.AttributeMap;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 
 public final class RSCProtocolDecoder extends ByteToMessageDecoder implements AttributeMap {
+	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 	public static final AttributeKey<ConnectionAttachment> attachment = AttributeKey.valueOf("conn-attachment");
 
 	@Override
@@ -46,7 +49,9 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 						lengthLength = 1;
 					}
 
-					System.out.println("Buffer readable bytes: " + buffer.readableBytes() + " len: " + length);
+					if (LOGGER.isDebugEnabled()) {
+						LOGGER.debug("Buffer readable bytes: {} len: {}", buffer.readableBytes(), length);
+					}
 					if (buffer.readableBytes() >= length && length > 0) {
 						int opcode;
 
@@ -206,8 +211,8 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 											Packet packet = new Packet(opcode, bufferOrdered);
 											addPacketToIncoming(out, att, packet);
 											return;
-										} else {
-											System.out.println("Caught invalid incoming opcode;; enc: %d; dec: %d; len: %d; isPossiblyValid: %b; opcodeTries: %d".formatted(encodedOpcode, opcode, length, isPossiblyValid, opcodeTries));
+										} else if (LOGGER.isDebugEnabled()) {
+											LOGGER.debug("Caught invalid incoming opcode;; enc: {}; dec: {}; len: {}; isPossiblyValid: {}; opcodeTries: {}", encodedOpcode, opcode, length, isPossiblyValid, opcodeTries);
 										}
 									}
 									// return without writing out any packet.

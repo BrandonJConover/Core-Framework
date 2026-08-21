@@ -101,6 +101,16 @@ public class RSCConnectionHandler extends ChannelInboundHandlerAdapter implement
 					ActionSender.sendInitialServerConfigs(getServer(), channel);
 				} else {
 					if (packet.getLength() > 10 || (packet.getID() == 4 && packet.getLength() > 8)) {
+						// Rate-limit the pre-auth login path. Each login packet
+						// drives one or more private-key RSA decrypts, so an
+						// unthrottled stream is an unauthenticated CPU-exhaustion
+						// DoS. Apply the same per-connection packet filter used
+						// for logged-in players before doing the crypto work.
+						if (!getServer().getPacketFilter().shouldAllowPacket(ctx.channel(), false)) {
+							LOGGER.info("Login packet flood from IP " + ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().getHostAddress() + ", closing channel");
+							ctx.channel().close();
+							return;
+						}
 						loginHandler.processLogin(packet, channel, getServer());
 					}
 				}

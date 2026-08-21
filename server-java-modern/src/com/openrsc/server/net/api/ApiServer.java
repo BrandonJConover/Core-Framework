@@ -84,8 +84,14 @@ public final class ApiServer {
                 }
             });
 
-        channel = bootstrap.bind(new InetSocketAddress(port)).sync();
-        LOGGER.info("API listener online on port {}", port);
+        // Bind to loopback by default: this listener is plaintext HTTP and is
+        // meant to sit behind a reverse proxy (see class doc). Binding the
+        // wildcard address would expose the credential endpoints directly if a
+        // host firewall rule were ever missed. Operators who need direct
+        // access can override with -Dopenrsc.apiBindHost=0.0.0.0.
+        String bindHost = System.getProperty("openrsc.apiBindHost", "127.0.0.1");
+        channel = bootstrap.bind(new InetSocketAddress(bindHost, port)).sync();
+        LOGGER.info("API listener online on {}:{}", bindHost, port);
     }
 
     public void stop() {

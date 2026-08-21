@@ -153,9 +153,12 @@ public final class DataConversions {
 
 		final String plainTextCompatHashed = hashPasswordCompatibility(passwordPlainText, salt);
 
-		// Password is in old DB format.
+		// Password is in old DB format. Compare in constant time so the
+		// legacy path doesn't leak match progress via timing.
 		if(passwordNeedsRehash(passwordHashed)) {
-			return plainTextCompatHashed.equals(passwordHashed);
+			return java.security.MessageDigest.isEqual(
+				plainTextCompatHashed.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+				passwordHashed.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 		}
 
 		return BCrypt.checkpw(plainTextCompatHashed, passwordHashed);

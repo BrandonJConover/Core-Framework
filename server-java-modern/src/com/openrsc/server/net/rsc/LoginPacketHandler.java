@@ -497,12 +497,20 @@ public class LoginPacketHandler {
 
 					final String username = getString(packet.getBuffer()).trim();
 					String password = "";
+					boolean cleartextRejected = false;
 					if (clientVersion < 10010 || clientVersion == 10069) {
 						password = getString(packet.getBuffer()).trim();
 					} else {
 						byte loginEncryptionVersion = packet.readByte(); //0 = none, 1 = RSA, 2 = SSL/TLS
 						if (loginEncryptionVersion == 0) {
+							// Read the password to keep the packet aligned, but the client
+							// chose to send it unencrypted. Reject unless an operator has
+							// explicitly opted in, so a MITM or patched client cannot force
+							// plaintext credentials on the wire.
 							password = getString(packet.getBuffer()).trim();
+							if (!Boolean.getBoolean("openrsc.allowCleartextLogin")) {
+								cleartextRejected = true;
+							}
 						} else if (loginEncryptionVersion == 1) {
 							int rsaLength = packet.readUnsignedShort();
 							byte[] loginBlock = Crypto.decryptRSA(packet.readBytes(rsaLength), 0, rsaLength);
@@ -523,7 +531,11 @@ public class LoginPacketHandler {
 								LOGGER.info("error parsing details in login block");
 								LOGGER.catching(e);
 							}
-							LOGGER.info("Login details for " + username + ": " + loginDetails);
+							// Do not log the decrypted, client-supplied login block at
+							// INFO — it can carry sensitive/credential-adjacent data.
+							if (LOGGER.isDebugEnabled()) {
+								LOGGER.debug("Parsed login details block for {} ({} bytes)", username, loginDetails.length());
+							}
 						}
 					}
 
@@ -557,6 +569,13 @@ public class LoginPacketHandler {
 					}
 					if (packet.getReadableBytes() > 0) {
 						cl.isAndroidClient = (packet.readUnsignedByte() & 0xFF) != 0;
+					}
+
+					if (cleartextRejected) {
+						LOGGER.warn("Rejecting unencrypted login for " + username + " from " + channel.remoteAddress());
+						channel.writeAndFlush(new PacketBuilder().writeByte((byte) LoginResponse.INVALID_CREDENTIALS).toPacket());
+						channel.close();
+						break;
 					}
 
 					final LoginRequest request = new LoginRequest(server, channel, username, password, false, clientVersion, opcode == OpcodeIn.RELOGIN, null) {

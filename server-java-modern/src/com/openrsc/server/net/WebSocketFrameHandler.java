@@ -13,8 +13,6 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.Locale;
-
 public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocketFrame> {
 	private static final Logger LOGGER = LogManager.getLogger("OpenRSC");
 
@@ -31,10 +29,12 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, WebSocketFrame frame) throws Exception {
-		if (frame instanceof TextWebSocketFrame textFrame) {
-			String request = textFrame.text();
-			LOGGER.debug("Ignoring text WebSocket frame from {}: {}", ctx.channel().remoteAddress(), request);
-			ctx.channel().writeAndFlush(new TextWebSocketFrame(request.toUpperCase(Locale.US)));
+		if (frame instanceof TextWebSocketFrame) {
+			// The RSC protocol is binary-only. Text frames are never expected;
+			// silently drop them. (Previously this echoed the frame back
+			// uppercased, a leftover from Netty's example code that acted as a
+			// small unauthenticated reflection primitive.)
+			LOGGER.debug("Dropping unexpected text WebSocket frame from {}", ctx.channel().remoteAddress());
 		} else if (frame instanceof BinaryWebSocketFrame binframe) {
 			ByteBuf buffer = binframe.content().retain();
 			ctx.fireChannelRead(buffer);
