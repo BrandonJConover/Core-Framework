@@ -88,10 +88,9 @@ JSON
 echo "==> Writing CheerpJ wrapper runtime config ..."
 cat > "$PUBLIC_DIR/wrapper-config.js" <<JS
 window.RT4_WRAPPER_CONFIG = {
-  debug: true,
+  debug: false,
   websocketUrl: "$WEBSOCKET_URL",
   tailscaleControlUrl: "$TAILSCALE_CONTROL_URL",
-  tailscaleAuthKey: "$TAILSCALE_AUTH_KEY",
   useTailscaleLogin: $USE_TAILSCALE_LOGIN
 };
 JS
@@ -119,6 +118,14 @@ location ^~ $URL_PREFIX {
     }
 
     add_header Accept-Ranges bytes always;
+    # nginx drops inherited server-level add_header once a location sets any of
+    # its own, so the security headers must be re-declared here to apply to
+    # wrapper responses (and when this snippet is included in a user's own
+    # HTTPS server block).
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Content-Type-Options    "nosniff" always;
+    add_header X-Frame-Options           "SAMEORIGIN" always;
+    add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
 }
 NGINX
 
@@ -138,7 +145,13 @@ server {
     ssl_certificate     /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_ciphers         "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305";
+    ssl_prefer_server_ciphers on;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Content-Type-Options    "nosniff" always;
+    add_header X-Frame-Options           "SAMEORIGIN" always;
+    add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
 
     include /etc/nginx/snippets/rt4-wrapper.conf;
 }
