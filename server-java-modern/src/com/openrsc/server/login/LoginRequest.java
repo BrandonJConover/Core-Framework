@@ -45,7 +45,11 @@ public abstract class LoginRequest extends LoginExecutorProcess{
 		this.setUsername(DataConversions.sanitizeUsername(username));
 		this.setPassword(password);
 		this.setAuthenticClient(isAuthenticClient);
-		this.setIpAddress(((InetSocketAddress) channel.remoteAddress()).getAddress().getHostAddress());
+		// Use the real client IP (recovered from the reverse proxy when the
+		// direct peer is a trusted proxy) so password throttling, per-IP
+		// session caps and bans apply to web-client players instead of
+		// collapsing them all onto the proxy's loopback address.
+		this.setIpAddress(com.openrsc.server.net.ClientAddress.effectiveIp(channel));
 		this.setClientVersion(clientVersion);
 		this.setUsernameHash(DataConversions.usernameToHash(username));
 		this.reconnecting = reconnecting;

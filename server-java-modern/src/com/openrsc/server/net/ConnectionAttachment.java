@@ -20,4 +20,11 @@ public class ConnectionAttachment {
 	public AtomicReference<Boolean> isLongSessionId = new AtomicReference<>();
 	public AtomicReference<Boolean> isWebSocket = new AtomicReference<>(false);
 
+	/**
+	 * Real client IP recovered from the reverse proxy's X-Forwarded-For header
+	 * during the WebSocket handshake, when the direct peer is a trusted proxy.
+	 * Null for direct connections or when no trusted forwarding was present.
+	 */
+	public AtomicReference<String> forwardedFor = new AtomicReference<>();
+
 }
