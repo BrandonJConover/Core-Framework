@@ -126,12 +126,23 @@ public class ClientDownloader {
     try (ZipInputStream inZip = new ZipInputStream(new FileInputStream(pathToUpdateZip))) {
       ZipEntry inZipEntry;
       int unzipCount = 0;
+      File destinationDir = new File(destinationPath);
+      String destinationCanonical = destinationDir.getCanonicalPath();
       while ((inZipEntry = inZip.getNextEntry()) != null) {
         File unZippedFile = new File(destinationPath, inZipEntry.getName());
+        // Zip Slip protection: reject any entry whose resolved path escapes the destination directory.
+        String unZippedCanonical = unZippedFile.getCanonicalPath();
+        if (!unZippedCanonical.equals(destinationCanonical)
+            && !unZippedCanonical.startsWith(destinationCanonical + File.separator)) {
+          throw new IOException("Blocked zip traversal entry: " + inZipEntry.getName());
+        }
         if (inZipEntry.isDirectory()) {
           unZippedFile.mkdirs();
         } else {
-          new File(unZippedFile.getParent()).mkdirs();
+          File parentDir = unZippedFile.getParentFile();
+          if (parentDir != null) {
+            parentDir.mkdirs();
+          }
           try (FileOutputStream unZippedFileOutputStream = new FileOutputStream(unZippedFile)) {
             int length;
             byte[] byteBuffer = new byte[1024];

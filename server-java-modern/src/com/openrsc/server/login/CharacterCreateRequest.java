@@ -40,7 +40,10 @@ public class CharacterCreateRequest extends LoginExecutorProcess{
 		this.setPassword(password);
 		this.setAuthenticClient(isAuthenticClient);
 		this.setChannel(channel);
-		this.setIpAddress(((InetSocketAddress) getChannel().remoteAddress()).getAddress().getHostAddress());
+		// Recover the real client IP behind a trusted reverse proxy so
+		// registration throttling isn't bypassed by web clients presenting as
+		// the proxy's loopback address.
+		this.setIpAddress(com.openrsc.server.net.ClientAddress.effectiveIp(getChannel()));
 		this.setClientVersion(clientVersion);
 		this.isSimRegister = false;
 	}
@@ -52,7 +55,10 @@ public class CharacterCreateRequest extends LoginExecutorProcess{
 		this.setPassword(password);
 		this.setAuthenticClient(isAuthenticClient);
 		this.setChannel(channel);
-		this.setIpAddress(((InetSocketAddress) getChannel().remoteAddress()).getAddress().getHostAddress());
+		// Recover the real client IP behind a trusted reverse proxy so
+		// registration throttling isn't bypassed by web clients presenting as
+		// the proxy's loopback address.
+		this.setIpAddress(com.openrsc.server.net.ClientAddress.effectiveIp(getChannel()));
 		this.setClientVersion(clientVersion);
 		this.isSimRegister = false;
 	}

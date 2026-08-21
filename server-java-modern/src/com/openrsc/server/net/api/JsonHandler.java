@@ -1,5 +1,6 @@
 package com.openrsc.server.net.api;
 
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -25,9 +26,26 @@ import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
  */
 public final class JsonHandler {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = buildMapper();
 
     private JsonHandler() {}
+
+    /**
+     * Build the shared mapper with explicit stream-read constraints. Untrusted
+     * request bodies are capped at 1MB by the HTTP aggregator, but without
+     * nesting/number/string limits a small deeply-nested payload can still
+     * exhaust the worker thread's stack (CVE-2025-52999 class). Bound them.
+     */
+    private static ObjectMapper buildMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.getFactory().setStreamReadConstraints(
+            StreamReadConstraints.builder()
+                .maxNestingDepth(200)
+                .maxStringLength(1_000_000)
+                .maxNumberLength(1_000)
+                .build());
+        return mapper;
+    }
 
     /** Serialise {@code body} as JSON and wrap in a Netty response with the given status. */
     public static FullHttpResponse json(HttpResponseStatus status, Object body) {

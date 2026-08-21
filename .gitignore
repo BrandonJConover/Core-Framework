@@ -171,5 +171,18 @@ DerivedData/
 .env
 VPN_SETUP.md
 
+# JWT signing secrets — must never be committed; generated at runtime per host
+.jwt-secret
+server-rust/.jwt-secret
+**/.jwt-secret
+
+# HeidiSQL portable saved sessions (store DB passwords)
+Portable_Windows/HeidiSQL_11.1_64_Portable/portable_settings.txt
+Portable_Windows/HeidiSQL_11.1_64_Portable/tabs.ini
+
 # macOS
 .DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc

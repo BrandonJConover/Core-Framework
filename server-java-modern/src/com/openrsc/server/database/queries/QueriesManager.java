@@ -5,7 +5,9 @@ import com.openrsc.server.database.queries.xmldto.QueriesListDTO;
 import com.openrsc.server.database.queries.xmldto.QueryDTO;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.converters.extended.ToAttributedValueConverter;
-import com.thoughtworks.xstream.security.AnyTypePermission;
+import com.thoughtworks.xstream.security.NoTypePermission;
+import com.thoughtworks.xstream.security.NullPermission;
+import com.thoughtworks.xstream.security.PrimitiveTypePermission;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -27,7 +29,14 @@ public class QueriesManager {
     public static final String DATABASE_DIRECTORY = "database/";
 
     static {
-		X_STREAM.addPermission(AnyTypePermission.ANY);
+		// Lock down deserialization to exactly the two DTO types this manager
+        // reads (plus nulls/primitives/String), instead of the blanket
+        // AnyTypePermission.ANY which re-enables XStream gadget-chain attacks.
+        X_STREAM.addPermission(NoTypePermission.NONE);
+        X_STREAM.addPermission(NullPermission.NULL);
+        X_STREAM.addPermission(PrimitiveTypePermission.PRIMITIVES);
+        X_STREAM.allowTypeHierarchy(String.class);
+        X_STREAM.allowTypes(new Class[]{QueryDTO.class, QueriesListDTO.class});
         X_STREAM.setMode(XStream.ID_REFERENCES);
         X_STREAM.alias("query", QueryDTO.class);
         X_STREAM.alias("queries", QueriesListDTO.class);

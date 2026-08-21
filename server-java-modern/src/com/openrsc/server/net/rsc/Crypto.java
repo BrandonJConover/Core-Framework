@@ -46,6 +46,23 @@ public class Crypto {
     private static final int XTEA_NUM_ROUNDS = 32;
     private static final int XTEA_DELTA = 0x9e3779b9;
 
+    /**
+     * Bit length for a freshly generated login RSA key. 512-bit RSA (the old
+     * hardcoded value) is factorable on commodity hardware in hours; this key
+     * protects every login block, so newly generated keys use 2048 bits.
+     * Override with -Dopenrsc.rsaKeyBits=N if needed.
+     *
+     * NOTE: custom clients fetch the modulus at runtime (opcode 19) and adapt
+     * automatically, but the authentic JS/WASM clients have the modulus baked
+     * in (see web-client/worldlist-patch.py). After regenerating the key at a
+     * new size, re-extract the modulus from the new client.pem and re-bake it
+     * into those clients, or they will fail to log in.
+     */
+    private static final int RSA_KEY_BITS =
+        Integer.getInteger("openrsc.rsaKeyBits", 2048);
+    /** Warn when a loaded key is weaker than this. */
+    private static final int RSA_MIN_SAFE_BITS = 2048;
+
     public static void init() {
         generateRSAKeys();
         loadRSAKeys();
@@ -102,7 +119,8 @@ public class Crypto {
 
                 KeyPairGenerator keyPairGenerator;
                 keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-                keyPairGenerator.initialize(512);
+                keyPairGenerator.initialize(RSA_KEY_BITS);
+                LOGGER.info("Generating a {}-bit login RSA key pair.", RSA_KEY_BITS);
                 KeyPair keyPair = keyPairGenerator.genKeyPair();
 
                 try (FileWriter publicKeyFile = new FileWriter("client.pem")) {
@@ -122,6 +140,14 @@ public class Crypto {
         try {
             publicKey = (RSAPublicKey)KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pemParser("client.pem")));
             privateKey = (RSAPrivateKey)KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(pemParser("server.pem")));
+
+            int bits = publicKey.getModulus().bitLength();
+            if (bits < RSA_MIN_SAFE_BITS) {
+                LOGGER.warn("Login RSA key is only {} bits — this is factorable and insecure. "
+                    + "Delete client.pem/server.pem and restart to regenerate at {} bits, "
+                    + "then re-bake the new modulus into the authentic JS/WASM clients.",
+                    bits, RSA_KEY_BITS);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

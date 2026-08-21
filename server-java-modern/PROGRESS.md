@@ -82,6 +82,15 @@ the codebase. All commits pushed to origin/develop.
 input resilience, no IO-thread exceptions). **CVE posture:** no known CVEs
 in any of the 43 runtime JARs.
 
+**Security dependency bump (network-security review):** netty 4.1.119.Final →
+4.1.137.Final (HTTP request-smuggling / compression-codec advisories),
+jackson-core/databind/annotations 2.17.2 → 2.19.4 (nested-input DoS), and
+commons-lang3 3.17.0 → 3.20.0. All jars fetched from Maven Central and verified
+against their published SHA-1. Core + plugins recompile clean against the new
+versions; a full `ant compile` + `./smoke_test.sh` should still be run before
+deploy. CVE posture is a point-in-time snapshot — add an SCA/dependency-scan
+step to CI to keep it current.
+
 Commits pushed to origin/ios/phase1-foundation this session:
 | Commit | Summary |
 |---|---|

@@ -509,6 +509,11 @@ public class RSCPacketFilter {
 					}
 				}
 				connectionTimes.removeAll(connectionsToRemove);
+				// Drop the key once no live timestamps remain so the map stays
+				// bounded to currently-active source IPs.
+				if (connectionTimes.isEmpty()) {
+					connectionAttempts.remove(hostAddress);
+				}
 			}
 		}
 		return cps;
@@ -532,6 +537,11 @@ public class RSCPacketFilter {
 					}
 				}
 				attempts.removeAll(attemptsToRemove);
+				// Drop the key once no live timestamps remain so the map stays
+				// bounded to currently-active source IPs.
+				if (attempts.isEmpty()) {
+					passwordAttempts.remove(hostAddress);
+				}
 			}
 		}
 		return countAttempts;
@@ -560,6 +570,11 @@ public class RSCPacketFilter {
 					}
 				}
 				loginTimes.removeAll(loginsToRemove);
+				// Drop the key once no live timestamps remain so the map stays
+				// bounded to currently-active source IPs.
+				if (loginTimes.isEmpty()) {
+					loginAttempts.remove(hostAddress);
+				}
 			}
 		}
 		return lps;

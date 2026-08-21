@@ -7,6 +7,7 @@ import launcher.Utils.Logger;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
@@ -95,8 +96,10 @@ public class Downloader implements Runnable {
       String description = file.getName();
       long fileSize = connection.getContentLength();
 
+      File outputFile = new File(this._GAMEFOLDER + File.separator + filename);
+      boolean downloadComplete = false;
       try (BufferedInputStream inputStream = new BufferedInputStream(new URL(completeFileUrl).openStream());
-          FileOutputStream fileOS = new FileOutputStream(this._GAMEFOLDER + File.separator + filename)) {
+          FileOutputStream fileOS = new FileOutputStream(outputFile)) {
         byte[] data = new byte[1024];
         int byteContent;
         double totalRead = 0;
@@ -106,13 +109,54 @@ public class Downloader implements Runnable {
           float percent = (float) (totalRead / fileSize) * 100;
           ProgressBar.setDownloadProgress(description, percent);
         }
+        downloadComplete = true;
       } catch (UnknownHostException uhe) {
         offline_start = true;
       } catch (Exception error) {
         error.printStackTrace();
       }
+
+      // Verify the freshly downloaded artifact before the launcher can execute it.
+      if (downloadComplete) {
+        verifyChecksum(outputFile);
+      }
     } catch (Exception error) {
       error.printStackTrace();
+    }
+  }
+
+  /**
+   * Re-hashes a downloaded file and compares it against the sum listed in the MD5.SUM
+   * manifest. On mismatch the file is deleted and an IOException is thrown so a
+   * corrupted or tampered artifact is never left on disk to be executed.
+   *
+   * SECURITY NOTE: MD5.SUM is served from the same origin as the payload
+   * (Defaults._GAME_FILES_SERVER), so this MD5 check only guards against corruption
+   * and partial/interrupted downloads. It is NOT an authenticity guarantee: an
+   * attacker who controls the download server controls both the file and its listed
+   * sum. A proper fix requires a detached signature over the manifest (e.g. minisign
+   * or GPG) verified with a public key pinned in the launcher.
+   * TODO: Add detached-signature verification of MD5.SUM against a pinned public key.
+   */
+  private void verifyChecksum(File downloadedFile) throws IOException {
+    // The manifest itself has no entry to verify against.
+    if (downloadedFile.getName().equals(Defaults._MD5_TABLE_FILENAME))
+      return;
+
+    File md5Table = new File(this._GAMEFOLDER + File.separator + Defaults._MD5_TABLE_FILENAME);
+    if (!md5Table.isFile())
+      return; // No manifest available to verify against.
+
+    Md5Handler remoteCache = new Md5Handler(md5Table, this._GAMEFOLDER);
+    String expectedSum = remoteCache.getRefSum(downloadedFile);
+    if (expectedSum == null)
+      return; // File not listed in the manifest; nothing to compare against.
+
+    String actualSum = Md5Handler.getMD5Checksum(downloadedFile);
+    if (actualSum == null || !actualSum.equalsIgnoreCase(expectedSum)) {
+      downloadedFile.delete();
+      throw new IOException("Checksum verification failed for " + downloadedFile.getName()
+          + " (expected " + expectedSum + ", got " + actualSum + "); deleted downloaded file.");
     }
   }
 

@@ -146,11 +146,16 @@ server {
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305";
+    ssl_prefer_server_ciphers on;
 
     # Required for WebAssembly SharedArrayBuffer (threading support)
     add_header Cross-Origin-Opener-Policy "same-origin" always;
     add_header Cross-Origin-Embedder-Policy "require-corp" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     root $RSC_C_DIR;
     index mudclient.html;
@@ -160,6 +165,10 @@ server {
         default_type application/wasm;
         add_header Cross-Origin-Opener-Policy "same-origin" always;
         add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     }
 
 	    location / {
@@ -198,6 +207,10 @@ server {
 	        add_header Cache-Control "no-store";
 	        add_header Cross-Origin-Opener-Policy "same-origin" always;
 	        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+	        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+	        add_header X-Content-Type-Options "nosniff" always;
+	        add_header X-Frame-Options "SAMEORIGIN" always;
+	        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 	    }
 
 	    location ^~ /rsc21/ {
@@ -209,6 +222,10 @@ server {
 	        }
 	        add_header Cross-Origin-Opener-Policy "same-origin" always;
 	        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+	        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+	        add_header X-Content-Type-Options "nosniff" always;
+	        add_header X-Frame-Options "SAMEORIGIN" always;
+	        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 	        rewrite ^/rsc21/(.*)$ /\$1 break;
 	        try_files \$uri \$uri/ =404;
 	    }
@@ -219,6 +236,10 @@ server {
         add_header Cache-Control "public, immutable";
         add_header Cross-Origin-Opener-Policy "same-origin" always;
         add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     }
 }
 NGINX

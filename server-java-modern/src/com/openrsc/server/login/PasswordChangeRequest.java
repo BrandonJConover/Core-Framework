@@ -75,9 +75,13 @@ public class PasswordChangeRequest extends LoginExecutorProcess {
 			String DBsalt = playerData.salt;
 			String newDBPass;
 			int playerID = getPlayer().getID();
-			// not known between mud76 and mud92 when current password started to be required
-			// per newspost of 14 Nov 2001 of better security, very likely was since the corresponding mudclient (93)
-			if (player.getClientVersion() >= 93 && !DataConversions.checkPassword(getOldPassword(), DBsalt, lastDBPass)) {
+			// Always require the current password. The client version is
+			// self-reported at login and is not clamped, so gating this check
+			// on version (previously ">= 93") let an attacker on a hijacked
+			// session declare an old version and change the password without
+			// knowing the current one — turning a transient session compromise
+			// into permanent account takeover.
+			if (!DataConversions.checkPassword(getOldPassword(), DBsalt, lastDBPass)) {
 				LOGGER.info(getPlayer().getCurrentIP() + " - Pass change failed: The current password did not match players record.");
 				ActionSender.sendMessage(getPlayer(), "No changes made, your current password did not match");
 				return;
@@ -102,8 +106,12 @@ public class PasswordChangeRequest extends LoginExecutorProcess {
 
 			getPlayer().getWorld().getServer().getDatabase().savePreviousPasswords(playerID, lastPw, earlierPw);
 
+			// Do not record the actual password hashes in the audit log; a
+			// change event plus the player/IP (captured by SecurityChangeLog)
+			// is enough for moderation without leaving crackable material in
+			// a table read by tooling.
 			getPlayer().getWorld().getServer().getGameLogger().addQuery(new SecurityChangeLog(getPlayer(), SecurityChangeLog.ChangeEvent.PASSWORD_CHANGE,
-				"From: " + lastDBPass + ", To: " + newDBPass));
+				"Password changed"));
 			ActionSender.sendMessage(getPlayer(), "Your password was successfully changed!");
 			LOGGER.info(getPlayer().getCurrentIP() + " - Password change successful");
 
