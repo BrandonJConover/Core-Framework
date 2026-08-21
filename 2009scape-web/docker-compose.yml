@@ -46,7 +46,7 @@ services:
     ports:
       - "0.0.0.0:43601:43601"
     command: >
-      bash -c "pip install -q websockify && websockify 0.0.0.0:43601 server:43595"
+      bash -c "pip install -q 'websockify==0.11.0' && websockify 0.0.0.0:43601 server:43595"
 
   # ── Web client (static files) ──
   client:
