@@ -90,7 +90,7 @@ rank-mariadb:
 	@[ "${db}" ] || ( echo ">> db is not set"; exit 1 )
 	@[ "${group}" ] || ( echo ">> group is not set"; exit 1 	)
 	@[ "${username}" ] || ( echo ">> username is not set"; exit 1 )
-	@MYSQL_PWD='${MARIADB_ROOT_PASSWORD}' mysql -u${MARIADB_ROOT_USER} -e "USE ${db}; UPDATE players SET group_id = '${group}' WHERE players.username = '${username}';"
+	@MYSQL_PWD='${MARIADB_ROOT_PASSWORD}' python3 Deployment_Scripts/db_admin.py --backend mysql --action rank --user ${MARIADB_ROOT_USER} --db "${db}" --group "${group}" --username "${username}"
 
 # Sets a specified username to be in a specified group in a specified database
 # Call via "make rank-sqlite db=cabbage group=0 username=wolf"
@@ -98,7 +98,7 @@ rank-sqlite:
 	@[ "${db}" ] || ( echo ">> db is not set"; exit 1 )
 	@[ "${group}" ] || ( echo ">> group is not set"; exit 1 	)
 	@[ "${username}" ] || ( echo ">> username is not set"; exit 1 )
-	sqlite3 "server/inc/sqlite/${db}.db" "UPDATE players SET group_id = '${group}' WHERE players.username = '${username}';" ".exit"
+	python3 Deployment_Scripts/db_admin.py --backend sqlite --action rank --db "${db}" --group "${group}" --username "${username}"
 
 # Changes a specified username to be a new username in a specified database
 # Call via "make namechange-mariadb db=cabbage oldname=wolf newname=wolf2"
@@ -106,7 +106,7 @@ namechange-mariadb:
 	@[ "${db}" ] || ( echo ">> db is not set"; exit 1 )
 	@[ "${oldname}" ] || ( echo ">> oldname is not set"; exit 1 	)
 	@[ "${newname}" ] || ( echo ">> newname is not set"; exit 1 )
-	@MYSQL_PWD='${MARIADB_ROOT_PASSWORD}' mysql -u${MARIADB_ROOT_USER} -e "USE ${db}; UPDATE players SET username = '${newname}' WHERE players.username = '${oldname}';"
+	@MYSQL_PWD='${MARIADB_ROOT_PASSWORD}' python3 Deployment_Scripts/db_admin.py --backend mysql --action namechange --user ${MARIADB_ROOT_USER} --db "${db}" --oldname "${oldname}" --newname "${newname}"
 
 # Changes a specified username to be a new username in a specified database
 # Call via "make namechange-sqlite db=cabbage oldname=wolf newname=wolf2"
@@ -114,13 +114,13 @@ namechange-sqlite:
 	@[ "${db}" ] || ( echo ">> db is not set"; exit 1 )
 	@[ "${oldname}" ] || ( echo ">> oldname is not set"; exit 1 	)
 	@[ "${newname}" ] || ( echo ">> newname is not set"; exit 1 )
-	sqlite3 "server/inc/sqlite/${db}.db" "UPDATE players SET username = '${newname}' WHERE players.username = '${oldname}';" ".exit"
+	python3 Deployment_Scripts/db_admin.py --backend sqlite --action namechange --db "${db}" --oldname "${oldname}" --newname "${newname}"
 
 # Creates a database that the user specifies the name of
 # Call via "make create-mariadb db=cabbage"
 create-mariadb:
 	@[ "${db}" ] || ( echo ">> db is not set"; exit 1 )
-	@MYSQL_PWD='${MARIADB_ROOT_PASSWORD}' mysql -u${MARIADB_ROOT_USER} -e "create database ${db};"
+	@MYSQL_PWD='${MARIADB_ROOT_PASSWORD}' python3 Deployment_Scripts/db_admin.py --backend mysql --action createdb --user ${MARIADB_ROOT_USER} --db "${db}"
 
 # Imports the core.sql file to a specified database
 # Call via "make import-authentic-mariadb db=preservation"
