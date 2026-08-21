@@ -182,3 +182,7 @@ Portable_Windows/HeidiSQL_11.1_64_Portable/tabs.ini
 
 # macOS
 .DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc
