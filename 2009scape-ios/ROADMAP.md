@@ -37,11 +37,13 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
       `l*_*` groups, and ~450 packets in 5 s frame cleanly.
 - [ ] Do the same from the Mac/iPhone against a reachable server (the Mac
       cannot reach the WireGuard address).
-- [ ] Keepalive / idle packets so the session survives (rt4 `client.mainLoop` outbound cadence).
-- [ ] Decode the core server packets into a `GameState` (not rendered yet):
-      VARP_SMALL/LARGE, interface open/close, chat messages, inventory updates,
-      skill stats, RUN_CS2 arguments. Unknown opcodes are skipped by length.
-- [ ] Unit tests built from captured packet streams.
+- [x] Keepalive / idle packets so the session survives (rt4 `client.mainLoop` outbound cadence).
+- [x] Decode server packets into typed `ServerMessage`s (VARPs, interfaces,
+      chat, inventories, stats, RUN_CS2, zone updates) plus PLAYER_INFO/NPC_INFO
+      with masks. Zero decode failures across login, teleports, items, anims
+      and two players on a live server. Folding them into a `GameState` is next.
+- [x] Client packets: keepalive, `::commands`, walking (MOVE_GAMECLICK/MINIMAPCLICK).
+- [x] Unit tests built from captured packet streams (`Fixtures/login-session.bin`).
 
 ## M2: iOS app shell
 
@@ -55,7 +57,8 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 
 ## M3: See the world
 
-- [ ] Config decoders from archive 2: FloType/FluType (floors), LocType, ObjType, NpcType, SeqType, SpotAnimType, IdkType, BasType, EnumType, ParamType.
+- [x] Config decoders: ObjType, NpcType, LocType, SeqType, SpotAnimType, VarbitType, EnumType, FloType, FluType, IdkType, BasType. Every entry in the cache decodes (about 88,000).
+- [ ] Remaining small configs: ParamType, StructType, InvType, VarpType, LightType.
 - [ ] Map squares from archive 5: `m{x}_{z}` terrain and `l{x}_{z}` locations (XTEA keys from REBUILD_NORMAL).
 - [ ] Terrain mesh (heights, underlays/overlays, shapes, blending) and loc placement.
 - [ ] `RawModel` decoder (archive 7) and lighting.
