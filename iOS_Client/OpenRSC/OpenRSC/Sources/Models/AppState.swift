@@ -39,6 +39,26 @@ final class AppState: ObservableObject {
         return servers
     }
 
+    /// Test hook: `-nativeHost <host> [-nativePort <port>] -nativeRSA <modulus>`
+    /// launch arguments (e.g. `xcrun simctl launch booted com.openrsc.client
+    /// -nativeHost 127.0.0.1 -nativeRSA <hex>`) open the native RSC client
+    /// straight away, without tapping through the menus.
+    func applyLaunchArguments() {
+        let defaults = UserDefaults.standard
+        guard let host = defaults.string(forKey: "nativeHost"), !host.isEmpty else { return }
+        let port = defaults.integer(forKey: "nativePort")
+        var profile = ServerProfile(
+            name: "Launch argument server",
+            host: host,
+            port: port > 0 ? port : 43594,
+            wsPort: 43494,
+            lastUsername: "",
+            gameType: .rsc
+        )
+        profile.rsaModulus = defaults.string(forKey: "nativeRSA") ?? ""
+        currentView = .nativeGame(profile)
+    }
+
     func saveServers() {
         if let encoded = try? JSONEncoder().encode(servers) {
             UserDefaults.standard.set(encoded, forKey: "savedServers")

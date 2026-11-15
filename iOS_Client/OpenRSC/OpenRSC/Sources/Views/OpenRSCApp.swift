@@ -14,6 +14,7 @@ struct OpenRSCApp: App {
                 RootView()
                     .environmentObject(appState)
                     .preferredColorScheme(.dark)
+                    .onAppear { appState.applyLaunchArguments() }
             )
         }
     }
