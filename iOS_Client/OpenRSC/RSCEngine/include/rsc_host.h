@@ -34,6 +34,13 @@ int rsc_host_write_world(const char *config_dir, const char *name,
                          const char *host, int port, const char *rsa_exponent,
                          const char *rsa_modulus);
 
+/* Sets an integer key in rsc-c's options.ini (creating the file if needed).
+ * rsc-c rewrites options.ini itself and drops keys it doesn't save, so call
+ * this before every rsc_host_start. Used to turn on in-game account
+ * creation: "registration" = 1 shows the New User button, and
+ * "account_management" = 1 makes it an in-game sign-up form. */
+int rsc_host_set_option(const char *config_dir, const char *key, int value);
+
 /* Starts the engine thread. Returns 0 on success. Only call once per
  * process: rsc-c keeps global state. */
 int rsc_host_start(const rsc_host_config *config);

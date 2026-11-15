@@ -93,6 +93,23 @@ public class LoginPacketHandler {
 		return null;
 	}
 
+	/**
+	 * rsc-c's register packet starts with a zero byte before the version short
+	 * (00 00 CC for version 204), where older clients start with the version
+	 * short itself (00 B1 for 177). A leading version of 0 never happens for a
+	 * real client, so 0x0000 followed by a version byte marks rsc-c's format.
+	 */
+	private static boolean isLoginBlockRegistration(Packet packet) {
+		ByteBuf buffer = packet.getBuffer();
+		int index = buffer.readerIndex();
+		if (buffer.readableBytes() < 5) {
+			return false;
+		}
+		int first = buffer.getUnsignedByte(index);
+		int version = buffer.getUnsignedShort(index + 1);
+		return first == 0 && version > 177 && version < 1000;
+	}
+
 	public void processLogin(Packet packet, Channel channel, Server server) {
 		final String IP = ((InetSocketAddress) channel.remoteAddress()).getAddress().getHostAddress();
 		ConnectionAttachment attachment = channel.attr(RSCConnectionHandler.attachment).get();
@@ -640,6 +657,49 @@ public class LoginPacketHandler {
 					} else {
 						// mudclients 93+
 						// Handle register packet
+						if (isLoginBlockRegistration(packet)) {
+							// rsc-c (iOS native client, 2003scape): same layout as its
+							// login packet: byte 0, short version, byte limit30,
+							// then the RSA login block with newline-terminated
+							// username and password.
+							packet.readUnsignedByte();
+							int clientVersion = packet.readUnsignedShort();
+							packet.readShort(); // limit30 + RSA length byte
+
+							int rsaLength = packet.getReadableBytes();
+							if (rsaLength <= 0) {
+								rejectMalformedLogin(channel, IP, "empty RSA register block");
+								return;
+							}
+							ByteBuffer registerBlock = ByteBuffer.wrap(Crypto.decryptRSA(packet.readBytes(rsaLength), 0, rsaLength));
+							if (registerBlock.remaining() < 21) {
+								rejectMalformedLogin(channel, IP, "RSA register block too short: " + registerBlock.remaining());
+								return;
+							}
+							registerBlock.get(); // magic '\n'
+							for (int i = 0; i < 4; i++) {
+								registerBlock.getInt(); // ISAAC keys, unused for registration
+							}
+							registerBlock.getInt(); // uid
+
+							String username = readZeroTerminatedLoginString(registerBlock, "username", IP, channel);
+							if (username == null) {
+								return;
+							}
+							String password = readZeroTerminatedLoginString(registerBlock, "password", IP, channel);
+							if (password == null) {
+								return;
+							}
+
+							if (server.getPacketFilter().shouldAllowLogin(IP, true)) {
+								server.getLoginExecutor().add(new CharacterCreateRequest(server, channel, username, password, true, clientVersion));
+							} else {
+								channel.writeAndFlush(new PacketBuilder().writeByte((byte) RegisterLoginResponse.UNSUCCESSFUL).toPacket());
+								channel.close();
+							}
+							break;
+						}
+
 						int clientVersion = packet.readUnsignedShort();
 						if (clientVersion >= 204) { // note that register packet doesn't actually exist in 204+, but this is mostly copied from 127 + utilization of RSA
 							long userHash = packet.readLong();

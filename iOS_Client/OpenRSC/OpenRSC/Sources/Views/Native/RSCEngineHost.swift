@@ -70,6 +70,12 @@ final class RSCEngineHost {
         let wrote = rsc_host_write_world(config.path, server.name, server.host, Int32(server.port), exponent, modulus)
         guard wrote == 0 else { throw StartError.engineFailed }
 
+        // Show "New User" on the welcome screen and make it an in-game
+        // sign-up form, so players without an account can create one.
+        // rsc-c rewrites options.ini on exit, so set these on every start.
+        rsc_host_set_option(config.path, "registration", 1)
+        rsc_host_set_option(config.path, "account_management", 1)
+
         rsc_host_set_log_handler { isError, message in
             guard let message else { return }
             let text = String(cString: message).trimmingCharacters(in: .whitespacesAndNewlines)

@@ -10,14 +10,14 @@ touch, keyboard and audio.
 ```
 SwiftUI / UIKit (Views/Native)          RSCEngine (C, this folder)
 NativeRSCView  ── touches, text ──▶  rsc_host.h  ──▶  SDL2-subset shim ──▶ rsc-c
-               ◀── frames, audio ──                (shim/rsc_sdl_shim.c)   (rsc-c-src, unmodified)
+               ◀── frames, audio ──                (shim/rsc_sdl_shim.c)   (rsc-c-src, 1-line patch)
 ```
 
 ## Layout
 
 | Path | What |
 |------|------|
-| `rsc-c-src/` | Vendored rsc-c `src/` (upstream commit `d9081d3`, 2026-10-19), **unmodified**. Console/GL-only files removed. |
+| `rsc-c-src/` | Vendored rsc-c `src/` (upstream commit `d9081d3`, 2026-10-19), with one local patch: `options.c` loads `account_management` from options.ini so the host can turn on the in-game sign-up form (search for "OpenRSC iOS"). Console/GL-only files removed. |
 | `rsc-cache/` | rsc-c game cache (`*.jag`, `*.mem`), bundled into the app. |
 | `shim/SDL.h`, `shim/rsc_sdl_shim.c` | Just enough SDL2 for rsc-c's SDL2 + software-renderer path, implemented on top of a thread-safe event queue, frame buffer and audio ring. |
 | `include/rsc_host.h` | The API Swift calls (`import RSCEngine`). |
@@ -67,3 +67,16 @@ Copy upstream `src/` over `rsc-c-src/` (drop `gl/`, `pica/`, `wii/`,
 `*-3ds*`, `*-gl.c`, `mudclient-wii.c`, `mudclient-sdl12.c`), copy new cache
 files into `rsc-cache/`, run the headless driver, then build the app. If
 upstream starts using another SDL function, add it to the shim.
+
+## Creating accounts in the app
+
+The app turns on rsc-c's `registration` and `account_management` options, so
+the welcome screen shows **New User**, which opens a sign-up form (username,
+password, confirm, terms checkbox). On success the server replies 2 and rsc-c
+logs straight in to character design. Return on the keyboard moves between the
+fields.
+
+rsc-c sends its register packet in the same layout as its login packet (a zero
+byte, version short, limit30, RSA block). `server-java-modern`'s
+`LoginPacketHandler` recognises that layout; other OpenRSC servers need the same
+change before in-app sign-up works against them.

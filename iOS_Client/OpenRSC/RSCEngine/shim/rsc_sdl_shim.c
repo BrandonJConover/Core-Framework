@@ -619,6 +619,87 @@ int rsc_host_write_world(const char *config_dir, const char *name,
     return 0;
 }
 
+int rsc_host_set_option(const char *config_dir, const char *key, int value) {
+    if (config_dir == NULL || key == NULL || key[0] == '\0') {
+        return -1;
+    }
+
+    mkdir(config_dir, 0700);
+
+    char path[SHIM_PATH_MAX * 2];
+    snprintf(path, sizeof(path), "%s/options.ini", config_dir);
+
+    /* read the existing file, if any */
+    char *contents = NULL;
+    long length = 0;
+    FILE *file = fopen(path, "rb");
+
+    if (file != NULL) {
+        fseek(file, 0, SEEK_END);
+        length = ftell(file);
+        fseek(file, 0, SEEK_SET);
+
+        if (length > 0) {
+            contents = malloc((size_t)length + 1);
+
+            if (contents == NULL) {
+                fclose(file);
+                return -1;
+            }
+
+            length = (long)fread(contents, 1, (size_t)length, file);
+            contents[length] = '\0';
+        }
+
+        fclose(file);
+    }
+
+    file = fopen(path, "wb");
+
+    if (file == NULL) {
+        free(contents);
+        return -1;
+    }
+
+    size_t key_len = strlen(key);
+    int replaced = 0;
+    char *line = contents;
+
+    while (line != NULL && *line != '\0') {
+        char *next = strchr(line, '\n');
+        size_t line_len = next != NULL ? (size_t)(next - line) : strlen(line);
+
+        const char *p = line;
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+
+        int is_key = strncmp(p, key, key_len) == 0 &&
+                     (p[key_len] == ' ' || p[key_len] == '\t' ||
+                      p[key_len] == '=');
+
+        if (is_key) {
+            if (!replaced) {
+                fprintf(file, "%s = %d\n", key, value);
+                replaced = 1;
+            }
+        } else {
+            fwrite(line, 1, line_len, file);
+            fputc('\n', file);
+        }
+
+        line = next != NULL ? next + 1 : NULL;
+    }
+
+    if (!replaced) {
+        fprintf(file, "%s = %d\n", key, value);
+    }
+
+    fclose(file);
+    free(contents);
+    return 0;
+}
+
 static void *shim_engine_thread(void *arg) {
     (void)arg;
 

@@ -129,6 +129,9 @@ int main(int argc, char **argv) {
     rsc_host_write_world(argv[2], "Local", argv[3], atoi(argv[4]), argv[5],
                          argv[6]);
 
+    rsc_host_set_option(argv[2], "registration", 1);
+    rsc_host_set_option(argv[2], "account_management", 1);
+
     rsc_host_config config = {argv[1], argv[2], window_w, window_h, 1};
 
     if (rsc_host_start(&config) != 0) {

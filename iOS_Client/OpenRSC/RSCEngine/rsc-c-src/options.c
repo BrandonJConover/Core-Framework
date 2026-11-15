@@ -351,6 +351,8 @@ void options_load(Options *options) {
     OPTION_INI_INT("max_quests", options->max_quests, 0, 50);
     OPTION_INI_INT("max_skills", options->max_skills, 0, 18);
     OPTION_INI_INT("registration", options->registration, 0, 1);
+    /* OpenRSC iOS: allow the host to turn on in-game account creation */
+    OPTION_INI_INT("account_management", options->account_management, 0, 1);
     OPTION_INI_INT("idle_logout", options->idle_logout, 0, 1);
     OPTION_INI_INT("remember_username", options->remember_username, 0, 1);
     OPTION_INI_INT("remember_password", options->remember_password, 0, 1);
