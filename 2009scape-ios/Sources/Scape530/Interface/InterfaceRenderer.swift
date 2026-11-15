@@ -44,6 +44,9 @@ public struct InterfaceState {
 public final class InterfaceRenderer {
 	let store: ConfigStore
 	var groups: [Int: [Component?]] = [:]
+	/// Every component drawn in the last `render`, in draw order, with its
+	/// screen rectangle (clipped to its parents). Used for touch hit tests.
+	public private(set) var drawn: [(component: Component, x: Int, y: Int, w: Int, h: Int)] = []
 	/// Drawn in place of a type-6 model or a 3D viewport component, if set.
 	public var drawModel: ((Component, Int, Int, Int, Int, inout Raster) -> Void)?
 
@@ -71,7 +74,19 @@ public final class InterfaceRenderer {
 	/// Renders `interface` as the top level filling the raster.
 	public func render(_ interface: Int, state: InterfaceState, into r: inout Raster) throws {
 		r.resetClip()
+		drawn.removeAll(keepingCapacity: true)
 		try renderInterface(interface, x: 0, y: 0, w: r.width, h: r.height, state: state, into: &r)
+	}
+
+	/// The top-most interactive component under (x, y) from the last render.
+	public func hitTest(x: Int, y: Int) -> Component? {
+		for d in drawn.reversed() where x >= d.x && y >= d.y && x < d.x + d.w && y < d.y + d.h {
+			let c = d.component
+			if c.hooks["onClickRepeat"] != nil || c.hooks["onOptionClick"] != nil || !c.ops.isEmpty || c.buttonType != 0 || c.option != nil {
+				return c
+			}
+		}
+		return nil
 	}
 
 	func renderInterface(_ interface: Int, x: Int, y: Int, w: Int, h: Int, state: InterfaceState, into r: inout Raster) throws {
@@ -97,6 +112,7 @@ public final class InterfaceRenderer {
 				r.setClip(clip.0, clip.1, clip.2, clip.3)
 				continue
 			}
+			drawn.append((c, r.clipLeft, r.clipTop, r.clipRight - r.clipLeft, r.clipBottom - r.clipTop))
 			try draw(c, x: x, y: y, w: w, h: h, state: state, into: &r)
 			if c.type == 0 {
 				let sy = state.scroll[c.id] ?? 0

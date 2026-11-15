@@ -19,15 +19,39 @@ with this package.
 │   │   ├── Util/            # Packet (rt4 Buffer), Base37, CRC32, cp1252
 │   │   ├── Crypto/          # ISAAC, XTEA, RSA (tiny BigUInt)
 │   │   ├── Compression/     # bzip2 + DEFLATE decoders (no zlib/libbz2 dependency)
-│   │   ├── Cache/           # JS5 containers, reference tables, group unpacking, dat2/idx reader
-│   │   └── Net/             # JS5 protocol + client, login, game packet framing, opcode tables
+│   │   ├── Cache/           # JS5 containers, reference tables, dat2/idx reader + writer, CacheUpdater
+│   │   ├── Net/             # JS5 + login + game packets: typed ServerMessage/ClientMessage, PLAYER/NPC_INFO
+│   │   ├── Config/          # obj/npc/loc/seq/spotanim/varbit/enum/floor/idk/bas decoders
+│   │   ├── Graphics/        # SpriteSheet, BitmapFont (rt4 fonts + tags), Raster (software 2D), PNG
+│   │   ├── Interface/       # Component (if1/if3) decoder, InterfaceRenderer (rt4 layout + drawing)
+│   │   └── Client/          # GameSession (network thread), GameState, GameClient (screens + input)
 │   └── scape530-probe/      # CLI to exercise the core against a cache or live server
+├── App/                     # iOS app shell (xcodegen project.yml + SwiftUI/UIKit sources)
 └── Tests/Scape530Tests/     # XCTest; golden values come from running rt4's Java classes
 ```
 
 The core must stay free of UIKit/SwiftUI/Metal so it can be tested in a
-Linux container. The iOS app target (SwiftUI shell + Metal renderer) will sit
-on top of it.
+Linux container. Everything the player sees is drawn by the core into a
+`Raster` from cache sprites, fonts and interfaces, exactly as rt4's software
+mode does, so tests can render any screen to PNG (`SCAPE530_OUT=dir`). The
+app only blits that raster and forwards taps and typed text.
+
+## iOS app
+
+```bash
+cd 2009scape-ios/App
+xcodegen generate
+open Scape530.xcodeproj   # run the Scape530App scheme on a device or simulator
+```
+
+On first launch the app downloads the cache from the server's JS5 port into
+Application Support (about 90 MB; later launches only fetch what changed),
+then shows the 2009 login screen from the cache's `loginscreen` interface.
+The server button (top right) sets host and port (world 1 = 43595). The game
+logs in in resizable mode (window mode 2), so the server opens interface 746,
+which lays itself out for the phone's shape; below 765x503 game pixels the
+frame is drawn at that size and scaled down. Build the Release configuration
+for real play: the software raster is slow without optimisation.
 
 ## Build and test
 

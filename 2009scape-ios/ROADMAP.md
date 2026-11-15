@@ -47,13 +47,20 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 
 ## M2: iOS app shell
 
-- [ ] `project.yml` (xcodegen) app target depending on the package.
-- [ ] SwiftUI login screen (server/port/world, username, password) with Keychain storage.
-- [ ] Cache bootstrap: download via JS5 into Application Support, written in the
-      standard `dat2`/`idx` layout so `DiskCache` reads it back; CRC check on start.
-      Option to side-load a bundled cache for faster first launch.
-- [ ] Network transport on `Network.framework` (non-blocking), feeding the framer on the game tick.
-- [ ] `MTKView` that shows a debug overlay (connection state, tick, position).
+- [x] `App/project.yml` (xcodegen) app target depending on the package.
+- [x] Login screen drawn from the cache's own `loginscreen` interface (744):
+      main menu scroll, then "Please Log In" with username/password typed
+      through the system keyboard; server/port sheet; Keychain storage.
+      The components CS2 would toggle are set by `GameClient.loginState()`
+      until the interpreter lands.
+- [x] Cache bootstrap: `CacheUpdater` downloads via JS5 into Application
+      Support in the standard `dat2`/`idx` layout and only refetches groups
+      whose CRC/version changed.
+- [x] `GameSession` network thread (login, framing, PLAYER/NPC_INFO, keepalive)
+      feeding `GameState` on the UI thread; resizable game frame (746) renders
+      after login. A test drives the full flow against a live server.
+- [ ] First run on a device via the MacBook Air; move frame upload to Metal.
+- [ ] Non-blocking transport on `Network.framework`.
 
 ## M3: See the world
 
@@ -74,8 +81,10 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 
 ## M5: Interfaces
 
-- [ ] Sprites (archive 8), fonts, and a 2D compositor drawn as Metal textures.
-- [ ] Interface components (archive 3) and the CS2 interpreter (archive 12). This is the biggest single port; the whole HUD (inventory, chatbox, tabs, bank) runs on it.
+- [x] Sprites (archive 8), fonts (archive 13 metrics + rt4 kerning/tags), software 2D raster.
+- [x] Interface components (archive 3, if1 + if3, all 31,622 decode) with rt4 layout and drawing for layers, rectangles, text, sprites and lines.
+- [ ] CS2 interpreter (archive 12). The biggest single port; the HUD's dynamic parts (tab switching, chat, orbs, login screen states) run on it.
+- [ ] Inventory/item icons (type 2 and IF_SETOBJECT), model components (type 6), IF_BUTTON packets.
 - [ ] Right-click menus mapped to long-press; on-screen keyboard for chat.
 
 ## M6: Polish
@@ -99,6 +108,30 @@ this milestone means one of:
 
 Decide between them once the client is playable; the server's content
 scripts (quests, skills, NPC dialogue) are the bulk of that work.
+
+## Many revisions, one client
+
+Goal (Brandon, 2026-11-15): one client that can talk to many RSPS revisions,
+picking the packet set and asset formats for the server it connects to.
+Rev 530 is the first; nothing above should block on this, but the shared
+layers are kept free of 530 specifics so others can plug in later:
+
+- **Shared core** (revision-agnostic): `Packet`, ISAAC/XTEA/RSA, bzip2/DEFLATE,
+  sockets/`GameSession` threading, `Raster`, sprite/font drawing, the
+  interface layout engine, game state shapes (entities, inventories, stats),
+  the iOS shell and touch input.
+- **Per-era modules** (formats shared by a range of revisions): JS5 caches
+  and if1/if3 interfaces (roughly 400-600s), the older JAG archive cache and
+  317-style interfaces, and RSC classic as its own era.
+- **Per-revision definitions**: opcode tables and packet bodies
+  (`ServerProt`/`ClientProt`/`ServerMessage`/`ClientMessage` today), the login
+  block, config opcode quirks (like npc 1688's later-revision opcodes), and
+  server keys. The plan is a `Revision` value chosen at connect time that
+  supplies these, with 530's current tables becoming the first instance.
+
+Typed messages (`ServerMessage`, `ClientMessage`) are already the boundary:
+the UI and game state only see those, never opcodes, so a new revision means
+a new decoder/encoder pair rather than changes above it.
 
 ## Rendering approach
 
