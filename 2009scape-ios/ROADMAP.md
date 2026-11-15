@@ -81,6 +81,22 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 - [ ] Resizable layout for iPhone vs iPad, safe areas, controller support.
 - [ ] TestFlight build via the MacBook Air.
 
+## M7: Offline play (server on device)
+
+The app supports both modes: connect to a remote 2009scape server, or play
+fully offline against a server running inside the app. The client talks to
+both through the same socket protocol, so nothing above changes. The
+2009scape server is Kotlin/Java on the JVM, which iOS cannot run as-is, so
+this milestone means one of:
+
+- Porting the server's game logic to Swift (largest, fully native), or
+- Running the JVM server through an embedded interpreter/AOT build (for
+  example a GraalVM native-image-style compile), which needs research on what
+  iOS allows.
+
+Decide between them once the client is playable; the server's content
+scripts (quests, skills, NPC dialogue) are the bulk of that work.
+
 ## Rendering approach
 
 rt4 has two renderers: a software rasteriser (`Rasteriser`, used by the

@@ -109,13 +109,112 @@ do {
 		}
 		// Read a few seconds of game packets to prove framing stays aligned.
 		var framer = GamePacketFramer(cipher: session.inCipher)
-		var counts: [Int: Int] = [:]
-		let deadline = Date().addingTimeInterval(5)
-		while Date() < deadline {
-			guard let chunk = try? session.socket.readSome(), !chunk.isEmpty else { break }
-			for pkt in try framer.feed(chunk) { counts[pkt.opcode, default: 0] += 1 }
+		var start = (x: 52, z: 52)
+		if session.account.firstOpcode == ServerProt.rebuildNormal, let r = try? RebuildNormal(payload: session.firstPacket) {
+			start = (r.localX, r.localZ)
 		}
-		print("packets in 5s by opcode: \(counts.sorted { $0.key < $1.key })")
+		var players = PlayerInfoDecoder(selfIndex: session.account.selfId, localX: start.x, localZ: start.z)
+		var npcs = NpcInfoDecoder()
+		var recording = [UInt8]()
+		let recordPath = ProcessInfo.processInfo.environment["PROBE_RECORD"]
+		func record(_ op: Int, _ payload: [UInt8]) {
+			guard recordPath != nil else { return }
+			var h = Packet(capacity: 5)
+			h.p1(op); h.p4(payload.count)
+			recording += h.written + payload
+		}
+		record(session.account.firstOpcode, session.firstPacket)
+		var typed = 0
+		var unhandled: [Int: Int] = [:]
+		var failures: [String] = []
+		let seconds = Double(ProcessInfo.processInfo.environment["PROBE_SECONDS"] ?? "5") ?? 5
+		let verbose = ProcessInfo.processInfo.environment["PROBE_VERBOSE"] != nil
+		// PROBE_SCRIPT="2:cmd tele 3222 3218|4:walk 3225 3218" runs client actions at second offsets.
+		var script: [(at: Double, action: String)] = (ProcessInfo.processInfo.environment["PROBE_SCRIPT"] ?? "")
+			.split(separator: "|").compactMap { item in
+				let parts = item.split(separator: ":", maxSplits: 1)
+				guard parts.count == 2, let t = Double(parts[0]) else { return nil }
+				return (t, String(parts[1]))
+			}
+		var outCipher = session.outCipher
+		let began = Date()
+		var lastKeepAlive = began
+		var zone = (x: 0, z: 0)
+		if let r = try? RebuildNormal(payload: session.firstPacket) { zone = (r.zoneX, r.zoneZ) }
+		session.socket.setReadTimeout(milliseconds: 200)
+		let deadline = Date().addingTimeInterval(seconds)
+		while Date() < deadline {
+			let now = Date()
+			while let next = script.first, now.timeIntervalSince(began) >= next.at {
+				script.removeFirst()
+				let words = next.action.split(separator: " ")
+				var msg: ClientMessage?
+				if words.first == "cmd" {
+					msg = .command(words.dropFirst().joined(separator: " "))
+				} else if words.first == "walk", words.count == 3, let x = Int(words[1]), let z = Int(words[2]) {
+					msg = .walk(destX: x, destZ: z)
+				}
+				if let m = msg {
+					try session.socket.write(m.encode(&outCipher))
+					print("-> \(next.action)")
+				}
+			}
+			if now.timeIntervalSince(lastKeepAlive) >= 1 {
+				try session.socket.write(ClientMessage.keepAlive.encode(&outCipher))
+				lastKeepAlive = now
+			}
+			guard let chunk = try? session.socket.readSome() else { continue }
+			if chunk.isEmpty { print("server closed the connection"); break }
+			for pkt in try framer.feed(chunk) {
+				record(pkt.opcode, pkt.payload)
+				do {
+					if pkt.opcode == ServerProt.playerInfo {
+						let r = try players.decode(pkt.payload)
+						typed += 1
+						if verbose && (!r.added.isEmpty || !r.updated.isEmpty) {
+							print("  PLAYER_INFO added \(r.added) removed \(r.removed) updated \(r.updated.keys.sorted()) local \(players.localIds)")
+							for (id, m) in r.updated { if let a = m.appearance { print("    #\(id) \(a.name ?? "?") cb \(a.combatLevel) female \(a.female) bas \(a.basId)") } }
+						}
+						continue
+					}
+					if pkt.opcode == ServerProt.npcInfo {
+						let me = players.players[players.selfIndex]!
+						let r = try npcs.decode(pkt.payload, selfX: me.x, selfZ: me.z)
+						typed += 1
+						if verbose && !r.added.isEmpty {
+							print("  NPC_INFO added \(r.added.map { "#\($0) type \(npcs.npcs[$0]!.type) at \(npcs.npcs[$0]!.x),\(npcs.npcs[$0]!.z)" })")
+						}
+						continue
+					}
+					let msg = try ServerMessage.decode(pkt)
+					if case .rebuildNormal(let r) = msg {
+						let dx = (r.zoneX - zone.x) * 8, dz = (r.zoneZ - zone.z) * 8
+						players.rebase(dx: dx, dz: dz)
+						npcs.rebase(dx: dx, dz: dz)
+						zone = (r.zoneX, r.zoneZ)
+						print("  rebuild -> world (\(r.worldX), \(r.worldZ))")
+					}
+					if case .unhandled(let op, _) = msg {
+						unhandled[op, default: 0] += 1
+					} else {
+						typed += 1
+						if verbose { print("  \(msg)") }
+					}
+				} catch {
+					failures.append("\(error) payload=\(pkt.payload.map { String($0) }.joined(separator: ","))")
+				}
+			}
+		}
+		print("decoded \(typed) typed messages in \(Int(seconds))s")
+		print("not yet decoded (opcode: count): \(unhandled.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }.joined(separator: ", "))")
+		print("decode failures: \(failures.count)")
+		if let path = recordPath {
+			try Data(recording).write(to: URL(fileURLWithPath: path))
+			print("recorded \(recording.count) bytes to \(path)")
+		}
+		let me = players.players[players.selfIndex]!
+		print("self at scene \(me.x),\(me.z); players tracked \(players.players.count), npcs tracked \(npcs.npcs.count)")
+		for f in Set(failures).sorted() { print("  \(f)") }
 	default:
 		usage()
 	}

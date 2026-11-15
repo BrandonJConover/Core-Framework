@@ -50,6 +50,12 @@ public final class BlockingSocket {
 
 	deinit { close() }
 
+	/// Receive timeout; `readSome` throws when it expires with no data.
+	public func setReadTimeout(milliseconds: Int) {
+		var tv = timeval(tv_sec: milliseconds / 1000, tv_usec: .init((milliseconds % 1000) * 1000))
+		setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+	}
+
 	public func close() {
 		if fd >= 0 {
 			BlockingSocket.closeFD(fd)

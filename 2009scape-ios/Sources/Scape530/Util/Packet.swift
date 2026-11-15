@@ -49,6 +49,10 @@ public struct Packet {
 	public mutating func g1neg() throws -> Int { Int(0 &- data[try take(1)]) }
 	public mutating func g1sub() throws -> Int { Int(128 &- data[try take(1)]) }
 
+	public mutating func g1bneg() throws -> Int { Int(Int8(bitPattern: 0 &- data[try take(1)])) }
+	public mutating func g1badd() throws -> Int { Int(Int8(bitPattern: data[try take(1)] &- 128)) }
+	public mutating func g1bsub() throws -> Int { Int(Int8(bitPattern: 128 &- data[try take(1)])) }
+
 	public mutating func g2() throws -> Int {
 		let i = try take(2)
 		return Int(data[i]) << 8 | Int(data[i + 1])
@@ -67,6 +71,28 @@ public struct Packet {
 	public mutating func ig2() throws -> Int {
 		let i = try take(2)
 		return Int(data[i + 1]) << 8 | Int(data[i])
+	}
+
+	public mutating func g2badd() throws -> Int {
+		let v = try g2add()
+		return v > 32767 ? v - 0x10000 : v
+	}
+
+	public mutating func ig2b() throws -> Int {
+		let v = try ig2()
+		return v > 32767 ? v - 0x10000 : v
+	}
+
+	public mutating func ig2badd() throws -> Int {
+		let v = try ig2add()
+		return v > 32767 ? v - 0x10000 : v
+	}
+
+	/// rt4 `ig3` as written: `((b2 << 16) + b1) << 8 + b0`, i.e. b2 lands in
+	/// the top byte. Mirrors the shipped client rather than a "clean" LE read.
+	public mutating func ig3() throws -> Int {
+		let i = try take(3)
+		return Int(Int32(truncatingIfNeeded: (((Int(data[i + 2]) << 16) + Int(data[i + 1])) << 8) + Int(data[i])))
 	}
 
 	public mutating func ig2add() throws -> Int {
