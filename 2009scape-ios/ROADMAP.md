@@ -30,8 +30,12 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 
 ## M1: Talk to a live server
 
-- [ ] Run `scape530-probe js5` and `login` against a real 2009scape server
-      (local Docker stack from `2009scape-web/`, or a public port; the Mac
+- [x] Run `scape530-probe js5` and `login` against a real 2009scape server
+      (2026-11-15, locally built 2009scape server, no DB): JS5 serves all 29
+      reference tables with matching CRCs, login returns code 2, REBUILD_NORMAL
+      decodes (Tutorial Island, 3094,3107), the server's XTEA keys open all 9
+      `l*_*` groups, and ~450 packets in 5 s frame cleanly.
+- [ ] Do the same from the Mac/iPhone against a reachable server (the Mac
       cannot reach the WireGuard address).
 - [ ] Keepalive / idle packets so the session survives (rt4 `client.mainLoop` outbound cadence).
 - [ ] Decode the core server packets into a `GameState` (not rendered yet):

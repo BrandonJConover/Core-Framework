@@ -67,6 +67,15 @@ swift run scape530-probe login <host> 43595 <user> <pass> [js5-port]
 29 archives; the only groups it cannot open are archive 5's XTEA-encrypted
 `l*_*` location groups, whose keys come from the server in REBUILD_NORMAL.
 
+### Local server for end-to-end tests
+
+The 2009scape server builds with Maven (`Server/mvnw clean package -Dmaven.test.skip=true`)
+and runs without MariaDB when `use_auth` and `persist_accounts` are both
+false in its world config. Copy the cache into `Server/data/cache`, then
+`java -jar target/server-1.0.0-jar-with-dependencies.jar <conf>` and point the
+probe at `127.0.0.1 43595`. With `SCAPE530_CACHE` set, `login` also decrypts
+the map location groups using the keys from REBUILD_NORMAL.
+
 ## Server compatibility notes
 
 These come from 2009scape's `GlobalConfig` in rt4-client and are mirrored in

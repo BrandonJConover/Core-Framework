@@ -92,6 +92,20 @@ do {
 		if session.account.firstOpcode == ServerProt.rebuildNormal {
 			let rebuild = try RebuildNormal(payload: session.firstPacket)
 			print("rebuild: world (\(rebuild.worldX), \(rebuild.worldZ)) plane \(rebuild.plane), regions \(rebuild.regions.map(\.locGroupName))")
+			// With a local cache, prove the server's XTEA keys open the location groups.
+			if let dir = ProcessInfo.processInfo.environment["SCAPE530_CACHE"] {
+				let cache = try DiskCache(directory: URL(fileURLWithPath: dir))
+				let maps = try Js5Index(container: Js5Container.stripVersion(cache.read(archive: 255, group: 5)!))
+				for (region, key) in zip(rebuild.regions, rebuild.xteaKeys) {
+					guard let g = maps.group(named: region.locGroupName), var c = cache.read(archive: 5, group: g).map(Js5Container.stripVersion) else {
+						print("  \(region.locGroupName): not in cache")
+						continue
+					}
+					if key != [0, 0, 0, 0] { Xtea.decryptContainer(&c, key: key) }
+					let result = (try? Js5Container.decompress(c)).map { "\($0.count) bytes" } ?? "FAILED"
+					print("  \(region.locGroupName) (group \(g)): \(result)")
+				}
+			}
 		}
 		// Read a few seconds of game packets to prove framing stays aligned.
 		var framer = GamePacketFramer(cipher: session.inCipher)
