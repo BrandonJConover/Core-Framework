@@ -6,8 +6,10 @@ import XCTest
 /// then a ::tele to Lumbridge, ::item spawns and an ::anim). Every packet must
 /// decode strictly, and the entity decoders must stay in sync for the whole run.
 final class SessionReplayTests: XCTestCase {
-	func packets() throws -> [GamePacket] {
-		let url = try XCTUnwrap(Bundle.module.url(forResource: "Fixtures/login-session", withExtension: "bin"))
+	func packets() throws -> [GamePacket] { try Self.recordedPackets() }
+
+	static func recordedPackets(_ name: String = "login-session") throws -> [GamePacket] {
+		let url = try XCTUnwrap(Bundle.module.url(forResource: "Fixtures/\(name)", withExtension: "bin"))
 		var p = Packet([UInt8](try Data(contentsOf: url)))
 		var out: [GamePacket] = []
 		while p.remaining > 0 {

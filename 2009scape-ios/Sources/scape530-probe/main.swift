@@ -83,6 +83,7 @@ do {
 	case "login":
 		guard args.count >= 6, let port = Int(args[3]) else { usage() }
 		var req = Login.Request(username: args[4], password: args[5])
+		if let m = ProcessInfo.processInfo.environment["PROBE_WINDOW_MODE"].flatMap({ Int($0) }) { req.windowMode = m; req.canvasWidth = 1015; req.canvasHeight = 469 }
 		if args.count >= 7, let js5Port = Int(args[6]) {
 			req.archiveChecksums = Array(try js5Command(args[2], js5Port).prefix(28))
 		}
