@@ -14,10 +14,40 @@ settings:
     DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
 
 targets:
+  # rsc-c — the same C engine as the WebAssembly browser client — compiled
+  # natively with an SDL2-subset shim. Keep these flags in sync with
+  # Package.swift and RSCEngine/tools/Makefile. See RSCEngine/README.md.
+  RSCEngine:
+    type: library.static
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: RSCEngine/rsc-c-src
+        excludes:
+          - "COPYING"
+      - path: RSCEngine/shim
+      - path: RSCEngine/include
+        buildPhase: none
+    settings:
+      base:
+        PRODUCT_NAME: RSCEngine
+        GCC_C_LANGUAGE_STANDARD: gnu99
+        # ANDROID selects rsc-c's mobile SDL2 path (touch input, 360px-tall
+        # scaled UI, SDL_GetPrefPath config). main() becomes rsc_c_main(),
+        # which the shim runs on the engine thread.
+        GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) SDL2=1 RENDER_SW=1 ANDROID=1 main=rsc_c_main"
+        HEADER_SEARCH_PATHS: "$(SRCROOT)/RSCEngine/shim $(SRCROOT)/RSCEngine/include"
+        OTHER_CFLAGS: "$(inherited) -fwrapv"
+        GCC_WARN_INHIBIT_ALL_WARNINGS: YES
+        CLANG_ENABLE_MODULES: NO
+        SKIP_INSTALL: YES
+
   OpenRSC:
     type: application
     platform: iOS
     deploymentTarget: "16.0"
+    dependencies:
+      - target: RSCEngine
     sources:
       - path: OpenRSC/Sources
         excludes:
@@ -74,6 +104,10 @@ targets:
         type: file
         buildPhase: resources
         optional: true
+      # rsc-c game cache (*.jag / *.mem), read by the embedded engine.
+      - path: RSCEngine/rsc-cache
+        type: folder
+        buildPhase: resources
       # Sound effects (37 .wav files + sounds.mem). Mirrors
       # Client_Base/Cache/audio/. Loaded by SoundManager via
       # Bundle.main.url(forResource:withExtension:"wav").
@@ -120,3 +154,5 @@ targets:
         # Define OPENRSC_APP so OpenRSCApp.swift's @main attribute is active.
         # Without this, the linker can't find _main.
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) OPENRSC_APP"
+        # Exposes RSCEngine/include/module.modulemap so Swift can `import RSCEngine`.
+        SWIFT_INCLUDE_PATHS: "$(inherited) $(SRCROOT)/RSCEngine/include"

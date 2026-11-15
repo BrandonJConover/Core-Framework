@@ -7,6 +7,8 @@ enum AppView {
     case login(ServerProfile)
     case webGame(ServerProfile, String?, String?)
     case game(ServerProfile, String, String)  // server, username, password
+    /// Native RSC client: the embedded rsc-c engine draws its own login screen.
+    case nativeGame(ServerProfile)
 }
 
 @MainActor
@@ -45,6 +47,12 @@ final class AppState: ObservableObject {
 
     func addServer(_ profile: ServerProfile) {
         servers.append(profile)
+        saveServers()
+    }
+
+    func updateServer(_ profile: ServerProfile) {
+        guard let index = servers.firstIndex(where: { $0.id == profile.id }) else { return }
+        servers[index] = profile
         saveServers()
     }
 

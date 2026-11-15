@@ -34,6 +34,12 @@ struct RootView: View {
             WebGameScreen(server: server, username: username, password: password)
         case .game(let server, let username, let password):
             GameView(server: server, username: username, password: password)
+        case .nativeGame(let server):
+            #if canImport(UIKit)
+            NativeRSCScreen(server: server)
+            #else
+            Text("The native client requires iOS")
+            #endif
         }
     }
 }

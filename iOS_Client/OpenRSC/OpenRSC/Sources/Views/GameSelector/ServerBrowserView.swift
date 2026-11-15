@@ -52,7 +52,12 @@ struct ServerBrowserView: View {
                             ServerRow(server: server)
                                 .listRowBackground(Color(hex: "#2a2a2a"))
                                 .onTapGesture {
-                                    appState.currentView = .login(server)
+                                    if server.gameType == .rsc {
+                                        // Native engine (rsc-c) with its own login screen.
+                                        appState.currentView = .nativeGame(server)
+                                    } else {
+                                        appState.currentView = .login(server)
+                                    }
                                 }
                         }
                         .onDelete { offsets in
@@ -104,6 +109,7 @@ private struct AddServerSheet: View {
     @State private var host = ""
     @State private var port = "43594"
     @State private var wsPort = "43494"
+    @State private var rsaModulus = ""
 
     var body: some View {
         NavigationStack {
@@ -127,6 +133,17 @@ private struct AddServerSheet: View {
                             .keyboardType(.numberPad)
                             #endif
                     }
+                    if gameType == .rsc {
+                        Section {
+                            TextField("RSA modulus (hex or decimal)", text: $rsaModulus)
+                                .autocorrectionDisabled()
+                                #if os(iOS)
+                                .textInputAutocapitalization(.never)
+                                #endif
+                        } footer: {
+                            Text("Printed by the game server at startup as \"RSA modulus\". You can also add it the first time you connect.")
+                        }
+                    }
                 }
                 .scrollContentBackground(.hidden)
             }
@@ -145,7 +162,8 @@ private struct AddServerSheet: View {
                             port: Int(port) ?? 43594,
                             wsPort: Int(wsPort) ?? 43494,
                             lastUsername: "",
-                            gameType: gameType
+                            gameType: gameType,
+                            rsaModulus: rsaModulus.trimmingCharacters(in: .whitespacesAndNewlines)
                         )
                         appState.addServer(profile)
                         isPresented = false
