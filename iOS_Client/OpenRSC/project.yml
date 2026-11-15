@@ -38,6 +38,7 @@ targets:
         GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) SDL2=1 RENDER_SW=1 ANDROID=1 main=rsc_c_main"
         HEADER_SEARCH_PATHS: "$(SRCROOT)/RSCEngine/shim $(SRCROOT)/RSCEngine/include"
         OTHER_CFLAGS: "$(inherited) -fwrapv"
+        GCC_PREFIX_HEADER: "$(SRCROOT)/RSCEngine/shim/rsc_ios_prefix.h"
         GCC_WARN_INHIBIT_ALL_WARNINGS: YES
         CLANG_ENABLE_MODULES: NO
         SKIP_INSTALL: YES

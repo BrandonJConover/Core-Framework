@@ -962,3 +962,9 @@ int rsc_host_read_audio(int16_t *dst, int max_samples) {
 }
 
 void rsc_host_set_log_handler(rsc_host_log_fn fn) { shim_log_fn = fn; }
+
+/* Stands in for system(), which iOS lacks (see rsc_ios_prefix.h). */
+int rsc_ios_system(const char *command) {
+    (void)command;
+    return -1;
+}
