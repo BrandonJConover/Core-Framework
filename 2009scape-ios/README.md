@@ -1,0 +1,80 @@
+# 2009scape iOS (native Swift, rev 530)
+
+A from-scratch Swift client for the rev-530 2009scape server. No embedded Java,
+C engine or web view: every subsystem is ported from
+[`reference/rt4-client`](../reference/rt4-client) (the authoritative rev-530
+deob) into Swift. This is an experiment project; see [ROADMAP.md](ROADMAP.md)
+for the milestones toward a playable client.
+
+The classic RSC iOS app is separate work (`iOS_Client/`) and shares no code
+with this package.
+
+## Layout
+
+```
+2009scape-ios/
+├── Package.swift
+├── Sources/
+│   ├── Scape530/            # Pure Swift + Foundation core (builds on Linux, macOS, iOS)
+│   │   ├── Util/            # Packet (rt4 Buffer), Base37, CRC32, cp1252
+│   │   ├── Crypto/          # ISAAC, XTEA, RSA (tiny BigUInt)
+│   │   ├── Compression/     # bzip2 + DEFLATE decoders (no zlib/libbz2 dependency)
+│   │   ├── Cache/           # JS5 containers, reference tables, group unpacking, dat2/idx reader
+│   │   └── Net/             # JS5 protocol + client, login, game packet framing, opcode tables
+│   └── scape530-probe/      # CLI to exercise the core against a cache or live server
+└── Tests/Scape530Tests/     # XCTest; golden values come from running rt4's Java classes
+```
+
+The core must stay free of UIKit/SwiftUI/Metal so it can be tested in a
+Linux container. The iOS app target (SwiftUI shell + Metal renderer) will sit
+on top of it.
+
+## Build and test
+
+macOS (Xcode 15+ toolchain):
+
+```bash
+cd 2009scape-ios
+swift test
+```
+
+Linux / cloud container (no local Swift install needed):
+
+```bash
+docker run --rm -v "$PWD":/pkg -w /pkg swift:6.0-jammy swift test
+```
+
+### Tests against the real cache
+
+`CacheTests` are skipped unless `SCAPE530_CACHE` points at a 2009scape cache
+directory (`main_file_cache.dat2` + `.idx0`...`.idx255`). The cache lives in
+the 2009scape server repo under Git LFS at `Server/data/cache`
+(`2009scape-web/setup.sh` clones it into `2009scape-web/2009scape`).
+
+```bash
+SCAPE530_CACHE=../2009scape-web/2009scape/Server/data/cache swift test
+```
+
+## Probe CLI
+
+```bash
+swift run -c release scape530-probe cache <cache-dir> --deep   # verify every group's CRC + decompress
+swift run scape530-probe js5 <host> 43595                       # JS5 handshake, master index, reference tables
+swift run scape530-probe login <host> 43595 <user> <pass> [js5-port]
+```
+
+`cache --deep` against the 2009scape cache verifies all 68,499 groups in the
+29 archives; the only groups it cannot open are archive 5's XTEA-encrypted
+`l*_*` location groups, whose keys come from the server in REBUILD_NORMAL.
+
+## Server compatibility notes
+
+These come from 2009scape's `GlobalConfig` in rt4-client and are mirrored in
+`Login.swift` / `IsaacRandom.swift`:
+
+- RSA key: 2009scape's 1024-bit modulus, exponent 65537 (`RsaKey.scape2009`).
+- `USE_ISAAC = false`: opcodes are sent and received unscrambled.
+- `LOGIN_EXTRA_INFO = true`: three empty strings follow the password in the RSA block.
+- `LOGIN_FAKE_IDX28 = true`: a 29th (zero) CRC is sent after archives 0...27.
+- Ports: the server listens on one port, `43594 + worldId` (43595 for world 1),
+  for both JS5 (opcode 15) and game login (opcode 14).
