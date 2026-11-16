@@ -62,6 +62,15 @@ public final class ItemIcons {
 		return r
 	}
 
+	/// The shared texture store (loaded on first use), for other software renderers that draw models.
+	public func textureStore() -> TextureStore? {
+		if !triedTextures {
+			triedTextures = true
+			textures = try? TextureStore(config: store)
+		}
+		return textures
+	}
+
 	func textureAvailable(_ id: Int) -> Bool {
 		guard let t = textures else { return false }
 		return t.meta.indices.contains(id) && t.meta[id].defined

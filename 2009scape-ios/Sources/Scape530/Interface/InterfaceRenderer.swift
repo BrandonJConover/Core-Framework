@@ -23,15 +23,36 @@ public struct InterfaceState {
 	/// Items of if1 inventory components (type 2), per component id then slot (rt4 `Component.objTypes`
 	/// / `objCounts`, filled by UPDATE_INV_*). Empty slots are absent.
 	public var invSlots: [Int: [Int: ServerMessage.InvItem]] = [:]
+	/// Animation playback of type-6 components (rt4 `anInt510/500/496`), keyed by component.
+	public var modelAnim: [ComponentRef: ModelAnim] = [:]
+	/// Pressed, selected and dragged inventory slots (rt4 `MiniMenu.pressedInventoryComponent`, `anInt5014`,
+	/// `InterfaceList.clickedInventoryComponent`).
+	public var inventoryUI = InventoryUI()
 
 	public init() {}
+
+	/// Inventory slot highlighting for the renderer (all component ids are `interface << 16 | index`).
+	public struct InventoryUI {
+		/// The item chosen with "Use" (outlined in white while selecting a target).
+		public var useSelected: (component: Int, slot: Int)?
+		/// A slot that was just activated, drawn at half opacity for 15 client cycles.
+		public var pressed: (component: Int, slot: Int)?
+		/// A slot being dragged and the finger's offset from where it started (already dead-zone filtered).
+		public var dragging: (component: Int, slot: Int, dx: Int, dy: Int)?
+		public init() {}
+	}
+
+	/// Resets the animation state of every component of `interface` (rt4 `InterfaceList.method1753` on open).
+	mutating func resetAnimations(of interface: Int) {
+		for key in modelAnim.keys where key.id >> 16 == interface { modelAnim[key] = nil }
+	}
 
 	/// Applies the IF_* server messages; returns true if it was one of them.
 	@discardableResult
 	public mutating func apply(_ m: ServerMessage) -> Bool {
 		switch m {
-		case .ifOpenTop(let id, _): top = id; open = [:]
-		case .ifOpenSub(let parent, let component, _): open[Int(parent)] = component
+		case .ifOpenTop(let id, _): top = id; open = [:]; resetAnimations(of: id)
+		case .ifOpenSub(let parent, let component, _): open[Int(parent)] = component; resetAnimations(of: component)
 		case .ifCloseSub(let parent): open[Int(parent)] = nil
 		case .ifSetHide(let c, let h): hidden[Int(c)] = h
 		case .ifSetText(let c, let t): text[Int(c)] = t
@@ -68,10 +89,14 @@ public final class InterfaceRenderer {
 	/// Every component drawn in the last `render`, in draw order, with its
 	/// screen rectangle (clipped to its parents). Used for touch hit tests.
 	public private(set) var drawn: [(component: Component, x: Int, y: Int, w: Int, h: Int)] = []
+	/// The unclipped top-left corner of every component in `drawn` (inventory slots are laid out from it).
+	public private(set) var origins: [ComponentRef: (x: Int, y: Int)] = [:]
 	/// Drawn in place of a type-6 model or a 3D viewport component, if set.
 	public var drawModel: ((Component, Int, Int, Int, Int, inout Raster) -> Void)?
 	/// Item icons for inventory components and if3 sprites with an item set.
 	public private(set) lazy var icons = ItemIcons(store: store)
+	/// Models of type-6 components (chat heads, items, npcs). `GameClient` wires the player and npc lookups.
+	public private(set) lazy var models = ComponentModels(store: store, icons: icons)
 
 	public init(store: ConfigStore) {
 		self.store = store
@@ -98,6 +123,7 @@ public final class InterfaceRenderer {
 	public func render(_ interface: Int, state: InterfaceState, into r: inout Raster) throws {
 		r.resetClip()
 		drawn.removeAll(keepingCapacity: true)
+		origins.removeAll(keepingCapacity: true)
 		try renderInterface(interface, x: 0, y: 0, w: r.width, h: r.height, state: state, into: &r)
 	}
 
@@ -105,7 +131,8 @@ public final class InterfaceRenderer {
 	public func hitTest(x: Int, y: Int) -> Component? {
 		for d in drawn.reversed() where x >= d.x && y >= d.y && x < d.x + d.w && y < d.y + d.h {
 			let c = d.component
-			if c.hooks["onClickRepeat"] != nil || c.hooks["onOptionClick"] != nil || !c.ops.isEmpty || c.buttonType != 0 || c.option != nil {
+			if c.hooks["onClickRepeat"] != nil || c.hooks["onOptionClick"] != nil || !c.ops.isEmpty || c.buttonType != 0 || c.option != nil
+				|| c.type == 2 || (c.events >> 11) & 0x7F != 0 {
 				return c
 			}
 		}
@@ -142,6 +169,7 @@ public final class InterfaceRenderer {
 				continue
 			}
 			drawn.append((c, r.clipLeft, r.clipTop, r.clipRight - r.clipLeft, r.clipBottom - r.clipTop))
+			origins[c.ref] = (x, y)
 			try draw(c, x: x, y: y, w: w, h: h, state: state, into: &r)
 			if c.type == 0 {
 				let sy = (isStatic ? state.scroll[c.id] : nil) ?? c.scrollY
@@ -203,7 +231,11 @@ public final class InterfaceRenderer {
 				r.drawScaled(f, x: x, y: y, w: w, h: h, opacity: opacity)
 			}
 		case 6:
-			drawModel?(c, x, y, w, h, &r)
+			if let hook = drawModel {
+				hook(c, x, y, w, h, &r)
+			} else {
+				models.draw(c, anim: state.modelAnim[c.ref] ?? ModelAnim(), x: x, y: y, w: w, h: h, into: &r)
+			}
 		case 9:
 			let rgb = UInt32(bitPattern: c.color) & 0xFFFFFF
 			if c.lineMirrored {
@@ -222,6 +254,7 @@ public final class InterfaceRenderer {
 	/// offset by their sprite's position.
 	func drawInventory(_ c: Component, x: Int, y: Int, state: InterfaceState, into r: inout Raster) {
 		let items = state.invSlots[c.id] ?? [:]
+		let ui = state.inventoryUI
 		var slot = 0
 		for row in 0..<c.baseHeight {
 			for col in 0..<c.baseWidth {
@@ -229,15 +262,54 @@ public final class InterfaceRenderer {
 				let extra = slot < c.invSprites.count ? c.invSprites[slot] : nil
 				if slot < 20, let e = extra { sx += e.x; sy += e.y }
 				defer { slot += 1 }
-				if sx + 32 <= r.clipLeft || sx >= r.clipRight || sy + 32 <= r.clipTop || sy >= r.clipBottom { continue }
+				let dragged = ui.dragging.map { $0.component == c.id && $0.slot == slot } ?? false
+				if !dragged && (sx + 32 <= r.clipLeft || sx >= r.clipRight || sy + 32 <= r.clipTop || sy >= r.clipBottom) { continue }
 				if let item = items[slot], item.id >= 0 {
-					if let icon = icons.sprite(selected: 1, id: item.id, drawText: c.objDrawText, count: Int(item.count), shadow: 0x302020) {
+					// rt4: the item picked with "Use" has a white outline; the rest a black one and a drop shadow.
+					let selected = ui.useSelected.map { $0.component == c.id && $0.slot == slot } ?? false
+					let icon = selected
+						? icons.sprite(selected: 2, id: item.id, drawText: c.objDrawText, count: Int(item.count), shadow: 0)
+						: icons.sprite(selected: 1, id: item.id, drawText: c.objDrawText, count: Int(item.count), shadow: 0x302020)
+					guard let icon else { continue }
+					if dragged, let d = ui.dragging {
+						// Drawn at half opacity where the finger is (at the start position inside the dead zone).
+						r.draw(icon, x: sx + d.dx, y: sy + d.dy, opacity: 128)
+					} else if let p = ui.pressed, p.component == c.id, p.slot == slot {
+						r.draw(icon, x: sx, y: sy, opacity: 128)
+					} else {
 						r.draw(icon, x: sx, y: sy)
 					}
 				} else if let e = extra, e.sprite >= 0, let sheet = try? store.sprite(Int(e.sprite)), let f = sheet.frames.first {
 					r.draw(f, x: sx, y: sy)
 				}
 			}
+		}
+	}
+
+	/// rt4 `InterfaceList` per-cycle animation step for type-6 components with a sequence: `cycles` client cycles
+	/// elapse, frames advance by the sequence's delays, wrapping with `replayOffset`.
+	public func advanceModelAnimations(_ state: inout InterfaceState, cycles: Int = 1) {
+		for d in drawn where d.component.type == 6 {
+			let c = d.component
+			guard c.modelSeqId != -1, let seq = try? store.seq(c.modelSeqId), !seq.frames.isEmpty, seq.frameDelays.count == seq.frames.count else { continue }
+			var a = state.modelAnim[c.ref] ?? ModelAnim()
+			a.cycles += cycles
+			var guardCount = 0
+			while a.frame < seq.frameDelays.count, a.cycles > seq.frameDelays[a.frame], guardCount < 64 {
+				guardCount += 1
+				a.cycles -= seq.frameDelays[a.frame]
+				a.frame += 1
+				if seq.frames.count <= a.frame {
+					a.frame -= seq.replayOffset
+					if a.frame < 0 || seq.frames.count <= a.frame { a.frame = 0 }
+				}
+				a.nextFrame = a.frame + 1
+				if seq.frames.count <= a.nextFrame {
+					a.nextFrame -= seq.replayOffset
+					if a.nextFrame < 0 || seq.frames.count <= a.nextFrame { a.nextFrame = -1 }
+				}
+			}
+			state.modelAnim[c.ref] = a
 		}
 	}
 }

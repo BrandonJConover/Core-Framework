@@ -47,6 +47,40 @@ public enum ClientMessage {
 	/// rt4 SOUND_SONGEND: the song that finished, so the server can pick the next one.
 	case songEnd(Int)
 
+	// MARK: targeting (rt4 `MiniMenu.doAction`, "Use" and spell target modes)
+
+	/// "Use item -> npc" (action 26, opcode 115). `component`/`slot`/`itemId` are the selected inventory item.
+	case useItemOnNpc(component: Int, slot: Int, itemId: Int, npc: Int)
+	/// "Use item -> loc" (action 14, opcode 134) at world tile (`x`, `z`).
+	case useItemOnLoc(component: Int, slot: Int, itemId: Int, locId: Int, x: Int, z: Int)
+	/// "Use item -> ground item" (action 33, opcode 101).
+	case useItemOnObj(component: Int, slot: Int, itemId: Int, objId: Int, x: Int, z: Int)
+	/// "Use item -> player" (action 1, opcode 248).
+	case useItemOnPlayer(component: Int, slot: Int, itemId: Int, player: Int)
+	/// "Use item -> inventory item" (action 40, opcode 27).
+	case useItemOnItem(component: Int, slot: Int, itemId: Int, targetComponent: Int, targetSlot: Int, targetItem: Int)
+	/// Spell (or other target-mode component, `child` = its created-component index, -1 when static) on an npc (action 45, opcode 239).
+	case spellOnNpc(component: Int, child: Int, npc: Int)
+	/// Spell on a loc (action 38, opcode 233).
+	case spellOnLoc(component: Int, child: Int, locId: Int, x: Int, z: Int)
+	/// Spell on a ground item (action 39, opcode 73).
+	case spellOnObj(component: Int, child: Int, objId: Int, x: Int, z: Int)
+	/// Spell on a player (action 15, opcode 195).
+	case spellOnPlayer(component: Int, child: Int, player: Int)
+	/// Spell on an inventory item (action 3, opcode 253).
+	case spellOnItem(component: Int, child: Int, targetComponent: Int, targetSlot: Int, targetItem: Int)
+	/// Spell on another interface component (action 12, opcode 82).
+	case spellOnComponent(component: Int, child: Int, targetComponent: Int, targetChild: Int)
+	/// Spell on a ground tile (action 11 with key 1, opcode 131) at world tile (`x`, `z`).
+	case spellOnTile(component: Int, child: Int, x: Int, z: Int)
+	/// An inventory item option (rt4 `MiniMenu` actions 47, 5, 43, 35, 58 for the item's `iops` 1...5 and
+	/// 25, 23, 48, 7, 13 for the component's own `invOptions`).
+	case invItemOp(action: Int, component: Int, slot: Int, itemId: Int)
+	/// MOVE_ITEM (opcode 231): an inventory drag from slot `from` to slot `to`; `insert` is rt4 "inserting" (shift) mode.
+	case moveItem(component: Int, from: Int, to: Int, insert: Bool)
+	/// IF_DRAG (opcode 79): a draggable if3 component released over another one.
+	case ifDrag(component: Int, child: Int, targetComponent: Int, targetChild: Int)
+
 	/// rt4 `ClientProt.method4512`: the opcode for IF_BUTTON1...10.
 	static let ifButtonOpcodes = [155, 196, 124, 199, 234, 168, 166, 64, 53, 9]
 
@@ -158,6 +192,61 @@ public enum ClientMessage {
 		case .examineObj(let id):
 			op(ClientProt.examineObj)
 			p.ip2add(id)
+		case let .useItemOnNpc(c, slot, item, npc):
+			op(115)
+			p.mp4(c); p.ip2(slot); p.ip2(npc); p.ip2add(item)
+		case let .useItemOnLoc(c, slot, item, loc, x, z):
+			op(134)
+			p.p2add(x); p.p2(item); p.ip2(z); p.p2(slot); p.mp4(c); p.p2add(loc)
+		case let .useItemOnObj(c, slot, item, obj, x, z):
+			op(101)
+			p.ip2add(x); p.ip2(slot); p.ip2(item); p.ip2(obj); p.ip2add(z); p.mp4(c)
+		case let .useItemOnPlayer(c, slot, item, player):
+			op(248)
+			p.ip2add(player); p.p2(item); p.p2(slot); p.mp4(c)
+		case let .useItemOnItem(c, slot, item, tc, ts, ti):
+			op(27)
+			p.p2(slot); p.ip4(tc); p.ip2(ts); p.ip4(c); p.ip2add(item); p.ip2add(ti)
+		case let .spellOnNpc(c, child, npc):
+			op(239)
+			p.ip4(c); p.p2add(child); p.ip2add(npc)
+		case let .spellOnLoc(c, child, loc, x, z):
+			op(233)
+			p.ip2add(z); p.p2add(x); p.ip2add(child); p.imp4(c); p.p2add(loc)
+		case let .spellOnObj(c, child, obj, x, z):
+			op(73)
+			p.imp4(c); p.p2(z); p.ip2add(obj); p.ip2add(x); p.ip2(child)
+		case let .spellOnPlayer(c, child, player):
+			op(195)
+			p.p2add(child); p.ip4(c); p.ip2add(player)
+		case let .spellOnItem(c, child, tc, ts, ti):
+			op(253)
+			p.ip4(c); p.ip2add(ts); p.ip4(tc); p.p2add(ti); p.ip2(child)
+		case let .spellOnComponent(c, child, tc, tchild):
+			op(82)
+			p.p2(child); p.imp4(tc); p.p4(c); p.ip2add(tchild)
+		case let .spellOnTile(c, child, x, z):
+			op(131)
+			p.mp4(c); p.p2add(x); p.ip2add(child); p.p2add(z)
+		case let .invItemOp(action, c, slot, item):
+			switch action {
+			case 47: op(156); p.ip2add(slot); p.p2add(item); p.ip4(c)
+			case 5: op(55); p.ip2(item); p.p2add(slot); p.imp4(c)
+			case 43: op(153); p.ip4(c); p.ip2(slot); p.ip2(item)
+			case 35: op(161); p.ip4(c); p.ip2add(item); p.ip2add(slot)
+			case 58: op(135); p.p2add(item); p.p2add(slot); p.mp4(c)
+			case 25: op(81); p.p2add(slot); p.p2(item); p.imp4(c)
+			case 23: op(206); p.p2add(item); p.ip2(slot); p.ip4(c)
+			case 48: op(154); p.ip2(slot); p.imp4(c); p.ip2add(item)
+			case 7: op(85); p.imp4(c); p.p2(slot); p.p2add(item)
+			default: op(6); p.p4(c); p.p2add(slot); p.ip2(item) // action 13
+			}
+		case let .moveItem(c, from, to, insert):
+			op(231)
+			p.p2(to); p.ip4(c); p.p2add(from); p.p1sub(insert ? 1 : 0)
+		case let .ifDrag(c, child, tc, tchild):
+			op(79)
+			p.mp4(c); p.ip2(tchild); p.p4(tc); p.ip2(child)
 		case let .walk(destX, destZ, path, ctrlRun, minimap):
 			// rt4 (`ClientProt` walk sender) sends the first waypoint as an
 			// absolute tile, then the following ones as offsets from it
@@ -180,5 +269,17 @@ public enum ClientMessage {
 			}
 		}
 		return p.written
+	}
+}
+
+extension Packet {
+	/// rt4 `Buffer.mp4`: a 4-byte value as bytes 2, 3, 0, 1 (middle-endian).
+	mutating func mp4(_ v: Int) {
+		p1(v >> 16); p1(v >> 24); p1(v); p1(v >> 8)
+	}
+
+	/// rt4 `Buffer.imp4`: a 4-byte value as bytes 1, 0, 3, 2 (inverse middle-endian).
+	mutating func imp4(_ v: Int) {
+		p1(v >> 8); p1(v); p1(v >> 24); p1(v >> 16)
 	}
 }

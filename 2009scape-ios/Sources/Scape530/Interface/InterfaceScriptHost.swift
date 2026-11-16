@@ -153,8 +153,14 @@ public final class InterfaceScriptHost: ScriptHost {
 				slotEvents[Int(c), default: []].append((start, end, mask))
 			}
 		case let .ifSetObject(c, obj, count): mutate(ComponentRef(id: Int(c))) { $0.objId = obj; $0.objCount = Int(count) }
-		case let .ifSetModel(c, model): mutate(ComponentRef(id: Int(c))) { $0.modelId = model }
-		case let .ifSetAnim(c, seq): mutate(ComponentRef(id: Int(c))) { $0.modelSeqId = seq }
+		case let .ifSetModel(c, model): mutate(ComponentRef(id: Int(c))) { $0.modelType = 1; $0.modelId = model }
+		case let .ifSetNpcHead(c, npc): mutate(ComponentRef(id: Int(c))) { $0.modelType = 2; $0.modelId = npc }
+		case .ifSetPlayerHead(let c): mutate(ComponentRef(id: Int(c))) { $0.modelType = 3; $0.modelId = 0 }
+		case let .ifSetAnim(c, seq):
+			// rt4: a new sequence (or -1) restarts the playback.
+			let ref = ComponentRef(id: Int(c))
+			if component(ref)?.modelSeqId != seq || seq == -1 { game.interfaces.modelAnim[ref] = nil }
+			mutate(ref) { $0.modelSeqId = seq }
 		case let .runClientScript(id, args): runScript(id, args)
 		case .gameMessage: game.apply(m); chatAt = transmitTimer
 		case .friendlistLoaded, .updateFriend, .ignoreList: game.apply(m); friendAt = transmitTimer
@@ -357,7 +363,7 @@ public final class InterfaceScriptHost: ScriptHost {
 			case .sprite: c.spriteId = i(0)
 			case .angle2d: c.angle2d = i(0)
 			case .spriteTiling: c.spriteTiling = i(0) == 1
-			case .model: c.modelId = i(0)
+			case .model: c.modelType = 1; c.modelId = i(0)
 			case .modelRotation:
 				c.modelXOffset = i(0); c.modelZOffset = i(1); c.modelXAngle = i(2)
 				c.modelYAngle = i(3); c.modelYOffset = i(4); c.modelZoom = i(5)
@@ -379,7 +385,10 @@ public final class InterfaceScriptHost: ScriptHost {
 				} else {
 					c.objId = i(0); c.objCount = i(1); c.objDrawText = i(2) != 0
 				}
-			case .npcHead, .selfHead, .otherPlayerHead, .playerFull: c.modelId = a.first.map(Int.init) ?? -1
+			case .npcHead: c.modelType = 2; c.modelId = i(0)
+			case .selfHead: c.modelType = 3; c.modelId = 0
+			case .otherPlayerHead: c.modelType = 6; c.modelId = i(0)
+			case .playerFull: c.modelType = 5; c.modelId = i(0)
 			case .dragDeadZone: c.dragDeadzone = i(0)
 			case .dragDeadTime: c.dragDeadtime = i(0)
 			case .opEnabled:
