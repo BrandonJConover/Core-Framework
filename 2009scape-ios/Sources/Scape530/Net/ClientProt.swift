@@ -2,6 +2,10 @@
 /// Generated from reference/rt4-client `ClientProt.java`; names are rt4's (with its NXT-naming notes).
 public enum ClientProt {
 	public static let clientCheat = 44
+	/// rt4 `ScriptRunner` op 5008 (`p1isaac(237)`): public chat with colour and effect bytes.
+	public static let publicChat = 237
+	/// rt4 `ScriptRunner` op 5009 (`p1isaac(201)`): private message to a base-37 name.
+	public static let privateMessage = 201
 	public static let clanJoinchatLeavechat = 104
 	public static let clanKickuser = 162 // or CLANCHANNEL_KICKUSER
 	public static let friendlistAdd = 120

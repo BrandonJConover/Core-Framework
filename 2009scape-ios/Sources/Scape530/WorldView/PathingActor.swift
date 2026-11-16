@@ -82,6 +82,24 @@ final class PathingActor: SceneEntity {
 	/// rt4 `aBoolean171`: the current animation stretches the model's footprint.
 	var stretches = false
 
+	// Overhead text (rt4 `chatMessage`, `chatEffect`, `chatColor`, `chatLoops`; `OverheadChat.loop` ticks it down).
+	var chatMessage: String?
+	var chatEffect = 0, chatColor = 0, chatLoops = 0
+
+	// Hit splats and health bar (rt4 `hitDamages`, `hitTypes`, `hitVisibleUntil`, `hitpointsBar*`).
+	var hitDamages = [Int](repeating: 0, count: 4)
+	var hitTypes = [Int](repeating: 0, count: 4)
+	var hitVisibleUntil = [Int](repeating: 0, count: 4)
+	var hitpointsBar = 0
+	var hitpointsBarVisibleUntil = -1000
+
+	// Spot animation (rt4 `spotAnimId`, `spotAnimStart`, `anInt3399` frame, `anInt3418` next frame,
+	// `anInt3361` frame cycle, `spotAnimY`).
+	var spotAnimId = -1
+	var spotAnimStart = 0
+	var spotFrame = 0, spotNext = -1, spotStep = 0
+	var spotAnimY = 0
+
 	/// rt4 `PathingEntity.anInt3424`: ground height at the actor.
 	var groundY = 0
 	/// rt4 `minY`.
@@ -213,6 +231,11 @@ final class PathingActor: SceneEntity {
 
 	/// One client cycle (20 ms) of movement, turning and animation.
 	func cycle(isSelf: Bool) {
+		// rt4 `OverheadChat.loop`.
+		if chatLoops > 0 {
+			chatLoops -= 1
+			if chatLoops == 0 { chatMessage = nil }
+		}
 		updateMovement()
 		if xFine < 128 || zFine < 128 || xFine >= 13184 || zFine >= 13184 {
 			seqId = -1
@@ -505,6 +528,7 @@ final class PathingActor: SceneEntity {
 				moveSeqId = -1
 			}
 		}
+		updateSpotAnim()
 		// rt4: a looping-type-1 animation waits (delay 1) while the actor still has queued moves from when it started.
 		// The forced-move cycle fields are zero here, so the `client.loop` comparisons always hold.
 		if seqId != -1 && seqDelay <= 1 {
@@ -547,6 +571,59 @@ final class PathingActor: SceneEntity {
 		}
 		if seqDelay > 0 { seqDelay -= 1 }
 	}
+
+	// MARK: hits and spot animations (rt4 PathingEntity.addHit, Protocol spotanim masks, NpcList.method879)
+
+	/// rt4 `PathingEntity.addHit`: the first free of four splat slots shows `damage` for 70 cycles.
+	func addHit(type: Int, damage: Int) {
+		for i in 0..<4 where ctx.loop >= hitVisibleUntil[i] {
+			hitDamages[i] = damage
+			hitTypes[i] = type
+			hitVisibleUntil[i] = ctx.loop + 70
+			return
+		}
+	}
+
+	/// rt4 priority rule for replacing a running spot animation: the new one wins unless the
+	/// running one has a higher sequence priority.
+	private func spotPriority(_ id: Int) -> Int {
+		guard id != -1, let t = (try? ctx.store.spotAnim(id)) ?? nil, t.seq != -1, let s = (try? ctx.store.seq(t.seq)) ?? nil else { return 0 }
+		return s.priority
+	}
+
+	/// rt4 spot animation mask (`Protocol` flags 0x100 players, 0x80 npcs, and SPOTANIM_ENTITY).
+	func setSpotAnim(id: Int, height: Int, delay: Int) {
+		guard id == -1 || spotAnimId == -1 || spotPriority(id) >= spotPriority(spotAnimId) else { return }
+		spotAnimStart = delay + ctx.loop
+		spotStep = 0
+		spotFrame = 0
+		spotAnimId = id
+		if spotAnimStart > ctx.loop { spotFrame = -1 }
+		spotAnimY = height
+		spotNext = 1
+	}
+
+	/// The spot animation part of rt4 `NpcList.method879`.
+	func updateSpotAnim() {
+		guard spotAnimId != -1, ctx.loop >= spotAnimStart else { return }
+		guard let t = (try? ctx.store.spotAnim(spotAnimId)) ?? nil, t.seq != -1,
+		      let s = (try? ctx.store.seq(t.seq)) ?? nil, !s.frames.isEmpty else {
+			spotAnimId = -1
+			return
+		}
+		if spotFrame < 0 { spotFrame = 0 }
+		spotStep += 1
+		if spotFrame < s.frames.count && s.frameDelays[spotFrame] < spotStep {
+			spotFrame += 1
+			spotStep = 1
+		}
+		if spotFrame >= s.frames.count { spotAnimId = -1 }
+		spotNext = spotFrame + 1
+		if s.frames.count <= spotNext { spotNext = -1 }
+	}
+
+	/// rt4 `PathingEntity.method2691`: model height above the ground (200 until a model was built).
+	var modelHeight: Int { minY == -32768 ? 200 : -minY }
 
 	// MARK: rendering
 

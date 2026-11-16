@@ -30,6 +30,12 @@ public enum ServerMessage: Equatable {
 
 	// Chat / social
 	case gameMessage(String)
+	/// MESSAGE_PRIVATE: a private message from `name37`; `text` is the huffman-packed body (rt4 `formatChatMessage`).
+	case privateMessage(name37: Int64, messageId: Int64, rights: Int, text: [UInt8])
+	/// MESSAGE_PRIVATE_ECHO: our own private message sent to `name37`, echoed back.
+	case privateMessageEcho(name37: Int64, text: [UInt8])
+	/// SPOTANIM_ENTITY (rt4 opcode 56): a graphic on an npc or player (`target` flags the kind), or on a ground tile.
+	case spotAnimEntity(delay: Int, height: Int, target: Int32, gfx: Int)
 	case chatFilterSettings(publicFilter: Int, privateFilter: Int, tradeFilter: Int)
 	case friendlistLoaded(state: Int)
 	case updateFriend(name37: Int64, world: Int, rank: Int, worldName: String?)
@@ -197,6 +203,21 @@ public enum ServerMessage: Equatable {
 
 		case ServerProt.messageGame:
 			return .gameMessage(try p.gjstr())
+		case ServerProt.messagePrivate:
+			let name = try p.g8()
+			let top = try p.g2()
+			let bot = try p.g3()
+			let rights = try p.g1()
+			return .privateMessage(name37: name, messageId: Int64(bot) + (Int64(top) << 32), rights: rights, text: try p.gdata(p.remaining))
+		case ServerProt.messagePrivateEcho:
+			let name = try p.g8()
+			return .privateMessageEcho(name37: name, text: try p.gdata(p.remaining))
+		case ServerProt.spotanimEntity:
+			let delay = try p.g2()
+			let height = try p.ig2()
+			let target = try p.img4()
+			let gfx = try p.ig2add()
+			return .spotAnimEntity(delay: delay, height: height, target: target, gfx: gfx)
 		case ServerProt.chatFilterSettings:
 			return .chatFilterSettings(publicFilter: try p.g1(), privateFilter: try p.g1(), tradeFilter: try p.g1())
 		case ServerProt.friendlistLoaded:

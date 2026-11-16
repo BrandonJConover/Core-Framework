@@ -34,6 +34,17 @@ public final class WorldView {
 	public private(set) var buildErrors: [String] = []
 	/// Called with each placed loc (collision flagging hooks in here).
 	public var onLocPlaced: ((LocPlacement) -> Void)?
+	/// Social state fed by `GameClient` (see `WorldView+Social` / `WorldView+Overlay`).
+	/// Public chat decoded from player info, for the chat history.
+	public var onPublicChat: ((PublicChatEvent) -> Void)?
+	/// True when rt4's ignore rules drop a public chat line from `name37` with staff `rights`.
+	public var isChatIgnored: (_ name37: Int64, _ rights: Int) -> Bool = { _, _ in false }
+	/// rt4 `Chat.publicFilter`: 0 show all, 1 friends only, 2 hide (3 show all too).
+	public var publicFilter = 0
+	/// rt4 `VarpDomain.chatEffectsDisabled`: overhead text drawn plain yellow.
+	public var chatEffectsDisabled = false
+	/// Camera of the last rendered frame.
+	var overlayCamera: OverlayCamera?
 	/// Incremented every time the scene is rebuilt.
 	public private(set) var buildCount = 0
 
@@ -77,6 +88,8 @@ public final class WorldView {
 			selfIndex = a.selfId
 		case .message(.rebuildNormal(let r)):
 			applyRebuild(r)
+		case .message(.spotAnimEntity(let delay, let height, let target, let gfx)):
+			applySpotAnimMessage(delay: delay, height: height, target: target, gfx: gfx)
 		case .message(let m):
 			applyZone(m)
 		case .players(let result, let decoder):
@@ -157,6 +170,7 @@ public final class WorldView {
 		if let anim = m.anim { a.animate(delay: anim.delay, seq: anim.seq) }
 		if let f = m.faceEntity { a.faceEntity = f }
 		if let t = m.faceTile { a.faceX = t.x; a.faceY = t.z }
+		applySocialMasks(a, m)
 	}
 
 	func applyPlayers(_ r: PlayerInfoDecoder.Result, _ d: PlayerInfoDecoder) {
@@ -286,6 +300,7 @@ public final class WorldView {
 	public func draw(into raster: inout Raster, rect: (x: Int, y: Int, w: Int, h: Int)) -> Bool {
 		guard let r3 = renderScene(rect: rect, pick: nil) else { return false }
 		r3.copy(into: &raster, x: rect.x, y: rect.y)
+		drawOverlays(into: &raster, rect: rect)
 		return true
 	}
 
@@ -330,12 +345,20 @@ public final class WorldView {
 			a.groundY = scene.tileHeight(level: level, xFine: a.xFine, zFine: a.zFine)
 			scene.add(level: level, xFine: a.xFine, zFine: a.zFine, y: a.groundY, radius: (a.size - 1) * 64 + 60, entity: a, yaw: a.yaw, key: key, extend: a.stretches)
 		}
-		for (id, a) in ctx.npcs { place(a, key: Int64(id) << 32 | 0x2000_0000) }
-		for (id, a) in ctx.players { place(a, key: Int64(id) << 32) }
+		/// rt4 renders the spot animation model with the same orientation as its actor (the GL path
+		/// draws it as a second model with the actor's key).
+		func placeSpot(_ a: PathingActor, key: Int64) {
+			guard a.isVisible, let m = spotAnimModel(for: a) else { return }
+			scene.add(level: level, xFine: a.xFine, zFine: a.zFine, y: a.groundY, radius: (a.size - 1) * 64 + 60, entity: m, yaw: a.yaw, key: key, extend: false)
+		}
+		for (id, a) in ctx.npcs { place(a, key: Int64(id) << 32 | 0x2000_0000); placeSpot(a, key: Int64(id) << 32 | 0x2000_0000) }
+		for (id, a) in ctx.players { place(a, key: Int64(id) << 32); placeSpot(a, key: Int64(id) << 32) }
 
 		camera.clampAngles()
 		let groundY = scene.tileHeight(level: level, xFine: me.xFine, zFine: me.zFine)
 		let eye = camera.eye(groundY: groundY)
+		overlayCamera = OverlayCamera(x: eye.x, y: eye.y, z: eye.z, pitch: eye.pitch, yaw: eye.yaw, level: level,
+		                              centerX: Int(r3.centerX), centerY: Int(r3.centerY))
 		scene.draw(into: r3, cameraX: eye.x, cameraY: eye.y, cameraZ: eye.z, pitch: eye.pitch, yaw: eye.yaw, plane: level,
 		           playerTile: (me.xFine >> 7, me.zFine >> 7))
 		return r3
