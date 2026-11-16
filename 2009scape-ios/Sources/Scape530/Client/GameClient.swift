@@ -25,6 +25,10 @@ public final class GameClient {
 	public var ui: InterfaceRenderer { host.renderer }
 	public var server: Server
 	public private(set) var session: GameSession?
+	/// The 3D world drawn behind the interfaces while in game (rt4 scene + camera + actors).
+	public private(set) var world: WorldView
+	/// The 3D viewport component's rectangle from the last frame (rt4 `Component.clientCode == 1337`).
+	public private(set) var viewport: (x: Int, y: Int, w: Int, h: Int)?
 	public private(set) var lastSize = (w: 0, h: 0)
 	private var inGame = false
 	private var lastCycleAt: Date?
@@ -50,6 +54,7 @@ public final class GameClient {
 		let probe = InterfaceRenderer(store: store)
 		loginInterface = try probe.interfaceId(named: "loginscreen") ?? 744
 		host = InterfaceScriptHost(store: store)
+		world = WorldView(store: store)
 		bindHost()
 		openLoginScreen()
 	}
@@ -113,16 +118,56 @@ public final class GameClient {
 		let now = Date()
 		let cycles = lastCycleAt.map { min(max(Int(now.timeIntervalSince($0) / 0.02), 1), 5) } ?? 1
 		lastCycleAt = lastCycleAt.map { $0.addingTimeInterval(Double(cycles) * 0.02) } ?? now
-		for _ in 0..<cycles { host.cycle() }
+		for _ in 0..<cycles {
+			host.cycle()
+			if inGame { world.cycle(varps: host.game.varps) }
+		}
 		var r = Raster(width: width, height: height)
 		let top = host.game.interfaces.top
-		if top != -1 && !(inGame && top == loginInterface) {
-			try ui.render(top, state: host.game.interfaces, into: &r)
+		let showInterface = top != -1 && !(inGame && top == loginInterface)
+		// The world is drawn first, inside the viewport component found while laying out the interface
+		// (the previous frame's rectangle; a changed rectangle repeats the frame once).
+		for pass in 0..<2 {
+			let drawnViewport = inGame && drawWorld(into: &r, width: width, height: height)
+			if showInterface { try ui.render(top, state: host.game.interfaces, into: &r) }
+			let found = showInterface ? ui.drawn.first(where: { $0.component.clientCode == 1337 }).map { (x: $0.x, y: $0.y, w: $0.w, h: $0.h) } : nil
+			let changed = found.map { f in viewport.map { $0 != f } ?? true } ?? false
+			if let f = found { viewport = f }
+			if !(changed && drawnViewport) || pass == 1 { break }
+			r = Raster(width: width, height: height)
 		}
 		if inGame, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
 			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 16, color: 0xFFFF00, shadow: 0, into: &r)
 		}
 		return r
+	}
+
+	/// Draws the 3D world into the viewport (the whole raster until the interface has told us where it is).
+	private func drawWorld(into r: inout Raster, width: Int, height: Int) -> Bool {
+		let v = viewport.flatMap { $0.x + $0.w <= width && $0.y + $0.h <= height ? $0 : nil } ?? (x: 0, y: 0, w: width, h: height)
+		return world.draw(into: &r, rect: v)
+	}
+
+	// MARK: camera (rt4 Camera: yawTarget / pitchTarget / ZOOM)
+
+	/// One-finger drag over the world, in game pixels: horizontal turns the camera, vertical tilts it.
+	public func cameraDrag(dx: Double, dy: Double) { world.camera.drag(dx: dx, dy: dy) }
+
+	/// Pinch gesture: `scale` > 1 zooms in, < 1 out (use the change since the last callback).
+	public func cameraPinch(scale: Double) { world.camera.pinch(scale: scale) }
+
+	/// Back to rt4's default zoom, facing north.
+	public func cameraReset() {
+		world.camera.zoom = WorldCamera.defaultZoom
+		world.camera.pitchTarget = 128
+		world.camera.yawTarget = 0
+	}
+
+	/// True when a drag starting at (x, y) belongs to the camera: inside the world viewport and not
+	/// on an interactive interface component.
+	public func isOverWorld(x: Int, y: Int) -> Bool {
+		guard inGame, let v = viewport else { return false }
+		return x >= v.x && y >= v.y && x < v.x + v.w && y < v.y + v.h && ui.hitTest(x: x, y: y) == nil
 	}
 
 	// MARK: input
@@ -197,6 +242,8 @@ public final class GameClient {
 		inGame = false
 		let (u, p) = (username, password)
 		host = InterfaceScriptHost(store: store)
+		world = WorldView(store: store)
+		viewport = nil
 		host.canvas = (lastSize.w > 0 ? lastSize.w : 765, lastSize.h > 0 ? lastSize.h : 503)
 		bindHost()
 		openLoginScreen()
@@ -207,6 +254,7 @@ public final class GameClient {
 	public func send(_ m: ClientMessage) { session?.send(m) }
 
 	func handle(_ e: GameSession.Event) {
+		world.handle(e, varps: host.game.varps)
 		switch e {
 		case .loggedIn:
 			host.apply(e)
