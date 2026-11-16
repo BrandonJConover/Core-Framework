@@ -335,8 +335,9 @@ final class InteractTests: XCTestCase {
 		let v = try XCTUnwrap(client.viewport)
 		let me = try XCTUnwrap(client.world.selfSceneTile)
 		var target: (x: Int, y: Int, tile: (x: Int, z: Int))?
-		search: for dy in stride(from: 40, through: 140, by: 10) {
-			for dx in stride(from: -240, through: 240, by: 20) {
+		// Scan the whole viewport: the spawn point varies and scenery (a tree) can hide the area near the player.
+		search: for dy in stride(from: -v.h / 2 + 20, through: v.h / 2 - 20, by: 10) {
+			for dx in stride(from: -v.w / 2 + 20, through: v.w / 2 - 20, by: 15) {
 				let px = v.x + v.w / 2 + dx, py = v.y + v.h / 2 + dy
 				guard client.isOverWorld(x: px, y: py), let (m, pick) = client.buildMenu(x: px, y: py), let t = pick.tile else { continue }
 				let dist = abs(t.x - me.x) + abs(t.z - me.z)

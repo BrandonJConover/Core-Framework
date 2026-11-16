@@ -355,7 +355,7 @@ final class SocialTests: XCTestCase {
 		while Date() < until && !echoed {
 			Thread.sleep(forTimeInterval: 0.02)
 			frame = try client.frame(width: w, height: h)
-			echoed = client.state.chatLog.lines.contains { $0.type == 2 && $0.message == "Hello from swift" }
+			echoed = client.state.chatLog.lines.contains { ($0.type == 1 || $0.type == 2) && $0.message == "Hello from swift" } // type 1 when the server gives the account a staff icon
 		}
 		XCTAssertTrue(echoed, "chat log: \(client.state.chatLog.lines.prefix(5))")
 		try save(frame, "social-live-chat")
