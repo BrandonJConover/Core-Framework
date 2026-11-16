@@ -9,6 +9,14 @@ private let reciprocal16: [Int] = (0..<2048).map { $0 == 0 ? 0 : 65536 / $0 }
 final class ModelRenderScratch {
 	static let shared = ModelRenderScratch()
 
+	/// Fixed scratch memory as raw pointers: the instance is a process-long singleton, so the buffers are never
+	/// freed, and indexing skips Array bounds and uniqueness checks (rt4 sizes and guards are kept by the callers).
+	private static func buffer<T>(_ value: T, count: Int) -> UnsafeMutablePointer<T> {
+		let p = UnsafeMutablePointer<T>.allocate(capacity: count)
+		p.initialize(repeating: value, count: count)
+		return p
+	}
+
 	static let maxVertices = 4096
 	static let depthBuckets = 1600
 	static let bucketSize = 64
@@ -16,34 +24,34 @@ final class ModelRenderScratch {
 	static let overflowSize = 512
 
 	// Per-vertex.
-	var vertexScreenX = [Int](repeating: 0, count: maxVertices)
-	var vertexScreenY = [Int](repeating: 0, count: maxVertices)
-	var vertexDepth = [Int](repeating: 0, count: maxVertices)
-	var projectX = [Int](repeating: 0, count: maxVertices)
-	var projectY = [Int](repeating: 0, count: maxVertices)
-	var projectZ = [Int](repeating: 0, count: maxVertices)
+	let vertexScreenX = ModelRenderScratch.buffer(0, count: ModelRenderScratch.maxVertices)
+	let vertexScreenY = ModelRenderScratch.buffer(0, count: ModelRenderScratch.maxVertices)
+	let vertexDepth = ModelRenderScratch.buffer(0, count: ModelRenderScratch.maxVertices)
+	let projectX = ModelRenderScratch.buffer(0, count: ModelRenderScratch.maxVertices)
+	let projectY = ModelRenderScratch.buffer(0, count: ModelRenderScratch.maxVertices)
+	let projectZ = ModelRenderScratch.buffer(0, count: ModelRenderScratch.maxVertices)
 	// Per-triangle.
-	var projectTriangle = [Bool](repeating: false, count: maxVertices)
-	var testTriangleX = [Bool](repeating: false, count: maxVertices)
+	let projectTriangle = ModelRenderScratch.buffer(false, count: ModelRenderScratch.maxVertices)
+	let testTriangleX = ModelRenderScratch.buffer(false, count: ModelRenderScratch.maxVertices)
 
 	// Depth buckets (rt4 anIntArray558 / anIntArrayArray44 / anIntArray552 / anIntArrayArray43).
-	var bucketCount = [Int](repeating: 0, count: depthBuckets)
-	var buckets = [Int](repeating: 0, count: depthBuckets * bucketSize)
-	var overflowCount = [Int](repeating: 0, count: overflowRows)
-	var overflow = [Int](repeating: 0, count: overflowRows * overflowSize)
+	let bucketCount = ModelRenderScratch.buffer(0, count: ModelRenderScratch.depthBuckets)
+	let buckets = ModelRenderScratch.buffer(0, count: ModelRenderScratch.depthBuckets * ModelRenderScratch.bucketSize)
+	let overflowCount = ModelRenderScratch.buffer(0, count: ModelRenderScratch.overflowRows)
+	let overflow = ModelRenderScratch.buffer(0, count: ModelRenderScratch.overflowRows * ModelRenderScratch.overflowSize)
 	var overflowRowsUsed = 0
 
 	// Priority lists (rt4 priorityTriangles etc.): 12 priorities.
-	var priorityCounts = [Int](repeating: 0, count: 12)
-	var lowPrioritySum = [Int](repeating: 0, count: 12)
-	var priorityTriangles = [Int](repeating: 0, count: 12 * maxVertices)
-	var normalPriorityDepth = [Int](repeating: 0, count: maxVertices)
-	var highPriorityDepth = [Int](repeating: 0, count: maxVertices)
+	let priorityCounts = ModelRenderScratch.buffer(0, count: 12)
+	let lowPrioritySum = ModelRenderScratch.buffer(0, count: 12)
+	let priorityTriangles = ModelRenderScratch.buffer(0, count: 12 * ModelRenderScratch.maxVertices)
+	let normalPriorityDepth = ModelRenderScratch.buffer(0, count: ModelRenderScratch.maxVertices)
+	let highPriorityDepth = ModelRenderScratch.buffer(0, count: ModelRenderScratch.maxVertices)
 
 	// Near-plane clipped polygon (rt4 anIntArray542 / 547 / 553).
-	var clipX = [Int](repeating: 0, count: 10)
-	var clipY = [Int](repeating: 0, count: 10)
-	var clipColor = [Int](repeating: 0, count: 10)
+	let clipX = ModelRenderScratch.buffer(0, count: 10)
+	let clipY = ModelRenderScratch.buffer(0, count: 10)
+	let clipColor = ModelRenderScratch.buffer(0, count: 10)
 }
 
 extension SoftwareModel {
@@ -126,8 +134,12 @@ extension SoftwareModel {
 				}
 			}
 		}
+		guard vertexX.count >= vertexCount, vertexY.count >= vertexCount, vertexZ.count >= vertexCount else { return }
+		let screenX = s.vertexScreenX, screenY = s.vertexScreenY, depths = s.vertexDepth
+		let projX = s.projectX, projY = s.projectY, projZ = s.projectZ
+		vertexX.withUnsafeBufferPointer { vxs in vertexY.withUnsafeBufferPointer { vys in vertexZ.withUnsafeBufferPointer { vzs in
 		for v in 0..<vertexCount {
-			var x = vertexX[v], y = vertexY[v], z = vertexZ[v]
+			var x = vxs[v], y = vys[v], z = vzs[v]
 			if yaw != 0 {
 				let w = (z * yawSin + x * yawCos) >> 16
 				z = (z * yawCos - x * yawSin) >> 16
@@ -141,20 +153,21 @@ extension SoftwareModel {
 			x = w
 			w = (y * cosCameraPitch - z * sinCameraPitch) >> 16
 			z = (y * sinCameraPitch + z * cosCameraPitch) >> 16
-			s.vertexDepth[v] = z - b
+			depths[v] = z - b
 			if z >= 50 {
-				s.vertexScreenX[v] = cx + (x << 9) / z
-				s.vertexScreenY[v] = cy + (w << 9) / z
+				screenX[v] = cx + (x << 9) / z
+				screenY[v] = cy + (w << 9) / z
 			} else {
-				s.vertexScreenX[v] = -5000
+				screenX[v] = -5000
 				anyBehind = true
 			}
 			if project {
-				s.projectX[v] = x
-				s.projectY[v] = w
-				s.projectZ[v] = z
+				projX[v] = x
+				projY[v] = w
+				projZ[v] = z
 			}
 		}
+		} } }
 		drawProjected(r, s, anyBehind, b - d, c - d + 2, pickKey: testTriangles ? key : 0)
 	}
 
@@ -255,8 +268,8 @@ extension SoftwareModel {
 	private func drawProjected(_ r: Rasteriser3D, _ s: ModelRenderScratch, _ anyBehind: Bool, _ depthOffset: Int, _ bucketLimit: Int, pickKey: Int64 = 0) {
 		var pickKey = pickKey
 		if bucketLimit >= ModelRenderScratch.depthBuckets { return }
-		for i in 0..<ModelRenderScratch.depthBuckets { s.bucketCount[i] = 0 }
-		for i in 0..<ModelRenderScratch.overflowRows { s.overflowCount[i] = 0 }
+		s.bucketCount.update(repeating: 0, count: ModelRenderScratch.depthBuckets)
+		s.overflowCount.update(repeating: 0, count: ModelRenderScratch.overflowRows)
 		s.overflowRowsUsed = 0
 		let width = Int(r.width)
 
@@ -284,8 +297,9 @@ extension SoftwareModel {
 			}
 		}
 
-		for i in 0..<triangleCount where triangleColorC[i] != -2 {
-			let a = triangleVertexA[i], b = triangleVertexB[i], c = triangleVertexC[i]
+		let triA = triangleVertexA, triB = triangleVertexB, triC = triangleVertexC, colC = triangleColorC
+		for i in 0..<triangleCount where colC[i] != -2 {
+			let a = triA[i], b = triB[i], c = triC[i]
 			let xa = s.vertexScreenX[a], xb = s.vertexScreenX[b], xc = s.vertexScreenX[c]
 			if anyBehind && (xa == -5000 || xb == -5000 || xc == -5000) {
 				// At least one vertex is behind the near plane: cull in view space.
@@ -434,7 +448,7 @@ extension SoftwareModel {
 				r.fillTexturedAlphaTriangle(s.vertexScreenY[a], s.vertexScreenY[b], s.vertexScreenY[c], s.vertexScreenX[a], s.vertexScreenX[b], s.vertexScreenX[c], colorA, colorB, colorC, s.projectX[tA], s.projectX[tB], s.projectX[tC], s.projectY[tA], s.projectY[tB], s.projectY[tC], s.projectZ[tA], s.projectZ[tB], s.projectZ[tC], tex[index])
 			}
 		} else if colorC == -1 {
-			r.fillTriangle(s.vertexScreenY[a], s.vertexScreenY[b], s.vertexScreenY[c], s.vertexScreenX[a], s.vertexScreenX[b], s.vertexScreenX[c], Int(r.palette[colorA & 0xFFFF]))
+			r.fillTriangle(s.vertexScreenY[a], s.vertexScreenY[b], s.vertexScreenY[c], s.vertexScreenX[a], s.vertexScreenX[b], s.vertexScreenX[c], Int(r.pal[colorA & 0xFFFF]))
 		} else {
 			r.fillGouraudTriangle(s.vertexScreenY[a], s.vertexScreenY[b], s.vertexScreenY[c], s.vertexScreenX[a], s.vertexScreenX[b], s.vertexScreenX[c], colorA & 0xFFFF, colorB & 0xFFFF, colorC & 0xFFFF)
 		}
@@ -514,7 +528,7 @@ extension SoftwareModel {
 					r.fillTexturedAlphaTriangle(y0, y1, y2, x0, x1, x2, s.clipColor[0], s.clipColor[1], s.clipColor[2], s.projectX[tA], s.projectX[tB], s.projectX[tC], s.projectY[tA], s.projectY[tB], s.projectY[tC], s.projectZ[tA], s.projectZ[tB], s.projectZ[tC], textured)
 				}
 			} else if colorC == -1 {
-				r.fillTriangle(y0, y1, y2, x0, x1, x2, Int(r.palette[flatColor & 0xFFFF]))
+				r.fillTriangle(y0, y1, y2, x0, x1, x2, Int(r.pal[flatColor & 0xFFFF]))
 			} else {
 				r.fillGouraudTriangle(y0, y1, y2, x0, x1, x2, s.clipColor[0], s.clipColor[1], s.clipColor[2])
 			}
@@ -531,7 +545,7 @@ extension SoftwareModel {
 				r.fillTexturedAlphaTriangle(y0, y2, y3, x0, x2, x3, s.clipColor[0], s.clipColor[2], s.clipColor[3], s.projectX[tA], s.projectX[tB], s.projectX[tC], s.projectY[tA], s.projectY[tB], s.projectY[tC], s.projectZ[tA], s.projectZ[tB], s.projectZ[tC], textured)
 			}
 		} else if colorC == -1 {
-			let color = Int(r.palette[flatColor & 0xFFFF])
+			let color = Int(r.pal[flatColor & 0xFFFF])
 			r.fillTriangle(y0, y1, y2, x0, x1, x2, color)
 			r.fillTriangle(y0, y2, y3, x0, x2, x3, color)
 		} else {

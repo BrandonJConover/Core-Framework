@@ -29,9 +29,22 @@ public final class Rasteriser3D {
 	/// Buffer height in rows.
 	public let bufferHeight: Int32
 	/// rt4 `SoftwareRaster.pixels`: 0x00RRGGBB.
-	public var pixels: [Int32]
-	/// rt4 `Rasteriser.palette`: HSL16 -> 0xRRGGBB.
-	public var palette = [Int32](repeating: 0, count: 65536)
+	/// Backing store of `pixels`: raw memory so the scanline loops index without Array bounds, uniqueness
+	/// and exclusivity checks (the buffer never reallocates and lives as long as the rasteriser).
+	let px: UnsafeMutablePointer<Int32>
+	public let pixelCount: Int
+	/// Backing store of `palette`.
+	let pal: UnsafeMutablePointer<Int32>
+	/// The target buffer as an array (a copy; use `px` in hot code).
+	public var pixels: [Int32] {
+		get { Array(UnsafeBufferPointer(start: px, count: pixelCount)) }
+		set { for i in 0..<min(pixelCount, newValue.count) { px[i] = newValue[i] } }
+	}
+	/// rt4 `Rasteriser.palette`: HSL16 -> 0xRRGGBB (a copy of `pal`).
+	public var palette: [Int32] {
+		get { Array(UnsafeBufferPointer(start: pal, count: 65536)) }
+		set { for i in 0..<min(65536, newValue.count) { pal[i] = newValue[i] } }
+	}
 	/// rt4 `Rasteriser.offsets`: row start index for each viewport row.
 	var offsets = [Int32](repeating: 0, count: 1024)
 	/// rt4 `Rasteriser.textureProvider`.
@@ -67,10 +80,19 @@ public final class Rasteriser3D {
 	public init(width: Int, height: Int) {
 		stride = Int32(width)
 		bufferHeight = Int32(height)
-		pixels = [Int32](repeating: 0, count: width * height)
+		pixelCount = width * height
+		px = UnsafeMutablePointer<Int32>.allocate(capacity: max(1, width * height))
+		px.initialize(repeating: 0, count: max(1, width * height))
+		pal = UnsafeMutablePointer<Int32>.allocate(capacity: 65536)
+		pal.initialize(repeating: 0, count: 65536)
 		setClip(0, 0, width, height)
 		prepare()
 		setBrightness(0.8, jitter: false)
+	}
+
+	deinit {
+		px.deallocate()
+		pal.deallocate()
 	}
 
 	public func setClip(_ left: Int, _ top: Int, _ right: Int, _ bottom: Int) {
@@ -164,7 +186,7 @@ public final class Rasteriser3D {
 				let intR = Int32(r * 256.0), intG = Int32(g * 256.0), intB = Int32(b * 256.0)
 				var rgb = (intR &<< 16) &+ (intG &<< 8) &+ intB
 				if rgb == 0 { rgb = 1 }
-				palette[offset] = rgb
+				pal[offset] = rgb
 				offset += 1
 			}
 		}
@@ -174,13 +196,13 @@ public final class Rasteriser3D {
 
 	/// Fills the whole buffer with 0xRRGGBB.
 	public func clear(_ rgb: Int32 = 0) {
-		for i in 0..<pixels.count { pixels[i] = rgb }
+		px.update(repeating: rgb, count: pixelCount)
 	}
 
 	/// Loads a `Raster` (same size) into the buffer, dropping alpha.
 	public func load(from raster: Raster) {
-		let n = min(pixels.count, raster.pixels.count)
-		for i in 0..<n { pixels[i] = Int32(bitPattern: raster.pixels[i] & 0xFFFFFF) }
+		let n = min(pixelCount, raster.pixels.count)
+		for i in 0..<n { px[i] = Int32(bitPattern: raster.pixels[i] & 0xFFFFFF) }
 	}
 
 	/// Copies the buffer into `raster` at (x, y) as opaque pixels, honouring
@@ -193,7 +215,7 @@ public final class Rasteriser3D {
 			for sx in 0..<w {
 				let dx = x + sx
 				guard dx >= raster.clipLeft && dx < raster.clipRight else { continue }
-				raster.pixels[dy * raster.width + dx] = 0xFF00_0000 | UInt32(bitPattern: pixels[sy * w + sx])
+				raster.pixels[dy * raster.width + dx] = 0xFF00_0000 | UInt32(bitPattern: px[sy * w + sx])
 			}
 		}
 	}
@@ -231,6 +253,29 @@ public final class Rasteriser3D {
 	guard let texels = texelsOpt else { return }
 	lowDetail = tp.isLowDetail(Int(textureId))
 	opaque = tp.isOpaque(Int(textureId))
+	texels.withUnsafeBufferPointer { fillTexturedTriangleTail($0.baseAddress!, yA, yB, yC, xA, xB, xC, colorA, colorB, colorC, viewXA, viewXB, viewXC, viewYA, viewYB, viewYC, viewZA, viewZB, viewZC, textureId) }
+}
+
+	func fillTexturedTriangleTail(_ texels: UnsafePointer<Int32>, _ yA: Int32, _ yB: Int32, _ yC: Int32, _ xA: Int32, _ xB: Int32, _ xC: Int32, _ colorA: Int32, _ colorB: Int32, _ colorC: Int32, _ viewXA: Int32, _ viewXB: Int32, _ viewXC: Int32, _ viewYA: Int32, _ viewYB: Int32, _ viewYC: Int32, _ viewZA: Int32, _ viewZB: Int32, _ viewZC: Int32, _ textureId: Int32) {
+		var yA = yA
+		var yB = yB
+		var yC = yC
+		var xA = xA
+		var xB = xB
+		var xC = xC
+		var colorA = colorA
+		var colorB = colorB
+		var colorC = colorC
+		var viewXA = viewXA
+		var viewXB = viewXB
+		var viewXC = viewXC
+		var viewYA = viewYA
+		var viewYB = viewYB
+		var viewYC = viewYC
+		var viewZA = viewZA
+		var viewZB = viewZB
+		var viewZC = viewZC
+		var textureId = textureId
 	var dxAB: Int32 = xB &- xA
 	var dyAB: Int32 = yB &- yA
 	var dxAC: Int32 = xC &- xA
@@ -881,6 +926,29 @@ public final class Rasteriser3D {
 	guard let texels = texelsOpt else { return }
 	lowDetail = tp.isLowDetail(Int(textureId))
 	opaque = tp.isOpaque(Int(textureId))
+	texels.withUnsafeBufferPointer { fillTexturedAlphaTriangleTail($0.baseAddress!, yA, yB, yC, xA, xB, xC, colorA, colorB, colorC, viewXA, viewXB, viewXC, viewYA, viewYB, viewYC, viewZA, viewZB, viewZC, textureId) }
+}
+
+	func fillTexturedAlphaTriangleTail(_ texels: UnsafePointer<Int32>, _ yA: Int32, _ yB: Int32, _ yC: Int32, _ xA: Int32, _ xB: Int32, _ xC: Int32, _ colorA: Int32, _ colorB: Int32, _ colorC: Int32, _ viewXA: Int32, _ viewXB: Int32, _ viewXC: Int32, _ viewYA: Int32, _ viewYB: Int32, _ viewYC: Int32, _ viewZA: Int32, _ viewZB: Int32, _ viewZC: Int32, _ textureId: Int32) {
+		var yA = yA
+		var yB = yB
+		var yC = yC
+		var xA = xA
+		var xB = xB
+		var xC = xC
+		var colorA = colorA
+		var colorB = colorB
+		var colorC = colorC
+		var viewXA = viewXA
+		var viewXB = viewXB
+		var viewXC = viewXC
+		var viewYA = viewYA
+		var viewYB = viewYB
+		var viewYC = viewYC
+		var viewZA = viewZA
+		var viewZB = viewZB
+		var viewZC = viewZC
+		var textureId = textureId
 	var dxAB: Int32 = xB &- xA
 	var dyAB: Int32 = yB &- yA
 	var dxAC: Int32 = xC &- xA
@@ -1499,7 +1567,7 @@ public final class Rasteriser3D {
 
 	/// rt4 `Rasteriser.drawTexturedAlphaScanline`.
 
-	func drawTexturedAlphaScanline(_ texels: [Int32], _ offset: Int32, _ xA: Int32, _ xB: Int32, _ lightnessA: Int32, _ lightnessB: Int32, _ verticalA: Int32, _ verticalB: Int32, _ verticalC: Int32, _ horizontalA: Int32, _ horizontalB: Int32, _ horizontalC: Int32) {
+	func drawTexturedAlphaScanline(_ texels: UnsafePointer<Int32>, _ offset: Int32, _ xA: Int32, _ xB: Int32, _ lightnessA: Int32, _ lightnessB: Int32, _ verticalA: Int32, _ verticalB: Int32, _ verticalC: Int32, _ horizontalA: Int32, _ horizontalB: Int32, _ horizontalC: Int32) {
 		var offset = offset
 		var xA = xA
 		var xB = xB
@@ -1578,49 +1646,49 @@ public final class Rasteriser3D {
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t1 = Int(offset)
 						offset &+= 1
-						pixels[_t1] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t1] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t2 = Int(offset)
 						offset &+= 1
-						pixels[_t2] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t2] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t3 = Int(offset)
 						offset &+= 1
-						pixels[_t3] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t3] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t4 = Int(offset)
 						offset &+= 1
-						pixels[_t4] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t4] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t5 = Int(offset)
 						offset &+= 1
-						pixels[_t5] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t5] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t6 = Int(offset)
 						offset &+= 1
-						pixels[_t6] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t6] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t7 = Int(offset)
 						offset &+= 1
-						pixels[_t7] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t7] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t8 = Int(offset)
 						offset &+= 1
-						pixels[_t8] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t8] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 
 						uA = uB
 						vA = vB
@@ -1652,7 +1720,7 @@ public final class Rasteriser3D {
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t9 = Int(offset)
 						offset &+= 1
-						pixels[_t9] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t9] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 						length &-= 1
 					} while length > k(0)
@@ -1662,56 +1730,56 @@ public final class Rasteriser3D {
 					repeat {
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 
 						uv &+= uvStep
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 
@@ -1743,7 +1811,7 @@ public final class Rasteriser3D {
 					repeat {
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
@@ -1793,49 +1861,49 @@ public final class Rasteriser3D {
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t10 = Int(offset)
 					offset &+= 1
-					pixels[_t10] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t10] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t11 = Int(offset)
 					offset &+= 1
-					pixels[_t11] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t11] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t12 = Int(offset)
 					offset &+= 1
-					pixels[_t12] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t12] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t13 = Int(offset)
 					offset &+= 1
-					pixels[_t13] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t13] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t14 = Int(offset)
 					offset &+= 1
-					pixels[_t14] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t14] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t15 = Int(offset)
 					offset &+= 1
-					pixels[_t15] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t15] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t16 = Int(offset)
 					offset &+= 1
-					pixels[_t16] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t16] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t17 = Int(offset)
 					offset &+= 1
-					pixels[_t17] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t17] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 
 					uA = uB
 					vA = vB
@@ -1866,7 +1934,7 @@ public final class Rasteriser3D {
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t18 = Int(offset)
 					offset &+= 1
-					pixels[_t18] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t18] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 					length &-= 1
 				} while length > k(0)
@@ -1878,56 +1946,56 @@ public final class Rasteriser3D {
 			repeat {
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 
@@ -1962,7 +2030,7 @@ public final class Rasteriser3D {
 		repeat {
 			color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 			if color != k(0) {
-				pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+				px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 			}
 			offset &+= 1
 			uv &+= uvStep
@@ -1972,7 +2040,7 @@ public final class Rasteriser3D {
 
 	/// rt4 `Rasteriser.drawTexturedScanline`.
 
-	func drawTexturedScanline(_ texels: [Int32], _ offset: Int32, _ xA: Int32, _ xB: Int32, _ lightnessA: Int32, _ lightnessB: Int32, _ verticalA: Int32, _ verticalB: Int32, _ verticalC: Int32, _ horizontalA: Int32, _ horizontalB: Int32, _ horizontalC: Int32) {
+	func drawTexturedScanline(_ texels: UnsafePointer<Int32>, _ offset: Int32, _ xA: Int32, _ xB: Int32, _ lightnessA: Int32, _ lightnessB: Int32, _ verticalA: Int32, _ verticalB: Int32, _ verticalC: Int32, _ horizontalA: Int32, _ horizontalB: Int32, _ horizontalC: Int32) {
 		var offset = offset
 		var xA = xA
 		var xB = xB
@@ -2053,49 +2121,49 @@ public final class Rasteriser3D {
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t19 = Int(offset)
 						offset &+= 1
-						pixels[_t19] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t19] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t20 = Int(offset)
 						offset &+= 1
-						pixels[_t20] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t20] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t21 = Int(offset)
 						offset &+= 1
-						pixels[_t21] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t21] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t22 = Int(offset)
 						offset &+= 1
-						pixels[_t22] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t22] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t23 = Int(offset)
 						offset &+= 1
-						pixels[_t23] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t23] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t24 = Int(offset)
 						offset &+= 1
-						pixels[_t24] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t24] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t25 = Int(offset)
 						offset &+= 1
-						pixels[_t25] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t25] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t26 = Int(offset)
 						offset &+= 1
-						pixels[_t26] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t26] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 
 						lightnessA &+= lightnessB
@@ -2110,7 +2178,7 @@ public final class Rasteriser3D {
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						let _t27 = Int(offset)
 						offset &+= 1
-						pixels[_t27] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+						px[_t27] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						uv &+= uvStep
 						length &-= 1
 					} while length > k(0)
@@ -2120,56 +2188,56 @@ public final class Rasteriser3D {
 					repeat {
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
 
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 						uv &+= uvStep
@@ -2185,7 +2253,7 @@ public final class Rasteriser3D {
 					repeat {
 						color = texels[Int(((uv & k(0x3F80)) &+ ushr(uv, k(25))))]
 						if color != k(0) {
-							pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+							px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 						}
 						offset &+= 1
 
@@ -2235,49 +2303,49 @@ public final class Rasteriser3D {
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t28 = Int(offset)
 					offset &+= 1
-					pixels[_t28] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t28] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t29 = Int(offset)
 					offset &+= 1
-					pixels[_t29] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t29] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t30 = Int(offset)
 					offset &+= 1
-					pixels[_t30] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t30] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t31 = Int(offset)
 					offset &+= 1
-					pixels[_t31] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t31] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t32 = Int(offset)
 					offset &+= 1
-					pixels[_t32] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t32] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t33 = Int(offset)
 					offset &+= 1
-					pixels[_t33] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t33] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t34 = Int(offset)
 					offset &+= 1
-					pixels[_t34] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t34] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t35 = Int(offset)
 					offset &+= 1
-					pixels[_t35] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t35] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 
 					lightnessA &+= lightnessB
@@ -2292,7 +2360,7 @@ public final class Rasteriser3D {
 					color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 					let _t36 = Int(offset)
 					offset &+= 1
-					pixels[_t36] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[_t36] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 					uv &+= uvStep
 					length &-= 1
 				} while length > k(0)
@@ -2304,56 +2372,56 @@ public final class Rasteriser3D {
 			repeat {
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				offset &+= 1
 				uv &+= uvStep
 
 				color = texels[Int(((uv & k(0xFC0)) &+ ushr(uv, k(26))))]
 				if color != k(0) {
-					pixels[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+					px[Int(offset)] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 				}
 				uv &+= uvStep
 
@@ -2373,7 +2441,7 @@ public final class Rasteriser3D {
 			if color != k(0) {
 				let _t37 = Int(offset)
 				offset &+= 1
-				pixels[_t37] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
+				px[_t37] = (((((color & k(0xFF00FF)) &* lightness) & k(Int32(bitPattern: 0xFF00FF00))) &+ (((color & k(0xFF00)) &* lightness) & k(0xFF0000))) &>> k(8))
 			}
 
 			uv &+= uvStep
@@ -2895,7 +2963,7 @@ public final class Rasteriser3D {
 				repeat {
 					let _t38 = Int(offset)
 					offset &+= 1
-					pixels[_t38] = palette[Int((colorA &>> k(8)))]
+					px[_t38] = pal[Int((colorA &>> k(8)))]
 					colorA &+= colorStep
 					length &-= 1
 				} while length > k(0)
@@ -2904,15 +2972,15 @@ public final class Rasteriser3D {
 				invAlpha = (k(256) &- self.alpha)
 
 				repeat {
-					color = palette[Int((colorA &>> k(8)))]
+					color = pal[Int((colorA &>> k(8)))]
 
 					colorA &+= colorStep
 					color = (((((color & k(0xFF00FF)) &* invAlpha) &>> k(8)) & k(0xFF00FF)) &+ ((((color & k(0xFF00)) &* invAlpha) &>> k(8)) & k(0xFF00)))
 
-					srcColor = pixels[Int(offset)]
+					srcColor = px[Int(offset)]
 					let _t39 = Int(offset)
 					offset &+= 1
-					pixels[_t39] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+					px[_t39] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
 
 					length &-= 1
 				} while length > k(0)
@@ -2924,31 +2992,31 @@ public final class Rasteriser3D {
 			if self.alpha == k(0) {
 				if length > k(0) {
 					repeat {
-						color = palette[Int((colorA &>> k(8)))]
+						color = pal[Int((colorA &>> k(8)))]
 						colorA &+= colorStep
 						let _t40 = Int(offset)
 						offset &+= 1
-						pixels[_t40] = color
+						px[_t40] = color
 						let _t41 = Int(offset)
 						offset &+= 1
-						pixels[_t41] = color
+						px[_t41] = color
 						let _t42 = Int(offset)
 						offset &+= 1
-						pixels[_t42] = color
+						px[_t42] = color
 						let _t43 = Int(offset)
 						offset &+= 1
-						pixels[_t43] = color
+						px[_t43] = color
 						length &-= 1
 					} while length > k(0)
 				}
 
 				length = ((xB &- xA) & k(0x3))
 				if length > k(0) {
-					color = palette[Int((colorA &>> k(8)))]
+					color = pal[Int((colorA &>> k(8)))]
 					repeat {
 						let _t44 = Int(offset)
 						offset &+= 1
-						pixels[_t44] = color
+						px[_t44] = color
 						length &-= 1
 					} while length > k(0)
 				}
@@ -2957,30 +3025,30 @@ public final class Rasteriser3D {
 				invAlpha = (k(256) &- self.alpha)
 				if length > k(0) {
 					repeat {
-						color = palette[Int((colorA &>> k(8)))]
+						color = pal[Int((colorA &>> k(8)))]
 
 						colorA &+= colorStep
 						color = (((((color & k(0xFF00FF)) &* invAlpha) &>> k(8)) & k(0xFF00FF)) &+ ((((color & k(0xFF00)) &* invAlpha) &>> k(8)) & k(0xFF00)))
 
-						srcColor = pixels[Int(offset)]
+						srcColor = px[Int(offset)]
 						let _t45 = Int(offset)
 						offset &+= 1
-						pixels[_t45] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+						px[_t45] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
 
-						srcColor = pixels[Int(offset)]
+						srcColor = px[Int(offset)]
 						let _t46 = Int(offset)
 						offset &+= 1
-						pixels[_t46] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+						px[_t46] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
 
-						srcColor = pixels[Int(offset)]
+						srcColor = px[Int(offset)]
 						let _t47 = Int(offset)
 						offset &+= 1
-						pixels[_t47] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+						px[_t47] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
 
-						srcColor = pixels[Int(offset)]
+						srcColor = px[Int(offset)]
 						let _t48 = Int(offset)
 						offset &+= 1
-						pixels[_t48] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+						px[_t48] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
 
 						length &-= 1
 					} while length > k(0)
@@ -2991,13 +3059,13 @@ public final class Rasteriser3D {
 					return
 				}
 
-				color = palette[Int((colorA &>> k(8)))]
+				color = pal[Int((colorA &>> k(8)))]
 				color = (((((color & k(0xFF00FF)) &* invAlpha) &>> k(8)) & k(0xFF00FF)) &+ ((((color & k(0xFF00)) &* invAlpha) &>> k(8)) & k(0xFF00)))
 				repeat {
-					srcColor = pixels[Int(offset)]
+					srcColor = px[Int(offset)]
 					let _t49 = Int(offset)
 					offset &+= 1
-					pixels[_t49] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+					px[_t49] = ((color &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
 					length &-= 1
 				} while length > k(0)
 			}
@@ -3472,22 +3540,22 @@ public final class Rasteriser3D {
 						}
 						let _t50 = Int(offset)
 						offset &+= 1
-						pixels[_t50] = color
+						px[_t50] = color
 					}
 				}
 
 				let _t51 = Int(offset)
 				offset &+= 1
-				pixels[_t51] = color
+				px[_t51] = color
 				let _t52 = Int(offset)
 				offset &+= 1
-				pixels[_t52] = color
+				px[_t52] = color
 				let _t53 = Int(offset)
 				offset &+= 1
-				pixels[_t53] = color
+				px[_t53] = color
 				let _t54 = Int(offset)
 				offset &+= 1
-				pixels[_t54] = color
+				px[_t54] = color
 			}
 		} else if alpha == k(254) {
 			while true {
@@ -3501,22 +3569,22 @@ public final class Rasteriser3D {
 						}
 						let _t55 = Int(offset)
 						offset &+= 1
-						pixels[_t55] = pixels[Int(offset)]
+						px[_t55] = px[Int(offset)]
 					}
 				}
 
 				let _t56 = Int(offset)
 				offset &+= 1
-				pixels[_t56] = color
+				px[_t56] = color
 				let _t57 = Int(offset)
 				offset &+= 1
-				pixels[_t57] = color
+				px[_t57] = color
 				let _t58 = Int(offset)
 				offset &+= 1
-				pixels[_t58] = color
+				px[_t58] = color
 				let _t59 = Int(offset)
 				offset &+= 1
-				pixels[_t59] = color
+				px[_t59] = color
 			}
 		} else {
 			var alpha: Int32 = self.alpha
@@ -3535,29 +3603,29 @@ public final class Rasteriser3D {
 							return
 						}
 
-						srcColor = pixels[Int(offset)]
+						srcColor = px[Int(offset)]
 						let _t60 = Int(offset)
 						offset &+= 1
-						pixels[_t60] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+						px[_t60] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
 					}
 				}
 
-				srcColor = pixels[Int(offset)]
+				srcColor = px[Int(offset)]
 				let _t61 = Int(offset)
 				offset &+= 1
-				pixels[_t61] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
-				srcColor = pixels[Int(offset)]
+				px[_t61] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+				srcColor = px[Int(offset)]
 				let _t62 = Int(offset)
 				offset &+= 1
-				pixels[_t62] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
-				srcColor = pixels[Int(offset)]
+				px[_t62] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+				srcColor = px[Int(offset)]
 				let _t63 = Int(offset)
 				offset &+= 1
-				pixels[_t63] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
-				srcColor = pixels[Int(offset)]
+				px[_t63] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+				srcColor = px[Int(offset)]
 				let _t64 = Int(offset)
 				offset &+= 1
-				pixels[_t64] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
+				px[_t64] = ((sample &+ ((((srcColor & k(0xFF00FF)) &* alpha) &>> k(8)) & k(0xFF00FF))) &+ ((((srcColor & k(0xFF00)) &* alpha) &>> k(8)) & k(0xFF00)))
 			}
 		}
 	}

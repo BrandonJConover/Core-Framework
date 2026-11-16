@@ -137,11 +137,16 @@ public final class GameClient {
 
 	// MARK: frame
 
+	/// Draws one frame at `width` x `height` game pixels. rt4's resizable interface assumes a canvas of at
+	/// least 765x503; shells below that (phones) should pick a larger game size and scale the result down
+	/// (`App/Sources/GameView.swift` does: `scale = max(1, 503 / h, 765 / w)`) instead of asking for a smaller canvas.
 	public func frame(width: Int, height: Int) throws -> Raster {
 		lastSize = (width, height)
 		host.resize(width: width, height: height)
 		world.publicFilter = host.game.chatFilters.public
 		if let s = session {
+			// A live session builds each region's scene in the background (recorded events fed to `handle` do not).
+			world.asyncBuild = true
 			for e in s.poll() { handle(e) }
 		}
 		// One client cycle is 20 ms; always run at least one so scripts and

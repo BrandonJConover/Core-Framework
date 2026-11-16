@@ -93,6 +93,7 @@ public final class Scene {
 	var hideMask: [[[UInt8]]]?
 	var hideFromLevel = 0
 	var hideValue: UInt8 = 0
+	var roofBoxes: [RoofBox] = []
 
 	public init(store: ConfigStore, textures: TextureSource?, width: Int = 128, length: Int = 128, visibility: Int = 25) {
 		self.store = store
