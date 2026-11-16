@@ -5,6 +5,11 @@ public enum ClientMessage {
 	case keepAlive
 	/// `::command` from the chatbox (rt4 `Cheat`), without the leading "::".
 	case command(String)
+	/// Public chat (rt4 `ScriptRunner` 5008): `colour` 0...11, `effect` 0...5, `text` already
+	/// packed by `WordPack.encode` (length smart + huffman bytes).
+	case publicChat(colour: Int, effect: Int, text: [UInt8])
+	/// Private message (rt4 `ScriptRunner` 5009) to `name37`; `text` packed by `WordPack.encode`.
+	case privateMessage(name37: Int64, text: [UInt8])
 	/// Walk to a world tile. `path` is the client pathfinder's turn points
 	/// before `dest`, in walking order (world coords); empty lets the server
 	/// path to `dest` itself.
@@ -53,6 +58,17 @@ public enum ClientMessage {
 			op(ClientProt.clientCheat)
 			p.p1(Cp1252.encode(c).count + 1)
 			p.pjstr(c)
+		case let .publicChat(colour, effect, text):
+			op(ClientProt.publicChat)
+			p.p1(text.count + 2)
+			p.p1(colour)
+			p.p1(effect)
+			p.pdata(text)
+		case let .privateMessage(name37, text):
+			op(ClientProt.privateMessage)
+			p.p1(text.count + 8)
+			p.p8(name37)
+			p.pdata(text)
 		case let .ifButton(n, component, child):
 			op(Self.ifButtonOpcodes[min(max(n, 1), 10) - 1])
 			p.p4(component)

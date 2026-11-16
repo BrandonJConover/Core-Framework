@@ -14,7 +14,12 @@ public struct GameState {
 	public var chatFilters: (public: Int, private: Int, trade: Int) = (0, 0, 0)
 	/// Seconds until the server reboots (rt4 `Player.rebootTimer`, in ticks / 30).
 	public var rebootSeconds = 0
-	public var chat: [String] = []
+	/// Chat history, newest first (rt4 `Chat`); read by the chatbox scripts.
+	public var chatLog = ChatLog()
+	/// Base-37 names on the ignore list (rt4 `IgnoreList.encodedUsernames`).
+	public var ignored: Set<Int64> = []
+	/// Game messages as plain strings, oldest first (kept for callers that only want the text).
+	public var chat: [String] { chatLog.lines.reversed().filter { $0.type == 0 }.map(\.message) }
 	public var rebuild: RebuildNormal?
 	public var players: PlayerInfoDecoder?
 	public var npcs: NpcInfoDecoder?
@@ -47,9 +52,8 @@ public struct GameState {
 		case .updateStat(let s, let l, let xp): stats[s] = (l, xp)
 		case .runEnergy(let e): runEnergy = e
 		case .runWeight(let w): weight = w
-		case .gameMessage(let s):
-			chat.append(s)
-			if chat.count > 100 { chat.removeFirst(chat.count - 100) }
+		case .gameMessage(let s): chatLog.addGameMessage(s, ignored: ignored)
+		case .ignoreList(let names): ignored = Set(names)
 		case .invFull(_, let inv, let items):
 			var slots: [Int: ServerMessage.InvItem] = [:]
 			for (i, it) in items.enumerated() where it.id >= 0 { slots[i] = it }

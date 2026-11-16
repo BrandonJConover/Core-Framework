@@ -55,8 +55,10 @@ extension InterfaceScriptHost {
 		switch op.name {
 		// MARK: client actions
 		case "chatMessage":
-			game.chat.append(s.first ?? "")
+			game.chatLog.add(type: 0, name: "", message: s.first ?? "")
 			chatAt = transmitTimer
+		case "sayPublic": sayPublic(s.first ?? "")
+		case "sendPrivateMessage": sendPrivateMessage(to: s.first ?? "", text: s.count > 1 ? s[1] : "")
 		case "closeWidget": closeModals(); send(.closeModal)
 		case "sendIntegerInput": send(.resumeCount(Int32(s.first ?? "") ?? 0))
 		case "sendNameInput": send(.resumeName(s.first ?? ""))
@@ -97,16 +99,19 @@ extension InterfaceScriptHost {
 		case "friendIndexOf": return r(-1)
 
 		// MARK: chat
-		case "chatMessageCount": return r(game.chat.count)
-		case "chatMessageText":
-			let n = i(0)
-			return HostResult(strings: [n >= 0 && n < game.chat.count ? game.chat[game.chat.count - 1 - n] : ""])
-		case "chatMessageType": return r(0)
+		case "chatMessageCount": return r(game.chatLog.size)
+		case "chatMessageText": return HostResult(strings: [game.chatLog.line(i(0))?.message ?? ""])
+		case "chatMessageType": return r(game.chatLog.line(i(0))?.type ?? -1)
+		case "chatMessageName": return HostResult(strings: [game.chatLog.line(i(0))?.name ?? ""])
+		case "chatMessageClan": return HostResult(strings: [game.chatLog.line(i(0))?.clan ?? ""])
+		case "chatMessagePhrase": return r(game.chatLog.line(i(0))?.phraseId ?? -1)
 		case "publicChatFilter": return r(game.chatFilters.public)
 		case "privateChatFilter": return r(game.chatFilters.private)
 		case "tradeChatFilter": return r(game.chatFilters.trade)
 		case "setChatFilters": game.chatFilters = (i(0), i(1), i(2))
-		case "myName": return HostResult(strings: [""])
+		case "myName":
+			if let n = game.players?.players[game.players?.selfIndex ?? -1]?.appearance?.name37, n != 0 { return HostResult(strings: [WordPack.displayName(n)]) }
+			return HostResult(strings: [varcstr(32)])
 
 		// MARK: keyboard modifiers
 		case "isHoldingAlt", "isHoldingCtrl", "isHoldingShift": return r(0)

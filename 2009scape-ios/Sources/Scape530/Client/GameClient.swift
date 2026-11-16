@@ -65,6 +65,27 @@ public final class GameClient {
 		host.send = { [weak self] in self?.send($0) }
 		host.onDirectLogin = { [weak self] user, pass in self?.beginLogin(username: user, password: pass) }
 		host.log = { [weak self] in self?.log($0) }
+		bindWorld()
+	}
+
+	/// Wires the world's chat callbacks to the host's chat history (`Chat/`).
+	private func bindWorld() {
+		world.onPublicChat = { [weak self] e in
+			guard let self else { return }
+			self.host.game.chatLog.add(type: e.line.type, name: e.line.name, message: e.line.message, clan: e.line.clan, phraseId: e.line.phraseId)
+			self.host.chatAt = self.host.transmitTimer
+		}
+		world.isChatIgnored = { [weak self] name37, rights in
+			guard let self else { return false }
+			return rights <= 1 && self.chatRestricted(name37)
+		}
+	}
+
+	/// rt4 ignore rules for incoming chat from ordinary players: under-13 and quick-chat-only accounts
+	/// hear no typed chat, everyone else drops names on the ignore list.
+	func chatRestricted(_ name37: Int64) -> Bool {
+		if let a = host.game.account, (a.underage && !a.parentalChatConsent) || a.mapQuickChat { return true }
+		return host.game.ignored.contains(name37)
 	}
 
 	/// rt4 `InterfaceList.method1596`: the login interface becomes the top level
@@ -104,14 +125,22 @@ public final class GameClient {
 
 	public var state: GameState { host.game }
 
-	/// True while a text field has focus, so the shell shows a keyboard.
-	public var wantsKeyboard: Bool { focus != nil }
+	/// True while a text field has focus, or in game while the player asked to type into the chatbox
+	/// (tap the chat input, or `toggleKeyboard()`), so the shell shows a keyboard.
+	public var wantsKeyboard: Bool { focus != nil || (screen == .game && keyboardRequested) }
+
+	/// In-game typing: set when a tap lands on the chatbox, cleared by a tap on the world.
+	public var keyboardRequested = false
+
+	/// Shows or hides the keyboard in game (for a button in the shell).
+	public func toggleKeyboard() { keyboardRequested.toggle() }
 
 	// MARK: frame
 
 	public func frame(width: Int, height: Int) throws -> Raster {
 		lastSize = (width, height)
 		host.resize(width: width, height: height)
+		world.publicFilter = host.game.chatFilters.public
 		if let s = session {
 			for e in s.poll() { handle(e) }
 		}
@@ -178,11 +207,19 @@ public final class GameClient {
 
 	/// A tap in game pixels: press and release of the primary button.
 	public func tap(x: Int, y: Int) {
-		if inGame, worldTap(x: x, y: y) { return }
-		if host.tap(x: x, y: y) == nil, inGame, let c = ui.hitTest(x: x, y: y) {
+		if inGame, worldTap(x: x, y: y) { keyboardRequested = false; return }
+		let hit = inGame ? ui.hitTest(x: x, y: y) : nil
+		if host.tap(x: x, y: y) == nil, inGame, let c = hit {
 			log("tap on \(c.id >> 16):\(c.id & 0xFFFF) (\(c.ops.first ?? c.option ?? "no op"))")
 		}
+		if inGame { keyboardRequested = hit.map(takesTyping) ?? false }
 		host.cycle()
+	}
+
+	/// True for components that read typed keys: the chat input (rt4 interface 137 / its resizable
+	/// counterparts) or anything with an `onKey` hook.
+	func takesTyping(_ c: Component) -> Bool {
+		c.hooks["onKey"] != nil || (c.id >> 16) == 137
 	}
 
 	/// Pointer hover (mouse or Apple Pencil hover); drives onMouseOver/Leave.
@@ -251,6 +288,7 @@ public final class GameClient {
 		let (u, p) = (username, password)
 		host = InterfaceScriptHost(store: store)
 		world = WorldView(store: store)
+		keyboardRequested = false
 		viewport = nil
 		interaction.reset()
 		host.canvas = (lastSize.w > 0 ? lastSize.w : 765, lastSize.h > 0 ? lastSize.h : 503)
@@ -262,9 +300,34 @@ public final class GameClient {
 
 	public func send(_ m: ClientMessage) { session?.send(m) }
 
+	/// Private messages (rt4 `Protocol` MESSAGE_PRIVATE / MESSAGE_PRIVATE_ECHO): huffman-decoded into the chat history.
+	private func receiveChat(_ m: ServerMessage) {
+		switch m {
+		case let .privateMessage(name37, messageId, rights, text):
+			guard let codec = (try? WordPack.loadCodec(store)) ?? nil else { return }
+			if host.game.chatLog.hasSeen(messageId: messageId) { return }
+			if rights <= 1 && chatRestricted(name37) { return }
+			_ = host.game.chatLog.remember(messageId: messageId)
+			let message = WordPack.display(WordPack.decode(text, codec: codec))
+			let name = WordPack.displayName(name37)
+			if rights != 0 {
+				host.game.chatLog.add(type: 7, name: WordPack.chatIcon(rights: rights) + name, message: message)
+			} else {
+				host.game.chatLog.add(type: 3, name: name, message: message)
+			}
+			host.chatAt = host.transmitTimer
+		case let .privateMessageEcho(name37, text):
+			guard let codec = (try? WordPack.loadCodec(store)) ?? nil else { return }
+			host.game.chatLog.add(type: 6, name: WordPack.displayName(name37), message: WordPack.display(WordPack.decode(text, codec: codec)))
+			host.chatAt = host.transmitTimer
+		default:
+			break
+		}
+	}
+
 	func handle(_ e: GameSession.Event) {
 		world.handle(e, varps: host.game.varps)
-		if case .message(let m) = e { interaction.handle(m) }
+		if case .message(let m) = e { interaction.handle(m); receiveChat(m) }
 		switch e {
 		case .loggedIn:
 			host.apply(e)
