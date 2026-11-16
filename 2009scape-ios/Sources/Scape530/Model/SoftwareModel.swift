@@ -43,6 +43,8 @@ public final class SoftwareModel {
 	public var triangleSources: [Int16]?
 
 	var boundsValid = false
+	/// rt4 `aBoolean304`: set by colour transforms; cleared by re-lighting in `Anim`.
+	var needsRelight = false
 	public private(set) var minX = 0, maxX = 0, minY = 0, maxY = 0, minZ = 0, maxZ = 0
 	/// rt4 `lengthXZ` and `aShort35` (max radius incl. Y).
 	public private(set) var lengthXZ = 0, radius = 0
