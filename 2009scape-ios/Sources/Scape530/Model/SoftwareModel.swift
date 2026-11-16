@@ -42,7 +42,7 @@ public final class SoftwareModel {
 	public var vertexSources: [Int16]?
 	public var triangleSources: [Int16]?
 
-	private var boundsValid = false
+	var boundsValid = false
 	public private(set) var minX = 0, maxX = 0, minY = 0, maxY = 0, minZ = 0, maxZ = 0
 	/// rt4 `lengthXZ` and `aShort35` (max radius incl. Y).
 	public private(set) var lengthXZ = 0, radius = 0
