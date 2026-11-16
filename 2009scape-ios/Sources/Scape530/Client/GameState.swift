@@ -16,8 +16,17 @@ public struct GameState {
 	public var rebootSeconds = 0
 	/// Chat history, newest first (rt4 `Chat`); read by the chatbox scripts.
 	public var chatLog = ChatLog()
+	/// Friends, ignores and clan chat (rt4 `FriendsList`, `IgnoreList`, `ClanChat`).
+	public var social = SocialLists()
+	/// rt4 `Player.worldId`: used to sort same-world friends first.
+	public var ownWorld = 1
 	/// Base-37 names on the ignore list (rt4 `IgnoreList.encodedUsernames`).
-	public var ignored: Set<Int64> = []
+	public var ignored: Set<Int64> { Set(social.ignores) }
+	/// Our own base-37 name (rt4 `Player.name37`), from the appearance block once it has arrived.
+	public var selfName37: Int64 {
+		guard let p = players else { return 0 }
+		return p.players[p.selfIndex]?.appearance?.name37 ?? 0
+	}
 	/// Game messages as plain strings, oldest first (kept for callers that only want the text).
 	public var chat: [String] { chatLog.lines.reversed().filter { $0.type == 0 }.map(\.message) }
 	public var rebuild: RebuildNormal?
@@ -53,7 +62,15 @@ public struct GameState {
 		case .runEnergy(let e): runEnergy = e
 		case .runWeight(let w): weight = w
 		case .gameMessage(let s): chatLog.addGameMessage(s, ignored: ignored)
-		case .ignoreList(let names): ignored = Set(names)
+		case .ignoreList(let names): social.setIgnores(names)
+		case .friendlistLoaded(let state): social.friendsState = state
+		case let .updateFriend(name37, world, rank, worldName):
+			if let notice = social.updateFriend(rawName37: name37, world: world, rank: rank, worldName: worldName, ownWorld: ownWorld) {
+				chatLog.add(type: 5, name: "", message: notice)
+			}
+		case .joinClanChat(let j): social.joinClan(j, selfName37: selfName37)
+		case let .updateClan(name37, world, rank, worldName, removed):
+			social.updateClan(name37: name37, world: world, rank: rank, worldName: worldName, removed: removed, selfName37: selfName37)
 		case .invFull(_, let inv, let items):
 			var slots: [Int: ServerMessage.InvItem] = [:]
 			for (i, it) in items.enumerated() where it.id >= 0 { slots[i] = it }

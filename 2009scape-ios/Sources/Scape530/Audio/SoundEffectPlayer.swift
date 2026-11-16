@@ -21,10 +21,10 @@ public final class SoundEffectPlayer {
 	public static let capacity = 50
 	private static let ticksFrames = AudioConfig.sampleRate * 20 / 1000
 
-	private let archive: AudioArchive
-	private let lock = NSLock()
+	let archive: AudioArchive
+	let lock = NSLock()
 	private var queue: [Pending] = []
-	private let mixer = VoiceMixer()
+	let mixer = VoiceMixer()
 	private var cache: [Int: (PcmSound, Int)] = [:]
 	private var countdown = SoundEffectPlayer.ticksFrames
 	private var scratch: [Int32] = []
@@ -35,6 +35,9 @@ public final class SoundEffectPlayer {
 	public var effectVolume = 127
 	/// `Preferences.ambientSoundsVolume` 0...127 (0 = positional sounds off).
 	public var ambientVolume = 127
+
+	/// Looping ambient sounds around the player (rt4 `AreaSoundManager`).
+	public private(set) lazy var area = AreaSoundManager(effects: self)
 
 	public init(archives: AudioArchives) { archive = archives.synth }
 
@@ -179,6 +182,7 @@ public final class SoundEffectPlayer {
 		queue.removeAll()
 		mixer.removeAll()
 		lock.unlock()
+		area.dropVoices()
 	}
 }
 

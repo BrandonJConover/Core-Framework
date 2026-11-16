@@ -40,6 +40,12 @@ public enum ServerMessage: Equatable {
 	case friendlistLoaded(state: Int)
 	case updateFriend(name37: Int64, world: Int, rank: Int, worldName: String?)
 	case ignoreList([Int64])
+	/// JOIN_CLAN_CHAT: the channel we joined, or nil when the server cleared it (owner 0).
+	case joinClanChat(ClanChannelJoin?)
+	/// UPDATE_CLAN: one member joined, changed world or rank (`removed` false), or left (`removed` true).
+	case updateClan(name37: Int64, world: Int, rank: Int, worldName: String?, removed: Bool)
+	/// MESSAGE_CLANCHANNEL: a typed clan chat line (`text` is the huffman-packed body).
+	case clanMessage(name37: Int64, clan37: Int64, messageId: Int64, rights: Int, text: [UInt8])
 	case lastLoginInfo(ip: Int32)
 
 	// Interfaces
@@ -233,6 +239,37 @@ public enum ServerMessage: Equatable {
 			var names: [Int64] = []
 			while p.remaining >= 8 { names.append(try p.g8()) }
 			return .ignoreList(names)
+		case ServerProt.joinClanChat:
+			let owner = try p.g8()
+			if owner == 0 { return .joinClanChat(nil) }
+			let name = try p.g8()
+			let minKick = try p.g1b()
+			let size = try p.g1()
+			// rt4: a size of 255 changes only the header and leaves the member list alone.
+			if size == 255 { return .joinClanChat(ClanChannelJoin(owner37: owner, name37: name, minKick: minKick, members: nil)) }
+			var members: [ClanMember] = []
+			for _ in 0..<size {
+				let key = try p.g8()
+				let world = try p.g2()
+				let rank = try p.g1b()
+				members.append(ClanMember(name37: key, world: world, rank: rank, worldName: try p.gjstr()))
+			}
+			return .joinClanChat(ClanChannelJoin(owner37: owner, name37: name, minKick: minKick, members: members))
+		case ServerProt.updateClan:
+			let raw = try p.g8()
+			let world = try p.g2()
+			let rank = try p.g1b()
+			// rt4: the sign bit marks a removal, which carries no world name.
+			if raw < 0 { return .updateClan(name37: raw & Int64.max, world: world, rank: rank, worldName: nil, removed: true) }
+			return .updateClan(name37: raw, world: world, rank: rank, worldName: try p.gjstr(), removed: false)
+		case ServerProt.messageClanchannel:
+			let name = try p.g8()
+			_ = try p.g1b()
+			let clan = try p.g8()
+			let top = try p.g2()
+			let bot = try p.g3()
+			let rights = try p.g1()
+			return .clanMessage(name37: name, clan37: clan, messageId: Int64(bot) + (Int64(top) << 32), rights: rights, text: try p.gdata(p.remaining))
 		case ServerProt.lastLoginInfo:
 			return .lastLoginInfo(ip: try p.img4())
 

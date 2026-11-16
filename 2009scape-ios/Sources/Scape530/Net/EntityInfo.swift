@@ -75,6 +75,8 @@ public struct PlayerAppearance: Equatable {
 	public var skillTotal: Int
 	public var combatRange: Int
 	public var soundRadius: Int
+	/// Ambient sound ids [idle, crawl, walk, run] (rt4 `Player.anInt1648/1658/1654/1670`); -1 when none.
+	public var sounds: [Int] = [-1, -1, -1, -1]
 
 	public init(_ bytes: [UInt8]) throws {
 		var p = Packet(bytes)
@@ -115,7 +117,8 @@ public struct PlayerAppearance: Equatable {
 		}
 		soundRadius = try p.g1()
 		if soundRadius != 0 {
-			p.offset += 8 // four area-sound ids
+			// rt4 reads them in the order idle, crawl, walk, run.
+			sounds = try (0..<4).map { _ in try p.g2() }
 		}
 	}
 
@@ -201,6 +204,20 @@ public struct PlayerInfoDecoder {
 		}
 	}
 
+	/// rt4 `PlayerList.self.teleport(x, jump, z)` plus `Player.plane`: puts the local player at a
+	/// scene-local tile. Used by PLAYER_INFO's teleport block and by TELEPORT_LOCAL_PLAYER.
+	public mutating func teleportSelf(x: Int, z: Int, plane: Int, jump: Bool) {
+		self.plane = plane
+		guard var me = players[selfIndex] else { return }
+		me.x = x
+		me.z = z
+		me.lastStep = []
+		me.lastSpeed = []
+		me.jump = jump
+		me.posSerial += 1
+		players[selfIndex] = me
+	}
+
 	public mutating func decode(_ payload: [UInt8]) throws -> Result {
 		var r = Result()
 		var extended: [Int] = []
@@ -229,12 +246,7 @@ public struct PlayerInfoDecoder {
 				plane = try bc.bits(2)
 				if try bc.bits(1) == 1 { extended.append(selfIndex) }
 				let x = try bc.bits(7)
-				players[selfIndex]!.x = x
-				players[selfIndex]!.z = z
-				players[selfIndex]!.lastStep = []
-				players[selfIndex]!.lastSpeed = []
-				players[selfIndex]!.jump = jump
-				players[selfIndex]!.posSerial += 1
+				teleportSelf(x: x, z: z, plane: plane, jump: jump)
 			}
 		}
 

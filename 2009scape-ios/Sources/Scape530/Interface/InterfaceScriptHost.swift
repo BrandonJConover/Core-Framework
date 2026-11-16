@@ -54,7 +54,7 @@ public final class InterfaceScriptHost: ScriptHost {
 	var slotEvents: [Int: [(start: Int, end: Int, mask: Int32)]] = [:]
 	var keyQueue: [(code: Int, char: Int)] = []
 	/// rt4 `Chat.transmitAt` and friends: the transmit timer value of the last change.
-	var chatAt = 0, friendAt = 0, miscAt = 0
+	var chatAt = 0, friendAt = 0, clanAt = 0, miscAt = 0
 	var hovering: Set<ComponentRef> = []
 	var pointer: (x: Int, y: Int)?
 	/// Children per interface: `[interface: [parent id: [component index]]]`.
@@ -163,7 +163,12 @@ public final class InterfaceScriptHost: ScriptHost {
 			mutate(ref) { $0.modelSeqId = seq }
 		case let .runClientScript(id, args): runScript(id, args)
 		case .gameMessage: game.apply(m); chatAt = transmitTimer
-		case .friendlistLoaded, .updateFriend, .ignoreList: game.apply(m); friendAt = transmitTimer
+		case .friendlistLoaded, .updateFriend, .ignoreList:
+			game.ownWorld = Int(worldId)
+			game.apply(m)
+			friendAt = transmitTimer
+			if case .updateFriend = m { chatAt = transmitTimer }
+		case .joinClanChat, .updateClan: game.apply(m); clanAt = transmitTimer
 		case .rebootTimer: game.apply(m); miscAt = transmitTimer
 		case .varp(let id, let v): setVarp(id, v)
 		case let .varbit(id, v): writeVarbit(id, v)

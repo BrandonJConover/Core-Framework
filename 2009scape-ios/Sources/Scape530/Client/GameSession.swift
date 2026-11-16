@@ -73,36 +73,10 @@ public final class GameSession {
 		post(.loggedIn(session.account))
 		var framer = GamePacketFramer(cipher: session.inCipher)
 		var out = session.outCipher
-		var players = PlayerInfoDecoder(selfIndex: session.account.selfId, localX: 52, localZ: 52)
-		var npcs = NpcInfoDecoder()
-		var zone: (x: Int, z: Int)?
+		var pipeline = Pipeline(selfId: session.account.selfId)
 
 		func handle(_ pkt: GamePacket) {
-			do {
-				switch pkt.opcode {
-				case ServerProt.playerInfo:
-					let r = try players.decode(pkt.payload)
-					post(.players(r, players))
-				case ServerProt.npcInfo:
-					guard let me = players.players[players.selfIndex] else { return }
-					let r = try npcs.decode(pkt.payload, selfX: me.x, selfZ: me.z)
-					post(.npcs(r, npcs))
-				default:
-					let m = try ServerMessage.decode(pkt)
-					if case .rebuildNormal(let r) = m {
-						if let z = zone {
-							players.rebase(dx: (r.zoneX - z.x) * 8, dz: (r.zoneZ - z.z) * 8)
-							npcs.rebase(dx: (r.zoneX - z.x) * 8, dz: (r.zoneZ - z.z) * 8)
-						} else {
-							players = PlayerInfoDecoder(selfIndex: session.account.selfId, localX: r.localX, localZ: r.localZ)
-						}
-						zone = (r.zoneX, r.zoneZ)
-					}
-					post(.message(m))
-				}
-			} catch {
-				post(.decodeFailed(opcode: pkt.opcode, error: "\(error)"))
-			}
+			for e in pipeline.handle(pkt) { post(e) }
 		}
 
 		handle(GamePacket(opcode: session.account.firstOpcode, payload: session.firstPacket))
@@ -141,5 +115,56 @@ public final class GameSession {
 		}
 		session.socket.close()
 		post(.disconnected(nil))
+	}
+
+	/// The decoding half of the network thread, separated so tests can feed it packets: it owns the
+	/// stateful PLAYER_INFO / NPC_INFO decoders and keeps them aligned with map rebuilds and teleports.
+	public struct Pipeline {
+		public private(set) var players: PlayerInfoDecoder
+		public private(set) var npcs = NpcInfoDecoder()
+		private var zone: (x: Int, z: Int)?
+		private let selfId: Int
+
+		public init(selfId: Int) {
+			self.selfId = selfId
+			players = PlayerInfoDecoder(selfIndex: selfId, localX: 52, localZ: 52)
+		}
+
+		/// Decodes one packet into the events the UI thread should see.
+		public mutating func handle(_ pkt: GamePacket) -> [Event] {
+			do {
+				switch pkt.opcode {
+				case ServerProt.playerInfo:
+					let r = try players.decode(pkt.payload)
+					return [.players(r, players)]
+				case ServerProt.npcInfo:
+					guard let me = players.players[players.selfIndex] else { return [] }
+					let r = try npcs.decode(pkt.payload, selfX: me.x, selfZ: me.z)
+					return [.npcs(r, npcs)]
+				default:
+					let m = try ServerMessage.decode(pkt)
+					switch m {
+					case .rebuildNormal(let r):
+						if let z = zone {
+							players.rebase(dx: (r.zoneX - z.x) * 8, dz: (r.zoneZ - z.z) * 8)
+							npcs.rebase(dx: (r.zoneX - z.x) * 8, dz: (r.zoneZ - z.z) * 8)
+						} else {
+							players = PlayerInfoDecoder(selfIndex: selfId, localX: r.localX, localZ: r.localZ)
+						}
+						zone = (r.zoneX, r.zoneZ)
+					case let .teleportLocalPlayer(x, z, plane, jump):
+						// rt4 `Protocol` TELEPORT_LOCAL_PLAYER: `Player.plane = flags >> 1; self.teleport(x, jump, z)`.
+						// The world view follows the decoder, so republish it right after the message.
+						players.teleportSelf(x: x, z: z, plane: plane, jump: jump)
+						return [.message(m), .players(PlayerInfoDecoder.Result(), players)]
+					default:
+						break
+					}
+					return [.message(m)]
+				}
+			} catch {
+				return [.decodeFailed(opcode: pkt.opcode, error: "\(error)")]
+			}
+		}
 	}
 }

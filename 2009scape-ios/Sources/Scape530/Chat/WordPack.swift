@@ -91,6 +91,11 @@ public enum WordPack {
 	/// rt4 `Base37.decode37(..).toTitleCase()`: underscores become spaces, each word capitalised.
 	public static func displayName(_ name37: Int64) -> String {
 		guard let n = Base37.decode(name37) else { return "" }
+		return titleCase(n)
+	}
+
+	/// rt4 `JagString.toTitleCase` on a decoded (lowercase, underscored) name.
+	public static func titleCase(_ n: String) -> String {
 		var out = "", capNext = true
 		for ch in n {
 			if ch == "_" { out.append(" "); capNext = true; continue }

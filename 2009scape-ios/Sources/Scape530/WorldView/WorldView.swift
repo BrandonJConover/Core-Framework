@@ -49,6 +49,10 @@ public final class WorldView {
 	public private(set) var buildErrors: [String] = []
 	/// Called with each placed loc (collision flagging hooks in here).
 	public var onLocPlaced: ((LocPlacement) -> Void)?
+	/// A loc was removed by a zone update (rt4 `SceneGraph.removeLoc`): its type and scene tile / level.
+	public var onLocRemoved: ((_ loc: LocType, _ x: Int, _ z: Int, _ level: Int) -> Void)?
+	/// A finished scene build is about to replace the old scene; `onLocPlaced` replays its locs next.
+	public var onSceneAdopted: (() -> Void)?
 	/// Social state fed by `GameClient` (see `WorldView+Social` / `WorldView+Overlay`).
 	/// Public chat decoded from player info, for the chat history.
 	public var onPublicChat: ((PublicChatEvent) -> Void)?
@@ -361,6 +365,7 @@ public final class WorldView {
 			builtPlane = b.plane
 			buildCount += 1
 			placer?.onPlaced = { [weak self] p in self?.onLocPlaced?(p) }
+			onSceneAdopted?()
 			for p in b.placements { onLocPlaced?(p) }
 			if let img = b.minimapImage {
 				minimap.image = img

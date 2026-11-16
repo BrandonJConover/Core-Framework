@@ -214,7 +214,7 @@ extension GameClient {
 
 	/// The hint line ("Use Item ->", "Cast Spell ->") drawn at the top left while in target mode.
 	func drawTargetHint(into r: inout Raster) throws {
-		guard let t = interaction.target, interaction.popup == nil, let font = try store.font(named: "b12_full") else { return }
+		guard let t = interaction.target, interaction.popup == nil, interaction.preview == nil, let font = try store.font(named: "b12_full") else { return }
 		font.drawLeft(t.hint, x: 4, y: 15, color: 0xFFFFFF, shadow: 0, into: &r)
 	}
 
