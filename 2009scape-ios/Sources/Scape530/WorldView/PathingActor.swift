@@ -574,6 +574,7 @@ final class PathingActor: SceneEntity {
 	func render(_ r: Rasteriser3D, yaw orientation: Int, sinPitch: Int, cosPitch: Int, sinYaw: Int, cosYaw: Int, x: Int, y: Int, z: Int, key: Int64) {
 		guard let m = buildModel() else { return }
 		minY = m.getMinY()
+		m.pickable = true // rt4 `Player.render` / `Npc.render`
 		m.render(r, yaw: orientation, sinPitch: sinPitch, cosPitch: cosPitch, sinYaw: sinYaw, cosYaw: cosYaw, x: x, y: y, z: z, key: key)
 	}
 }

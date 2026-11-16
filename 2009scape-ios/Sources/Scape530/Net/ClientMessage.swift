@@ -19,6 +19,22 @@ public enum ClientMessage {
 	case ifContinue(component: Int, child: Int)
 	/// CLOSE_MODAL (rt4 `ClientProt.closeWidget`).
 	case closeModal
+	/// Opcode 77: walk toward an interaction target; same layout as `walk` (rt4 `method3502` with argument 2).
+	case walkInteract(destX: Int, destZ: Int, path: [(x: Int, z: Int)] = [], ctrlRun: Bool = false)
+	/// OPNPC1...5 (`option` 1...5) on npc index `index` (rt4 `MiniMenu` actions 17, 16, 4, 19, 2).
+	case opNpc(option: Int, index: Int)
+	/// Examine an npc by its (resolved) type id (rt4 action 1007).
+	case examineNpc(typeId: Int)
+	/// A player option: `action` is the `MiniMenu` code (30 option 1, 6, 31 follow, 29 trade, 10, 44, 37, 57).
+	case opPlayer(action: Int, index: Int)
+	/// OPLOC1...5 on loc `id` at world tile (`x`, `z`).
+	case opLoc(option: Int, id: Int, x: Int, z: Int)
+	/// Examine a loc by type id (rt4 action 1004).
+	case examineLoc(id: Int)
+	/// OPOBJ1...5 on ground item `id` at world tile (`x`, `z`).
+	case opObj(option: Int, id: Int, x: Int, z: Int)
+	/// Examine a ground item by type id (rt4 action 1002).
+	case examineObj(id: Int)
 	/// RESUME_P_COUNTDIALOG / RESUME_P_NAMEDIALOG / RESUME_P_STRINGDIALOG.
 	case resumeCount(Int32)
 	case resumeName(String)
@@ -62,6 +78,65 @@ public enum ClientMessage {
 			op(ClientProt.resumePStringdialog)
 			p.p1(Cp1252.encode(s).count + 1)
 			p.pjstr(s)
+		case let .walkInteract(destX, destZ, path, ctrlRun):
+			let points = Array((path.map { ($0.x, $0.z) } + [(destX, destZ)]).prefix(25))
+			op(ClientProt.moveInteract)
+			p.p1(points.count * 2 + 3)
+			p.p1add(ctrlRun ? 1 : 0)
+			let (fx, fz) = points[0]
+			p.p2(fx)
+			p.p2add(fz)
+			for (x, z) in points.dropFirst() {
+				p.p1add(x - fx)
+				p.p1sub(z - fz)
+			}
+		case let .opNpc(option, index):
+			// rt4 `MiniMenu.doAction` NPC_ACTION_1...5.
+			op(ClientProt.opNpc[min(max(option, 1), 5) - 1])
+			switch option {
+			case 2: p.ip2add(index)
+			case 3: p.p2add(index)
+			case 4: p.p2(index)
+			default: p.ip2(index)
+			}
+		case .examineNpc(let typeId):
+			op(ClientProt.examineNpc)
+			p.p2(typeId)
+		case let .opPlayer(action, index):
+			switch action {
+			case 30: op(68); p.ip2add(index)
+			case 31: op(71); p.ip2add(index)
+			case 29: op(180); p.ip2add(index)
+			case 37: op(114); p.ip2add(index)
+			case 57: op(175); p.p2add(index)
+			case 44: op(133); p.ip2(index)
+			case 6: op(106); p.p2(index)
+			default: op(4); p.ip2(index) // action 10
+			}
+		case let .opLoc(option, id, x, z):
+			op(ClientProt.opLoc[min(max(option, 1), 5) - 1])
+			switch option {
+			case 1: p.ip2(x); p.p2add(id); p.p2(z)
+			case 2: p.ip2add(z); p.ip2(x); p.p2(id)
+			case 3: p.ip2add(id); p.ip2add(z); p.ip2(x)
+			case 4: p.ip2(z); p.ip2add(x); p.p2(id)
+			default: p.ip2add(id); p.ip2add(x); p.ip2add(z)
+			}
+		case .examineLoc(let id):
+			op(ClientProt.examineLoc)
+			p.ip2add(id)
+		case let .opObj(option, id, x, z):
+			op(ClientProt.opObj[min(max(option, 1), 5) - 1])
+			switch option {
+			case 1: p.p2(id); p.ip2(x); p.ip2add(z)
+			case 2: p.ip2(z); p.p2(x); p.ip2add(id)
+			case 3: p.ip2(x); p.p2(id); p.ip2add(z)
+			case 4: p.p2(id); p.p2(x); p.ip2(z)
+			default: p.p2add(x); p.ip2add(id); p.ip2(z)
+			}
+		case .examineObj(let id):
+			op(ClientProt.examineObj)
+			p.ip2add(id)
 		case let .walk(destX, destZ, path, ctrlRun, minimap):
 			// rt4 (`ClientProt` walk sender) sends the first waypoint as an
 			// absolute tile, then the following ones as offsets from it

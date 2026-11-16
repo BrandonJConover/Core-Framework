@@ -30,6 +30,8 @@ public final class GameClient {
 	/// The 3D viewport component's rectangle from the last frame (rt4 `Component.clientCode == 1337`).
 	public private(set) var viewport: (x: Int, y: Int, w: Int, h: Int)?
 	public private(set) var lastSize = (w: 0, h: 0)
+	/// Touch interaction with the world: open menu, click cross, player options.
+	public let interaction = WorldInteraction()
 	private var inGame = false
 	private var lastCycleAt: Date?
 	/// Called when a tap lands on something the client cannot handle yet.
@@ -120,7 +122,7 @@ public final class GameClient {
 		lastCycleAt = lastCycleAt.map { $0.addingTimeInterval(Double(cycles) * 0.02) } ?? now
 		for _ in 0..<cycles {
 			host.cycle()
-			if inGame { world.cycle(varps: host.game.varps) }
+			if inGame { world.cycle(varps: host.game.varps); interaction.cycle() }
 		}
 		var r = Raster(width: width, height: height)
 		let top = host.game.interfaces.top
@@ -137,6 +139,7 @@ public final class GameClient {
 			r = Raster(width: width, height: height)
 		}
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
+		if inGame { try drawInteraction(into: &r) }
 		if inGame, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
 			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 16, color: 0xFFFF00, shadow: 0, into: &r)
 		}
@@ -167,7 +170,7 @@ public final class GameClient {
 	/// True when a drag starting at (x, y) belongs to the camera: inside the world viewport and not
 	/// on an interactive interface component.
 	public func isOverWorld(x: Int, y: Int) -> Bool {
-		guard inGame, let v = viewport else { return false }
+		guard inGame, !interaction.isMenuOpen, let v = viewport else { return false }
 		return x >= v.x && y >= v.y && x < v.x + v.w && y < v.y + v.h && ui.hitTest(x: x, y: y) == nil
 	}
 
@@ -175,6 +178,7 @@ public final class GameClient {
 
 	/// A tap in game pixels: press and release of the primary button.
 	public func tap(x: Int, y: Int) {
+		if inGame, worldTap(x: x, y: y) { return }
 		if host.tap(x: x, y: y) == nil, inGame, let c = ui.hitTest(x: x, y: y) {
 			log("tap on \(c.id >> 16):\(c.id & 0xFFFF) (\(c.ops.first ?? c.option ?? "no op"))")
 		}
@@ -182,7 +186,10 @@ public final class GameClient {
 	}
 
 	/// Pointer hover (mouse or Apple Pencil hover); drives onMouseOver/Leave.
-	public func hover(x: Int, y: Int) { host.pointerMoved(x: x, y: y) }
+	public func hover(x: Int, y: Int) {
+		interaction.pointer = (x, y)
+		host.pointerMoved(x: x, y: y)
+	}
 
 	/// Typed characters, one client cycle each so the scripts see them in
 	/// order. rt4 queues printable keys as (code -1, char) and Enter as code 84.
@@ -245,6 +252,7 @@ public final class GameClient {
 		host = InterfaceScriptHost(store: store)
 		world = WorldView(store: store)
 		viewport = nil
+		interaction.reset()
 		host.canvas = (lastSize.w > 0 ? lastSize.w : 765, lastSize.h > 0 ? lastSize.h : 503)
 		bindHost()
 		openLoginScreen()
@@ -256,6 +264,7 @@ public final class GameClient {
 
 	func handle(_ e: GameSession.Event) {
 		world.handle(e, varps: host.game.varps)
+		if case .message(let m) = e { interaction.handle(m) }
 		switch e {
 		case .loggedIn:
 			host.apply(e)

@@ -37,6 +37,18 @@ public final class WorldView {
 	/// Incremented every time the scene is rebuilt.
 	public private(set) var buildCount = 0
 
+	/// Collision maps for the four levels of the current scene (rt4 `PathFinder.collisionMaps`),
+	/// built with every scene rebuild and updated by loc add/delete packets.
+	public internal(set) var collision: [CollisionMap] = []
+	/// Kept after a build so loc changes can be placed into the live scene.
+	var placer: LocPlacer?
+	/// The zone the following zone-update packets apply to, in scene tiles (rt4 `SceneGraph.currentChunkX/Z`).
+	var chunk = (x: 0, z: 0)
+	/// Ground items per `level << 16 | x << 8 | z`, oldest first (rt4 `SceneGraph.objStacks`).
+	public internal(set) var objStacks: [Int: [GroundObj]] = [:]
+	/// The moving click flag on the minimap (scene tile), set when a walk is sent (rt4 `LoginManager.mapFlagX/Z`).
+	public var destinationFlag: (x: Int, z: Int)?
+
 	public init(store: ConfigStore) {
 		self.store = store
 		ctx = WorldContext(store: store, models: ActorModels(store: store))
@@ -63,6 +75,8 @@ public final class WorldView {
 			selfIndex = a.selfId
 		case .message(.rebuildNormal(let r)):
 			applyRebuild(r)
+		case .message(let m):
+			applyZone(m)
 		case .players(let result, let decoder):
 			env.varps = varps
 			applyPlayers(result, decoder)
@@ -89,6 +103,10 @@ public final class WorldView {
 		consumedNpc = [:]
 		npcBase = [:]
 		camera = WorldCamera()
+		collision = []
+		placer = nil
+		objStacks = [:]
+		destinationFlag = nil
 	}
 
 	/// rt4 `LoginManager` region change: the scene is rebuilt around the new zone, actors keep their
@@ -107,6 +125,8 @@ public final class WorldView {
 		rebuild = r
 		plane = r.plane
 		needsBuild = true
+		objStacks = [:]
+		destinationFlag = nil
 	}
 
 	private func shift(_ a: PathingActor, _ dx: Int, _ dz: Int) {
@@ -199,6 +219,8 @@ public final class WorldView {
 		for (id, a) in ctx.players { a.cycle(isSelf: id == selfIndex) }
 		for a in ctx.npcs.values { a.cycle(isSelf: false) }
 		if let me = selfActor { camera.follow(playerXFine: me.xFine, playerZFine: me.zFine) }
+		// rt4 clears the minimap flag once the player stands on it.
+		if let f = destinationFlag, let t = selfSceneTile, t.x == f.x, t.z == f.z { destinationFlag = nil }
 	}
 
 	// MARK: scene build (rt4 LoginManager.rebuildMap + method743 / readLocs)
@@ -216,16 +238,25 @@ public final class WorldView {
 			let s = Scene(store: store, textures: ts, width: 104, length: 104)
 			let baseX = (r.zoneX - 6) * 8, baseZ = (r.zoneZ - 6) * 8
 			var squares: [MapSquare] = []
-			for region in r.regions {
-				if let sq = try store.mapSquare(x: region.x, z: region.z) { squares.append(sq) }
+			var collisionSquares: [CollisionBuilder.Square] = []
+			var regionLocs: [[MapLoc]] = []
+			for (i, region) in r.regions.enumerated() {
+				let sq = try store.mapSquare(x: region.x, z: region.z)
+				if let sq = sq { squares.append(sq) }
+				let key = i < r.xteaKeys.count ? r.xteaKeys[i] : [0, 0, 0, 0]
+				let locs = (try? store.mapLocs(x: region.x, z: region.z, key: key)) ?? nil
+				regionLocs.append(locs ?? [])
+				if let sq = sq { collisionSquares.append(CollisionBuilder.Square(terrain: sq, locs: locs ?? [])) }
 			}
+			collision = (try? CollisionBuilder.build(baseX: baseX, baseZ: baseZ, squares: collisionSquares, locType: { try self.store.loc($0) }))
+				?? (0..<4).map { _ in CollisionMap(width: 104, length: 104) }
 			let placer = LocPlacer(scene: s, store: store, builder: builder, env: env)
 			placer.onPlaced = { [weak self] p in self?.onLocPlaced?(p) }
+			self.placer = placer
 			var failures = 0
 			try s.loadMapSquares(squares, baseTileX: baseX, baseTileZ: baseZ, centralPlane: plane) { scene in
 				for (i, region) in r.regions.enumerated() {
-					let key = i < r.xteaKeys.count ? r.xteaKeys[i] : [0, 0, 0, 0]
-					guard let locs = try? self.store.mapLocs(x: region.x, z: region.z, key: key) else { continue }
+					let locs = regionLocs[i]
 					for loc in locs {
 						let tx = region.x * 64 + loc.x - baseX, tz = region.z * 64 + loc.z - baseZ
 						guard tx > 0 && tz > 0 && tx < 103 && tz < 103 else { continue }
@@ -250,8 +281,16 @@ public final class WorldView {
 	/// Draws the world into `raster` inside `rect` (game pixels). Returns false when there is nothing to draw yet.
 	@discardableResult
 	public func draw(into raster: inout Raster, rect: (x: Int, y: Int, w: Int, h: Int)) -> Bool {
+		guard let r3 = renderScene(rect: rect, pick: nil) else { return false }
+		r3.copy(into: &raster, x: rect.x, y: rect.y)
+		return true
+	}
+
+	/// Renders the scene into the 3D buffer; with `pick` set, also runs rt4's mouse picking at that
+	/// point (game pixels) and leaves the result in `ScenePicker.shared`. Nil when there is nothing to draw yet.
+	func renderScene(rect: (x: Int, y: Int, w: Int, h: Int), pick: (x: Int, y: Int)?) -> Rasteriser3D? {
 		if needsBuild || (scene != nil && builtPlane != plane && rebuild != nil) { buildScene() }
-		guard let scene = scene, let me = selfActor, rect.w > 0, rect.h > 0 else { return false }
+		guard let scene = scene, let me = selfActor, rect.w > 0, rect.h > 0 else { return nil }
 
 		// The 3D buffer matches the viewport; textures and brightness are set once per buffer.
 		if raster3D == nil || Int(raster3D!.stride) != rect.w || Int(raster3D!.bufferHeight) != rect.h {
@@ -260,10 +299,25 @@ public final class WorldView {
 			r3.setBrightness(0.8, jitter: false)
 			raster3D = r3
 		}
-		guard let r3 = raster3D else { return false }
+		guard let r3 = raster3D else { return nil }
 		r3.setClip(0, 0, rect.w, rect.h)
 		r3.prepare()
 		r3.clear(0)
+
+		// rt4 `ScriptRunner.method4326`: picking is armed only while the mouse is inside the viewport.
+		let picker = ScenePicker.shared
+		picker.reset()
+		if let p = pick {
+			picker.allowInput = true
+			picker.mouseX = p.x - rect.x - Int(r3.centerX)
+			picker.mouseY = p.y - rect.y - Int(r3.centerY)
+			picker.tileRequested = true
+			picker.tileMaxLevel = plane
+		} else {
+			picker.allowInput = false
+			picker.tileRequested = false
+		}
+		defer { picker.allowInput = false; picker.tileRequested = false }
 
 		// Temporary entities of the last frame go, this frame's actors come in (rt4 method3711 / method3240).
 		for s in scene.sceneryList { scene.removeScenery(s) }
@@ -281,7 +335,6 @@ public final class WorldView {
 		let eye = camera.eye(groundY: groundY)
 		scene.draw(into: r3, cameraX: eye.x, cameraY: eye.y, cameraZ: eye.z, pitch: eye.pitch, yaw: eye.yaw, plane: level,
 		           playerTile: (me.xFine >> 7, me.zFine >> 7))
-		r3.copy(into: &raster, x: rect.x, y: rect.y)
-		return true
+		return r3
 	}
 }

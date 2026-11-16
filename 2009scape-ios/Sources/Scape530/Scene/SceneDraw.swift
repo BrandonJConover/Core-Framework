@@ -420,9 +420,9 @@ extension Scene {
 				t.pendingGround = false
 				if let b = t.bridgeBelow {
 					if let p = b.plainTile {
-						if !isTileOccluded(0, x, z) { drawPlainTile(r, p, level: 0, x: x, z: z) }
+						drawPlainTile(r, p, level: 0, x: x, z: z, drawPixels: !isTileOccluded(0, x, z))
 					} else if let s = b.shapedTile {
-						if !isTileOccluded(0, x, z) { drawShapedTile(r, s) }
+						drawShapedTile(r, s, x: x, z: z, drawPixels: !isTileOccluded(0, x, z))
 					}
 					if let w = b.wall {
 						renderEntity(w.primary, r, yaw: 0, x: w.xFine - cameraX, y: w.y - cameraY, z: w.zFine - cameraZ, key: w.key)
@@ -434,15 +434,22 @@ extension Scene {
 					}
 				}
 				var groundDrawn = false
+				// rt4 still runs the mouse-over-tile test on occluded tiles (only the fill is skipped),
+				// and on tiles without a colour while a tile pick is requested.
 				if let p = t.plainTile {
 					if !isTileOccluded(hl, x, z) {
 						groundDrawn = true
-						if p.colorNE != 12345678 { drawPlainTile(r, p, level: hl, x: x, z: z) }
+						let picking = ScenePicker.shared.tileRequested && hl <= ScenePicker.shared.tileMaxLevel
+						if p.colorNE != 12345678 || picking { drawPlainTile(r, p, level: hl, x: x, z: z) }
+					} else {
+						drawPlainTile(r, p, level: hl, x: x, z: z, drawPixels: false)
 					}
 				} else if let s = t.shapedTile {
 					if !isTileOccluded(hl, x, z) {
 						groundDrawn = true
-						drawShapedTile(r, s)
+						drawShapedTile(r, s, x: x, z: z)
+					} else {
+						drawShapedTile(r, s, x: x, z: z, drawPixels: false)
 					}
 				}
 				if groundDrawn, let g = t.groundDecor, (g.key & 0x80000000) != 0 {
@@ -634,7 +641,7 @@ extension Scene {
 	// MARK: - Terrain triangles
 
 	/// rt4 `SceneGraph.method2610`: draws a PlainTile as two triangles.
-	func drawPlainTile(_ r: Rasteriser3D, _ tile: PlainTile, level: Int, x: Int, z: Int) {
+	func drawPlainTile(_ r: Rasteriser3D, _ tile: PlainTile, level: Int, x: Int, z: Int, drawPixels: Bool = true) {
 		let cxs = Int(r.centerX), cys = Int(r.centerY), w = Int(r.width)
 		let h = tileHeights[level]
 		let x0 = (x << 7) - cameraX, z0 = (z << 7) - cameraZ
@@ -660,21 +667,27 @@ extension Scene {
 		let sxC = cxs + (c.vx << 9) / c.vz, syC = cys + (c.vy << 9) / c.vz
 		let sxD = cxs + (d.vx << 9) / d.vz, syD = cys + (d.vy << 9) / d.vz
 		r.alpha = 0
+		let picker = ScenePicker.shared
 		if (sxC - sxD) * (syB - syD) - (syC - syD) * (sxB - sxD) > 0 {
-			r.testX = sxC < 0 || sxD < 0 || sxB < 0 || sxC > w || sxD > w || sxB > w
-			if tile.texture == -1 {
-				if tile.colorNE != 12345678 {
-					r.fillGouraudTriangle(syC, syD, syB, sxC, sxD, sxB, tile.colorNE, tile.colorNW, tile.colorSE)
+			picker.testTile(cxs, cys, syC, syD, syB, sxC, sxD, sxB, tileX: x, tileZ: z)
+			if drawPixels {
+				r.testX = sxC < 0 || sxD < 0 || sxB < 0 || sxC > w || sxD > w || sxB > w
+				if tile.texture == -1 {
+					if tile.colorNE != 12345678 {
+						r.fillGouraudTriangle(syC, syD, syB, sxC, sxD, sxB, tile.colorNE, tile.colorNW, tile.colorSE)
+					}
+				} else if tile.flat {
+					r.fillTexturedTriangle(syC, syD, syB, sxC, sxD, sxB, tile.colorNE, tile.colorNW, tile.colorSE,
+						a.vx, b.vx, d.vx, a.vy, b.vy, d.vy, a.vz, b.vz, d.vz, tile.texture)
+				} else {
+					r.fillTexturedTriangle(syC, syD, syB, sxC, sxD, sxB, tile.colorNE, tile.colorNW, tile.colorSE,
+						c.vx, d.vx, b.vx, c.vy, d.vy, b.vy, c.vz, d.vz, b.vz, tile.texture)
 				}
-			} else if tile.flat {
-				r.fillTexturedTriangle(syC, syD, syB, sxC, sxD, sxB, tile.colorNE, tile.colorNW, tile.colorSE,
-					a.vx, b.vx, d.vx, a.vy, b.vy, d.vy, a.vz, b.vz, d.vz, tile.texture)
-			} else {
-				r.fillTexturedTriangle(syC, syD, syB, sxC, sxD, sxB, tile.colorNE, tile.colorNW, tile.colorSE,
-					c.vx, d.vx, b.vx, c.vy, d.vy, b.vy, c.vz, d.vz, b.vz, tile.texture)
 			}
 		}
 		if (sxA - sxB) * (syD - syB) - (syA - syB) * (sxD - sxB) > 0 {
+			picker.testTile(cxs, cys, syA, syB, syD, sxA, sxB, sxD, tileX: x, tileZ: z)
+			guard drawPixels else { return }
 			r.testX = sxA < 0 || sxB < 0 || sxD < 0 || sxA > w || sxB > w || sxD > w
 			if tile.texture == -1 {
 				if tile.colorSW != 12345678 {
@@ -688,7 +701,7 @@ extension Scene {
 	}
 
 	/// rt4 `SceneGraph.method2762`: draws a ShapedTile's triangles.
-	func drawShapedTile(_ r: Rasteriser3D, _ tile: ShapedTile) {
+	func drawShapedTile(_ r: Rasteriser3D, _ tile: ShapedTile, x tileX: Int, z tileZ: Int, drawPixels: Bool = true) {
 		let cxs = Int(r.centerX), cys = Int(r.centerY), w = Int(r.width)
 		let n = tile.vertexX.count
 		var sx = [Int](repeating: 0, count: n), sy = sx, vx = sx, vy = sx, vz = sx
@@ -711,6 +724,8 @@ extension Scene {
 			let xa = sx[a], xb = sx[b], xc = sx[c]
 			let ya = sy[a], yb = sy[b], yc = sy[c]
 			guard (xa - xb) * (yc - yb) - (ya - yb) * (xc - xb) > 0 else { continue }
+			ScenePicker.shared.testTile(cxs, cys, ya, yb, yc, xa, xb, xc, tileX: tileX, tileZ: tileZ)
+			guard drawPixels else { continue }
 			r.testX = xa < 0 || xb < 0 || xc < 0 || xa > w || xb > w || xc > w
 			if let tex = tile.textures, tex[i] != -1 {
 				if tile.flat {
