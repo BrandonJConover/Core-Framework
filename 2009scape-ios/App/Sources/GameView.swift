@@ -111,9 +111,21 @@ final class GameCanvasView: UIView, UIKeyInput {
 	}
 
 	@objc private func pressed(_ g: UILongPressGestureRecognizer) {
-		guard g.state == .began else { return }
 		let p = g.location(in: self)
-		longPressFired = client.longPress(x: Int(p.x * scale), y: Int(p.y * scale))
+		let x = Int(p.x * scale), y = Int(p.y * scale)
+		switch g.state {
+		case .began:
+			longPressFired = client.longPress(x: x, y: y)
+		case .changed:
+			// Moving the finger after a long press on an inventory slot drags the item (rt4 drag/swap).
+			client.dragMove(x: x, y: y)
+		case .ended:
+			if client.isDraggingItem { client.dragEnd(x: x, y: y) }
+		case .cancelled, .failed:
+			if client.isDraggingItem { client.dragEnd(x: -1, y: -1) }
+		default:
+			break
+		}
 	}
 
 	@objc private func panned(_ g: UIPanGestureRecognizer) {
