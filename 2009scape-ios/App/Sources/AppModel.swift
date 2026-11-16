@@ -23,13 +23,16 @@ final class AppModel: ObservableObject {
 	let cacheDirectory: URL
 
 	init() {
-		host = UserDefaults.standard.string(forKey: "server.host") ?? "127.0.0.1"
+		host = UserDefaults.standard.string(forKey: "server.host") ?? ""
 		let p = UserDefaults.standard.integer(forKey: "server.port")
 		port = p == 0 ? 43595 : p
 		let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
 		cacheDirectory = support.appendingPathComponent("cache530", isDirectory: true)
 		start()
 	}
+
+	/// False until the player has entered a server address.
+	var hasConfiguredServer: Bool { !host.isEmpty }
 
 	var hasLocalCache: Bool {
 		FileManager.default.fileExists(atPath: cacheDirectory.appendingPathComponent("main_file_cache.idx255").path)
@@ -38,6 +41,10 @@ final class AppModel: ObservableObject {
 	/// Checks the cache against the server (downloading what changed), then
 	/// opens it. With no server but an existing cache, it still starts.
 	func start() {
+		guard hasConfiguredServer else {
+			phase = .failed("Enter the address of a 2009scape server to download the game.")
+			return
+		}
 		phase = .updatingCache(label: "Connecting to update server", fraction: 0)
 		let dir = cacheDirectory, host = host, port = port
 		Task.detached(priority: .userInitiated) {
@@ -59,7 +66,7 @@ final class AppModel: ObservableObject {
 
 	private func openCache(updateError: Error?) {
 		guard hasLocalCache else {
-			phase = .failed("Could not download the game cache from \(host):\(port).\n\(updateError.map { "\($0)" } ?? "")")
+			phase = .failed("Could not download the game from \(host):\(port).\nCheck the server is running and the phone is on the same network.\n\(updateError.map { "\($0)" } ?? "")")
 			return
 		}
 		do {

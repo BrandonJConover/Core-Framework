@@ -19,7 +19,10 @@ struct RootView: View {
 						.font(.system(size: 14, weight: .bold, design: .default))
 						.foregroundColor(.white)
 						.multilineTextAlignment(.center)
-					Button("Try again") { model.start() }
+					HStack(spacing: 24) {
+						Button("Set server") { showingServer = true }
+						Button("Try again") { model.start() }
+					}
 				}
 				.padding()
 				.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -31,6 +34,10 @@ struct RootView: View {
 					.foregroundColor(.white.opacity(0.6))
 					.padding(10)
 			}
+		}
+		.onAppear {
+			// First launch: there is no sensible default server for a phone.
+			if !model.hasConfiguredServer { showingServer = true }
 		}
 		.sheet(isPresented: $showingServer) {
 			ServerSettingsView(host: model.host, port: String(model.port)) { host, port in
