@@ -21,6 +21,8 @@ final class AppModel: ObservableObject {
 	}
 
 	let cacheDirectory: URL
+	/// Speaker output for the client's music and sound effects.
+	private var audioOutput: AudioOutput?
 
 	init() {
 		host = UserDefaults.standard.string(forKey: "server.host") ?? ""
@@ -79,6 +81,10 @@ final class AppModel: ObservableObject {
 				Keychain.setPassword(pass, for: user)
 			}
 			client.log = { print("[client] \($0)") }
+			audioOutput?.stop()
+			let output = AudioOutput(mixer: client.audio)
+			output.start()
+			audioOutput = output
 			phase = .ready(client)
 		} catch {
 			phase = .failed("The game cache could not be opened.\n\(error)")

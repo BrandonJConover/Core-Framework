@@ -39,6 +39,8 @@ final class InteractTests: XCTestCase {
 		XCTAssertEqual(bytes, [op(254, key), UInt8(3222 & 0xFF), UInt8(3222 >> 8), 0x01, 0x02 &+ 128, UInt8(3218 >> 8), UInt8(3218 & 0xFF)])
 		(bytes, key) = encode(.opPlayer(action: 31, index: 7))
 		XCTAssertEqual(bytes, [op(71, key), 7 &+ 128, 0])
+		(bytes, key) = encode(.songEnd(0x01020304))
+		XCTAssertEqual(bytes, [op(137, key), 1, 2, 3, 4])
 		(bytes, key) = encode(.examineNpc(typeId: 0x0102))
 		XCTAssertEqual(bytes, [op(72, key), 0x01, 0x02])
 		(bytes, key) = encode(.examineLoc(id: 0x0102))

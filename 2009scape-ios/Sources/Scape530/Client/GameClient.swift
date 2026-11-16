@@ -27,6 +27,11 @@ public final class GameClient {
 	public private(set) var session: GameSession?
 	/// The 3D world drawn behind the interfaces while in game (rt4 scene + camera + actors).
 	public private(set) var world: WorldView
+	/// Music and sound effects (rt4 `MusicPlayer`/`SoundPlayer`). The iOS layer pulls PCM from
+	/// `audio.render(into:frames:)` on its audio thread; everything here only queues work.
+	public private(set) lazy var audio = AudioMixer(store: store.isolatedCopy() ?? store)
+	/// Song/jingle decoding takes a moment (instruments and samples), so it runs off the frame thread.
+	private let audioLoader = DispatchQueue(label: "scape530.audio-loader")
 	/// The 3D viewport component's rectangle from the last frame (rt4 `Component.clientCode == 1337`).
 	public private(set) var viewport: (x: Int, y: Int, w: Int, h: Int)?
 	public private(set) var lastSize = (w: 0, h: 0)
@@ -74,6 +79,10 @@ public final class GameClient {
 			guard let self else { return }
 			self.host.game.chatLog.add(type: e.line.type, name: e.line.name, message: e.line.message, clan: e.line.clan, phraseId: e.line.phraseId)
 			self.host.chatAt = self.host.transmitTimer
+		}
+		world.onSoundArea = { [weak self] id, x, z, radius, loops, delay in
+			guard let self, let me = self.world.selfSceneTile else { return }
+			self.audio.effects.playArea(id: id, x: x, z: z, radius: radius, loops: loops, delay: delay, playerTileX: me.x, playerTileZ: me.z)
 		}
 		world.isChatIgnored = { [weak self] name37, rights in
 			guard let self else { return false }
@@ -158,6 +167,7 @@ public final class GameClient {
 			host.cycle()
 			if inGame { world.cycle(varps: host.game.varps); interaction.cycle() }
 		}
+		if inGame { updateAudio() }
 		var r = Raster(width: width, height: height)
 		let top = host.game.interfaces.top
 		let showInterface = top != -1 && !(inGame && top == loginInterface)
@@ -287,6 +297,9 @@ public final class GameClient {
 	}
 
 	public func logout() {
+		let music = audio.music
+		audioLoader.async { music.stop() }
+		audio.effects.clear()
 		session?.close()
 		session = nil
 		inGame = false
@@ -304,6 +317,28 @@ public final class GameClient {
 	}
 
 	public func send(_ m: ClientMessage) { session?.send(m) }
+
+	/// rt4 `Protocol` MIDI_SONG / MIDI_JINGLE / SYNTH_SOUND.
+	private func playAudio(_ m: ServerMessage) {
+		switch m {
+		case .midiSong(let id):
+			let music = audio.music
+			audioLoader.async { music.play(songId: id) }
+		case let .midiJingle(id, _):
+			let music = audio.music
+			audioLoader.async { music.playJingle(id: id) }
+		case let .synthSound(id, loops, delay):
+			audio.effects.play(id: id, loops: loops, delay: delay)
+		default:
+			break
+		}
+	}
+
+	/// Per frame: keep the listener on the player and report finished songs (rt4 `SoundPlayer` SOUND_SONGEND).
+	private func updateAudio() {
+		if let me = world.selfActorFine { audio.effects.setListener(xFine: me.x, zFine: me.z) }
+		if let ended = audio.music.takeSongEnded(), ended >= 0 { send(.songEnd(ended)) }
+	}
 
 	/// Private messages (rt4 `Protocol` MESSAGE_PRIVATE / MESSAGE_PRIVATE_ECHO): huffman-decoded into the chat history.
 	private func receiveChat(_ m: ServerMessage) {
@@ -332,7 +367,7 @@ public final class GameClient {
 
 	func handle(_ e: GameSession.Event) {
 		world.handle(e, varps: host.game.varps)
-		if case .message(let m) = e { interaction.handle(m); receiveChat(m) }
+		if case .message(let m) = e { interaction.handle(m); receiveChat(m); playAudio(m) }
 		switch e {
 		case .loggedIn:
 			host.apply(e)

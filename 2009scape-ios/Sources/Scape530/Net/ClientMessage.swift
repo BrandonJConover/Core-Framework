@@ -44,6 +44,8 @@ public enum ClientMessage {
 	case resumeCount(Int32)
 	case resumeName(String)
 	case resumeString(String)
+	/// rt4 SOUND_SONGEND: the song that finished, so the server can pick the next one.
+	case songEnd(Int)
 
 	/// rt4 `ClientProt.method4512`: the opcode for IF_BUTTON1...10.
 	static let ifButtonOpcodes = [155, 196, 124, 199, 234, 168, 166, 64, 53, 9]
@@ -84,6 +86,9 @@ public enum ClientMessage {
 			p.ip2(child)
 		case .closeModal:
 			op(ClientProt.closeModal)
+		case .songEnd(let id):
+			op(ClientProt.soundSongend)
+			p.p4(Int32(truncatingIfNeeded: id))
 		case .resumeCount(let v):
 			op(ClientProt.resumePCountdialog)
 			p.p4(v)

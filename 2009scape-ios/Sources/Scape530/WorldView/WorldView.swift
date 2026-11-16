@@ -46,6 +46,8 @@ public final class WorldView {
 	/// Social state fed by `GameClient` (see `WorldView+Social` / `WorldView+Overlay`).
 	/// Public chat decoded from player info, for the chat history.
 	public var onPublicChat: ((PublicChatEvent) -> Void)?
+	/// SOUND_AREA zone updates, already converted to scene-local tiles: (id, x, z, radius, loops, delay).
+	public var onSoundArea: ((_ id: Int, _ x: Int, _ z: Int, _ radius: Int, _ loops: Int, _ delay: Int) -> Void)?
 	/// True when rt4's ignore rules drop a public chat line from `name37` with staff `rights`.
 	public var isChatIgnored: (_ name37: Int64, _ rights: Int) -> Bool = { _, _ in false }
 	/// rt4 `Chat.publicFilter`: 0 show all, 1 friends only, 2 hide (3 show all too).
@@ -95,6 +97,8 @@ public final class WorldView {
 	public var isBuilding: Bool { inFlightStamp != nil }
 
 	var selfActor: PathingActor? { ctx.players[selfIndex] }
+	/// The local player's scene-local fine position (rt4 `PlayerList.self.xFine/zFine`), for the sound listener.
+	public var selfActorFine: (x: Int, z: Int)? { selfActor.map { ($0.xFine, $0.zFine) } }
 
 	/// The local player's position in world tiles.
 	public var selfTile: (x: Int, z: Int)? {

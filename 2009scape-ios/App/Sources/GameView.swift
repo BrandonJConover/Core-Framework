@@ -80,7 +80,7 @@ final class GameCanvasView: UIView, UIKeyInput {
 		let pts = bounds.size
 		guard pts.width > 0, pts.height > 0 else { return (0, 0) }
 		scale = max(1, 503 / pts.height, 765 / pts.width)
-		return (Int(pts.width * scale), Int(pts.height * scale))
+		return (Int((pts.width * scale).rounded(.up)), Int((pts.height * scale).rounded(.up)))
 	}
 
 	@objc private func step() {

@@ -45,6 +45,10 @@ public final class PcmSound {
 	public func asInt16() -> [Int16] { samples.map { Int16($0) << 8 } }
 }
 
+/// Serialises every cache read the audio code makes: songs load on a loader queue while
+/// effects decode on the audio thread, and `ConfigStore`/`DiskCache` are not thread-safe.
+let audioCacheLock = NSLock()
+
 /// One JS5 archive as the audio code sees it (rt4 `Js5.fetchFile` overloads).
 public struct AudioArchive {
 	let store: ConfigStore
@@ -56,19 +60,21 @@ public struct AudioArchive {
 	}
 
 	/// rt4 `Js5.capacity()`: the number of group slots.
-	public func capacity() -> Int { (try? store.index(archive).capacity) ?? -1 }
+	public func capacity() -> Int { audioCacheLock.lock(); defer { audioCacheLock.unlock() }; return (try? store.index(archive).capacity) ?? -1 }
 
 	/// rt4 `Js5.getGroupCapacity`.
 	public func groupCapacity(_ group: Int) -> Int {
+		audioCacheLock.lock(); defer { audioCacheLock.unlock() }
 		guard let idx = try? store.index(archive), group >= 0, group < idx.capacity else { return 0 }
 		return idx.groupCapacities[group]
 	}
 
-	public func isValid(group: Int) -> Bool { ((try? store.index(archive))?.isValid(group: group)) ?? false }
+	public func isValid(group: Int) -> Bool { audioCacheLock.lock(); defer { audioCacheLock.unlock() }; return ((try? store.index(archive))?.isValid(group: group)) ?? false }
 
 	/// rt4 `Js5.fetchFile(group, file)`.
 	public func fetchFile(_ group: Int, _ file: Int) -> [UInt8]? {
-		(try? store.file(archive: archive, group: group, file: file)) ?? nil
+		audioCacheLock.lock(); defer { audioCacheLock.unlock() }
+		return (try? store.file(archive: archive, group: group, file: file)) ?? nil
 	}
 
 	/// rt4 `Js5.fetchFile(id)`: the single file of group `id` (or file `id` of the only group).
