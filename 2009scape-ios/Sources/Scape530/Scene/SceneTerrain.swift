@@ -6,7 +6,7 @@ extension Scene {
 	/// Builds terrain tiles from decoded map squares. `baseTileX/Z` is the world tile that becomes
 	/// scene tile (0, 0); each square lands at `(regionX * 64 - baseTileX, regionZ * 64 - baseTileZ)`.
 	/// Squares that do not fit are cropped. Replaces any previous terrain, keeps no scenery.
-	public func loadMapSquares(_ squares: [MapSquare], baseTileX: Int, baseTileZ: Int, centralPlane: Int = 0) throws {
+	public func loadMapSquares(_ squares: [MapSquare], baseTileX: Int, baseTileZ: Int, centralPlane: Int = 0, beforeBuild: ((Scene) throws -> Void)? = nil) throws {
 		self.centralPlane = centralPlane
 		clear()
 		let W = width, L = length
@@ -44,6 +44,9 @@ extension Scene {
 				}
 			}
 		}
+		// rt4 reads the locs between the terrain read and `method1169`: they set walls, scenery,
+		// shadows and occluder flags that the tile build then uses.
+		try beforeBuild?(self)
 		try buildTiles(underlays: underlays, overlays: overlays, shapes: shapes, angles: angles)
 	}
 
