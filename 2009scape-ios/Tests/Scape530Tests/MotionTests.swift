@@ -56,11 +56,6 @@ final class MotionTests: XCTestCase {
 					}
 					zone = (r.zoneX, r.zoneZ)
 				}
-				// Music would start background decoding that races with other suites' cache reads.
-				switch m {
-				case .midiSong, .midiJingle, .synthSound: continue
-				default: break
-				}
 				client.handle(.message(m))
 			}
 		}

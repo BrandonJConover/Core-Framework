@@ -29,7 +29,14 @@ public final class GameClient {
 	public private(set) var world: WorldView
 	/// Music and sound effects (rt4 `MusicPlayer`/`SoundPlayer`). The iOS layer pulls PCM from
 	/// `audio.render(into:frames:)` on its audio thread; everything here only queues work.
-	public private(set) lazy var audio = AudioMixer(store: store.isolatedCopy() ?? store)
+	public private(set) lazy var audio: AudioMixer = {
+		// Audio reads the cache from other threads, so it needs its own store. A store that cannot be
+		// copied (not disk-backed, as in tests) is shared, and then songs load on the calling thread.
+		if let copy = store.isolatedCopy() { return AudioMixer(store: copy) }
+		audioSharesStore = true
+		return AudioMixer(store: store)
+	}()
+	private var audioSharesStore = false
 	/// Song/jingle decoding takes a moment (instruments and samples), so it runs off the frame thread.
 	private let audioLoader = DispatchQueue(label: "scape530.audio-loader")
 	/// The 3D viewport component's rectangle from the last frame (rt4 `Component.clientCode == 1337`).
@@ -93,6 +100,7 @@ public final class GameClient {
 			self.host.game.chatLog.add(type: e.line.type, name: e.line.name, message: e.line.message, clan: e.line.clan, phraseId: e.line.phraseId)
 			self.host.chatAt = self.host.transmitTimer
 		}
+		world.onSeqFrameSound = { [weak self] seq, i, x, z, me in self?.audio.effects.playSeq(seq, index: i, xFine: x, zFine: z, isSelf: me) }
 		world.onSoundArea = { [weak self] id, x, z, radius, loops, delay in
 			guard let self, let me = self.world.selfSceneTile else { return }
 			self.audio.effects.playArea(id: id, x: x, z: z, radius: radius, loops: loops, delay: delay, playerTileX: me.x, playerTileZ: me.z)
@@ -343,10 +351,10 @@ public final class GameClient {
 		switch m {
 		case .midiSong(let id):
 			let music = audio.music
-			audioLoader.async { music.play(songId: id) }
+			if audioSharesStore { music.play(songId: id) } else { audioLoader.async { music.play(songId: id) } }
 		case let .midiJingle(id, _):
 			let music = audio.music
-			audioLoader.async { music.playJingle(id: id) }
+			if audioSharesStore { music.playJingle(id: id) } else { audioLoader.async { music.playJingle(id: id) } }
 		case let .synthSound(id, loops, delay):
 			audio.effects.play(id: id, loops: loops, delay: delay)
 		default:

@@ -730,6 +730,7 @@ public final class VorbisSound {
 		var setups: [Int: VorbisSetup] = [:]
 	}
 	private static let cache = SetupCache()
+	private static let decodeLock = NSLock()
 
 	static func setup(for archive: AudioArchive) -> VorbisSetup? {
 		cache.lock.lock()
@@ -749,6 +750,10 @@ public final class VorbisSound {
 	/// rt4 `toPcmSound(null)`: decodes every packet and converts to signed 8 bit.
 	public func decode(archive: AudioArchive) -> PcmSound? {
 		guard let setup = VorbisSound.setup(for: archive) else { return nil }
+		// The setup (codebooks, floors, residues) is shared and keeps per-decode scratch state, as
+		// rt4's statics do, so only one decode may run at a time across every mixer and thread.
+		VorbisSound.decodeLock.lock()
+		defer { VorbisSound.decodeLock.unlock() }
 		prevN = 0
 		prevVector = [Float](repeating: 0, count: setup.blockSize1)
 		var vector = [Float](repeating: 0, count: setup.blockSize1)
