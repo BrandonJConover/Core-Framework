@@ -66,30 +66,32 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 
 - [x] Config decoders: ObjType, NpcType, LocType, SeqType, SpotAnimType, VarbitType, EnumType, FloType, FluType, IdkType, BasType. Every entry in the cache decodes (about 88,000).
 - [ ] Remaining small configs: ParamType, StructType, InvType, VarpType, LightType.
-- [ ] Map squares from archive 5: `m{x}_{z}` terrain and `l{x}_{z}` locations (XTEA keys from REBUILD_NORMAL).
-- [ ] Terrain mesh (heights, underlays/overlays, shapes, blending) and loc placement.
-- [ ] `RawModel` decoder (archive 7) and lighting.
-- [ ] Metal renderer: terrain + static locs + camera (drag to rotate, pinch to zoom).
+- [x] Map squares from archive 5: `m{x}_{z}` terrain and `l{x}_{z}` locations (XTEA keys from REBUILD_NORMAL).
+- [x] Terrain (rt4 SceneGraph port: blending, PlainTile/ShapedTile, occluders) and loc placement (`Scene/`).
+- [x] `RawModel` decoder (all 45,472 models) and lighting; textures (all 680) via `TextureStore`.
+- [x] Software renderer (bit-exact rt4 `Rasteriser`) + camera follow, drag to rotate, pinch to zoom; roof hiding; async scene builds. Metal stays optional (see Rendering approach).
 
 ## M4: Things move
 
-- [ ] PLAYER_INFO / NPC_INFO bit-packed updates (movement + masks).
-- [ ] Player appearance compositing (kits + worn items, recolours).
-- [ ] Animation: frame bases + framesets (archives 0/1), SeqType playback, BAS idle/walk.
-- [ ] Tap-to-walk: pathfinding + MOVE_GAMECLICK; minimap.
-- [ ] Zone updates: LOC_ADD/DEL, OBJ_ADD/DEL, projectiles, spot anims.
+- [x] PLAYER_INFO / NPC_INFO bit-packed updates (movement + masks: appearance, chat, hits, spot anims).
+- [x] Player appearance compositing (kits + worn items, recolours) and NPC models (`Actor/`).
+- [x] Animation: frame bases + framesets, SeqType playback with tweening, BAS idle/walk/run/turn.
+- [x] Tap-to-walk: CollisionMap + PathFinder + MOVE_GAMECLICK/MINIMAPCLICK; minimap with walls, icons, dots, compass, flag.
+- [x] Zone updates: LOC_ADD/DEL, OBJ_ADD/DEL/COUNT/REVEAL, SOUND_AREA.
+- [ ] Projectiles, forced movement, layered (action + movement) animations (in progress).
 
 ## M5: Interfaces
 
 - [x] Sprites (archive 8), fonts (archive 13 metrics + rt4 kerning/tags), software 2D raster.
 - [x] Interface components (archive 3, if1 + if3, all 31,622 decode) with rt4 layout and drawing for layers, rectangles, text, sprites and lines.
-- [ ] CS2 interpreter (archive 12). The biggest single port; the HUD's dynamic parts (tab switching, chat, orbs, login screen states) run on it.
-- [ ] Inventory/item icons (type 2 and IF_SETOBJECT), model components (type 6), IF_BUTTON packets.
-- [ ] Right-click menus mapped to long-press; on-screen keyboard for chat.
+- [x] CS2 interpreter (all 2,063 scripts decode) and `InterfaceScriptHost`: hooks, transmits, timers; the login screen and HUD run on the game's own scripts.
+- [x] Inventory/item icons (type 2 and IF_SETOBJECT, noted/lent), ground item piles, IF_BUTTON packets.
+- [ ] Model components (type 6) including NPC/player chat heads; use-item-on and spell targeting; inventory drag (in progress).
+- [x] Right-click menus mapped to long-press (picking, MiniMenu, OPNPC/OPLOC/OPOBJ/OPPLAYER); public/private chat with Huffman, overhead text, hitsplats, health bars.
 
 ## M6: Polish
 
-- [ ] Sound effects (archive 4/14) and music (archive 6) through AVAudioEngine.
+- [x] Sound effects (synth archive 4, Vorbis archive 14) and MIDI music (archive 6 + instruments 15) through AVAudioEngine.
 - [ ] Resizable layout for iPhone vs iPad, safe areas, controller support.
 - [ ] TestFlight build via the MacBook Air.
 
