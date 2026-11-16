@@ -58,7 +58,7 @@ extension WorldView {
 			let friend = a.appearance.map { mm.friends[$0.name37] != nil } ?? false
 			plot.sprite("mapdots", friend ? 3 : 2, dx: dx, dz: dz, &r)
 		}
-		if let flag = mm.destination {
+		if let flag = mm.destination ?? destinationFlag.map({ (x: $0.x + ctx.originX, z: $0.z + ctx.originZ) }) {
 			plot.sprite("mapflag", 0, dx: (flag.x - ctx.originX) * 4 + 2 - plot.meX, dz: (flag.z - ctx.originZ) * 4 + 2 - plot.meZ, &r)
 		}
 		// The local player: rt4 fills a 3x3 white square on the centre.

@@ -66,6 +66,7 @@ extension GameClient {
 	/// `MiniMenu.method1372` -> `doAction(size - 1)`). Returns false when the point is not over the world.
 	func worldTap(x: Int, y: Int) -> Bool {
 		if let p = interaction.popup { selectMenuEntry(p, x: x, y: y); return true }
+		if let t = minimapTileAt(x: x, y: y) { return walkToMinimapTile(t.tileX, t.tileZ) }
 		guard isOverWorld(x: x, y: y), let (menu, _) = buildMenu(x: x, y: y) else { return false }
 		doAction(menu, menu.top, clickX: x, clickY: y)
 		return true
@@ -205,6 +206,23 @@ extension GameClient {
 	private func sendOp(_ m: ClientMessage) {
 		interaction.onSend?(m)
 		send(m)
+	}
+
+	/// A tap on the minimap: walk to that world tile with the minimap walk packet, falling back to the
+	/// nearest reachable tile as rt4 does for minimap clicks.
+	@discardableResult
+	func walkToMinimapTile(_ tileX: Int, _ tileZ: Int) -> Bool {
+		let o = world.origin
+		let plane = world.plane
+		guard let me = world.selfSceneTile, plane >= 0, plane < world.collision.count else { return false }
+		let finder = PathFinder(collision: world.collision[plane])
+		guard let route = finder.findPath(srcX: me.x, srcZ: me.z, size: me.size, target: .tile(x: tileX - o.x, z: tileZ - o.z), allowFallback: true),
+			let last = route.waypoints.last else { return true }
+		let message = PathFinder.walkMessage(route: route, originX: o.x, originZ: o.z, running: false, minimap: true)
+		world.destinationFlag = last
+		interaction.onSend?(message)
+		send(message)
+		return true
 	}
 
 	/// rt4 `PathFinder.findPath(... 1, ..., 2 ...)` towards an npc or player: walk up to it (no fallback tile).
