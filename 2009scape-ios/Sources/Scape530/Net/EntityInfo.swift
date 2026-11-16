@@ -152,8 +152,20 @@ public struct TrackedEntity: Equatable {
 	/// NPC type id (NPCs only).
 	public var type: Int = -1
 	public var lastStep: [Int] = []
+	/// Speed of each entry of `lastStep` (rt4 `move(speed, direction)`): 0 crawl (a lone step of
+	/// "type 2"), 1 walk, 2 run (two steps).
+	public var lastSpeed: [Int] = []
+	/// Speed of the latest step; true when it was a run step.
 	public var running = false
 	public var appearance: PlayerAppearance?
+	/// Counts position events (an add record, or the local player's teleport block). A consumer that
+	/// remembers the serial it applied knows when `x/z` were set rather than walked to.
+	public var posSerial = 0
+	/// The jump flag of the latest position event (rt4 `teleport(x, jump, z)` / `method2683`):
+	/// set means snap there, clear means walk there when it is within 8 tiles.
+	public var jump = false
+	/// Facing of an add record, as an angle (rt4 `PathingEntity.ANGLES[bits]`), applied to new actors only.
+	public var facing = 0
 }
 
 /// Stateful PLAYER_INFO decoder: keeps rt4's local player list so later
@@ -200,25 +212,29 @@ public struct PlayerInfoDecoder {
 			case 0:
 				extended.append(selfIndex)
 			case 1:
-				step(selfIndex, try bc.bits(3), running: false)
+				step(selfIndex, try bc.bits(3), speed: 1)
 				if try bc.bits(1) == 1 { extended.append(selfIndex) }
 			case 2:
 				if try bc.bits(1) == 1 {
-					step(selfIndex, try bc.bits(3), running: true)
-					step(selfIndex, try bc.bits(3), running: true)
+					step(selfIndex, try bc.bits(3), speed: 2)
+					step(selfIndex, try bc.bits(3), speed: 2)
 				} else {
-					step(selfIndex, try bc.bits(3), running: false)
+					step(selfIndex, try bc.bits(3), speed: 0)
 				}
 				if try bc.bits(1) == 1 { extended.append(selfIndex) }
 			default:
+				// rt4 `readSelfPlayerInfo` type 3: `teleport(x, jump, z)`.
 				let z = try bc.bits(7)
-				_ = try bc.bits(1) // jump
+				let jump = try bc.bits(1) == 1
 				plane = try bc.bits(2)
 				if try bc.bits(1) == 1 { extended.append(selfIndex) }
 				let x = try bc.bits(7)
 				players[selfIndex]!.x = x
 				players[selfIndex]!.z = z
 				players[selfIndex]!.lastStep = []
+				players[selfIndex]!.lastSpeed = []
+				players[selfIndex]!.jump = jump
+				players[selfIndex]!.posSerial += 1
 			}
 		}
 
@@ -238,15 +254,15 @@ public struct PlayerInfoDecoder {
 				extended.append(id)
 			case 1:
 				kept.append(id)
-				step(id, try bc.bits(3), running: false)
+				step(id, try bc.bits(3), speed: 1)
 				if try bc.bits(1) == 1 { extended.append(id) }
 			case 2:
 				kept.append(id)
 				if try bc.bits(1) == 1 {
-					step(id, try bc.bits(3), running: true)
-					step(id, try bc.bits(3), running: true)
+					step(id, try bc.bits(3), speed: 2)
+					step(id, try bc.bits(3), speed: 2)
 				} else {
-					step(id, try bc.bits(3), running: false)
+					step(id, try bc.bits(3), speed: 0)
 				}
 				if try bc.bits(1) == 1 { extended.append(id) }
 			default:
@@ -261,15 +277,19 @@ public struct PlayerInfoDecoder {
 			if id == 2047 { break }
 			if try bc.bits(1) == 1 { extended.append(id) }
 			var dx = try bc.bits(5)
-			_ = try bc.bits(3) // facing
+			let facing = entityAngles[try bc.bits(3)]
 			if dx > 15 { dx -= 32 }
-			_ = try bc.bits(1) // jump
+			let jump = try bc.bits(1) == 1
 			var dz = try bc.bits(5)
 			if dz > 15 { dz -= 32 }
 			var e = players[id] ?? TrackedEntity(index: id, x: 0, z: 0)
 			e.x = me.x + dx
 			e.z = me.z + dz
 			e.lastStep = []
+			e.lastSpeed = []
+			e.jump = jump
+			e.facing = facing
+			e.posSerial += 1
 			if e.appearance == nil { e.appearance = appearanceCache[id] }
 			players[id] = e
 			kept.append(id)
@@ -298,12 +318,13 @@ public struct PlayerInfoDecoder {
 		return r
 	}
 
-	mutating func step(_ id: Int, _ dir: Int, running: Bool) {
+	mutating func step(_ id: Int, _ dir: Int, speed: Int) {
 		guard var e = players[id] else { return }
 		e.x += WalkDirection.dx[dir]
 		e.z += WalkDirection.dz[dir]
 		e.lastStep.append(dir)
-		e.running = running
+		e.lastSpeed.append(speed)
+		e.running = speed == 2
 		players[id] = e
 	}
 
@@ -401,15 +422,15 @@ public struct NpcInfoDecoder {
 				extended.append(id)
 			case 1:
 				kept.append(id)
-				step(id, try bc.bits(3), running: false)
+				step(id, try bc.bits(3), speed: 1)
 				if try bc.bits(1) == 1 { extended.append(id) }
 			case 2:
 				kept.append(id)
 				if try bc.bits(1) == 1 {
-					step(id, try bc.bits(3), running: true)
-					step(id, try bc.bits(3), running: true)
+					step(id, try bc.bits(3), speed: 2)
+					step(id, try bc.bits(3), speed: 2)
 				} else {
-					step(id, try bc.bits(3), running: false)
+					step(id, try bc.bits(3), speed: 0)
 				}
 				if try bc.bits(1) == 1 { extended.append(id) }
 			default:
@@ -420,15 +441,19 @@ public struct NpcInfoDecoder {
 		while bc.remaining >= 27 {
 			let id = try bc.bits(15)
 			if id == 32767 { break }
-			_ = try bc.bits(1) // jump
-			_ = try bc.bits(3) // facing
+			let jump = try bc.bits(1) == 1
+			let facing = entityAngles[try bc.bits(3)]
 			if try bc.bits(1) == 1 { extended.append(id) }
 			var dz = try bc.bits(5)
 			let type = try bc.bits(14)
 			if dz > 15 { dz -= 32 }
 			var dx = try bc.bits(5)
 			if dx > 15 { dx -= 32 }
-			npcs[id] = TrackedEntity(index: id, x: selfX + dx, z: selfZ + dz, type: type)
+			var e = TrackedEntity(index: id, x: selfX + dx, z: selfZ + dz, type: type)
+			e.jump = jump
+			e.facing = facing
+			e.posSerial = (npcs[id]?.posSerial ?? 0) + 1
+			npcs[id] = e
 			kept.append(id)
 			r.added.append(id)
 		}
@@ -451,12 +476,13 @@ public struct NpcInfoDecoder {
 		return r
 	}
 
-	mutating func step(_ id: Int, _ dir: Int, running: Bool) {
+	mutating func step(_ id: Int, _ dir: Int, speed: Int) {
 		guard var e = npcs[id] else { return }
 		e.x += WalkDirection.dx[dir]
 		e.z += WalkDirection.dz[dir]
 		e.lastStep.append(dir)
-		e.running = running
+		e.lastSpeed.append(speed)
+		e.running = speed == 2
 		npcs[id] = e
 	}
 
