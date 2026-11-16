@@ -29,7 +29,7 @@ extension WorldView {
 		picker.allowInput = false
 		picker.tileRequested = false
 		// Ground items have no model here: a stack on the picked tile counts as the farthest hit.
-		if let t = tile, !groundObjects(x: t.x, z: t.z).isEmpty {
+		if let t = tile, !groundObjects(x: t.x, z: t.z).isEmpty, !hits.contains(Int64((t.z << 7) + t.x + 0x6000_0000)) {
 			hits.insert(Int64(t.x) | Int64(t.z) << 7 | 0x6000_0000, at: 0)
 		}
 		return WorldPick(hits: hits, tile: tile)
@@ -71,7 +71,7 @@ extension WorldView {
 			chunk = (x, z)
 		case let .zoneFullFollows(x, z):
 			chunk = (x, z)
-			for tx in x..<(x + 8) { for tz in z..<(z + 8) { objStacks[stackKey(plane, tx, tz)] = nil } }
+			for tx in x..<(x + 8) { for tz in z..<(z + 8) { objStacks[stackKey(plane, tx, tz)] = nil; refreshObjStack(x: tx, z: tz) } }
 		case let .zonePartialEnclosed(x, z, updates):
 			chunk = (x, z)
 			for u in updates { applyZoneUpdate(u) }
@@ -95,15 +95,22 @@ extension WorldView {
 		case let .locAdd(x, z, id, shape, rotation):
 			if let t = tile(x, z) { changeLoc(level: plane, x: t.x, z: t.z, id: id, shape: shape, rotation: rotation) }
 		case let .objAdd(x, z, id, count, hiddenFrom):
-			if hiddenFrom != selfIndex, let t = tile(x, z) { objStacks[stackKey(plane, t.x, t.z), default: []].append(GroundObj(type: id, amount: count)) }
+			if hiddenFrom != selfIndex, let t = tile(x, z) {
+				objStacks[stackKey(plane, t.x, t.z), default: []].append(GroundObj(type: id, amount: count))
+				refreshObjStack(x: t.x, z: t.z)
+			}
 		case let .objReveal(x, z, id, count):
-			if let t = tile(x, z) { objStacks[stackKey(plane, t.x, t.z), default: []].append(GroundObj(type: id, amount: count)) }
+			if let t = tile(x, z) {
+				objStacks[stackKey(plane, t.x, t.z), default: []].append(GroundObj(type: id, amount: count))
+				refreshObjStack(x: t.x, z: t.z)
+			}
 		case let .objDel(x, z, id):
 			guard let t = tile(x, z) else { return }
 			let k = stackKey(plane, t.x, t.z)
 			if var list = objStacks[k], let i = list.firstIndex(where: { $0.type == id }) {
 				list.remove(at: i)
 				objStacks[k] = list.isEmpty ? nil : list
+				refreshObjStack(x: t.x, z: t.z)
 			}
 		case let .objCount(x, z, id, oldCount, newCount):
 			guard let t = tile(x, z) else { return }
@@ -111,6 +118,7 @@ extension WorldView {
 			if var list = objStacks[k], let i = list.firstIndex(where: { $0.type == id && $0.amount == oldCount }) {
 				list[i].amount = newCount
 				objStacks[k] = list
+				refreshObjStack(x: t.x, z: t.z)
 			}
 		default:
 			break

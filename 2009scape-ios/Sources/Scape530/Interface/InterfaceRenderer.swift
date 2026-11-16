@@ -20,6 +20,9 @@ public struct InterfaceState {
 	/// CS2-created children (`cc_create`): parent layer id -> child index ->
 	/// component. Drawn after the layer's static children.
 	public var dynamic: [Int: [Int: Component]] = [:]
+	/// Items of if1 inventory components (type 2), per component id then slot (rt4 `Component.objTypes`
+	/// / `objCounts`, filled by UPDATE_INV_*). Empty slots are absent.
+	public var invSlots: [Int: [Int: ServerMessage.InvItem]] = [:]
 
 	public init() {}
 
@@ -38,6 +41,17 @@ public struct InterfaceState {
 			color[Int(c)] = Int32(r << 16 | g << 8 | b)
 		case .ifSetPosition(let c, let x, let y): position[Int(c)] = (x, y)
 		case .ifSetScrollPos(let c, let pos): scroll[Int(c)] = pos
+		case .invFull(let c, _, let items) where c >= 0:
+			var slots: [Int: ServerMessage.InvItem] = [:]
+			for (i, it) in items.enumerated() where it.id >= 0 { slots[i] = it }
+			invSlots[Int(c)] = slots
+			return false
+		case .invPartial(let c, _, let changes) where c >= 0:
+			for ch in changes { invSlots[Int(c), default: [:]][ch.slot] = ch.item.id >= 0 ? ch.item : nil }
+			return false
+		case .invClear(let c) where c >= 0:
+			invSlots[Int(c)] = [:]
+			return false
 		default: return false
 		}
 		return true
@@ -56,6 +70,8 @@ public final class InterfaceRenderer {
 	public private(set) var drawn: [(component: Component, x: Int, y: Int, w: Int, h: Int)] = []
 	/// Drawn in place of a type-6 model or a 3D viewport component, if set.
 	public var drawModel: ((Component, Int, Int, Int, Int, inout Raster) -> Void)?
+	/// Item icons for inventory components and if3 sprites with an item set.
+	public private(set) lazy var icons = ItemIcons(store: store)
 
 	public init(store: ConfigStore) {
 		self.store = store
@@ -151,6 +167,18 @@ public final class InterfaceRenderer {
 			let rgb = UInt32(bitPattern: (isStatic ? state.color[c.id] : nil) ?? c.color) & 0xFFFFFF
 			font.drawParagraph(text, x: x, y: y, w: w, h: h, color: rgb, shadow: c.shadowed ? 0 : -1,
 				halign: c.halign, valign: c.valign, lineSpacing: c.lineSpacing, opacity: 256, into: &r)
+		case 2:
+			drawInventory(c, x: x, y: y, state: state, into: &r)
+		case 5 where c.if3 && c.objId != -1:
+			// rt4 draws the item icon with the component's outline thickness and shadow colour.
+			guard let icon = icons.sprite(selected: c.outlineThickness, id: c.objId, drawText: c.objDrawText, count: c.objCount, shadow: c.shadowColor) else { return }
+			if c.alpha != 0 {
+				r.drawScaled(icon, x: x, y: y, w: w, h: h, opacity: opacity)
+			} else if w == icon.width && h == icon.height {
+				r.draw(icon, x: x, y: y)
+			} else {
+				r.drawScaled(icon, x: x, y: y, w: w, h: h)
+			}
 		case 5:
 			let id = (isStatic ? state.sprite[c.id] : nil) ?? c.spriteId
 			guard id != -1, let sheet = try store.sprite(id), let f = sheet.frames.first else { return }
@@ -185,6 +213,31 @@ public final class InterfaceRenderer {
 			}
 		default:
 			break
+		}
+	}
+
+	/// rt4 `renderComponent`, type 2: a grid of `baseWidth` x `baseHeight` 32x32 slots spaced by the
+	/// margins, each showing its item's icon (black outline, 0x302020 shadow, count text), or the
+	/// slot's own empty sprite for the first 20 slots when defined. The first 20 slots may also be
+	/// offset by their sprite's position.
+	func drawInventory(_ c: Component, x: Int, y: Int, state: InterfaceState, into r: inout Raster) {
+		let items = state.invSlots[c.id] ?? [:]
+		var slot = 0
+		for row in 0..<c.baseHeight {
+			for col in 0..<c.baseWidth {
+				var sx = x + col * (c.invMarginX + 32), sy = y + row * (c.invMarginY + 32)
+				let extra = slot < c.invSprites.count ? c.invSprites[slot] : nil
+				if slot < 20, let e = extra { sx += e.x; sy += e.y }
+				defer { slot += 1 }
+				if sx + 32 <= r.clipLeft || sx >= r.clipRight || sy + 32 <= r.clipTop || sy >= r.clipBottom { continue }
+				if let item = items[slot], item.id >= 0 {
+					if let icon = icons.sprite(selected: 1, id: item.id, drawText: c.objDrawText, count: Int(item.count), shadow: 0x302020) {
+						r.draw(icon, x: sx, y: sy)
+					}
+				} else if let e = extra, e.sprite >= 0, let sheet = try? store.sprite(Int(e.sprite)), let f = sheet.frames.first {
+					r.draw(f, x: sx, y: sy)
+				}
+			}
 		}
 	}
 }
