@@ -58,7 +58,16 @@ extension WorldView {
 	/// rt4 SPOTANIM_ENTITY (opcode 56) aimed at an npc or a player.
 	func applySpotAnimMessage(delay: Int, height: Int, target: Int32, gfx: Int) {
 		let t = Int(target)
-		guard t >> 30 == 0 else { return } // ground graphics are not drawn yet
+		guard t >> 30 == 0 else {
+			// A graphic on a tile: plane, then world x and z.
+			let level = (t >> 28) & 3
+			let tx = ((t >> 14) & 0x3FFF) - ctx.originX, tz = (t & 0x3FFF) - ctx.originZ
+			guard tx >= 0, tz >= 0, tx < 104, tz < 104, gfx != 65535, let scene = scene else { return }
+			let fx = tx * 128 + 64, fz = tz * 128 + 64
+			groundSpots.append(GroundSpotAnim(store: store, spotAnimId: gfx, plane: level, xFine: fx, zFine: fz,
+			                                  y: scene.tileHeight(level: level, xFine: fx, zFine: fz) - height, delay: delay, loop: ctx.loop))
+			return
+		}
 		let id = gfx == 65535 ? -1 : gfx
 		if t >> 29 != 0 {
 			ctx.npcs[t & 0xFFFF]?.setSpotAnim(id: id, height: height, delay: delay)

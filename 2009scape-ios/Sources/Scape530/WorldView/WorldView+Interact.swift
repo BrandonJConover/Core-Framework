@@ -90,6 +90,8 @@ extension WorldView {
 			return tx >= 0 && tz >= 0 && tx < 104 && tz < 104 ? (tx, tz) : nil
 		}
 		switch u {
+		case .projectile, .spotAnim:
+			applyMotionUpdate(u)
 		case let .soundArea(x, z, id, radius, loops, delay):
 			if let t = tile(x, z) { onSoundArea?(id, t.x, t.z, radius, loops, delay) }
 		case let .locDel(x, z, shape, _):

@@ -12,6 +12,11 @@ final class WorldContext {
 	/// Index -> actor, for `faceEntity` (npc ids below 32768, players above).
 	var npcs: [Int: PathingActor] = [:]
 	var players: [Int: PathingActor] = [:]
+	/// The local player's index (rt4 `PlayerList.selfId`), so sound cues of its own actions are full volume.
+	var selfIndex = -1
+	/// rt4 `SoundPlayer.playSeqSound(zFine, seq, xFine, self, index)`: an animation reached cue `index`
+	/// at an actor's fine position. See `WorldView.onSeqFrameSound`.
+	var onSeqSound: ((_ seq: SeqType, _ index: Int, _ xFine: Int, _ zFine: Int, _ isSelf: Bool) -> Void)?
 
 	init(store: ConfigStore, models: ActorModels) {
 		self.store = store
@@ -24,9 +29,9 @@ final class WorldContext {
 /// stepping), shared by players and npcs. Field names say what they do; the
 /// rt4 name is in the doc comment.
 ///
-/// Not ported: forced movement (`lerpToForceMove*`), layered animations
-/// (`aClass147Array3`), spot animations, hit splats, overhead text, the
-/// terrain tilt of large creatures (`method2685`) and BAS roll/pitch.
+/// Forced movement (`lerpToForceMove*`) and layered animations (`aClass147Array3`) are ported
+/// (see `applyForceMove`, `applyLayeredAnims`). Not ported: the terrain tilt of large creatures
+/// (`method2685`) and BAS roll/pitch.
 final class PathingActor: SceneEntity {
 	enum Kind {
 		case player
@@ -82,6 +87,31 @@ final class PathingActor: SceneEntity {
 	/// rt4 `aBoolean171`: the current animation stretches the model's footprint.
 	var stretches = false
 
+	/// One layered animation (rt4 `PathingEntity_Class147`): plays on the model parts of its slot
+	/// on top of the action and movement animations.
+	struct LayerAnim {
+		/// `anInt5396`
+		var seq: Int
+		/// `anInt5398`: the next frame for tweening, -1 for none.
+		var next: Int
+		/// `anInt5399`
+		var frame: Int
+		/// `anInt5400`: completed loops.
+		var loops: Int
+		/// `anInt5404`: cycles into the frame.
+		var step: Int
+		/// `anInt5408`: cycles left before it starts.
+		var delay: Int
+	}
+	/// rt4 `aClass147Array3`: one slot per model part bit.
+	var layers = [LayerAnim?](repeating: nil, count: 12)
+
+	// Forced movement (rt4 `forceMoveStartX/Y`, `forceMoveDestX/Y`, `forceMoveCyclesToStart/Dest`,
+	// `forceMoveDirection`): the actor is dragged from start to destination tile between two loop counts.
+	var forceStartX = 0, forceStartZ = 0, forceDestX = 0, forceDestZ = 0
+	var forceCyclesToStart = 0, forceCyclesToDest = 0
+	var forceDirection = 0
+
 	// Overhead text (rt4 `chatMessage`, `chatEffect`, `chatColor`, `chatLoops`; `OverheadChat.loop` ticks it down).
 	var chatMessage: String?
 	var chatEffect = 0, chatColor = 0, chatLoops = 0
@@ -117,6 +147,14 @@ final class PathingActor: SceneEntity {
 	// MARK: SceneEntity
 
 	func getMinY() -> Int { minY }
+
+	// MARK: sound cues
+
+	/// rt4 `SoundPlayer.playSeqSound` for this actor (the world forwards it to the audio mixer).
+	func playSeqSound(_ seq: SeqType, _ cue: Int) {
+		guard seq.soundEffects != nil else { return }
+		ctx.onSeqSound?(seq, cue, xFine, zFine, kind == .player && index == ctx.selfIndex)
+	}
 
 	// MARK: BAS
 
@@ -210,6 +248,7 @@ final class PathingActor: SceneEntity {
 				seqNext = 1
 				seqFrame = 0
 				seqLoops = 0
+				playSeqSound(s, seqFrame)
 			}
 			if s.exactMove == 2 { seqLoops = 0 }
 		} else {
@@ -223,6 +262,54 @@ final class PathingActor: SceneEntity {
 				seqLoops = 0
 				seqStep = 0
 				seqId = newSeq
+				if newSeq != -1, let s = (try? ctx.store.seq(newSeq)) ?? nil { playSeqSound(s, seqFrame) }
+			}
+		}
+	}
+
+	/// rt4 `Protocol.readExtendedPlayerInfo` mask 0x400: `[startX, startZ, destX, destZ, cyclesToStart,
+	/// cyclesToDest, direction]` (tiles; the cycle counts are relative to now).
+	func applyForceMove(_ v: [Int]) {
+		guard v.count == 7 else { return }
+		forceStartX = v[0]; forceStartZ = v[1]
+		forceDestX = v[2]; forceDestZ = v[3]
+		forceCyclesToStart = v[4] + ctx.loop
+		forceCyclesToDest = v[5] + ctx.loop
+		forceDirection = v[6]
+		queueSize = 1
+		animQueueMark = 0
+	}
+
+	/// rt4 `Player.method865` / `Protocol.method3037`: layered animation masks. Each entry starts
+	/// (or restarts, or clears with seq -1) the animation on every slot whose bit is set.
+	func applyLayeredAnims(_ list: [LayeredAnim]) {
+		for l in list {
+			var slot = 0
+			var bits = l.slotMask
+			while bits != 0 && slot < layers.count {
+				defer { slot += 1; bits >>= 1 }
+				guard bits & 1 != 0 else { continue }
+				if l.seq == -1 { layers[slot] = nil; continue }
+				guard let s = (try? ctx.store.seq(l.seq)) ?? nil else { continue }
+				if let cur = layers[slot] {
+					if l.seq == cur.seq {
+						if s.exactMove == 0 {
+							layers[slot] = nil
+						} else if s.exactMove == 1 {
+							layers[slot] = LayerAnim(seq: l.seq, next: 1, frame: 0, loops: 0, step: 0, delay: l.delay)
+							playSeqSound(s, 0)
+							continue
+						} else if s.exactMove == 2 {
+							layers[slot]?.loops = 0
+						}
+					} else if let old = (try? ctx.store.seq(cur.seq)) ?? nil, s.priority >= old.priority {
+						layers[slot] = nil
+					}
+				}
+				if layers[slot] == nil {
+					layers[slot] = LayerAnim(seq: l.seq, next: 1, frame: 0, loops: 0, step: 0, delay: l.delay)
+					playSeqSound(s, 0)
+				}
 			}
 		}
 	}
@@ -236,14 +323,26 @@ final class PathingActor: SceneEntity {
 			chatLoops -= 1
 			if chatLoops == 0 { chatMessage = nil }
 		}
-		updateMovement()
+		if ctx.loop < forceCyclesToStart {
+			lerpToForceMoveStart()
+		} else if forceCyclesToDest >= ctx.loop {
+			lerpToForceMoveDest()
+		} else {
+			updateMovement()
+		}
 		if xFine < 128 || zFine < 128 || xFine >= 13184 || zFine >= 13184 {
 			seqId = -1
+			spotAnimId = -1
+			forceCyclesToStart = 0
+			forceCyclesToDest = 0
 			xFine = queueX[0] * 128 + size * 64
 			zFine = queueZ[0] * 128 + size * 64
 			clearQueue()
 		}
 		if isSelf && (xFine < 1536 || zFine < 1536 || xFine >= 11776 || zFine >= 11776) {
+			spotAnimId = -1
+			forceCyclesToStart = 0
+			forceCyclesToDest = 0
 			seqId = -1
 			xFine = queueX[0] * 128 + size * 64
 			zFine = queueZ[0] * 128 + size * 64
@@ -251,6 +350,52 @@ final class PathingActor: SceneEntity {
 		}
 		updateFacing()
 		updateAnimations()
+	}
+
+	/// rt4 `forceMoveDirection` to the yaw the actor faces while dragged.
+	private func forceMoveYaw() -> Int? {
+		switch forceDirection {
+		case 0: return 1024
+		case 1: return 1536
+		case 2: return 0
+		case 3: return 512
+		default: return nil
+		}
+	}
+
+	/// rt4 `NpcList.lerpToForceMoveStart`: before the forced move begins the actor eases (a
+	/// `1 / cyclesLeft` share of the distance per cycle) to its start tile.
+	func lerpToForceMoveStart() {
+		let left = forceCyclesToStart - ctx.loop
+		let startX = forceStartX * 128 + size * 64
+		let startZ = forceStartZ * 128 + size * 64
+		xFine += (startX - xFine) / left
+		zFine += (startZ - zFine) / left
+		if let y = forceMoveYaw() { targetYaw = y }
+		catchUp = 0
+	}
+
+	/// rt4 `NpcList.lerpToForceMoveDest`: between the two cycle counts the position is the linear
+	/// interpolation from start to destination. Like rt4 it is only refreshed when the animation is
+	/// not mid-frame (or on the last cycle), so the actor does not shimmer against its own animation.
+	func lerpToForceMoveDest() {
+		var refresh = ctx.loop == forceCyclesToDest || seqId == -1 || seqDelay != 0
+		if !refresh, let s = (try? ctx.store.seq(seqId)) ?? nil, seqFrame >= 0, seqFrame < s.frameDelays.count {
+			refresh = seqStep + 1 > s.frameDelays[seqFrame]
+		}
+		let span = forceCyclesToDest - forceCyclesToStart
+		if refresh && span != 0 {
+			let t = ctx.loop - forceCyclesToStart
+			let startX = forceStartX * 128 + size * 64, startZ = forceStartZ * 128 + size * 64
+			let destX = forceDestX * 128 + size * 64, destZ = forceDestZ * 128 + size * 64
+			xFine = (t * destX + startX * (span - t)) / span
+			zFine = (destZ * t + startZ * (span - t)) / span
+		}
+		catchUp = 0
+		if let y = forceMoveYaw() {
+			targetYaw = y
+			yaw = y
+		}
 	}
 
 	/// rt4 `NpcList.method2247`: moves towards the oldest queued tile and picks the walk/run animation.
@@ -517,10 +662,12 @@ final class PathingActor: SceneEntity {
 					moveStep = 1
 					moveFrame += 1
 					moveNext += 1
+					playSeqSound(s, moveFrame)
 				}
 				if moveFrame >= s.frames.count {
 					moveFrame = 0
 					moveStep = 0
+					playSeqSound(s, moveFrame)
 				}
 				moveNext = moveFrame + 1
 				if moveNext >= s.frames.count { moveNext = 0 }
@@ -530,9 +677,8 @@ final class PathingActor: SceneEntity {
 		}
 		updateSpotAnim()
 		// rt4: a looping-type-1 animation waits (delay 1) while the actor still has queued moves from when it started.
-		// The forced-move cycle fields are zero here, so the `client.loop` comparisons always hold.
 		if seqId != -1 && seqDelay <= 1 {
-			if let s = (try? store.seq(seqId)) ?? nil, s.loopType == 1 && animQueueMark > 0 && ctx.loop >= 0 && ctx.loop > 0 {
+			if let s = (try? store.seq(seqId)) ?? nil, s.loopType == 1 && animQueueMark > 0 && ctx.loop >= forceCyclesToStart && ctx.loop > forceCyclesToDest {
 				seqDelay = 1
 				return
 			}
@@ -543,6 +689,7 @@ final class PathingActor: SceneEntity {
 				if seqFrame < s.frames.count && seqStep > s.frameDelays[seqFrame] {
 					seqStep = 1
 					seqFrame += 1
+					playSeqSound(s, seqFrame)
 				}
 				if s.frames.count <= seqFrame {
 					seqFrame -= s.replayOffset
@@ -550,7 +697,7 @@ final class PathingActor: SceneEntity {
 					if seqLoops >= s.replayCount {
 						seqId = -1
 					} else if seqFrame >= 0 && s.frames.count > seqFrame {
-						// loops
+						playSeqSound(s, seqFrame)
 					} else {
 						seqId = -1
 					}
@@ -570,6 +717,53 @@ final class PathingActor: SceneEntity {
 			}
 		}
 		if seqDelay > 0 { seqDelay -= 1 }
+		updateLayers()
+	}
+
+	/// The tail of rt4 `NpcList.method879`: steps every layered animation (waiting out its delay first),
+	/// dropping it when its loops are used up.
+	func updateLayers() {
+		for i in 0..<layers.count {
+			guard var l = layers[i] else { continue }
+			if l.delay > 0 {
+				l.delay -= 1
+				layers[i] = l
+				continue
+			}
+			guard let s = (try? ctx.store.seq(l.seq)) ?? nil, !s.frames.isEmpty else {
+				layers[i] = nil
+				continue
+			}
+			l.step += 1
+			if l.frame < s.frames.count && l.step > s.frameDelays[l.frame] {
+				l.frame += 1
+				l.step = 1
+				playSeqSound(s, l.frame)
+			}
+			if s.frames.count <= l.frame {
+				l.loops += 1
+				l.frame -= s.replayOffset
+				if s.replayCount <= l.loops {
+					layers[i] = nil
+					continue
+				} else if l.frame >= 0 && l.frame < s.frames.count {
+					playSeqSound(s, l.frame)
+				} else {
+					layers[i] = nil
+					continue
+				}
+			}
+			l.next = l.frame + 1
+			if s.frames.count <= l.next {
+				l.next -= s.replayOffset
+				if l.loops + 1 >= s.replayCount {
+					l.next = -1
+				} else if l.next < 0 || s.frames.count <= l.next {
+					l.next = -1
+				}
+			}
+			layers[i] = l
+		}
 	}
 
 	// MARK: hits and spot animations (rt4 PathingEntity.addHit, Protocol spotanim masks, NpcList.method879)
@@ -601,6 +795,10 @@ final class PathingActor: SceneEntity {
 		if spotAnimStart > ctx.loop { spotFrame = -1 }
 		spotAnimY = height
 		spotNext = 1
+		if id != -1 && ctx.loop == spotAnimStart, let t = (try? ctx.store.spotAnim(id)) ?? nil, t.seq != -1,
+		   let s = (try? ctx.store.seq(t.seq)) ?? nil, !s.frames.isEmpty {
+			playSeqSound(s, 0)
+		}
 	}
 
 	/// The spot animation part of rt4 `NpcList.method879`.
@@ -611,11 +809,15 @@ final class PathingActor: SceneEntity {
 			spotAnimId = -1
 			return
 		}
-		if spotFrame < 0 { spotFrame = 0 }
+		if spotFrame < 0 {
+			spotFrame = 0
+			playSeqSound(s, 0)
+		}
 		spotStep += 1
 		if spotFrame < s.frames.count && s.frameDelays[spotFrame] < spotStep {
 			spotFrame += 1
 			spotStep = 1
+			playSeqSound(s, spotFrame)
 		}
 		if spotFrame >= s.frames.count { spotAnimId = -1 }
 		spotNext = spotFrame + 1
@@ -634,15 +836,20 @@ final class PathingActor: SceneEntity {
 		let b = currentBas
 		var movement: SeqType?
 		if moveSeqId != -1 && !(moveSeqId == b.idle && action != nil) { movement = (try? store.seq(moveSeqId)) ?? nil }
+		var layerPoses = [SeqPose?](repeating: nil, count: layers.count)
+		for (i, l) in layers.enumerated() {
+			guard let l, let s = (try? store.seq(l.seq)) ?? nil, !s.frames.isEmpty, l.frame < s.frames.count else { continue }
+			layerPoses[i] = SeqPose(seq: s, frame: l.frame, nextFrame: l.next, step: l.step)
+		}
 		let actionPose = action.map { SeqPose(seq: $0, frame: seqFrame, nextFrame: seqNext, step: seqStep) }
 		let movePose = movement.map { SeqPose(seq: $0, frame: moveFrame, nextFrame: moveNext, step: moveStep) }
 		switch kind {
 		case .player:
 			guard let look = look else { return nil }
-			return try? ctx.models.player(look, action: actionPose, movement: movePose)
+			return try? ctx.models.player(look, layers: layerPoses, action: actionPose, movement: movePose)
 		case .npc:
 			guard let t = npcType else { return nil }
-			return try? ctx.models.npc(t, action: actionPose, movement: movePose)
+			return try? ctx.models.npc(t, layers: layerPoses, action: actionPose, movement: movePose)
 		}
 	}
 

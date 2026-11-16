@@ -37,6 +37,12 @@ public final class WorldView {
 	var consumedPlayer: [Int: Int] = [:]
 	var consumedNpc: [Int: Int] = [:]
 	var npcBase: [Int: NpcType] = [:]
+	/// Position events (`TrackedEntity.posSerial`) already applied to each actor.
+	var seenPlayerPos: [Int: Int] = [:]
+	var seenNpcPos: [Int: Int] = [:]
+	/// Projectiles and tile graphics in flight (rt4 `SceneGraph.projectiles` / `spotanims`), see `Projectiles.swift`.
+	var projectiles: [Projectile] = []
+	var groundSpots: [GroundSpotAnim] = []
 
 	/// Seconds the last scene build took, and any build problems.
 	public private(set) var lastBuildSeconds = 0.0
@@ -48,6 +54,12 @@ public final class WorldView {
 	public var onPublicChat: ((PublicChatEvent) -> Void)?
 	/// SOUND_AREA zone updates, already converted to scene-local tiles: (id, x, z, radius, loops, delay).
 	public var onSoundArea: ((_ id: Int, _ x: Int, _ z: Int, _ radius: Int, _ loops: Int, _ delay: Int) -> Void)?
+	/// rt4 `SoundPlayer.playSeqSound`: an actor's (or graphic's) animation reached sound cue `index`
+	/// (`seq.soundEffects[index]`) at the fine position (`xFine`, `zFine`); `isSelf` for the local
+	/// player. `GameClient` forwards it: `audio.effects.playSeq(seq, index: i, xFine: x, zFine: z, isSelf: me)`.
+	public var onSeqFrameSound: ((_ seq: SeqType, _ index: Int, _ xFine: Int, _ zFine: Int, _ isSelf: Bool) -> Void)? {
+		didSet { ctx.onSeqSound = onSeqFrameSound }
+	}
 	/// True when rt4's ignore rules drop a public chat line from `name37` with staff `rights`.
 	public var isChatIgnored: (_ name37: Int64, _ rights: Int) -> Bool = { _, _ in false }
 	/// rt4 `Chat.publicFilter`: 0 show all, 1 friends only, 2 hide (3 show all too).
@@ -115,6 +127,7 @@ public final class WorldView {
 		case .loggedIn(let a):
 			reset()
 			selfIndex = a.selfId
+			ctx.selfIndex = a.selfId
 		case .message(.rebuildNormal(let r)):
 			applyRebuild(r)
 		case .message(.spotAnimEntity(let delay, let height, let target, let gfx)):
@@ -150,6 +163,10 @@ public final class WorldView {
 		consumedPlayer = [:]
 		consumedNpc = [:]
 		npcBase = [:]
+		seenPlayerPos = [:]
+		seenNpcPos = [:]
+		projectiles = []
+		groundSpots = []
 		camera = WorldCamera()
 		collision = []
 		placer = nil
@@ -168,6 +185,8 @@ public final class WorldView {
 			camera.followZ -= dz * 128
 		}
 		rebuildStamp += 1
+		projectiles = []
+		groundSpots = []
 		zone = (r.zoneX, r.zoneZ)
 		ctx.originX = (r.zoneX - 6) * 8
 		ctx.originZ = (r.zoneZ - 6) * 8
@@ -186,15 +205,22 @@ public final class WorldView {
 
 	// MARK: entity updates (rt4 Protocol.readPlayerInfoPacket / readNpcPacket)
 
-	private func sync(_ a: PathingActor, _ e: TrackedEntity, consumed: inout Int, isNew: Bool) {
-		if isNew {
-			a.setPosition(x: e.x, z: e.z, jump: true)
+	/// Brings an actor's position up to the decoder's: a new position event (add record or the local
+	/// player's teleport block) calls rt4 `method2683` with its jump flag, then each step the decoder
+	/// took since the last call is queued with its speed (0 crawl, 1 walk, 2 run).
+	private func sync(_ a: PathingActor, _ e: TrackedEntity, consumed: inout Int, seen: inout Int, isNew: Bool) {
+		// A decoder that was recreated (login, region reset) counts from zero again: not a position event.
+		if e.posSerial < seen { seen = e.posSerial; consumed = 0 }
+		if e.posSerial != seen {
+			seen = e.posSerial
+			if isNew { a.yaw = e.facing; a.targetYaw = e.facing }
+			a.setPosition(x: e.x, z: e.z, jump: e.jump)
 			consumed = e.lastStep.count
 			return
 		}
 		if e.lastStep.count < consumed { consumed = 0 }
-		for dir in e.lastStep[consumed...] where dir >= 0 && dir < 8 {
-			a.move(speed: e.running ? 2 : 1, direction: dir)
+		for (i, dir) in e.lastStep.enumerated().dropFirst(consumed) where dir >= 0 && dir < 8 {
+			a.move(speed: i < e.lastSpeed.count ? e.lastSpeed[i] : (e.running ? 2 : 1), direction: dir)
 		}
 		consumed = e.lastStep.count
 		if a.queueX[0] != e.x || a.queueZ[0] != e.z { a.setPosition(x: e.x, z: e.z, jump: false) }
@@ -204,13 +230,16 @@ public final class WorldView {
 		if let anim = m.anim { a.animate(delay: anim.delay, seq: anim.seq) }
 		if let f = m.faceEntity { a.faceEntity = f }
 		if let t = m.faceTile { a.faceX = t.x; a.faceY = t.z }
+		if let f = m.forceMove { a.applyForceMove(f) }
+		if let l = m.layeredAnims { a.applyLayeredAnims(l) }
 		applySocialMasks(a, m)
 	}
 
 	func applyPlayers(_ r: PlayerInfoDecoder.Result, _ d: PlayerInfoDecoder) {
 		selfIndex = d.selfIndex
 		plane = d.plane
-		for id in r.removed { ctx.players[id] = nil; consumedPlayer[id] = nil }
+		ctx.selfIndex = d.selfIndex
+		for id in r.removed { ctx.players[id] = nil; consumedPlayer[id] = nil; seenPlayerPos[id] = nil }
 		for (id, e) in d.players {
 			let isNew = ctx.players[id] == nil
 			let a = ctx.players[id] ?? PathingActor(kind: .player, index: id, ctx: ctx)
@@ -220,15 +249,16 @@ public final class WorldView {
 				a.look = PlayerLook(ap)
 				a.size = ap.size
 			}
-			var c = consumedPlayer[id] ?? 0
-			sync(a, e, consumed: &c, isNew: isNew)
+			var c = consumedPlayer[id] ?? 0, seen = seenPlayerPos[id] ?? 0
+			sync(a, e, consumed: &c, seen: &seen, isNew: isNew)
 			consumedPlayer[id] = c
+			seenPlayerPos[id] = seen
 		}
 		for (id, m) in r.updated { if let a = ctx.players[id] { applyMasks(a, m) } }
 	}
 
 	func applyNpcs(_ r: PlayerInfoDecoder.Result, _ d: NpcInfoDecoder) {
-		for id in r.removed { ctx.npcs[id] = nil; consumedNpc[id] = nil; npcBase[id] = nil }
+		for id in r.removed { ctx.npcs[id] = nil; consumedNpc[id] = nil; npcBase[id] = nil; seenNpcPos[id] = nil }
 		for (id, e) in d.npcs {
 			let isNew = ctx.npcs[id] == nil
 			let a = ctx.npcs[id] ?? PathingActor(kind: .npc, index: id, ctx: ctx)
@@ -238,9 +268,16 @@ public final class WorldView {
 				a.fallbackBasId = t.basId
 			}
 			resolveType(a, id)
-			var c = consumedNpc[id] ?? 0
-			sync(a, e, consumed: &c, isNew: isNew)
+			var c = consumedNpc[id] ?? 0, seen = seenNpcPos[id] ?? 0
+			let added = e.posSerial != seen
+			sync(a, e, consumed: &c, seen: &seen, isNew: isNew)
+			if added, let t = npcBase[id] {
+				// rt4 `loadAreaNPCs`: an add record takes the turn rate from the type (0 = never turns, faces north).
+				a.turnRate = t.rotationSpeed
+				if t.rotationSpeed == 0 { a.yaw = 0 }
+			}
 			consumedNpc[id] = c
+			seenNpcPos[id] = seen
 		}
 		for (id, m) in r.updated { if let a = ctx.npcs[id] { applyMasks(a, m) } }
 	}
@@ -268,6 +305,7 @@ public final class WorldView {
 		for (id, a) in ctx.npcs { resolveType(a, id) }
 		for (id, a) in ctx.players { a.cycle(isSelf: id == selfIndex) }
 		for a in ctx.npcs.values { a.cycle(isSelf: false) }
+		updateMotionEffects()
 		if let me = selfActor { camera.follow(playerXFine: me.xFine, playerZFine: me.zFine) }
 		// rt4 clears the minimap flag once the player stands on it.
 		if let f = destinationFlag, let t = selfSceneTile, t.x == f.x, t.z == f.z { destinationFlag = nil }
@@ -471,6 +509,7 @@ public final class WorldView {
 			scene.add(level: level, xFine: a.xFine, zFine: a.zFine, y: a.groundY, radius: (a.size - 1) * 64 + 60, entity: m, yaw: a.yaw, key: key, extend: false)
 		}
 		placeActors(place: { place($0, key: $1) }, placeSpot: { placeSpot($0, key: $1) })
+		placeMotionEffects(scene: scene, level: level)
 
 		camera.clampAngles()
 		let groundY = scene.tileHeight(level: level, xFine: me.xFine, zFine: me.zFine)
