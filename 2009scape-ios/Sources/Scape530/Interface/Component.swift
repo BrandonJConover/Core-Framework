@@ -52,6 +52,16 @@ public struct Component {
 	public var modelXOffset = 0, modelZOffset = 0
 	public var modelOrtho = false
 	public var aspectWidth = 0, aspectHeight = 0
+	/// rt4 `Component.modelType` for type-6 components: 0 none, 1 model id, 2 npc head, 3 own player head,
+	/// 4 item, 5 player (looked up by name hash), 6 npc body, 7 player head built from kits.
+	public var modelType = 0
+	/// rt4 `anInt495` / `anInt481`: the decoded screen-space shift of the model's centre, in 1/256 of the
+	/// component's size relative to its aspect size (not the CS2 `modelXOffset`/`modelZOffset`).
+	public var screenShiftX = 0, screenShiftY = 0
+	/// rt4 `Component.anInt498`: the second model argument (kit-based heads).
+	public var modelExtra = 0
+	/// rt4 `ServerActiveProperties.targetParam`: the param id a spell target must have, -1 for none.
+	public var targetParam = -1
 
 	// Text
 	public var font = -1
@@ -210,7 +220,8 @@ public struct Component {
 		_ = try p.g1() // drag render behaviour
 		optionCircumfix = try p.gjstr()
 		if (eventMask >> 11) & 0x7F != 0 {
-			_ = try p.g2(); _ = try p.g2(); _ = try p.g2()
+			targetParam = nullable(try p.g2())
+			_ = try p.g2(); _ = try p.g2()
 		}
 		events = eventMask
 		eventMask = 0
@@ -262,7 +273,13 @@ public struct Component {
 		}
 		if type == 2 {
 			dynamicWidth = 3; dynamicHeight = 3
-			for _ in 0..<4 { _ = try p.g1() }
+			// rt4 turns the four flags into `ServerActiveProperties` bits: 28 swap, 30 item options,
+			// 31 "Use", 29 replace; each option string sets bit 23 + its index.
+			let swap = try p.g1(), itemOps = try p.g1(), use = try p.g1(), replace = try p.g1()
+			if swap == 1 { events |= 1 << 28 }
+			if itemOps == 1 { events |= 1 << 30 }
+			if use == 1 { events |= 1 << 31 }
+			if replace == 1 { events |= 1 << 29 }
 			invMarginX = try p.g1()
 			invMarginY = try p.g1()
 			for _ in 0..<20 {
@@ -272,7 +289,11 @@ public struct Component {
 					invSprites.append(nil)
 				}
 			}
-			for _ in 0..<5 { let o = try p.gjstr(); invOptions.append(o.isEmpty ? nil : o) }
+			for i in 0..<5 {
+				let o = try p.gjstr()
+				invOptions.append(o.isEmpty ? nil : o)
+				if !o.isEmpty { events |= 1 << (23 + i) }
+			}
 		}
 		if type == 3 { filled = try p.g1() == 1 }
 		if type == 4 || type == 1 {
@@ -297,6 +318,7 @@ public struct Component {
 			activeSpriteId = Int(try p.g4())
 		}
 		if type == 6 {
+			modelType = 1
 			modelId = nullable(try p.g2())
 			activeModelId = nullable(try p.g2())
 			modelSeqId = nullable(try p.g2())
@@ -320,12 +342,15 @@ public struct Component {
 		if buttonType == 2 || type == 2 {
 			optionCircumfix = try p.gjstr()
 			optionSuffix = try p.gjstr()
-			_ = try p.g2()
+			let mask = try p.g2() & 0x3F
+			events |= mask << 11
 		}
 		if [1, 4, 5, 6].contains(buttonType) {
 			let o = try p.gjstr()
 			option = o.isEmpty ? [1: "Ok", 4: "Select", 5: "Select", 6: "Continue"][buttonType] : o
 		}
+		if [1, 4, 5].contains(buttonType) { events |= 0x400000 }
+		if buttonType == 6 { events |= 1 }
 	}
 
 	// MARK: layout (rt4 InterfaceList.method2801 / method2291)

@@ -53,6 +53,7 @@ extension InterfaceScriptHost {
 	public func cycle() {
 		loop += 1
 		transmitTimer += 1
+		renderer.advanceModelAnimations(&game.interfaces)
 		var high: [Pending] = [], medium: [Pending] = [], low: [Pending] = []
 		walk { c in
 			guard !c.hooks.isEmpty else { return }

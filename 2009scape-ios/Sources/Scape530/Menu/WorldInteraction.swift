@@ -17,6 +17,13 @@ public final class WorldInteraction {
 	}
 
 	public internal(set) var popup: Popup?
+	/// Target mode (rt4 `MiniMenu.anInt5014` "Use" / `aBoolean302` spell): set by selecting an item's "Use" or a
+	/// spell, cleared by any action or a tap that finds nothing to target.
+	public internal(set) var target: TargetMode?
+	/// A long press on a draggable inventory slot that may turn into a drag (see `GameClient.dragMove`).
+	var dragCandidate: (component: Int, slot: Int, x: Int, y: Int)?
+	/// Client cycles since the last slot activation, for the pressed highlight (rt4 `MiniMenu.anInt2043`).
+	var pressedCycles = 0
 	public internal(set) var cross = Cross()
 	/// rt4 `Player.options` (8 slots) set by SET_INTERACTION.
 	public internal(set) var playerOptions = [PlayerOption?](repeating: nil, count: 8)
@@ -33,6 +40,8 @@ public final class WorldInteraction {
 
 	func reset() {
 		popup = nil
+		target = nil
+		dragCandidate = nil
 		cross = Cross()
 		playerOptions = [PlayerOption?](repeating: nil, count: 8)
 		walkText = "Walk here"
@@ -77,6 +86,7 @@ extension GameClient {
 	@discardableResult
 	public func longPress(x: Int, y: Int) -> Bool {
 		if interaction.popup != nil { interaction.popup = nil }
+		if screen == .game, openInventoryMenu(x: x, y: y) { return true }
 		guard screen == .game, isOverWorld(x: x, y: y), let (menu, _) = buildMenu(x: x, y: y) else { return false }
 		openMenu(menu, atX: x, y: y)
 		return true
@@ -88,7 +98,7 @@ extension GameClient {
 	/// Entries for a touch point, via a picking draw of the scene (rt4 builds them every frame).
 	func buildMenu(x: Int, y: Int) -> (Menu, WorldPick)? {
 		guard let v = viewport, let pick = world.pick(x: x, y: y, rect: v) else { return nil }
-		let menu = MenuBuilder.build(world: world, pick: pick, walkText: interaction.walkText, playerOptions: interaction.playerOptions)
+		let menu = MenuBuilder.build(world: world, pick: pick, walkText: interaction.walkText, playerOptions: interaction.playerOptions, target: interaction.target)
 		return (menu, pick)
 	}
 
@@ -109,7 +119,7 @@ extension GameClient {
 	}
 
 	/// rt4 `Protocol` click handling while the menu is open: the entry under the click runs, then the menu closes.
-	private func selectMenuEntry(_ p: WorldInteraction.Popup, x: Int, y: Int) {
+	func selectMenuEntry(_ p: WorldInteraction.Popup, x: Int, y: Int) {
 		interaction.popup = nil
 		for i in 0..<p.menu.count {
 			let rowY = (p.menu.count - i - 1) * 15 + p.y + 31
@@ -195,15 +205,17 @@ extension GameClient {
 			sendOp(.examineObj(id: key))
 
 		default:
-			break // Cancel and everything that belongs to interface components
+			doTargetAction(menu, index, action: action, clickX: clickX, clickY: clickY)
+			return
 		}
+		finishAction()
 	}
 
-	private func setCross(_ type: Int, _ x: Int, _ y: Int) {
+	func setCross(_ type: Int, _ x: Int, _ y: Int) {
 		interaction.cross = WorldInteraction.Cross(type: type, milliseconds: 0, x: x, y: y)
 	}
 
-	private func sendOp(_ m: ClientMessage) {
+	func sendOp(_ m: ClientMessage) {
 		interaction.onSend?(m)
 		send(m)
 	}
@@ -226,7 +238,7 @@ extension GameClient {
 	}
 
 	/// rt4 `PathFinder.findPath(... 1, ..., 2 ...)` towards an npc or player: walk up to it (no fallback tile).
-	private func approach(_ target: PathFinder.Target, clickX: Int, clickY: Int) {
+	func approach(_ target: PathFinder.Target, clickX: Int, clickY: Int) {
 		walkTo(target, type: .interact, fallback: false, clickX: clickX, clickY: clickY, cross: 2)
 	}
 
@@ -235,7 +247,7 @@ extension GameClient {
 	/// placed whether or not a route was found for actions (rt4 sets it in the action) and only on
 	/// success for plain walking.
 	@discardableResult
-	private func walkTo(_ target: PathFinder.Target, type: PathFinder.WalkType, fallback: Bool, clickX: Int, clickY: Int, cross: Int) -> Bool {
+	func walkTo(_ target: PathFinder.Target, type: PathFinder.WalkType, fallback: Bool, clickX: Int, clickY: Int, cross: Int) -> Bool {
 		let plane = world.plane
 		guard let me = world.selfSceneTile, plane >= 0, plane < world.collision.count else { return false }
 		let finder = PathFinder(collision: world.collision[plane])

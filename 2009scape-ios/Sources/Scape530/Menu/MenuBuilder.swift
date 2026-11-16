@@ -40,10 +40,18 @@ enum MenuBuilder {
 
 	/// rt4 `MiniMenu.addEntries`: the walk entry, then one block per picked entity, in pick order.
 	/// `tile` is the scene tile under the touch (nil when over the sky).
-	static func build(world: WorldView, pick: WorldPick, walkText: String, playerOptions: [PlayerOption?]) -> Menu {
+	static func build(world: WorldView, pick: WorldPick, walkText: String, playerOptions: [PlayerOption?], target: TargetMode? = nil) -> Menu {
 		var menu = Menu()
 		let tile = pick.tile ?? (x: -1, z: -1)
-		menu.add(op: walkText, base: "", action: Menu.Action.walkHere, key: 0, x: tile.x, z: tile.z)
+		switch target {
+		case .use?:
+			break // rt4: no walk entry while an item is selected
+		case let .spell(_, _, mask, _, verb, _)? where mask & 0x40 != 0:
+			// rt4 action 11: the spell targets a ground tile (key 1 = the tile is already known).
+			menu.add(op: verb, base: " ->", action: Menu.Action.spellOnTile, key: 1, x: tile.x, z: tile.z)
+		default:
+			menu.add(op: walkText, base: "", action: Menu.Action.walkHere, key: 0, x: tile.x, z: tile.z)
+		}
 
 		var previous: Int64 = -1
 		let plane = world.plane
@@ -57,15 +65,15 @@ enum MenuBuilder {
 				guard let scene = world.scene, scene.isLocValid(level: plane, x: x, z: z, key: key),
 				      let base = (try? world.store.loc(id)) ?? nil,
 				      let loc = world.env.resolve(base, store: world.store) else { continue }
-				addLoc(&menu, loc, key: key, x: x, z: z)
+				addLoc(&menu, loc, key: key, x: x, z: z, target: target)
 			case 1:
 				guard let a = world.ctx.npcs[id] else { continue }
-				addNpc(&menu, a, index: id, world: world)
+				addNpc(&menu, a, index: id, world: world, target: target)
 			case 0:
 				guard let a = world.ctx.players[id] else { continue }
-				addPlayer(&menu, a, index: id, world: world, options: playerOptions)
+				addPlayer(&menu, a, index: id, world: world, options: playerOptions, target: target)
 			case 3:
-				addObjs(&menu, world: world, x: x, z: z)
+				addObjs(&menu, world: world, x: x, z: z, target: target)
 			default:
 				break
 			}
@@ -75,8 +83,18 @@ enum MenuBuilder {
 	}
 
 	/// The loc block of rt4 `addEntries` (ops 4 down to 0, then Examine).
-	static func addLoc(_ menu: inout Menu, _ loc: LocType, key: Int64, x: Int, z: Int) {
+	static func addLoc(_ menu: inout Menu, _ loc: LocType, key: Int64, x: Int, z: Int, target: TargetMode? = nil) {
 		let base = "<col=00ffff>" + loc.name
+		switch target {
+		case let .use(_, _, _, label)?:
+			menu.add(op: "Use", base: label + " -> " + base, action: Menu.Action.useOnLoc, key: key, x: x, z: z)
+			return
+		case let .spell(_, _, mask, _, verb, label)?:
+			if mask & 0x4 != 0 { menu.add(op: verb, base: label + " -> " + base, action: Menu.Action.spellOnLoc, key: key, x: x, z: z) }
+			return
+		case nil:
+			break
+		}
 		for i in stride(from: 4, through: 0, by: -1) {
 			guard let op = loc.ops[i] else { continue }
 			menu.add(op: op, base: base, action: Menu.Action.loc[i], key: key, x: x, z: z)
@@ -85,7 +103,7 @@ enum MenuBuilder {
 	}
 
 	/// rt4 `MiniMenu.addNpcEntries`.
-	static func addNpc(_ menu: inout Menu, _ a: PathingActor, index: Int, world: WorldView) {
+	static func addNpc(_ menu: inout Menu, _ a: PathingActor, index: Int, world: WorldView, target: TargetMode? = nil) {
 		guard menu.count < 400, let type = a.npcType, type.interactive else { return }
 		var name = type.name
 		let own = world.ownCombatLevel
@@ -93,6 +111,16 @@ enum MenuBuilder {
 			name += combatLevelColor(other: type.combatLevel, own: own) + " (level: \(type.combatLevel))"
 		}
 		let base = "<col=ffff00>" + name
+		switch target {
+		case let .use(_, _, _, label)?:
+			menu.add(op: "Use", base: label + " -> " + base, action: Menu.Action.useOnNpc, key: Int64(index))
+			return
+		case let .spell(_, _, mask, _, verb, label)?:
+			if mask & 0x2 != 0 { menu.add(op: verb, base: label + " -> " + base, action: Menu.Action.spellOnNpc, key: Int64(index)) }
+			return
+		case nil:
+			break
+		}
 		for i in stride(from: 4, through: 0, by: -1) {
 			guard let op = type.ops[i], op.lowercased() != "attack" else { continue }
 			menu.add(op: op, base: base, action: Menu.Action.npc[i], key: Int64(index))
@@ -107,7 +135,7 @@ enum MenuBuilder {
 	}
 
 	/// rt4 `MiniMenu.addPlayerEntries`.
-	static func addPlayer(_ menu: inout Menu, _ a: PathingActor, index: Int, world: WorldView, options: [PlayerOption?]) {
+	static func addPlayer(_ menu: inout Menu, _ a: PathingActor, index: Int, world: WorldView, options: [PlayerOption?], target: TargetMode? = nil) {
 		guard index != world.selfIndex, menu.count < 400, let ap = a.appearance else { return }
 		let name = displayName(ap)
 		let own = world.ownCombatLevel
@@ -122,7 +150,15 @@ enum MenuBuilder {
 		} else {
 			label = name + " (skill: \(ap.skillTotal))"
 		}
-		for slot in stride(from: 7, through: 0, by: -1) {
+		switch target {
+		case let .use(_, _, _, tlabel)?:
+			menu.add(op: "Use", base: tlabel + " -> <col=ffffff>" + label, action: Menu.Action.useOnPlayer, key: Int64(index))
+		case let .spell(_, _, mask, _, verb, tlabel)?:
+			if mask & 0x8 != 0 { menu.add(op: verb, base: tlabel + " -> <col=ffffff>" + label, action: Menu.Action.spellOnPlayer, key: Int64(index)) }
+		case nil:
+			break
+		}
+		for slot in stride(from: 7, through: 0, by: -1) where target == nil {
 			guard slot < options.count, let o = options[slot] else { continue }
 			var offset = 0
 			if o.text.lowercased() == "attack" {
@@ -139,10 +175,21 @@ enum MenuBuilder {
 	}
 
 	/// The ground item block of rt4 `addEntries` (newest stack entry first, ops 4 down to 0, then Examine).
-	static func addObjs(_ menu: inout Menu, world: WorldView, x: Int, z: Int) {
+	static func addObjs(_ menu: inout Menu, world: WorldView, x: Int, z: Int, target: TargetMode? = nil) {
 		for stack in world.groundObjects(x: x, z: z).reversed() {
 			guard let t = (try? world.store.objResolved(stack.type)) ?? nil else { continue }
 			let base = "<col=ff9040>" + t.name
+			switch target {
+			case let .use(_, _, _, label)?:
+				menu.add(op: "Use", base: label + " -> " + base, action: Menu.Action.useOnObj, key: Int64(stack.type), x: x, z: z)
+				continue
+			case let .spell(_, _, mask, param, verb, label)?:
+				let paramOK = param == -1 || t.params[param] != nil
+				if mask & 0x1 != 0 && paramOK { menu.add(op: verb, base: label + " -> " + base, action: Menu.Action.spellOnObj, key: Int64(stack.type), x: x, z: z) }
+				continue
+			case nil:
+				break
+			}
 			for i in stride(from: 4, through: 0, by: -1) {
 				guard let op = t.ops[i] else { continue }
 				menu.add(op: op, base: base, action: Menu.Action.obj[i], key: Int64(stack.type), x: x, z: z)

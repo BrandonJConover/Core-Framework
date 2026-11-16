@@ -31,6 +31,16 @@ public struct Menu {
 		public static let player = [30, 6, 31, 29, 10, 44, 37, 57]
 		public static let obj = [21, 34, 18, 20, 24]
 		public static let objExamine = 1002
+		// Target modes (rt4 `MiniMenu` "Use" and spell actions).
+		public static let useOnPlayer = 1, useOnLoc = 14, useOnNpc = 26, useOnObj = 33, useOnItem = 40
+		public static let spellOnPlayer = 15, spellOnLoc = 38, spellOnNpc = 45, spellOnObj = 39, spellOnItem = 3
+		public static let spellOnComponent = 12, spellOnTile = 11
+		/// Selecting a spell component (action 32) or an inventory item's "Use" (22).
+		public static let selectSpell = 32, selectUse = 22
+		/// Inventory slot options: the item's own `iops` 1...5 and the component's `invOptions` 1...5.
+		public static let itemOps = [47, 5, 43, 35, 58]
+		public static let invOptions = [25, 23, 48, 7, 13]
+		public static let itemExamine = 1006
 	}
 
 	public init() { reset() }

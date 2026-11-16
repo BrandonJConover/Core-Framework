@@ -71,6 +71,19 @@ public final class GameClient {
 		host.onDirectLogin = { [weak self] user, pass in self?.beginLogin(username: user, password: pass) }
 		host.log = { [weak self] in self?.log($0) }
 		bindWorld()
+		bindModels()
+	}
+
+	/// Gives the interface model renderer (chat heads, player models) its view of the world.
+	private func bindModels() {
+		ui.models.selfLook = { [weak self] in self?.world.selfActor?.appearance.map(PlayerLook.init) }
+		ui.models.playerLook = { [weak self] i in self?.world.ctx.players[i]?.appearance.map(PlayerLook.init) }
+		ui.models.resolveNpc = { [weak self] t in
+			guard let self, let list = t.multiNpcs, !list.isEmpty else { return t }
+			let v = self.world.env.value(varbit: t.multiVarbit, varp: t.multiVarp, store: self.store)
+			let pick = (v < 0 || v >= list.count - 1 || list[v] == -1) ? list[list.count - 1] : list[v]
+			return pick == -1 ? nil : ((try? self.store.npc(pick)) ?? nil)
+		}
 	}
 
 	/// Wires the world's chat callbacks to the host's chat history (`Chat/`).
@@ -165,7 +178,7 @@ public final class GameClient {
 		lastCycleAt = lastCycleAt.map { $0.addingTimeInterval(Double(cycles) * 0.02) } ?? now
 		for _ in 0..<cycles {
 			host.cycle()
-			if inGame { world.cycle(varps: host.game.varps); interaction.cycle() }
+			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI() }
 		}
 		if inGame { updateAudio() }
 		var r = Raster(width: width, height: height)
@@ -183,7 +196,7 @@ public final class GameClient {
 			r = Raster(width: width, height: height)
 		}
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
-		if inGame { try drawInteraction(into: &r) }
+		if inGame { try drawInteraction(into: &r); try drawTargetHint(into: &r) }
 		if inGame, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
 			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 16, color: 0xFFFF00, shadow: 0, into: &r)
 		}
@@ -222,11 +235,18 @@ public final class GameClient {
 
 	/// A tap in game pixels: press and release of the primary button.
 	public func tap(x: Int, y: Int) {
+		if inGame, interaction.popup == nil {
+			if inventoryTap(x: x, y: y) { keyboardRequested = false; return }
+			if componentTargetTap(x: x, y: y) { return }
+		}
+		let hadTarget = interaction.target != nil
 		if inGame, worldTap(x: x, y: y) { keyboardRequested = false; return }
 		let hit = inGame ? ui.hitTest(x: x, y: y) : nil
 		if host.tap(x: x, y: y) == nil, inGame, let c = hit {
 			log("tap on \(c.id >> 16):\(c.id & 0xFFFF) (\(c.ops.first ?? c.option ?? "no op"))")
 		}
+		// rt4: a click that finds no target leaves target mode.
+		if hadTarget { cancelTarget() }
 		if inGame { keyboardRequested = hit.map(takesTyping) ?? false }
 		host.cycle()
 	}
