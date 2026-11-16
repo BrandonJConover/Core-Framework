@@ -37,6 +37,8 @@ public final class GameClient {
 		return AudioMixer(store: store)
 	}()
 	private var audioSharesStore = false
+	private var areaResolverBound = false
+	private var lastAreaLoop = 0
 	/// Song/jingle decoding takes a moment (instruments and samples), so it runs off the frame thread.
 	private let audioLoader = DispatchQueue(label: "scape530.audio-loader")
 	/// The 3D viewport component's rectangle from the last frame (rt4 `Component.clientCode == 1337`).
@@ -104,6 +106,16 @@ public final class GameClient {
 		world.onSoundArea = { [weak self] id, x, z, radius, loops, delay in
 			guard let self, let me = self.world.selfSceneTile else { return }
 			self.audio.effects.playArea(id: id, x: x, z: z, radius: radius, loops: loops, delay: delay, playerTileX: me.x, playerTileZ: me.z)
+		}
+		// rt4 `AreaSoundManager`: ambient loops from locs placed in the scene.
+		world.onSceneAdopted = { [weak self] in self?.audio.effects.area.clearLocs() }
+		world.onLocPlaced = { [weak self] p in
+			guard let self, AreaSoundManager.hasAreaSound(p.loc, store: self.store) else { return }
+			self.audio.effects.area.addLoc(p.loc, x: p.x, z: p.z, level: p.level, width: p.width, length: p.length)
+		}
+		world.onLocRemoved = { [weak self] loc, x, z, level in
+			guard let self, AreaSoundManager.hasAreaSound(loc, store: self.store) else { return }
+			self.audio.effects.area.removeLoc(id: loc.id, x: x, z: z, level: level)
 		}
 		world.isChatIgnored = { [weak self] name37, rights in
 			guard let self else { return false }
@@ -206,7 +218,7 @@ public final class GameClient {
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
 		if inGame { try drawInteraction(into: &r); try drawTargetHint(into: &r) }
 		if inGame, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
-			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 16, color: 0xFFFF00, shadow: 0, into: &r)
+			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 32, color: 0xFFFF00, shadow: 0, into: &r)
 		}
 		return r
 	}
@@ -268,6 +280,7 @@ public final class GameClient {
 	/// Pointer hover (mouse or Apple Pencil hover); drives onMouseOver/Leave.
 	public func hover(x: Int, y: Int) {
 		interaction.pointer = (x, y)
+		if interaction.popup == nil { previewTap(x: x, y: y) }
 		host.pointerMoved(x: x, y: y)
 	}
 
@@ -328,6 +341,7 @@ public final class GameClient {
 		let music = audio.music
 		audioLoader.async { music.stop() }
 		audio.effects.clear()
+		audio.effects.area.clearAll()
 		session?.close()
 		session = nil
 		inGame = false
@@ -364,7 +378,19 @@ public final class GameClient {
 
 	/// Per frame: keep the listener on the player and report finished songs (rt4 `SoundPlayer` SOUND_SONGEND).
 	private func updateAudio() {
-		if let me = world.selfActorFine { audio.effects.setListener(xFine: me.x, zFine: me.z) }
+		if let me = world.selfActorFine {
+			audio.effects.setListener(xFine: me.x, zFine: me.z)
+			// rt4 `LoginManager`: `AreaSoundManager.redraw(sceneDelta, self.xFine, self.zFine, plane)` every cycle.
+			let area = audio.effects.area
+			if areaResolverBound == false {
+				areaResolverBound = true
+				area.resolveLoc = { [weak self] loc in self.flatMap { $0.world.env.resolve(loc, store: $0.store) } }
+			}
+			area.syncActors(world.areaSoundSources())
+			let loop = world.ctx.loop
+			area.redraw(cycles: max(loop - lastAreaLoop, 0), xFine: me.x, zFine: me.z, level: world.plane)
+			lastAreaLoop = loop
+		}
 		if let ended = audio.music.takeSongEnded(), ended >= 0 { send(.songEnd(ended)) }
 	}
 
@@ -383,6 +409,15 @@ public final class GameClient {
 			} else {
 				host.game.chatLog.add(type: 3, name: name, message: message)
 			}
+			host.chatAt = host.transmitTimer
+		case let .clanMessage(name37, clan37, messageId, rights, text):
+			// rt4 MESSAGE_CLANCHANNEL: same dedupe and ignore rules as private messages, shown as chat type 9.
+			guard let codec = (try? WordPack.loadCodec(store)) ?? nil else { return }
+			if host.game.chatLog.hasSeen(messageId: messageId) { return }
+			if rights <= 1 && chatRestricted(name37) { return }
+			_ = host.game.chatLog.remember(messageId: messageId)
+			let message = WordPack.display(WordPack.decode(text, codec: codec))
+			host.game.chatLog.add(type: 9, name: WordPack.chatIcon(rights: rights) + WordPack.displayName(name37), message: message, clan: WordPack.displayName(clan37))
 			host.chatAt = host.transmitTimer
 		case let .privateMessageEcho(name37, text):
 			guard let codec = (try? WordPack.loadCodec(store)) ?? nil else { return }

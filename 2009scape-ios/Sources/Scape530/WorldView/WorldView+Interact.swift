@@ -151,6 +151,7 @@ extension WorldView {
 		guard key != 0 else { return }
 		let id = Int((key >> 32) & Int64(Int32.max)), shape = Int((key >> 14) & 0x1F), rotation = Int((key >> 20) & 3)
 		if let type = (try? store.loc(id)) ?? nil {
+			onLocRemoved?(type, x, z, level)
 			let ml = collisionLevel(level, x, z)
 			if ml >= 0, ml < collision.count {
 				let map = collision[ml]

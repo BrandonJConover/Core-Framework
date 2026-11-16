@@ -24,6 +24,15 @@ public enum ClientMessage {
 	case ifContinue(component: Int, child: Int)
 	/// CLOSE_MODAL (rt4 `ClientProt.closeWidget`).
 	case closeModal
+	/// FRIENDLIST_ADD / FRIENDLIST_DEL / IGNORELIST_ADD / IGNORELIST_DEL (rt4 `FriendsList.add/remove`,
+	/// `IgnoreList.add/remove`): the base-37 name.
+	case friendAdd(Int64), friendDel(Int64), ignoreAdd(Int64), ignoreDel(Int64)
+	/// FRIEND_SETRANK (rt4 `FriendsList.setRank`): friends-chat rank for a friend.
+	case friendSetRank(name37: Int64, rank: Int)
+	/// CLAN_JOINCHAT_LEAVECHAT (rt4 `ClanChat.join/leave`): join the channel owned by `name37`, 0 leaves.
+	case clanJoinLeave(name37: Int64)
+	/// CLAN_KICKUSER (rt4 `ClanChat.kick`).
+	case clanKick(name37: Int64)
 	/// Opcode 77: walk toward an interaction target; same layout as `walk` (rt4 `method3502` with argument 2).
 	case walkInteract(destX: Int, destZ: Int, path: [(x: Int, z: Int)] = [], ctrlRun: Bool = false)
 	/// OPNPC1...5 (`option` 1...5) on npc index `index` (rt4 `MiniMenu` actions 17, 16, 4, 19, 2).
@@ -120,6 +129,16 @@ public enum ClientMessage {
 			p.ip2(child)
 		case .closeModal:
 			op(ClientProt.closeModal)
+		case .friendAdd(let n): op(ClientProt.friendlistAdd); p.p8(n)
+		case .friendDel(let n): op(ClientProt.friendlistDel); p.p8(n)
+		case .ignoreAdd(let n): op(ClientProt.ignorelistAdd); p.p8(n)
+		case .ignoreDel(let n): op(ClientProt.ignorelistDel); p.p8(n)
+		case let .friendSetRank(n, rank):
+			op(ClientProt.friendSetrank)
+			p.p1add(rank)
+			p.p8(n)
+		case .clanJoinLeave(let n): op(ClientProt.clanJoinchatLeavechat); p.p8(n)
+		case .clanKick(let n): op(ClientProt.clanKickuser); p.p8(n)
 		case .songEnd(let id):
 			op(ClientProt.soundSongend)
 			p.p4(Int32(truncatingIfNeeded: id))

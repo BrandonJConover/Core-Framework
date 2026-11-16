@@ -75,6 +75,7 @@ extension InterfaceScriptHost {
 			if c.hooks["onStatTransmit"] != nil, statLog.due(reader: &rd.stat, triggers: c.triggers["stat"]) { queue("onStatTransmit", into: &low) }
 			if chatAt > rd.lastTransmit { queue("onMsg", into: &low) }
 			if friendAt > rd.lastTransmit { queue("onFriendTransmit", into: &low) }
+			if clanAt > rd.lastTransmit { queue("onClanTransmit", into: &low) }
 			if miscAt > rd.lastTransmit { queue("onMiscTransmit", into: &low) }
 			rd.lastTransmit = transmitTimer
 			readers[ref] = rd

@@ -93,10 +93,51 @@ extension InterfaceScriptHost {
 		case "isQuickChatOnly": return b(game.account?.mapQuickChat ?? false)
 		case "loginTypeInfo", "language", "affiliate", "hasManyBlackmarks", "isFemale": return r(0)
 
-		// MARK: friends / ignore / clan (nothing loaded yet)
-		case "friendCount", "ignoreCount", "clanMemberCount", "clanMinKick", "clanMyRank": return r(0)
-		case "isFriend", "isIgnored": return r(0)
-		case "friendIndexOf": return r(-1)
+		// MARK: friends / ignore / clan (rt4 `ScriptRunner` 3600-3629, backed by `game.social`)
+		case "friendCount":
+			// rt4: -2 until the friend list is requested, -1 while it loads.
+			let st = game.social.friendsState
+			return r(st == 0 ? -2 : (st == 1 ? -1 : game.social.friends.count))
+		case "friendName":
+			guard game.social.friendsState == 2, let f = friend(i(0)) else { return HostResult(strings: [""]) }
+			return HostResult(strings: [f.displayName])
+		case "friendWorld": return r(game.social.friendsState == 2 ? (friend(i(0))?.world ?? 0) : 0)
+		case "friendRank": return r(game.social.friendsState == 2 ? (friend(i(0))?.rank ?? 0) : 0)
+		case "friendWorldName":
+			return HostResult(strings: [game.social.friendsState == 2 ? (friend(i(0))?.worldName ?? "") : ""])
+		case "friendSameGame": return b(game.social.friendsState == 2 && (friend(i(0))?.sameGame ?? false))
+		case "friendSetRank":
+			let n = Base37.encode(s.first ?? "")
+			send(.friendSetRank(name37: n, rank: i(0)))
+		case "friendAdd": socialAction(game.social.addFriend(s.first ?? "", selfName37: game.selfName37, members: game.account?.member ?? false))
+		case "friendRemove": socialAction(game.social.removeFriend(s.first ?? ""))
+		case "ignoreAdd": socialAction(game.social.addIgnore(s.first ?? "", selfName37: game.selfName37))
+		case "ignoreRemove": socialAction(game.social.removeIgnore(s.first ?? ""))
+		case "isFriend": return b(game.social.isFriend(s.first ?? "", selfName37: game.selfName37))
+		case "isIgnored": return b(game.social.isIgnored(s.first ?? ""))
+		case "friendIndexOf": return r(game.social.indexOfFriend(s.first ?? ""))
+		case "ignoreCount": return r(game.social.friendsState == 0 ? -1 : game.social.ignores.count)
+		case "ignoreName":
+			let list = game.social.ignores
+			guard game.social.friendsState != 0, i(0) >= 0, i(0) < list.count else { return HostResult(strings: [""]) }
+			return HostResult(strings: [WordPack.displayName(list[i(0)])])
+		case "clanName": return HostResult(strings: [game.social.clanName.map { WordPack.titleCase($0) } ?? ""])
+		case "clanOwner": return HostResult(strings: [game.social.clanOwner.map { WordPack.titleCase($0) } ?? ""])
+		case "clanMemberCount": return r(game.social.inClan ? game.social.clanMembers.count : -1)
+		case "clanMemberName": return HostResult(strings: [clanMember(i(0))?.displayName ?? ""])
+		case "clanMemberWorld": return r(clanMember(i(0))?.world ?? 0)
+		case "clanMemberRank": return r(clanMember(i(0))?.rank ?? 0)
+		case "clanMemberWorldName": return HostResult(strings: [clanMember(i(0))?.worldName ?? ""])
+		case "clanMemberIsSelf":
+			let me = game.selfName37
+			return b(me != 0 && clanMember(i(0))?.name37 == me)
+		case "clanMinKick": return r(game.social.clanMinKick)
+		case "clanMyRank": return r(game.social.clanRank)
+		case "clanKick": socialAction(game.social.kick(s.first ?? ""))
+		case "clanJoin":
+			let n = Base37.encode(s.first ?? "")
+			if n != 0 { send(.clanJoinLeave(name37: n)) }
+		case "clanLeave": send(.clanJoinLeave(name37: 0))
 
 		// MARK: chat
 		case "chatMessageCount": return r(game.chatLog.size)
@@ -157,6 +198,20 @@ extension InterfaceScriptHost {
 			break
 		}
 		return HostResult()
+	}
+
+	/// A friend row for a script index, or nil when it is out of range.
+	func friend(_ i: Int) -> Friend? { i >= 0 && i < game.social.friends.count ? game.social.friends[i] : nil }
+	/// A clan member for a script index; nil when we are in no channel or the index is out of range.
+	func clanMember(_ i: Int) -> ClanMember? {
+		game.social.inClan && i >= 0 && i < game.social.clanMembers.count ? game.social.clanMembers[i] : nil
+	}
+
+	/// Sends the packet of a list change and files its notice in the chat history, then wakes the friends hooks
+	/// (rt4 sets `FriendsList.transmitAt` when it changes either list).
+	func socialAction(_ a: SocialAction) {
+		if let n = a.notice { game.chatLog.add(type: 0, name: "", message: n); chatAt = transmitTimer }
+		if let m = a.message { send(m); friendAt = transmitTimer }
 	}
 
 	/// rt4 `ClientProt.closeWidget`: closes every modal (type 0) sub-interface.

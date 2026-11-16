@@ -31,6 +31,9 @@ public final class WorldInteraction {
 	public internal(set) var walkText = "Walk here"
 	/// The pointer, for highlighting menu entries (rt4 `Mouse.lastMouseX/Y`).
 	public var pointer = (x: -1, y: -1)
+	/// What a tap at the held finger would do (rt4 `MiniMenu.method471`, the top-left line shown on hover):
+	/// the default menu entry plus "/ N more options". Nil when no finger is held over the world.
+	public internal(set) var preview: String?
 	/// Every message the interaction sent, for tests and debugging.
 	public var onSend: ((ClientMessage) -> Void)?
 
@@ -45,6 +48,7 @@ public final class WorldInteraction {
 		cross = Cross()
 		playerOptions = [PlayerOption?](repeating: nil, count: 8)
 		walkText = "Walk here"
+		preview = nil
 	}
 
 	/// One client cycle: rt4 `Protocol` advances the cross by 20 ms and hides it after 400.
@@ -92,6 +96,17 @@ extension GameClient {
 		return true
 	}
 
+	/// Touch (or hover) at (x, y) in game pixels: shows, at the top left, the action a tap there would run,
+	/// like rt4 does for the hovered entry ("Walk here", "Talk-to Hans / 2 more options"). Costs one picking pass.
+	public func previewTap(x: Int, y: Int) {
+		interaction.preview = nil
+		guard screen == .game, interaction.popup == nil, isOverWorld(x: x, y: y), let (menu, _) = buildMenu(x: x, y: y) else { return }
+		interaction.preview = menu.hoverText
+	}
+
+	/// The finger lifted or moved off (a drag steers the camera instead): hides the preview.
+	public func clearPreview() { interaction.preview = nil }
+
 	/// Closes the menu without choosing (rt4 clicks outside the menu).
 	public func dismissMenu() { interaction.popup = nil }
 
@@ -136,6 +151,9 @@ extension GameClient {
 		if c.type != 0, let sheet = try store.sprite(named: "cross") {
 			let frame = c.milliseconds / 100 + (c.type == 2 ? 4 : 0)
 			if frame < sheet.frames.count { r.draw(sheet.frames[frame], x: c.x - 8, y: c.y - 8) }
+		}
+		if interaction.popup == nil, let text = interaction.preview, let font = try store.font(named: "b12_full") {
+			font.drawLeft(text, x: 4, y: 15, color: 0xFFFFFF, shadow: 0, into: &r)
 		}
 		guard let p = interaction.popup, let font = try store.font(named: "b12_full") else { return }
 		r.fillRect(p.x, p.y, p.width, p.height, 0x5D5447)

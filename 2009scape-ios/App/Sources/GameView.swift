@@ -107,7 +107,22 @@ final class GameCanvasView: UIView, UIKeyInput {
 
 	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
 		longPressFired = false
+		// Show what a tap here would do while the finger is down (rt4's hover text at the top left).
+		if let t = touches.first {
+			let p = t.location(in: self)
+			client.previewTap(x: Int(p.x * scale), y: Int(p.y * scale))
+		}
 		super.touchesBegan(touches, with: event)
+	}
+
+	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+		client.clearPreview()
+		super.touchesEnded(touches, with: event)
+	}
+
+	override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+		client.clearPreview()
+		super.touchesCancelled(touches, with: event)
 	}
 
 	@objc private func pressed(_ g: UILongPressGestureRecognizer) {
@@ -135,6 +150,7 @@ final class GameCanvasView: UIView, UIKeyInput {
 			let p = g.location(in: self)
 			let start = CGPoint(x: p.x - g.translation(in: self).x, y: p.y - g.translation(in: self).y)
 			draggingCamera = !longPressFired && client.isOverWorld(x: Int(start.x * scale), y: Int(start.y * scale))
+			if draggingCamera { client.clearPreview() }
 			g.setTranslation(.zero, in: self)
 		case .changed:
 			guard draggingCamera else { return }
