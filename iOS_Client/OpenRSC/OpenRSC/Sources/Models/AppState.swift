@@ -26,7 +26,19 @@ final class AppState: ObservableObject {
     }()
 
     private static func withDefaultServers(_ savedServers: [ServerProfile]) -> [ServerProfile] {
-        var servers = savedServers
+        // Migrate profiles created by the retired Hetzner/WireGuard deployment
+        // and the earlier LAN address to the Raspberry Pi on the home network.
+        var servers = savedServers.map { profile in
+            guard profile.gameType == .rsc || profile.gameType == .rscWeb else { return profile }
+            let oldHosts = ["10.8.0.1", "192.168.0.25", "127.0.0.1", "localhost"]
+            guard oldHosts.contains(profile.host) else { return profile }
+            var migrated = profile
+            migrated.host = "192.168.0.30"
+            migrated.port = 43594
+            migrated.wsPort = 43494
+            migrated.name = profile.gameType == .rsc ? "2001scape (Home)" : "2001scape Web (Home)"
+            return migrated
+        }
 
         if !servers.contains(where: { $0.gameType == .rsc }) {
             servers.append(.openRSCDefault)

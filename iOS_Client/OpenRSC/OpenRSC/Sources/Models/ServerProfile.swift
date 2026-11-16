@@ -21,8 +21,8 @@ struct ServerProfile: Codable, Identifiable, Equatable {
     var rsaExponent: String = "10001"
 
     static let openRSCDefault = ServerProfile(
-        name: "2001scape (VPN)",
-        host: "10.8.0.1",
+        name: "2001scape (Home)",
+        host: "192.168.0.30",
         port: 43594,
         wsPort: 43494,
         lastUsername: "",
@@ -30,8 +30,8 @@ struct ServerProfile: Codable, Identifiable, Equatable {
     )
 
     static let openRSCWebDefault = ServerProfile(
-        name: "2001scape Web (VPN)",
-        host: "10.8.0.1",
+        name: "2001scape Web (Home)",
+        host: "192.168.0.30",
         port: 43594,
         wsPort: 43494,
         lastUsername: "",
