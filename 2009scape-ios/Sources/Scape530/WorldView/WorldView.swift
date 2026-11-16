@@ -46,6 +46,8 @@ public final class WorldView {
 	var chunk = (x: 0, z: 0)
 	/// Ground items per `level << 16 | x << 8 | z`, oldest first (rt4 `SceneGraph.objStacks`).
 	public internal(set) var objStacks: [Int: [GroundObj]] = [:]
+	/// Models of ground items (see `Items/GroundItems.swift`).
+	var groundModels: GroundItemModels?
 	/// The moving click flag on the minimap (scene tile), set when a walk is sent (rt4 `LoginManager.mapFlagX/Z`).
 	public var destinationFlag: (x: Int, z: Int)?
 
@@ -268,6 +270,7 @@ public final class WorldView {
 			scene = s
 			builtPlane = plane
 			buildCount += 1
+			placeAllObjStacks()
 		} catch {
 			buildErrors.append("scene build failed: \(error)")
 			scene = nil
