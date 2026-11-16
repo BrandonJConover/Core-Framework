@@ -14,6 +14,8 @@ public final class WorldView {
 	public private(set) var scene: Scene?
 	var raster3D: Rasteriser3D?
 	public var camera = WorldCamera()
+	/// The minimap and compass (drawn by `drawMinimap`, see `Minimap/`).
+	public private(set) lazy var minimap = Minimap(store: store)
 
 	var rebuild: RebuildNormal?
 	var needsBuild = false
@@ -54,6 +56,7 @@ public final class WorldView {
 
 	/// Feeds one session event (call before the event is applied to `GameState`).
 	func handle(_ e: GameSession.Event, varps: [Int: Int32]) {
+		minimap.handle(e)
 		switch e {
 		case .loggedIn(let a):
 			reset()

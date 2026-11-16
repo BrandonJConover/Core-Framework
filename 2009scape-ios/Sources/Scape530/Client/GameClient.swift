@@ -136,6 +136,7 @@ public final class GameClient {
 			if !(changed && drawnViewport) || pass == 1 { break }
 			r = Raster(width: width, height: height)
 		}
+		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
 		if inGame, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
 			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 16, color: 0xFFFF00, shadow: 0, into: &r)
 		}
