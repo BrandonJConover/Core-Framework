@@ -249,14 +249,14 @@ extension ScriptRunner {
 	func execObj(_ op: Int) throws {
 		if op == 4208 {
 			let (o, p) = try pop2()
-			guard let t = try store.obj(Int(o)) else { throw StackFault(message: "missing obj \(o)") }
+			guard let t = try store.objResolved(Int(o)) else { throw StackFault(message: "missing obj \(o)") }
 			try pushParam(t.params, param: Int(p))
 			return
 		}
 		let obj: Int32
 		var idx: Int32 = 0
 		if op == 4201 || op == 4202 { (obj, idx) = try pop2() } else { obj = try popI() }
-		guard let t = try store.obj(Int(obj)) else { throw StackFault(message: "missing obj \(obj)") }
+		guard let t = try store.objResolved(Int(obj)) else { throw StackFault(message: "missing obj \(obj)") }
 		switch op {
 		case 4200: try pushS(t.name)
 		case 4201: try pushS(idx >= 1 && idx <= 5 ? (t.ops[Int(idx) - 1] ?? "") : "")

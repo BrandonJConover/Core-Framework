@@ -141,7 +141,7 @@ enum MenuBuilder {
 	/// The ground item block of rt4 `addEntries` (newest stack entry first, ops 4 down to 0, then Examine).
 	static func addObjs(_ menu: inout Menu, world: WorldView, x: Int, z: Int) {
 		for stack in world.groundObjects(x: x, z: z).reversed() {
-			guard let t = (try? world.store.obj(stack.type)) ?? nil else { continue }
+			guard let t = (try? world.store.objResolved(stack.type)) ?? nil else { continue }
 			let base = "<col=ff9040>" + t.name
 			for i in stride(from: 4, through: 0, by: -1) {
 				guard let op = t.ops[i] else { continue }
