@@ -1,3 +1,5 @@
+import Foundation
+
 /// Loads config types from a cache, mirroring which archive/group each rt4
 /// `*TypeList` reads. Groups are decompressed once and kept, files decoded
 /// lazily and memoised.
@@ -24,6 +26,8 @@ public final class ConfigStore {
 	var indexes: [Int: Js5Index] = [:]
 	var groups: [Int: [Int: [UInt8]]] = [:]
 	var cache: [String: Any] = [:]
+	/// The cache directory this store reads, when it was made with `init(disk:)`.
+	private var diskDirectory: URL?
 
 	/// `source(archive, group)` returns the packed container (e.g. `DiskCache.read`).
 	public init(source: @escaping (Int, Int) -> [UInt8]?) {
@@ -32,6 +36,15 @@ public final class ConfigStore {
 
 	public convenience init(disk: DiskCache) {
 		self.init(source: { disk.read(archive: $0, group: $1) })
+		diskDirectory = disk.directory
+	}
+
+	/// A second store over the same cache files that shares no mutable state with this one (own memo
+	/// tables and disk handles), so another thread can use it while this one keeps running. Nil for
+	/// stores made from a custom `source`.
+	public func isolatedCopy() -> ConfigStore? {
+		guard let dir = diskDirectory, let disk = try? DiskCache(directory: dir) else { return nil }
+		return ConfigStore(disk: disk)
 	}
 
 	public func index(_ archive: Int) throws -> Js5Index {

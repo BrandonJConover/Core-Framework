@@ -14,10 +14,22 @@ public struct LocPlacement {
 
 /// rt4 per-loc state shared by `Loc` entities: the cycle counter and the
 /// variable lookup that resolves multi-locs (`LocType.getMultiLoc`).
+///
+/// A scene can be built on a background thread while the frame thread keeps updating the cycle counter and
+/// variables, so both are guarded by a lock.
 public final class LocEnvironment {
+	private let lock = NSLock()
+	private var _loop = 0
+	private var _varps: [Int: Int32] = [:]
 	/// rt4 `client.loop`.
-	public var loop = 0
-	public var varps: [Int: Int32] = [:]
+	public var loop: Int {
+		get { lock.lock(); defer { lock.unlock() }; return _loop }
+		set { lock.lock(); _loop = newValue; lock.unlock() }
+	}
+	public var varps: [Int: Int32] {
+		get { lock.lock(); defer { lock.unlock() }; return _varps }
+		set { lock.lock(); _varps = newValue; lock.unlock() }
+	}
 	public init() {}
 
 	/// rt4 `VarpDomain.getVarbit` / `activeVarps`: the value that selects a multi-loc/npc variant.

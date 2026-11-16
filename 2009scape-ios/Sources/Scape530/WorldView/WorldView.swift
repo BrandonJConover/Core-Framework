@@ -10,9 +10,18 @@ public final class WorldView {
 	let ctx: WorldContext
 	let env = LocEnvironment()
 	var textures: TextureStore?
-	var locBuilder: LocModelBuilder?
-	public private(set) var scene: Scene?
+	/// The built scene. Hidden (nil) while a rebuild is in flight: its coordinates no longer match the actors.
+	public var scene: Scene? { isBuilding ? nil : liveScene }
+	var liveScene: Scene?
 	var raster3D: Rasteriser3D?
+	/// rt4 `Preferences.removeRoofsSelectively` (false = `neverRemoveRoofs`, roofs always drawn).
+	public var removeRoofs = true
+	var roofs = RoofHider()
+	/// rt4's one-actor-per-tile rule (`ScriptRunner.method964` / `method3240`): of several size-1 actors standing
+	/// exactly on a tile centre only one is drawn. Off by default because it needs the stacked-actor entries
+	/// of rt4 `MiniMenu` (every actor on the picked tile listed) in `MenuBuilder`, which is not ported yet;
+	/// without them a hidden actor could not be tapped.
+	public var oneActorPerTile = false
 	public var camera = WorldCamera()
 	/// The minimap and compass (drawn by `drawMinimap`, see `Minimap/`).
 	public private(set) lazy var minimap = Minimap(store: store)
@@ -69,6 +78,22 @@ public final class WorldView {
 
 	public var isReady: Bool { scene != nil && self.selfActor != nil }
 
+	// MARK: async scene build state
+
+	/// Build the scene on a background thread when a REBUILD arrives (the live session turns this on). Off by
+	/// default so recorded sessions fed through `GameClient.handle` have their scene on the first frame.
+	public var asyncBuild = false
+	/// Incremented by every region change and reset; a finished build is adopted only if it carries the
+	/// current stamp (the others were overtaken).
+	var rebuildStamp = 0
+	/// Stamp of the build running on the background thread, nil when none is.
+	var inFlightStamp: Int?
+	let mailbox = BuildMailbox()
+	/// Zone messages that arrived while a build was in flight; replayed into the new scene when it is adopted.
+	var deferredZone: [ServerMessage] = []
+	/// True while the scene is being built in the background (the viewport shows rt4's loading box).
+	public var isBuilding: Bool { inFlightStamp != nil }
+
 	var selfActor: PathingActor? { ctx.players[selfIndex] }
 
 	/// The local player's position in world tiles.
@@ -91,7 +116,7 @@ public final class WorldView {
 		case .message(.spotAnimEntity(let delay, let height, let target, let gfx)):
 			applySpotAnimMessage(delay: delay, height: height, target: target, gfx: gfx)
 		case .message(let m):
-			applyZone(m)
+			if isBuilding { deferredZone.append(m) } else { applyZone(m) }
 		case .players(let result, let decoder):
 			env.varps = varps
 			applyPlayers(result, decoder)
@@ -104,8 +129,12 @@ public final class WorldView {
 	}
 
 	func reset() {
-		scene = nil
+		rebuildStamp += 1
+		inFlightStamp = nil
+		deferredZone = []
+		liveScene = nil
 		raster3D = nil
+		roofs = RoofHider()
 		rebuild = nil
 		needsBuild = false
 		builtPlane = -1
@@ -134,6 +163,7 @@ public final class WorldView {
 			camera.followX -= dx * 128
 			camera.followZ -= dz * 128
 		}
+		rebuildStamp += 1
 		zone = (r.zoneX, r.zoneZ)
 		ctx.originX = (r.zoneX - 6) * 8
 		ctx.originZ = (r.zoneZ - 6) * 8
@@ -241,17 +271,92 @@ public final class WorldView {
 
 	// MARK: scene build (rt4 LoginManager.rebuildMap + method743 / readLocs)
 
-	private func buildScene() {
-		guard let r = rebuild else { return }
+	/// The frame thread's side of the build: adopts a finished build (the single swap point), then starts a
+	/// build when a region change or plane change asks for one. Cheap when nothing is pending.
+	func updateBuild() {
+		if let done = mailbox.take() { adopt(done) }
+		guard inFlightStamp == nil else { return }
+		guard needsBuild || (liveScene != nil && builtPlane != plane && rebuild != nil), let r = rebuild else { return }
+		needsBuild = false
+		var buildStore = store
+		var async = false
+		if asyncBuild, let iso = store.isolatedCopy() { buildStore = iso; async = true }
+		let input = BuildInput(rebuild: r, plane: plane, store: buildStore, textures: textures, env: env, stamp: rebuildStamp, minimap: async)
+		if !async {
+			adopt(Self.performBuild(input))
+			return
+		}
+		inFlightStamp = input.stamp
+		let box = mailbox
+		DispatchQueue.global(qos: .userInitiated).async { box.put(Self.performBuild(input)) }
+	}
+
+	/// Blocks until a build in flight has finished and swaps it in (tests and shells that must not show the loading box).
+	public func finishBuild() {
+		updateBuild()
+		while inFlightStamp != nil {
+			adopt(mailbox.wait())
+			updateBuild()
+		}
+	}
+
+	/// The swap: installs the scene, collision and minimap of a finished build and replays the zone messages
+	/// that arrived meanwhile. Everything a build made is owned by the frame thread from here on.
+	private func adopt(_ b: BuiltWorld) {
+		if b.stamp != rebuildStamp {
+			// Overtaken by a newer REBUILD (or a reset); that one has its own build coming.
+			if inFlightStamp == b.stamp { inFlightStamp = nil }
+			return
+		}
+		inFlightStamp = nil
+		if textures == nil { textures = b.textures }
+		buildErrors = b.errors
+		lastBuildSeconds = b.seconds
+		collision = b.collision
+		placer = b.placer
+		liveScene = b.scene
+		if let s = b.scene {
+			builtPlane = b.plane
+			buildCount += 1
+			placer?.onPlaced = { [weak self] p in self?.onLocPlaced?(p) }
+			for p in b.placements { onLocPlaced?(p) }
+			if let img = b.minimapImage {
+				minimap.image = img
+				minimap.builtFor = (buildCount, s.centralPlane)
+			}
+			placeAllObjStacks()
+		}
+		let queued = deferredZone
+		deferredZone = []
+		for m in queued { applyZone(m) }
+	}
+
+	/// What a build needs. All of it is either immutable or owned by the build: `store` is a private copy for
+	/// background builds, `env` is lock-protected, `textures` is only read for its metadata.
+	struct BuildInput: @unchecked Sendable {
+		var rebuild: RebuildNormal
+		var plane: Int
+		var store: ConfigStore
+		var textures: TextureStore?
+		var env: LocEnvironment
+		var stamp: Int
+		/// Also render the minimap image (background builds; the frame thread builds it lazily otherwise).
+		var minimap: Bool
+	}
+
+	/// Runs one scene build without touching any `WorldView` state, so it can run on any thread.
+	static func performBuild(_ input: BuildInput) -> BuiltWorld {
+		let out = BuiltWorld(stamp: input.stamp, plane: input.plane)
 		let t0 = Date()
-		buildErrors = []
+		let r = input.rebuild, plane = input.plane, store = input.store
 		do {
-			if textures == nil { textures = try TextureStore(config: store) }
-			guard let ts = textures else { return }
-			let builder = locBuilder ?? LocModelBuilder(store: store) { id in ts.meta.indices.contains(id) && ts.meta[id].defined }
-			locBuilder = builder
-			builder.clearCaches()
+			let ts = try input.textures ?? TextureStore(config: store)
+			out.textures = ts
+			let defined = ts.meta.map(\.defined)
+			let builder = LocModelBuilder(store: store) { id in id >= 0 && id < defined.count && defined[id] }
 			let s = Scene(store: store, textures: ts, width: 104, length: 104)
+			// rt4 defaults `Preferences.allLevelsVisible` to true: every level is built so roofs exist to be hidden.
+			s.allLevelsVisible = true
 			let baseX = (r.zoneX - 6) * 8, baseZ = (r.zoneZ - 6) * 8
 			var squares: [MapSquare] = []
 			var collisionSquares: [CollisionBuilder.Square] = []
@@ -264,11 +369,11 @@ public final class WorldView {
 				regionLocs.append(locs ?? [])
 				if let sq = sq { collisionSquares.append(CollisionBuilder.Square(terrain: sq, locs: locs ?? [])) }
 			}
-			collision = (try? CollisionBuilder.build(baseX: baseX, baseZ: baseZ, squares: collisionSquares, locType: { try self.store.loc($0) }))
+			out.collision = (try? CollisionBuilder.build(baseX: baseX, baseZ: baseZ, squares: collisionSquares, locType: { try store.loc($0) }))
 				?? (0..<4).map { _ in CollisionMap(width: 104, length: 104) }
-			let placer = LocPlacer(scene: s, store: store, builder: builder, env: env)
-			placer.onPlaced = { [weak self] p in self?.onLocPlaced?(p) }
-			self.placer = placer
+			let placer = LocPlacer(scene: s, store: store, builder: builder, env: input.env)
+			var placed: [LocPlacement] = []
+			placer.onPlaced = { placed.append($0) }
 			var failures = 0
 			try s.loadMapSquares(squares, baseTileX: baseX, baseTileZ: baseZ, centralPlane: plane) { scene in
 				for (i, region) in r.regions.enumerated() {
@@ -280,17 +385,22 @@ public final class WorldView {
 					}
 				}
 			}
-			if failures > 0 { buildErrors.append("\(failures) locs failed to place") }
-			scene = s
-			builtPlane = plane
-			buildCount += 1
-			placeAllObjStacks()
+			if failures > 0 { out.errors.append("\(failures) locs failed to place") }
+			placer.onPlaced = nil
+			out.placements = placed
+			out.placer = placer
+			out.scene = s
+			if input.minimap {
+				let mm = Minimap(store: store)
+				mm.buildImage(scene: s, level: s.centralPlane, palette: mm.hslPalette())
+				out.minimapImage = mm.image
+			}
 		} catch {
-			buildErrors.append("scene build failed: \(error)")
-			scene = nil
+			out.errors.append("scene build failed: \(error)")
+			out.scene = nil
 		}
-		needsBuild = false
-		lastBuildSeconds = Date().timeIntervalSince(t0)
+		out.seconds = Date().timeIntervalSince(t0)
+		return out
 	}
 
 	// MARK: drawing
@@ -298,6 +408,11 @@ public final class WorldView {
 	/// Draws the world into `raster` inside `rect` (game pixels). Returns false when there is nothing to draw yet.
 	@discardableResult
 	public func draw(into raster: inout Raster, rect: (x: Int, y: Int, w: Int, h: Int)) -> Bool {
+		updateBuild()
+		if isBuilding {
+			drawLoadingBox(into: &raster, rect: rect)
+			return true
+		}
 		guard let r3 = renderScene(rect: rect, pick: nil) else { return false }
 		r3.copy(into: &raster, x: rect.x, y: rect.y)
 		drawOverlays(into: &raster, rect: rect)
@@ -307,7 +422,7 @@ public final class WorldView {
 	/// Renders the scene into the 3D buffer; with `pick` set, also runs rt4's mouse picking at that
 	/// point (game pixels) and leaves the result in `ScenePicker.shared`. Nil when there is nothing to draw yet.
 	func renderScene(rect: (x: Int, y: Int, w: Int, h: Int), pick: (x: Int, y: Int)?) -> Rasteriser3D? {
-		if needsBuild || (scene != nil && builtPlane != plane && rebuild != nil) { buildScene() }
+		updateBuild()
 		guard let scene = scene, let me = selfActor, rect.w > 0, rect.h > 0 else { return nil }
 
 		// The 3D buffer matches the viewport; textures and brightness are set once per buffer.
@@ -351,16 +466,73 @@ public final class WorldView {
 			guard a.isVisible, let m = spotAnimModel(for: a) else { return }
 			scene.add(level: level, xFine: a.xFine, zFine: a.zFine, y: a.groundY, radius: (a.size - 1) * 64 + 60, entity: m, yaw: a.yaw, key: key, extend: false)
 		}
-		for (id, a) in ctx.npcs { place(a, key: Int64(id) << 32 | 0x2000_0000); placeSpot(a, key: Int64(id) << 32 | 0x2000_0000) }
-		for (id, a) in ctx.players { place(a, key: Int64(id) << 32); placeSpot(a, key: Int64(id) << 32) }
+		placeActors(place: { place($0, key: $1) }, placeSpot: { placeSpot($0, key: $1) })
 
 		camera.clampAngles()
 		let groundY = scene.tileHeight(level: level, xFine: me.xFine, zFine: me.zFine)
 		let eye = camera.eye(groundY: groundY)
 		overlayCamera = OverlayCamera(x: eye.x, y: eye.y, z: eye.z, pitch: eye.pitch, yaw: eye.yaw, level: level,
 		                              centerX: Int(r3.centerX), centerY: Int(r3.centerY))
-		scene.draw(into: r3, cameraX: eye.x, cameraY: eye.y, cameraZ: eye.z, pitch: eye.pitch, yaw: eye.yaw, plane: level,
-		           playerTile: (me.xFine >> 7, me.zFine >> 7))
+		let playerTile = (x: me.xFine >> 7, z: me.zFine >> 7)
+		// rt4 `ScriptRunner.method4302`: roofs above the player (or where the camera ray enters a building) are hidden.
+		roofs.update(scene: scene, plane: level, playerTile: playerTile, cameraX: eye.x, cameraZ: eye.z, pitch: eye.pitch)
+		scene.draw(into: r3, cameraX: eye.x, cameraY: eye.y, cameraZ: eye.z, pitch: eye.pitch, yaw: eye.yaw, plane: 3,
+		           playerTile: (playerTile.x, playerTile.z),
+		           hideMask: removeRoofs ? roofs.mask : nil, hideFromLevel: level + 1, hideValue: roofs.hideValue, roofBoxes: roofs.boxes)
 		return r3
+	}
+
+	/// Adds this frame's actors to the scene in rt4's order: the local player, npcs with top render priority,
+	/// the other players, then the other npcs (`ScriptRunner.method4326`). With `oneActorPerTile` each pass counts
+	/// the actors on every tile centre first; an actor on a tile with a count above one is skipped and
+	/// decrements it, so the last actor of a pass is the one drawn, and an actor drawn by an earlier pass
+	/// hides all later ones. rt4 walks `PlayerList.ids` / `NpcList.ids` (entry order); ascending index is used here.
+	private func placeActors(place: (PathingActor, Int64) -> Void, placeSpot: (PathingActor, Int64) -> Void) {
+		var counts = [Int](repeating: 0, count: oneActorPerTile ? 104 * 104 : 0)
+		func covered(_ a: PathingActor, forDraw: Bool) -> (x0: Int, x1: Int, z0: Int, z1: Int)? {
+			let size = a.size
+			let cx = a.xFine & 0x7F, cz = a.zFine & 0x7F
+			if size == 1 {
+				guard cx == 64 && cz == 64 else { return nil }
+				let x = a.xFine >> 7, z = a.zFine >> 7
+				return (x, x + 1, z, z + 1)
+			}
+			// rt4's draw test for players has z == 0 for odd sizes (kept); npcs and the count pass use 64.
+			let zOdd = (forDraw && a.kind == .player) ? 0 : 64
+			guard (size & 1 == 0 && cx == 0 && cz == 0) || (size & 1 == 1 && cx == 64 && cz == (forDraw ? zOdd : 64)) else { return nil }
+			let x0 = (a.xFine - size * 64) >> 7, z0 = (a.zFine - size * 64) >> 7
+			return (max(x0, 0), min(x0 + size, 104), max(z0, 0), min(z0 + size, 104))
+		}
+		func pass(_ all: [(PathingActor, Int64)]) {
+			let list = all.filter { $0.0.isVisible }
+			guard oneActorPerTile else {
+				for (a, key) in list { place(a, key); placeSpot(a, key) }
+				return
+			}
+			for (a, _) in list {
+				guard let c = covered(a, forDraw: false) else { continue }
+				for x in c.x0..<max(c.x0, c.x1) { for z in c.z0..<max(c.z0, c.z1) where x >= 0 && z >= 0 && x < 104 && z < 104 { counts[x * 104 + z] += 1 } }
+			}
+			for (a, key) in list {
+				if let c = covered(a, forDraw: true) {
+					let xs = max(c.x0, 0)..<max(max(c.x0, 0), min(c.x1, 104)), zs = max(c.z0, 0)..<max(max(c.z0, 0), min(c.z1, 104))
+					if a.size == 1 {
+						guard !xs.isEmpty && !zs.isEmpty else { continue }
+						if counts[xs.lowerBound * 104 + zs.lowerBound] > 1 { counts[xs.lowerBound * 104 + zs.lowerBound] -= 1; continue }
+					} else if !xs.isEmpty && !zs.isEmpty && xs.allSatisfy({ x in zs.allSatisfy { counts[x * 104 + $0] > 1 } }) {
+						for x in xs { for z in zs { counts[x * 104 + z] -= 1 } }
+						continue
+					}
+				}
+				place(a, key); placeSpot(a, key)
+			}
+		}
+		let npcKey = { (id: Int) in Int64(id) << 32 | 0x2000_0000 }
+		let me = ctx.players[selfIndex]
+		let npcs = ctx.npcs.sorted { $0.key < $1.key }
+		pass(me.map { [($0, Int64(selfIndex) << 32)] } ?? [])
+		pass(npcs.filter { $0.value.npcType?.topRenderPriority == true }.map { ($0.value, npcKey($0.key)) })
+		pass(ctx.players.sorted { $0.key < $1.key }.filter { $0.key != selfIndex }.map { ($0.value, Int64($0.key) << 32) })
+		pass(npcs.filter { $0.value.npcType?.topRenderPriority != true }.map { ($0.value, npcKey($0.key)) })
 	}
 }

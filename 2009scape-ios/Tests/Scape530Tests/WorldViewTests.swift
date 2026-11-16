@@ -140,6 +140,138 @@ final class WorldViewTests: XCTestCase {
 		}
 	}
 
+	/// rt4 selective roof removal: standing outside, the castle roofs are drawn; stepping under a roof
+	/// (a tile with render flag 4) hides the levels above, so the player is visible indoors.
+	func testRoofsHiddenWhenIndoors() throws {
+		let s = try store()
+		let client = try GameClient(store: s, server: .init(host: "127.0.0.1", port: 1))
+		try replay(client)
+		let world = client.world
+		let (w, h) = (1015, 469)
+		var outside = Raster(width: w, height: h)
+		XCTAssertTrue(world.draw(into: &outside, rect: (0, 0, w, h)))
+		try save(outside, "roof-outside")
+		let scene = try XCTUnwrap(world.scene)
+		let me = try XCTUnwrap(world.selfActor)
+		XCTAssertEqual(world.plane, 0)
+		let here = (x: me.xFine >> 7, z: me.zFine >> 7)
+		XCTAssertEqual(scene.renderFlags[0][here.x][here.z] & 4, 0, "the courtyard has no roof")
+		var upperHidden = 0
+		for l in 1...3 { for x in 0..<104 { for z in 0..<104 where world.roofs.mask[l][x][z] == world.roofs.hideValue { upperHidden += 1 } } }
+		XCTAssertEqual(upperHidden, 0, "nothing hidden outdoors")
+		// Nearest roofed tile on the ground level that is not at the scene border.
+		var best: (x: Int, z: Int)?
+		var bestD = Int.max
+		for x in 8..<96 { for z in 8..<96 where scene.renderFlags[0][x][z] & 4 != 0 && scene.tiles[1][x][z] != nil {
+			let d = abs(x - here.x) + abs(z - here.z)
+			if d < bestD { bestD = d; best = (x, z) }
+		} }
+		let roofed = try XCTUnwrap(best)
+		print("roofed tile \(roofed), \(bestD) tiles away; player at \(here)")
+		// Walk in: put the player there (the camera snaps after a long jump) and draw with and without roof removal.
+		me.xFine = roofed.x * 128 + 64; me.zFine = roofed.z * 128 + 64
+		for i in 0..<10 { me.queueX[i] = roofed.x; me.queueZ[i] = roofed.z }
+		world.cycle(varps: client.state.varps)
+		world.removeRoofs = false
+		var covered = Raster(width: w, height: h)
+		XCTAssertTrue(world.draw(into: &covered, rect: (0, 0, w, h)))
+		world.removeRoofs = true
+		var indoors = Raster(width: w, height: h)
+		XCTAssertTrue(world.draw(into: &indoors, rect: (0, 0, w, h)))
+		try save(covered, "roof-indoors-roofs-drawn")
+		try save(indoors, "roof-indoors-hidden")
+		upperHidden = 0
+		for l in 1...3 { for x in 0..<104 { for z in 0..<104 where world.roofs.mask[l][x][z] == world.roofs.hideValue { upperHidden += 1 } } }
+		XCTAssertGreaterThan(upperHidden, 0, "roof tiles above the player are stamped")
+		XCTAssertNotEqual(covered.pixels, indoors.pixels, "hiding roofs changes the picture")
+		XCTAssertTrue(world.roofs.mask[1][roofed.x][roofed.z] == world.roofs.hideValue, "the tile above the player is hidden")
+	}
+
+	/// The scene is built on a background thread: while it builds, the viewport shows rt4's loading box and
+	/// nothing blocks; once swapped in, the world is identical to a synchronous build.
+	func testAsyncBuildMatchesSyncBuild() throws {
+		let s = try store()
+		let sync = try GameClient(store: s, server: .init(host: "127.0.0.1", port: 1))
+		try replay(sync)
+		let (w, h) = (852, 393)
+		var expected = Raster(width: w, height: h)
+		XCTAssertTrue(sync.world.draw(into: &expected, rect: (0, 0, w, h)))
+		XCTAssertFalse(sync.world.isBuilding)
+
+		let async = try GameClient(store: s, server: .init(host: "127.0.0.1", port: 1))
+		async.world.asyncBuild = true
+		try replay(async)
+		let world = async.world
+		XCTAssertNil(world.scene, "nothing is drawn before the build finishes")
+		var loading = Raster(width: w, height: h)
+		let t0 = Date()
+		XCTAssertTrue(world.draw(into: &loading, rect: (0, 0, w, h)))
+		XCTAssertLessThan(Date().timeIntervalSince(t0), 0.5, "drawing while building does not wait for the build")
+		XCTAssertTrue(world.isBuilding)
+		XCTAssertEqual(loading.pixels[200 * w + 400], 0xFF00_0000, "the viewport is black")
+		XCTAssertEqual(loading.pixels[6 * w + 20], 0xFFFF_FFFF, "the loading box outline is at (6, 6)")
+		try save(loading, "world-loading")
+		world.finishBuild()
+		XCTAssertFalse(world.isBuilding)
+		XCTAssertEqual(world.buildErrors, [])
+		XCTAssertEqual(world.buildCount, 1)
+		let a = try XCTUnwrap(world.scene), b = try XCTUnwrap(sync.world.scene)
+		XCTAssertEqual(a.tileHeights, b.tileHeights)
+		XCTAssertEqual(a.renderFlags, b.renderFlags)
+		XCTAssertEqual(world.collision.map(\.flags), sync.world.collision.map(\.flags))
+		var got = Raster(width: w, height: h)
+		XCTAssertTrue(world.draw(into: &got, rect: (0, 0, w, h)))
+		try save(got, "world-async")
+		// Animated textures follow the wall clock, so allow a sliver of difference.
+		let same = zip(got.pixels, expected.pixels).filter { $0 == $1 }.count
+		XCTAssertGreaterThan(Double(same) / Double(got.pixels.count), 0.97, "an async build draws the same frame as a synchronous one")
+		// The minimap image was rendered on the build thread and is used as is.
+		XCTAssertEqual(world.minimap.builtFor.0, 1)
+	}
+
+	/// rt4's one-actor-per-tile rule: of two actors on one tile centre only one is drawn (the player wins over npcs).
+	func testOneActorPerTile() throws {
+		let client = try GameClient(store: try store(), server: .init(host: "127.0.0.1", port: 1))
+		try replay(client)
+		let world = client.world
+		let (w, h) = (852, 393)
+		var r = Raster(width: w, height: h)
+		XCTAssertTrue(world.draw(into: &r, rect: (0, 0, w, h)))
+		let me = try XCTUnwrap(world.selfActor)
+		let npc = try XCTUnwrap(world.ctx.npcs.values.first { $0.isVisible })
+		npc.xFine = me.xFine; npc.zFine = me.zFine
+		for i in 0..<10 { npc.queueX[i] = me.queueX[0]; npc.queueZ[i] = me.queueZ[0] }
+		let actors = { (world.scene?.sceneryList.count ?? 0) }
+		world.oneActorPerTile = false
+		XCTAssertTrue(world.draw(into: &r, rect: (0, 0, w, h)))
+		let all = actors()
+		world.oneActorPerTile = true
+		XCTAssertTrue(world.draw(into: &r, rect: (0, 0, w, h)))
+		XCTAssertEqual(actors(), all - 1, "the npc standing on the player is not drawn")
+	}
+
+	/// Frame times of the replayed scene (run with `SCAPE530_PERF=1`, ideally `swift test -c release`).
+	func testFrameTimes() throws {
+		guard ProcessInfo.processInfo.environment["SCAPE530_PERF"] != nil else { throw XCTSkip("set SCAPE530_PERF=1 to time frames") }
+		let client = try GameClient(store: try store(), server: .init(host: "127.0.0.1", port: 1))
+		try replay(client)
+		for (w, h) in [(1015, 469), (1278, 589)] {
+			_ = try client.frame(width: w, height: h)
+			var world = [Double](), full = [Double]()
+			var bare = Raster(width: w, height: h)
+			for _ in 0..<(Int(ProcessInfo.processInfo.environment["SCAPE530_PERF_N"] ?? "") ?? 12) {
+				var t = Date()
+				_ = client.world.draw(into: &bare, rect: (0, 0, w, h))
+				world.append(Date().timeIntervalSince(t) * 1000)
+				t = Date()
+				_ = try client.frame(width: w, height: h)
+				full.append(Date().timeIntervalSince(t) * 1000)
+			}
+			func stat(_ a: [Double]) -> String { String(format: "min %.1f ms, median %.1f ms", a.min() ?? 0, a.sorted()[a.count / 2]) }
+			print("PERF \(w)x\(h) world: \(stat(world)); full frame: \(stat(full))")
+		}
+	}
+
 	/// Drags and pinches change the picture; actors move between ticks.
 	func testCameraControlsChangeFrame() throws {
 		let s = try store()

@@ -21,10 +21,11 @@ extension Scene {
 	///   - pitch: 0...2047 (rt4 camera pitch, typically 128...383); yaw 0...2047.
 	///   - plane: highest level to draw (3 draws everything built).
 	///   - playerTile: tile whose surroundings (16 tiles) keep hidden entities animating; defaults to the camera tile.
+	///   - roofBoxes: the hidden-roof boxes of `RoofHider`, whose occluders are dropped.
 	///   - hideMask: rt4's roof-hiding map (`[level][x][z]`): tiles at `level >= hideFromLevel` whose entry equals `hideValue` are skipped.
 	public func draw(into r: Rasteriser3D, cameraX: Int, cameraY: Int, cameraZ: Int, pitch: Int, yaw: Int, plane: Int = 3,
 	                 playerTile: (x: Int, z: Int)? = nil,
-	                 hideMask: [[[UInt8]]]? = nil, hideFromLevel: Int = 0, hideValue: UInt8 = 0) {
+	                 hideMask: [[[UInt8]]]? = nil, hideFromLevel: Int = 0, hideValue: UInt8 = 0, roofBoxes: [RoofBox] = []) {
 		var cx = cameraX, cz = cameraZ
 		if cx < 0 { cx = 0 } else if cx >= width * 128 { cx = width * 128 - 1 }
 		if cz < 0 { cz = 0 } else if cz >= length * 128 { cz = length * 128 - 1 }
@@ -45,6 +46,7 @@ extension Scene {
 		self.hideMask = hideMask
 		self.hideFromLevel = hideFromLevel
 		self.hideValue = hideValue
+		self.roofBoxes = roofBoxes
 
 		// Per-corner visibility over the (2v+2)^2 grid, then per tile as "any of its four corners".
 		let v = visibility
@@ -100,7 +102,14 @@ extension Scene {
 	func selectActiveOccluders() {
 		activeOccluders.removeAll(keepingCapacity: true)
 		let v = visibility
-		for o in occluders {
+		occluderLoop: for o in occluders {
+			// Occluders inside a hidden roof box are dropped (rt4 `method2419` with `anIntArray8...`).
+			for b in roofBoxes where b.height != -1_000_000
+				&& (o.yHigh <= b.height || o.yLow <= b.height)
+				&& (o.minX <= b.maxX || o.maxX <= b.maxX) && (o.minX >= b.minX || o.maxX >= b.minX)
+				&& (o.minZ <= b.maxZ || o.maxZ <= b.maxZ) && (o.minZ >= b.minZ || o.maxZ >= b.minZ) {
+				continue occluderLoop
+			}
 			switch o.type {
 			case 1:
 				let i = o.minTileX + v - cameraTileX
