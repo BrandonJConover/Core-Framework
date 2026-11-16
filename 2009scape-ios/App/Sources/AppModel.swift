@@ -24,10 +24,22 @@ final class AppModel: ObservableObject {
 	/// Speaker output for the client's music and sound effects.
 	private var audioOutput: AudioOutput?
 
+	/// Brandon's home test server (the Linux machine on the LAN). Used until another address is saved;
+	/// addresses of earlier test hosts (the Mac, the old default) are replaced by it.
+	static let defaultHost = "192.168.0.223"
+	static let defaultPort = 43595
+	private static let retiredHosts: Set<String> = ["", "127.0.0.1", "192.168.0.12", "192.168.0.30"]
+
 	init() {
-		host = UserDefaults.standard.string(forKey: "server.host") ?? ""
+		let saved = UserDefaults.standard.string(forKey: "server.host") ?? ""
 		let p = UserDefaults.standard.integer(forKey: "server.port")
-		port = p == 0 ? 43595 : p
+		if Self.retiredHosts.contains(saved) {
+			host = Self.defaultHost
+			port = Self.defaultPort
+		} else {
+			host = saved
+			port = p == 0 ? Self.defaultPort : p
+		}
 		let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
 		cacheDirectory = support.appendingPathComponent("cache530", isDirectory: true)
 		start()
