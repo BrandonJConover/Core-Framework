@@ -53,8 +53,9 @@ extension SoftwareModel {
 	///
 	/// The camera is given as sin/cos of pitch and yaw (16.16 fixed point, from
 	/// `MathTables`); scene coordinates are relative to the camera. `key` is
-	/// rt4's picking key and is unused here (picking is not ported), as are the
-	/// particle system and rt4's `arg9`.
+	/// rt4's picking key: when it is positive and `ScenePicker.shared.allowInput`
+	/// is set, a model whose screen box holds the mouse reports its key (see
+	/// `ScenePicker`). The particle system and rt4's `arg9` are not ported.
 	public func render(_ r: Rasteriser3D, yaw: Int, sinPitch sinCameraPitch: Int, cosPitch cosCameraPitch: Int, sinYaw sinCameraYaw: Int, cosYaw cosCameraYaw: Int, x sceneX: Int, y sceneY: Int, z sceneZ: Int, key: Int64 = 0) {
 		ensureBounds()
 		let a = (sceneZ * cosCameraYaw - sceneX * sinCameraYaw) >> 16
@@ -85,6 +86,46 @@ extension SoftwareModel {
 			yawSin = MathTables.sin[yaw & 2047]
 			yawCos = MathTables.cos[yaw & 2047]
 		}
+
+		// Mouse picking (rt4 `SoftwareModel.render`): a coarse screen box first, then the projected
+		// bounding box; pickable models (actors) report right there, the rest are tested per triangle.
+		var testTriangles = false
+		let picker = ScenePicker.shared
+		if key > 0 && picker.allowInput && d > 0 {
+			var left: Int, right: Int, top: Int, bottom: Int
+			if e > 0 { left = maxScreenX / c; right = minScreenX / d } else { left = maxScreenX / d; right = minScreenX / c }
+			if f > 0 { top = maxScreenY / c; bottom = minScreenY / d } else { top = maxScreenY / d; bottom = minScreenY / c }
+			if picker.mouseX >= left && picker.mouseX <= right && picker.mouseY >= top && picker.mouseY <= bottom {
+				left = 999999; right = -999999; top = 999999; bottom = -999999
+				let bx = [minX, maxX, minX, maxX, minX, maxX, minX, maxX]
+				let bz = [minZ, minZ, maxZ, maxZ, minZ, minZ, maxZ, maxZ]
+				let by = [minY, minY, minY, minY, maxY, maxY, maxY, maxY]
+				for i in 0..<8 {
+					var px = bx[i], py = by[i], pz = bz[i]
+					if yaw != 0 {
+						let t = (pz * yawSin + px * yawCos) >> 16
+						pz = (pz * yawCos - px * yawSin) >> 16
+						px = t
+					}
+					px += sceneX
+					py += sceneY
+					pz += sceneZ
+					var t = (pz * sinCameraYaw + px * cosCameraYaw) >> 16
+					pz = (pz * cosCameraYaw - px * sinCameraYaw) >> 16
+					px = t
+					t = (py * cosCameraPitch - pz * sinCameraPitch) >> 16
+					pz = (py * sinCameraPitch + pz * cosCameraPitch) >> 16
+					if pz > 0 {
+						let sx = (px << 9) / pz, sy = (t << 9) / pz
+						left = min(left, sx); right = max(right, sx)
+						top = min(top, sy); bottom = max(bottom, sy)
+					}
+				}
+				if picker.mouseX >= left && picker.mouseX <= right && picker.mouseY >= top && picker.mouseY <= bottom {
+					if pickable { picker.add(key) } else { testTriangles = true }
+				}
+			}
+		}
 		for v in 0..<vertexCount {
 			var x = vertexX[v], y = vertexY[v], z = vertexZ[v]
 			if yaw != 0 {
@@ -114,7 +155,7 @@ extension SoftwareModel {
 				s.projectZ[v] = z
 			}
 		}
-		drawProjected(r, s, anyBehind, b - d, c - d + 2)
+		drawProjected(r, s, anyBehind, b - d, c - d + 2, pickKey: testTriangles ? key : 0)
 	}
 
 	/// rt4 `SoftwareModel.setCamera` (`method4573` family in the brief): draws
@@ -211,7 +252,8 @@ extension SoftwareModel {
 	/// visible triangle into a depth bucket (`depthOffset` shifts depths to
 	/// non-negative, `bucketLimit` is the number of buckets in use), then
 	/// draws far to near, interleaving the priority lists as rt4 does.
-	private func drawProjected(_ r: Rasteriser3D, _ s: ModelRenderScratch, _ anyBehind: Bool, _ depthOffset: Int, _ bucketLimit: Int) {
+	private func drawProjected(_ r: Rasteriser3D, _ s: ModelRenderScratch, _ anyBehind: Bool, _ depthOffset: Int, _ bucketLimit: Int, pickKey: Int64 = 0) {
+		var pickKey = pickKey
 		if bucketLimit >= ModelRenderScratch.depthBuckets { return }
 		for i in 0..<ModelRenderScratch.depthBuckets { s.bucketCount[i] = 0 }
 		for i in 0..<ModelRenderScratch.overflowRows { s.overflowCount[i] = 0 }
@@ -263,6 +305,16 @@ extension SoftwareModel {
 					file(i, (s.vertexDepth[a] + s.vertexDepth[b] + s.vertexDepth[c]) / 3 + depthOffset)
 				}
 			} else {
+				// rt4 `draw`: the mouse test runs before the back-face test, once per model.
+				if pickKey != 0 {
+					let picker = ScenePicker.shared
+					let ya = s.vertexScreenY[a], yb = s.vertexScreenY[b], yc = s.vertexScreenY[c]
+					let mx = picker.mouseX + Int(r.centerX), my = picker.mouseY + Int(r.centerY)
+					if !(my < ya && my < yb && my < yc) && !(my > ya && my > yb && my > yc) && !(mx < xa && mx < xb && mx < xc) && (mx <= xa || mx <= xb || mx <= xc) {
+						picker.add(pickKey)
+						pickKey = 0
+					}
+				}
 				let cross = Int32(truncatingIfNeeded: xa - xb) &* Int32(truncatingIfNeeded: s.vertexScreenY[c] - s.vertexScreenY[b])
 					&- Int32(truncatingIfNeeded: s.vertexScreenY[a] - s.vertexScreenY[b]) &* Int32(truncatingIfNeeded: xc - xb)
 				if cross > 0 {

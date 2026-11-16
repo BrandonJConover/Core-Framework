@@ -25,4 +25,15 @@ public enum ClientProt {
 	public static let moveMinimapclick = 39
 	public static let closeModal = 184
 	public static let noTimeout = 93 // assumed
+	/// Walk toward an interaction target (rt4 `ClientProt.method3502` with argument 2).
+	public static let moveInteract = 77
+	/// OPNPC1...5 (rt4 `MiniMenu` actions 17, 16, 4, 19, 2).
+	public static let opNpc = [78, 3, 148, 30, 218]
+	public static let examineNpc = 72
+	/// OPLOC1...5 (actions 42, 50, 49, 46, 1001).
+	public static let opLoc = [254, 194, 84, 247, 170]
+	public static let examineLoc = 94
+	/// OPOBJ1...5 for ground items (actions 21, 34, 18, 20, 24).
+	public static let opObj = [228, 109, 66, 33, 48]
+	public static let examineObj = 92
 }

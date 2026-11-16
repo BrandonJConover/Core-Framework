@@ -24,16 +24,29 @@ final class GameCanvasView: UIView, UIKeyInput {
 	/// Game pixels per point.
 	private var scale: CGFloat = 1
 	private let colorSpace = CGColorSpaceCreateDeviceRGB()
+	/// True once a long press opened the world menu during the current touch, so its lift is not also a tap.
+	private var longPressFired = false
+	/// True while a one-finger drag that started over the 3D world is turning the camera.
+	private var draggingCamera = false
 
 	init(client: GameClient) {
 		self.client = client
 		super.init(frame: .zero)
 		backgroundColor = .black
-		isMultipleTouchEnabled = false
+		isMultipleTouchEnabled = true // pinch zooms the camera
 		layer.contentsGravity = .resize
 		layer.magnificationFilter = .linear
 		layer.minificationFilter = .linear
 		addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped(_:))))
+		// Long press = rt4's right click (opens the menu at the touch point).
+		let press = UILongPressGestureRecognizer(target: self, action: #selector(pressed(_:)))
+		press.minimumPressDuration = 0.45
+		addGestureRecognizer(press)
+		// One-finger drag over the world turns the camera; pinch zooms it.
+		let pan = UIPanGestureRecognizer(target: self, action: #selector(panned(_:)))
+		pan.maximumNumberOfTouches = 1
+		addGestureRecognizer(pan)
+		addGestureRecognizer(UIPinchGestureRecognizer(target: self, action: #selector(pinched(_:))))
 		NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
 		NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
 	}
@@ -92,7 +105,43 @@ final class GameCanvasView: UIView, UIKeyInput {
 			provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
 	}
 
+	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+		longPressFired = false
+		super.touchesBegan(touches, with: event)
+	}
+
+	@objc private func pressed(_ g: UILongPressGestureRecognizer) {
+		guard g.state == .began else { return }
+		let p = g.location(in: self)
+		longPressFired = client.longPress(x: Int(p.x * scale), y: Int(p.y * scale))
+	}
+
+	@objc private func panned(_ g: UIPanGestureRecognizer) {
+		switch g.state {
+		case .began:
+			// Only drags that start on the 3D world (not on an interface or the open menu) steer the camera.
+			let p = g.location(in: self)
+			let start = CGPoint(x: p.x - g.translation(in: self).x, y: p.y - g.translation(in: self).y)
+			draggingCamera = !longPressFired && client.isOverWorld(x: Int(start.x * scale), y: Int(start.y * scale))
+			g.setTranslation(.zero, in: self)
+		case .changed:
+			guard draggingCamera else { return }
+			let t = g.translation(in: self)
+			client.cameraDrag(dx: Double(t.x * scale), dy: Double(t.y * scale))
+			g.setTranslation(.zero, in: self)
+		default:
+			draggingCamera = false
+		}
+	}
+
+	@objc private func pinched(_ g: UIPinchGestureRecognizer) {
+		guard g.state == .changed else { return }
+		client.cameraPinch(scale: Double(g.scale))
+		g.scale = 1
+	}
+
 	@objc private func tapped(_ g: UITapGestureRecognizer) {
+		guard !longPressFired else { return }
 		let p = g.location(in: self)
 		client.tap(x: Int(p.x * scale), y: Int(p.y * scale))
 		syncKeyboard()

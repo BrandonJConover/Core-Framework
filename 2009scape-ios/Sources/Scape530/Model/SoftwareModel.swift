@@ -43,6 +43,8 @@ public final class SoftwareModel {
 	public var triangleSources: [Int16]?
 
 	var boundsValid = false
+	/// rt4 `Model.pickable`: set on actor models, which report a pick from their bounding box alone.
+	public var pickable = false
 	/// rt4 `aBoolean304`: set by colour transforms; cleared by re-lighting in `Anim`.
 	var needsRelight = false
 	public private(set) var minX = 0, maxX = 0, minY = 0, maxY = 0, minZ = 0, maxZ = 0
