@@ -23,7 +23,7 @@ with this package.
 │   │   ├── Net/             # JS5 + login + game packets: typed ServerMessage/ClientMessage, PLAYER/NPC_INFO
 │   │   ├── Config/          # obj/npc/loc/seq/spotanim/varbit/enum/floor/idk/bas decoders
 │   │   ├── Graphics/        # SpriteSheet, BitmapFont (rt4 fonts + tags), Raster (software 2D), PNG
-│   │   ├── Interface/       # Component (if1/if3) decoder, InterfaceRenderer (rt4 layout + drawing)
+│   │   ├── Interface/       # Component (if1/if3) decoder, InterfaceRenderer (rt4 layout + drawing), InterfaceScriptHost (CS2 host: components, vars, hooks, taps)
 │   │   └── Client/          # GameSession (network thread), GameState, GameClient (screens + input)
 │   └── scape530-probe/      # CLI to exercise the core against a cache or live server
 ├── App/                     # iOS app shell (xcodegen project.yml + SwiftUI/UIKit sources)

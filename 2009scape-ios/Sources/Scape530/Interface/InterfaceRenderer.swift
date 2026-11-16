@@ -13,6 +13,13 @@ public struct InterfaceState {
 	public var scroll: [Int: Int] = [:]
 	/// Base size overrides (CS2 `cc_setsize`), applied before dynamic sizing.
 	public var size: [Int: (w: Int, h: Int)] = [:]
+	/// Whole-component replacements made by CS2 (or by the script host for
+	/// IF_* packets): a static component's current state, keyed by its id.
+	/// When present it is drawn instead of the cache component.
+	public var overrides: [Int: Component] = [:]
+	/// CS2-created children (`cc_create`): parent layer id -> child index ->
+	/// component. Drawn after the layer's static children.
+	public var dynamic: [Int: [Int: Component]] = [:]
 
 	public init() {}
 
@@ -97,13 +104,19 @@ public final class InterfaceRenderer {
 	func renderLayer(_ comps: [Component?], parent: Int, ox: Int, oy: Int, pw: Int, ph: Int, state: InterfaceState, into r: inout Raster) throws {
 		let clip = (r.clipLeft, r.clipTop, r.clipRight, r.clipBottom)
 		defer { r.setClip(clip.0, clip.1, clip.2, clip.3) }
-		for case let c? in comps where c.parent == parent {
-			if state.hidden[c.id] ?? c.hidden { continue }
+		var children: [Component] = []
+		for case let base? in comps where base.parent == parent { children.append(state.overrides[base.id] ?? base) }
+		if parent != -1, let made = state.dynamic[parent] {
+			for index in made.keys.sorted() { children.append(made[index]!) }
+		}
+		for c in children {
+			let isStatic = c.childIndex == -1
+			if (isStatic ? state.hidden[c.id] : nil) ?? c.hidden { continue }
 			var c = c
-			if let sz = state.size[c.id] { c.baseWidth = sz.w; c.baseHeight = sz.h }
+			if isStatic, let sz = state.size[c.id] { c.baseWidth = sz.w; c.baseHeight = sz.h }
 			let (w, h) = c.size(parentWidth: pw, parentHeight: ph)
 			var (lx, ly) = c.position(width: w, height: h, parentWidth: pw, parentHeight: ph)
-			if let p = state.position[c.id] { lx = p.x; ly = p.y }
+			if isStatic, let p = state.position[c.id] { lx = p.x; ly = p.y }
 			let x = ox + lx, y = oy + ly
 			// Clip to this component (lines extend one pixel).
 			let extra = c.type == 9 ? 1 : 0
@@ -115,9 +128,9 @@ public final class InterfaceRenderer {
 			drawn.append((c, r.clipLeft, r.clipTop, r.clipRight - r.clipLeft, r.clipBottom - r.clipTop))
 			try draw(c, x: x, y: y, w: w, h: h, state: state, into: &r)
 			if c.type == 0 {
-				let sy = state.scroll[c.id] ?? 0
-				try renderLayer(comps, parent: c.id, ox: x, oy: y - sy, pw: w, ph: h, state: state, into: &r)
-				if let sub = state.open[c.id] {
+				let sy = (isStatic ? state.scroll[c.id] : nil) ?? c.scrollY
+				try renderLayer(comps, parent: c.id, ox: x - c.scrollX, oy: y - sy, pw: w, ph: h, state: state, into: &r)
+				if isStatic, let sub = state.open[c.id] {
 					try renderInterface(sub, x: x, y: y, w: w, h: h, state: state, into: &r)
 				}
 			}
@@ -127,18 +140,19 @@ public final class InterfaceRenderer {
 
 	func draw(_ c: Component, x: Int, y: Int, w: Int, h: Int, state: InterfaceState, into r: inout Raster) throws {
 		let opacity = 256 - (c.alpha & 0xFF)
+		let isStatic = c.childIndex == -1
 		switch c.type {
 		case 3:
-			let rgb = UInt32(bitPattern: state.color[c.id] ?? c.color) & 0xFFFFFF
+			let rgb = UInt32(bitPattern: (isStatic ? state.color[c.id] : nil) ?? c.color) & 0xFFFFFF
 			if c.filled { r.fillRect(x, y, w, h, rgb, opacity: opacity) } else { r.drawRect(x, y, w, h, rgb, opacity: opacity) }
 		case 4:
 			guard c.font != -1, let font = try store.font(c.font) else { return }
-			let text = state.text[c.id] ?? c.text
-			let rgb = UInt32(bitPattern: state.color[c.id] ?? c.color) & 0xFFFFFF
+			let text = (isStatic ? state.text[c.id] : nil) ?? c.text
+			let rgb = UInt32(bitPattern: (isStatic ? state.color[c.id] : nil) ?? c.color) & 0xFFFFFF
 			font.drawParagraph(text, x: x, y: y, w: w, h: h, color: rgb, shadow: c.shadowed ? 0 : -1,
 				halign: c.halign, valign: c.valign, lineSpacing: c.lineSpacing, opacity: 256, into: &r)
 		case 5:
-			let id = state.sprite[c.id] ?? c.spriteId
+			let id = (isStatic ? state.sprite[c.id] : nil) ?? c.spriteId
 			guard id != -1, let sheet = try store.sprite(id), let f = sheet.frames.first else { return }
 			if !c.if3 {
 				r.draw(f, x: x, y: y)

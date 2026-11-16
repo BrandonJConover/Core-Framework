@@ -8,6 +8,12 @@ public struct GameState {
 	public var weight = 0
 	/// Inventory id -> slot -> item.
 	public var inventories: [Int: [Int: ServerMessage.InvItem]] = [:]
+	/// Inventory id -> slot count.
+	public var inventorySizes: [Int: Int] = [:]
+	/// Public / private / trade chat filter settings.
+	public var chatFilters: (public: Int, private: Int, trade: Int) = (0, 0, 0)
+	/// Seconds until the server reboots (rt4 `Player.rebootTimer`, in ticks / 30).
+	public var rebootSeconds = 0
 	public var chat: [String] = []
 	public var rebuild: RebuildNormal?
 	public var players: PlayerInfoDecoder?
@@ -29,7 +35,7 @@ public struct GameState {
 		case .players(_, let p): players = p; ticks += 1
 		case .npcs(_, let n): npcs = n
 		case .message(let m): apply(m)
-		case .decodeFailed, .disconnected: break
+		case .decodeFailed, .disconnected, .loginFailed: break
 		}
 	}
 
@@ -48,8 +54,14 @@ public struct GameState {
 			var slots: [Int: ServerMessage.InvItem] = [:]
 			for (i, it) in items.enumerated() where it.id >= 0 { slots[i] = it }
 			inventories[inv] = slots
+			inventorySizes[inv] = items.count
 		case .invPartial(_, let inv, let changes):
-			for c in changes { inventories[inv, default: [:]][c.slot] = c.item }
+			for c in changes {
+				inventories[inv, default: [:]][c.slot] = c.item.id >= 0 ? c.item : nil
+				inventorySizes[inv] = max(inventorySizes[inv] ?? 0, c.slot + 1)
+			}
+		case .chatFilterSettings(let p, let pr, let t): chatFilters = (p, pr, t)
+		case .rebootTimer(let secs): rebootSeconds = secs
 		case .logout: loggedOut = true
 		default: break
 		}

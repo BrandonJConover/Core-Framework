@@ -20,31 +20,82 @@ public final class GameClient {
 	}
 
 	public let store: ConfigStore
-	public let ui: InterfaceRenderer
+	/// The CS2 host: owns game state and interface state, runs hooks.
+	public private(set) var host: InterfaceScriptHost
+	public var ui: InterfaceRenderer { host.renderer }
 	public var server: Server
-	public private(set) var screen: Screen = .title
-	public private(set) var focus: Field?
-	public var username = ""
-	public var password = ""
-	public private(set) var status: (title: String, body: String) = ("", "")
-	public private(set) var state = GameState()
 	public private(set) var session: GameSession?
 	public private(set) var lastSize = (w: 0, h: 0)
-	private var frameCount = 0
+	private var inGame = false
+	private var lastCycleAt: Date?
 	/// Called when a tap lands on something the client cannot handle yet.
 	public var log: (String) -> Void = { _ in }
 	/// Called once the server accepts the login (e.g. to save credentials).
 	public var onLoggedIn: (_ username: String, _ password: String) -> Void = { _, _ in }
 
-	/// Interface ids, looked up by name where the cache names them.
+	/// The login interface (rt4 `LoginManager.loginScreenId`), looked up by name.
 	let loginInterface: Int
+
+	/// CS2 variables the 2009 login interface keeps its state in: the typed
+	/// username and password, and the stage (0 main menu, 1 username field,
+	/// 2 password field).
+	enum LoginVar {
+		static let username = 32, password = 33
+		static let stage = 174
+	}
 
 	public init(store: ConfigStore, server: Server) throws {
 		self.store = store
 		self.server = server
-		ui = InterfaceRenderer(store: store)
-		loginInterface = try ui.interfaceId(named: "loginscreen") ?? 744
+		let probe = InterfaceRenderer(store: store)
+		loginInterface = try probe.interfaceId(named: "loginscreen") ?? 744
+		host = InterfaceScriptHost(store: store)
+		bindHost()
+		openLoginScreen()
 	}
+
+	private func bindHost() {
+		host.send = { [weak self] in self?.send($0) }
+		host.onDirectLogin = { [weak self] user, pass in self?.beginLogin(username: user, password: pass) }
+		host.log = { [weak self] in self?.log($0) }
+	}
+
+	/// rt4 `InterfaceList.method1596`: the login interface becomes the top level
+	/// and its onLoad scripts build the screen.
+	private func openLoginScreen() {
+		host.apply(.ifOpenTop(id: loginInterface, reset: 0))
+	}
+
+	// MARK: derived screen state
+
+	public var screen: Screen {
+		if inGame { return .game }
+		if host.loginReply == -3 { return .connecting }
+		return host.varc(LoginVar.stage) == 0 ? .title : .loginForm
+	}
+
+	public var focus: Field? {
+		guard screen == .loginForm else { return nil }
+		return host.varc(LoginVar.stage) == 2 ? .password : .username
+	}
+
+	/// The text in the login form, kept by the interface scripts in varcstrs.
+	public var username: String {
+		get { host.varcstr(LoginVar.username) }
+		set { host.setVarcstr(LoginVar.username, newValue) }
+	}
+	public var password: String {
+		get { host.varcstr(LoginVar.password) }
+		set { host.setVarcstr(LoginVar.password, newValue) }
+	}
+
+	/// The login error the interface is showing, as text.
+	public var status: (title: String, body: String) {
+		let r = Int(host.loginReply)
+		return r > 2 || r == -5 ? ("", r == -5 ? "Error connecting to server." : Login.message(for: r)) : ("", "")
+	}
+
+	public var state: GameState { host.game }
 
 	/// True while a text field has focus, so the shell shows a keyboard.
 	public var wantsKeyboard: Bool { focus != nil }
@@ -52,124 +103,89 @@ public final class GameClient {
 	// MARK: frame
 
 	public func frame(width: Int, height: Int) throws -> Raster {
-		frameCount += 1
 		lastSize = (width, height)
+		host.resize(width: width, height: height)
 		if let s = session {
 			for e in s.poll() { handle(e) }
 		}
+		// One client cycle is 20 ms; always run at least one so scripts and
+		// timers advance on every frame, and never more than a few after a stall.
+		let now = Date()
+		let cycles = lastCycleAt.map { min(max(Int(now.timeIntervalSince($0) / 0.02), 1), 5) } ?? 1
+		lastCycleAt = lastCycleAt.map { $0.addingTimeInterval(Double(cycles) * 0.02) } ?? now
+		for _ in 0..<cycles { host.cycle() }
 		var r = Raster(width: width, height: height)
-		switch screen {
-		case .title, .loginForm, .connecting:
-			try ui.render(loginInterface, state: loginState(), into: &r)
-		case .game:
-			if state.interfaces.top != -1 {
-				try ui.render(state.interfaces.top, state: state.interfaces, into: &r)
-			}
-			if let p12 = try store.font(named: "p12_full"), let w = state.selfWorld {
-				p12.drawLeft("\(w.x), \(w.z)  tick \(state.ticks)", x: 6, y: 16, color: 0xFFFF00, shadow: 0, into: &r)
-			}
+		let top = host.game.interfaces.top
+		if top != -1 && !(inGame && top == loginInterface) {
+			try ui.render(top, state: host.game.interfaces, into: &r)
+		}
+		if inGame, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
+			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 16, color: 0xFFFF00, shadow: 0, into: &r)
 		}
 		return r
 	}
 
-	/// rt4 drives the login interface with CS2; until the interpreter lands,
-	/// this sets the same components the scripts would.
-	func loginState() -> InterfaceState {
-		var s = InterfaceState()
-		let id = { (c: Int) in self.loginInterface << 16 | c }
-		s.hidden[id(131)] = false // parchment scroll
-		switch screen {
-		case .title:
-			s.hidden[id(226)] = false // main menu
-		default:
-			s.hidden[id(241)] = false // "Please Log In"
-			let cursor = frameCount / 20 % 2 == 0 ? "|" : ""
-			s.text[id(340)] = username + (focus == .username ? cursor : "")
-			s.text[id(346)] = String(repeating: "*", count: password.count) + (focus == .password ? cursor : "")
-			s.text[id(333)] = status.title
-			s.text[id(334)] = status.body
-			if screen == .connecting {
-				s.text[id(332)] = "Connecting to server..."
-			}
-		}
-		return s
-	}
-
 	// MARK: input
 
+	/// A tap in game pixels: press and release of the primary button.
 	public func tap(x: Int, y: Int) {
-		guard let c = ui.hitTest(x: x, y: y) else {
-			if screen == .loginForm { focus = nil }
-			return
+		if host.tap(x: x, y: y) == nil, inGame, let c = ui.hitTest(x: x, y: y) {
+			log("tap on \(c.id >> 16):\(c.id & 0xFFFF) (\(c.ops.first ?? c.option ?? "no op"))")
 		}
-		let index = c.id & 0xFFFF
-		if c.id >> 16 == loginInterface {
-			switch (screen, index) {
-			case (.title, 250): // Log In (Existing User)
-				screen = .loginForm
-				focus = .username
-				status = ("", "")
-			case (.loginForm, 336): focus = .username
-			case (.loginForm, 342): focus = .password
-			case (.loginForm, 347): submit()
-			case (.loginForm, 348):
-				screen = .title
-				focus = nil
-			default:
-				log("login screen: component \(index) not wired yet")
-			}
-			return
-		}
-		log("tap on \(c.id >> 16):\(index) (\(c.ops.first ?? c.option ?? "no op"))")
+		host.cycle()
 	}
 
+	/// Pointer hover (mouse or Apple Pencil hover); drives onMouseOver/Leave.
+	public func hover(x: Int, y: Int) { host.pointerMoved(x: x, y: y) }
+
+	/// Typed characters, one client cycle each so the scripts see them in
+	/// order. rt4 queues printable keys as (code -1, char) and Enter as code 84.
 	public func type(_ text: String) {
-		for ch in text {
-			guard let f = focus else { return }
-			if ch == "\n" || ch == "\r" { enter(); continue }
-			switch f {
-			case .username:
-				// rt4 allows letters, digits, space and underscore, max 12.
-				if username.count < 12, ch.isLetter || ch.isNumber || ch == " " || ch == "_" { username.append(ch) }
-			case .password:
-				if password.count < 20, ch.isASCII, !ch.isWhitespace { password.append(ch) }
+		for ch in text.unicodeScalars {
+			if ch == "\n" || ch == "\r" {
+				host.key(code: 84, char: -1)
+			} else if ch == "\u{20AC}" {
+				host.key(code: -1, char: 128)
+			} else if ch.value > 0 && ch.value < 256 {
+				host.key(code: -1, char: Int(ch.value))
+			} else {
+				continue
 			}
+			host.cycle()
 		}
 	}
 
 	public func backspace() {
-		switch focus {
-		case .username: if !username.isEmpty { username.removeLast() }
-		case .password: if !password.isEmpty { password.removeLast() }
-		case nil: break
-		}
+		host.key(code: 85, char: -1)
+		host.cycle()
 	}
 
-	/// Return key: username -> password -> log in, like rt4.
+	/// Return key: the login scripts move username -> password -> log in.
 	public func enter() {
-		switch focus {
-		case .username: focus = .password
-		case .password: submit()
-		case nil: break
-		}
+		host.key(code: 84, char: -1)
+		host.cycle()
 	}
 
+	/// Presses the Log In button of the form.
 	public func submit() {
 		guard screen == .loginForm else { return }
-		guard !username.isEmpty, !password.isEmpty else {
-			status = ("", "Enter your username and password.")
-			return
-		}
-		focus = nil
-		screen = .connecting
-		status = ("", "")
+		let id = loginInterface << 16 | 347
+		if let d = ui.drawn.last(where: { $0.component.id == id }) { tap(x: d.x + d.w / 2, y: d.y + d.h / 2) }
+	}
+
+	// MARK: session
+
+	/// CS2 `directlogin` (opcode 5600): start connecting. rt4 sets the reply to
+	/// -3 ("connecting") and the scripts show it until a result arrives.
+	func beginLogin(username: String, password: String) {
+		guard session == nil else { return }
+		host.loginReply = -3
 		var req = Login.Request(username: username, password: password)
 		// Resizable mode: the server opens interface 746, which lays itself
 		// out for whatever size we draw at.
 		req.windowMode = 2
 		req.canvasWidth = max(lastSize.w, 765)
 		req.canvasHeight = max(lastSize.h, 503)
-		state = GameState()
 		let s = GameSession(host: server.host, port: server.port, request: req)
 		session = s
 		s.start()
@@ -178,30 +194,45 @@ public final class GameClient {
 	public func logout() {
 		session?.close()
 		session = nil
-		screen = .title
-		state = GameState()
+		inGame = false
+		let (u, p) = (username, password)
+		host = InterfaceScriptHost(store: store)
+		host.canvas = (lastSize.w > 0 ? lastSize.w : 765, lastSize.h > 0 ? lastSize.h : 503)
+		bindHost()
+		openLoginScreen()
+		username = u
+		password = p
 	}
 
 	public func send(_ m: ClientMessage) { session?.send(m) }
 
 	func handle(_ e: GameSession.Event) {
-		state.apply(e)
 		switch e {
 		case .loggedIn:
-			screen = .game
+			host.apply(e)
+			host.loginReply = 2
+			inGame = true
 			onLoggedIn(username, password)
+		case .loginFailed(let reply):
+			session = nil
+			switch reply {
+			case .failure(let code): host.loginReply = Int32(code)
+			case .hopDelay: host.loginReply = 21
+			case .disallowed(let r): host.loginReply = 29; host.loginDisallowResult = Int32(r)
+			case .retry, .success: host.loginReply = -5
+			}
 		case .disconnected(let reason):
 			session = nil
-			if screen == .game {
-				screen = .title
+			if inGame {
+				log("disconnected: \(reason ?? "closed")")
+				logout()
 			} else {
-				screen = .loginForm
-				status = ("Error connecting to server.", reason ?? "")
+				host.loginReply = -5
 			}
 		case .decodeFailed(let op, let err):
 			log("decode failed for opcode \(op): \(err)")
 		default:
-			break
+			host.apply(e)
 		}
 	}
 }
