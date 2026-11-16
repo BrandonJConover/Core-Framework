@@ -12,6 +12,8 @@ public final class GameSession {
 		case players(PlayerInfoDecoder.Result, PlayerInfoDecoder)
 		case npcs(PlayerInfoDecoder.Result, NpcInfoDecoder)
 		case decodeFailed(opcode: Int, error: String)
+		/// The server refused the login (reply code, hop delay, ...).
+		case loginFailed(Login.Reply)
 		case disconnected(String?)
 	}
 
@@ -61,6 +63,9 @@ public final class GameSession {
 		let session: GameConnection.Session
 		do {
 			session = try GameConnection.login(host: host, port: port, request: request)
+		} catch let failure as GameConnection.Failure {
+			post(.loginFailed(failure.reply))
+			return
 		} catch {
 			post(.disconnected("\(error)"))
 			return

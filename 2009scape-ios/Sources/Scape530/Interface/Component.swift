@@ -23,6 +23,17 @@ public struct Component {
 	public var hidden = false
 	public var scrollWidth = 0, scrollHeight = 0
 	public var noClickThrough = false
+	/// Scroll position and scroll extent (rt4 `scrollX/Y`, `scrollMaxH/V`; the
+	/// extent starts as the decoded scroll size and CS2 may change it).
+	public var scrollX = 0, scrollY = 0
+	public var scrollMaxH: Int { get { scrollWidth } set { scrollWidth = newValue } }
+	public var scrollMaxV: Int { get { scrollHeight } set { scrollHeight = newValue } }
+	/// rt4 `createdComponentId`: the index of a CS2-created child, -1 for a
+	/// component that comes from the cache. A created child shares its
+	/// parent layer's `id`.
+	public var childIndex = -1
+	/// Item shown by `cc_setobject` (rt4 `objId`/`objCount`).
+	public var objId = -1, objCount = 0, objDrawText = true
 
 	// Sprite
 	public var spriteId = -1, activeSpriteId = -1
@@ -82,6 +93,19 @@ public struct Component {
 		"onStatTransmit", "onTimer", "onOptionClick", "onMouseRepeat", "onClickRepeat", "onDrag", "onRelease",
 		"onHold", "onDragStart", "onDragRelease", "onScroll", "onVarcTransmit", "onVarcstrTransmit",
 	]
+
+	/// What scripts address this component by.
+	public var ref: ComponentRef { ComponentRef(id: id, child: childIndex) }
+
+	/// A blank component made by CS2 `cc_create` (rt4 `ScriptRunner` opcode 100):
+	/// an if3 component of `type` that is child `index` of layer `parentId`.
+	public init(parentId: Int, type: Int, index: Int) {
+		id = parentId
+		if3 = true
+		self.type = type
+		childIndex = index
+		parent = parentId
+	}
 
 	public init(id: Int, data: [UInt8]) throws {
 		self.id = id
