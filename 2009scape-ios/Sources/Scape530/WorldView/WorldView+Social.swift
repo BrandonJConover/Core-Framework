@@ -39,8 +39,19 @@ extension WorldView {
 	/// rt4 PLAYER_INFO flag 0x80: huffman-packed public chat.
 	private func applyPublicChat(_ a: PathingActor, effects: Int, rights: Int, encoded: [UInt8]) {
 		guard let ap = a.appearance, ap.name37 != 0 else { return }
-		// Quick chat phrases (bit 15) need the quick-chat tables, which are not ported.
-		if effects & 0x8000 != 0 { return }
+		// Quick chat phrase (bit 15): a phrase id then its dynamic values; only the ignore list applies.
+		if effects & 0x8000 != 0 {
+			if rights <= 1 && isQuickChatIgnored(ap.name37) { return }
+			var p = Packet(encoded)
+			guard let id = try? p.g2(), let message = QuickChat.message(phrase: id, values: Array(encoded.dropFirst(2)), store: store) else { return }
+			a.chatMessage = message.trimmingCharacters(in: .whitespaces)
+			a.chatEffect = effects & 0x7FFF & 0xFF
+			a.chatLoops = 150
+			a.chatColor = (effects & 0x7FFF) >> 8
+			let name = rights != 0 ? WordPack.chatIcon(rights: rights) + WordPack.displayName(ap.name37) : WordPack.displayName(ap.name37)
+			onPublicChat?(PublicChatEvent(playerIndex: a.index, line: ChatLine(type: 17, name: name, message: message, clan: nil, phraseId: id)))
+			return
+		}
 		if isChatIgnored(ap.name37, rights) { return }
 		guard let codec = (try? WordPack.loadCodec(store)) ?? nil else { return }
 		let message = WordPack.display(WordPack.decode(encoded, codec: codec))

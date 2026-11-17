@@ -26,6 +26,8 @@ final class GameCanvasView: UIView, UIKeyInput {
 	private let colorSpace = CGColorSpaceCreateDeviceRGB()
 	/// True once a long press opened the world menu during the current touch, so its lift is not also a tap.
 	private var longPressFired = false
+	/// The current pan drags an if3 component (rt4 `Cs1ScriptRunner.aClass13_14`) instead of the camera.
+	private var draggingComponent = false
 	/// True while a one-finger drag that started over the 3D world is turning the camera.
 	private var draggingCamera = false
 
@@ -149,15 +151,26 @@ final class GameCanvasView: UIView, UIKeyInput {
 			// Only drags that start on the 3D world (not on an interface or the open menu) steer the camera.
 			let p = g.location(in: self)
 			let start = CGPoint(x: p.x - g.translation(in: self).x, y: p.y - g.translation(in: self).y)
-			draggingCamera = !longPressFired && client.isOverWorld(x: Int(start.x * scale), y: Int(start.y * scale))
-			if draggingCamera { client.clearPreview() }
+			draggingComponent = !longPressFired && client.beginComponentDrag(x: Int(start.x * scale), y: Int(start.y * scale))
+			draggingCamera = !draggingComponent && !longPressFired && client.isOverWorld(x: Int(start.x * scale), y: Int(start.y * scale))
+			if draggingCamera || draggingComponent { client.clearPreview() }
 			g.setTranslation(.zero, in: self)
 		case .changed:
+			if draggingComponent {
+				let p = g.location(in: self)
+				client.moveComponentDrag(x: Int(p.x * scale), y: Int(p.y * scale))
+				return
+			}
 			guard draggingCamera else { return }
 			let t = g.translation(in: self)
 			client.cameraDrag(dx: Double(t.x * scale), dy: Double(t.y * scale))
 			g.setTranslation(.zero, in: self)
 		default:
+			if draggingComponent {
+				let p = g.location(in: self)
+				client.endComponentDrag(x: Int(p.x * scale), y: Int(p.y * scale))
+				draggingComponent = false
+			}
 			draggingCamera = false
 		}
 	}

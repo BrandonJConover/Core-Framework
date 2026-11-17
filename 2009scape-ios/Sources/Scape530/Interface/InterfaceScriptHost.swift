@@ -67,6 +67,17 @@ public final class InterfaceScriptHost: ScriptHost {
 	/// rt4 `Chat.transmitAt` and friends: the transmit timer value of the last change.
 	var chatAt = 0, friendAt = 0, clanAt = 0, miscAt = 0
 	var hovering: Set<ComponentRef> = []
+	/// if3 drag state (rt4 `Cs1ScriptRunner.aClass13_14` & co), see `ComponentDrag.swift`.
+	var drag: DragState?
+	/// rt4 `InterfaceList.aClass13_12`: the drag target under the pointer this cycle.
+	var dragTarget: ComponentRef?
+	/// The pointer is down on a gesture started with `beginDragGesture` (rt4 `Mouse.pressedButton == 1`).
+	var pointerHeld = false
+	var dragStart = (x: 0, y: 0)
+	/// Components pressed by the gesture that track hold and drag hooks (rt4 `Component.aBoolean24`).
+	var heldRefs: [ComponentRef] = []
+	/// Quick chat phrase being composed and the phrase search (rt4 `ScriptRunner.activePhrase`, `Find`).
+	var quickChat = QuickChatState()
 	var pointer: (x: Int, y: Int)?
 	/// Children per interface: `[interface: [parent id: [component index]]]`.
 	var childLists: [Int: [Int: [Int]]] = [:]
@@ -411,7 +422,9 @@ public final class InterfaceScriptHost: ScriptHost {
 			case .opEnabled:
 				let bit = i(0) + 1
 				c.events = i(1) != 0 ? c.events | (1 << bit) : c.events & ~(1 << bit)
-			case .opcode1121, .draggable, .dragRenderBehaviour, .opcode1308: break
+			case .draggable: c.dragLayer = child(of: i(0), index: i(1))
+			case .dragRenderBehaviour: c.dragRenderBehaviour = i(0) == 1
+			case .opcode1121, .opcode1308: break
 			}
 		}
 	}

@@ -279,3 +279,12 @@ extension ConfigStore {
 		return v
 	}
 }
+
+extension ConfigStore {
+	/// rt4 `QuickChatPhraseTypeList.anInt3490` / `anInt1047`: how many phrases the primary / secondary archive holds.
+	public func quickChatPhraseCount(secondary: Bool) -> Int {
+		let archive = secondary ? Archive.quickChatSecondary : Archive.quickChatPrimary
+		guard let idx = try? index(archive), idx.groupCapacities.count > 1 else { return 0 }
+		return idx.groupCapacities[1]
+	}
+}

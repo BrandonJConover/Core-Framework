@@ -41,6 +41,9 @@ public struct Menu {
 		public static let itemOps = [47, 5, 43, 35, 58]
 		public static let invOptions = [25, 23, 48, 7, 13]
 		public static let itemExamine = 1006
+		/// if3 component options 1...5 (rt4 `UNKNOWN_9`) and 6...10 (`UNKNOWN_1003`, which never become the default
+		/// entry unless alone and which turn a left click into a menu).
+		public static let componentOp = 9, componentOpHigh = 1003
 	}
 
 	public init() { reset() }
@@ -84,6 +87,12 @@ public struct Menu {
 
 	/// Replaces the target text of entry `i` (rt4 recolours "Walk here" under a player).
 	mutating func setBase(_ i: Int, _ base: String) { entries[i].base = base }
+
+	/// rt4 `MiniMenu.method4640(size - 1)`: the default entry is an if3 option 6...10.
+	public var topIsHighComponentOp: Bool {
+		guard let e = entries.last else { return false }
+		return (e.action >= 2000 ? e.action - 2000 : e.action) == Action.componentOpHigh
+	}
 
 	/// The default (left-click) entry: the last one (rt4 `MiniMenu.method1372` -> `doAction(size - 1)`).
 	public var top: Int { entries.count - 1 }

@@ -81,8 +81,23 @@ extension GameClient {
 		if let p = interaction.popup { selectMenuEntry(p, x: x, y: y); return true }
 		if let t = minimapTileAt(x: x, y: y) { return walkToMinimapTile(t.tileX, t.tileZ) }
 		guard isOverWorld(x: x, y: y), let (menu, _) = buildMenu(x: x, y: y) else { return false }
-		doAction(menu, menu.top, clickX: x, clickY: y)
+		leftClick(menu, x: x, y: y)
 		return true
+	}
+
+	/// rt4 `Protocol` left click (`MiniMenu.method1372`): the default entry runs, unless single mouse button mode
+	/// (varp client code 5) asks for the menu whenever there is a choice, or the default entry is an if3 option 6...10,
+	/// when the click is handled as a right click (`ScriptRunner.method3901` opens the menu).
+	func leftClick(_ menu: Menu, x: Int, y: Int) {
+		if leftClickOpensMenu(menu) {
+			openMenu(menu, atX: x, y: y)
+		} else {
+			doAction(menu, menu.top, clickX: x, clickY: y)
+		}
+	}
+
+	func leftClickOpensMenu(_ menu: Menu) -> Bool {
+		(host.varpClient.mouseButtons == 1 && menu.count > 2) || menu.topIsHighComponentOp
 	}
 
 	/// A long press over the world opens the menu at the touch point (rt4 right click -> `method3901`).
@@ -91,6 +106,7 @@ extension GameClient {
 	public func longPress(x: Int, y: Int) -> Bool {
 		if interaction.popup != nil { interaction.popup = nil }
 		if screen == .game, openInventoryMenu(x: x, y: y) { return true }
+		if screen == .game, openComponentMenu(x: x, y: y) { return true }
 		guard screen == .game, isOverWorld(x: x, y: y), let (menu, _) = buildMenu(x: x, y: y) else { return false }
 		openMenu(menu, atX: x, y: y)
 		return true

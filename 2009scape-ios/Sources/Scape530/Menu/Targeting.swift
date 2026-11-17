@@ -85,7 +85,7 @@ extension GameClient {
 		guard let hit = inventorySlot(atX: x, y: y) else { return false }
 		if let item = inventoryItem(hit.component, hit.slot) {
 			let menu = inventorySlotMenu(hit.component, slot: hit.slot, item: item)
-			doAction(menu, menu.top, clickX: x, clickY: y)
+			leftClick(menu, x: x, y: y)
 		} else {
 			cancelTarget()
 		}
@@ -304,6 +304,11 @@ extension GameClient {
 		case Menu.Action.itemExamine:
 			sendOp(.examineObj(id: key))
 			markPressed(component: e.z, slot: e.x)
+		case Menu.Action.componentOp, Menu.Action.componentOpHigh:
+			if let c = host.component(ComponentRef(id: e.z, child: e.x)) { host.clickOption(c, op: key) }
+		case Menu.Action.selectSpell:
+			if let c = host.component(ComponentRef(id: e.z, child: e.x)) { enterSpell(c) }
+			return
 		default:
 			break // Cancel
 		}

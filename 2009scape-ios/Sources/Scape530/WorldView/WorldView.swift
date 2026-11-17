@@ -22,10 +22,8 @@ public final class WorldView {
 	public var removeRoofs = true
 	var roofs = RoofHider()
 	/// rt4's one-actor-per-tile rule (`ScriptRunner.method964` / `method3240`): of several size-1 actors standing
-	/// exactly on a tile centre only one is drawn. Off by default because it needs the stacked-actor entries
-	/// of rt4 `MiniMenu` (every actor on the picked tile listed) in `MenuBuilder`, which is not ported yet;
-	/// without them a hidden actor could not be tapped.
-	public var oneActorPerTile = false
+	/// exactly on a tile centre only one is drawn; `MenuBuilder.addStacked` lists the hidden ones in the menu.
+	public var oneActorPerTile = true
 	public var camera = WorldCamera()
 	/// The minimap and compass (drawn by `drawMinimap`, see `Minimap/`).
 	public private(set) lazy var minimap = Minimap(store: store)
@@ -70,6 +68,8 @@ public final class WorldView {
 	}
 	/// True when rt4's ignore rules drop a public chat line from `name37` with staff `rights`.
 	public var isChatIgnored: (_ name37: Int64, _ rights: Int) -> Bool = { _, _ in false }
+	/// True when the ignore list drops a quick chat line from `name37` (quick chat bypasses the under-13 rule).
+	public var isQuickChatIgnored: (_ name37: Int64) -> Bool = { _ in false }
 	/// rt4 `Chat.publicFilter`: 0 show all, 1 friends only, 2 hide (3 show all too).
 	public var publicFilter = 0
 	/// rt4 `VarpDomain.chatEffectsDisabled`: overhead text drawn plain yellow.

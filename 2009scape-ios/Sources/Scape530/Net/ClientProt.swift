@@ -6,6 +6,10 @@ public enum ClientProt {
 	public static let publicChat = 237
 	/// rt4 `ScriptRunner` op 5009 (`p1isaac(201)`): private message to a base-37 name.
 	public static let privateMessage = 201
+	/// rt4 `ScriptRunner` ops 5059 / 5061 (`p1isaac(167)`): public or clan quick chat.
+	public static let quickChat = 167
+	/// rt4 `ScriptRunner` op 5060 (`p1isaac(178)`): private quick chat.
+	public static let quickChatPrivate = 178
 	public static let clanJoinchatLeavechat = 104
 	public static let clanKickuser = 162 // or CLANCHANNEL_KICKUSER
 	public static let friendlistAdd = 120

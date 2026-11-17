@@ -28,6 +28,8 @@ public struct InterfaceState {
 	/// Pressed, selected and dragged inventory slots (rt4 `MiniMenu.pressedInventoryComponent`, `anInt5014`,
 	/// `InterfaceList.clickedInventoryComponent`).
 	public var inventoryUI = InventoryUI()
+	/// The if3 component being dragged, once the pointer left its dead zone (rt4 `Cs1ScriptRunner.aBoolean172`).
+	public var componentDrag: ComponentDrag?
 
 	public init() {}
 
@@ -88,9 +90,11 @@ public final class InterfaceRenderer {
 	var groups: [Int: [Component?]] = [:]
 	/// Every component drawn in the last `render`, in draw order, with its
 	/// screen rectangle (clipped to its parents). Used for touch hit tests.
-	public private(set) var drawn: [(component: Component, x: Int, y: Int, w: Int, h: Int)] = []
+	public internal(set) var drawn: [(component: Component, x: Int, y: Int, w: Int, h: Int)] = []
 	/// The unclipped top-left corner of every component in `drawn` (inventory slots are laid out from it).
-	public private(set) var origins: [ComponentRef: (x: Int, y: Int)] = [:]
+	public internal(set) var origins: [ComponentRef: (x: Int, y: Int)] = [:]
+	/// The dragged component's drawing, run after everything else (rt4 draws it in a last pass).
+	var deferredDrag: [(inout Raster) throws -> Void] = []
 	/// Drawn in place of a type-6 model or a 3D viewport component, if set.
 	public var drawModel: ((Component, Int, Int, Int, Int, inout Raster) -> Void)?
 	/// Item icons for inventory components and if3 sprites with an item set.
@@ -124,7 +128,11 @@ public final class InterfaceRenderer {
 		r.resetClip()
 		drawn.removeAll(keepingCapacity: true)
 		origins.removeAll(keepingCapacity: true)
+		deferredDrag.removeAll()
 		try renderInterface(interface, x: 0, y: 0, w: r.width, h: r.height, state: state, into: &r)
+		r.resetClip()
+		for paint in deferredDrag { try paint(&r) }
+		deferredDrag.removeAll()
 	}
 
 	/// The top-most interactive component under (x, y) from the last render.
@@ -170,15 +178,36 @@ public final class InterfaceRenderer {
 			}
 			drawn.append((c, r.clipLeft, r.clipTop, r.clipRight - r.clipLeft, r.clipBottom - r.clipTop))
 			origins[c.ref] = (x, y)
-			try draw(c, x: x, y: y, w: w, h: h, state: state, into: &r)
-			if c.type == 0 {
-				let sy = (isStatic ? state.scroll[c.id] : nil) ?? c.scrollY
-				try renderLayer(comps, parent: c.id, ox: x - c.scrollX, oy: y - sy, pw: w, ph: h, state: state, into: &r)
-				if isStatic, let sub = state.open[c.id] {
-					try renderInterface(sub, x: x, y: y, w: w, h: h, state: state, into: &r)
+			var (px, py) = (x, y)
+			if let d = state.componentDrag, d.ref == c.ref {
+				(px, py) = (d.x, d.y)
+				if !c.dragRenderBehaviour {
+					// rt4 `renderComponent`: a pressed component is drawn last, floating at half opacity.
+					var faded = c
+					faded.alpha = 128
+					deferredDrag.append { r in try self.paint(comps, faded, isStatic: isStatic, x: px, y: py, w: w, h: h, clip: (0, 0, r.width, r.height), state: state, into: &r) }
+					r.setClip(clip.0, clip.1, clip.2, clip.3)
+					continue
 				}
 			}
+			try paint(comps, c, isStatic: isStatic, x: px, y: py, w: w, h: h, clip: clip, state: state, into: &r)
 			r.setClip(clip.0, clip.1, clip.2, clip.3)
+		}
+	}
+
+	/// Draws one component and its layer contents at (x, y), clipped to `clip` (its parent's) and itself.
+	func paint(_ comps: [Component?], _ c: Component, isStatic: Bool, x: Int, y: Int, w: Int, h: Int, clip: (Int, Int, Int, Int), state: InterfaceState, into r: inout Raster) throws {
+		let saved = (r.clipLeft, r.clipTop, r.clipRight, r.clipBottom)
+		defer { r.setClip(saved.0, saved.1, saved.2, saved.3) }
+		let extra = c.type == 9 ? 1 : 0
+		r.setClip(max(clip.0, x), max(clip.1, y), min(clip.2, x + w + extra), min(clip.3, y + h + extra))
+		try draw(c, x: x, y: y, w: w, h: h, state: state, into: &r)
+		if c.type == 0 {
+			let sy = (c.childIndex == -1 ? state.scroll[c.id] : nil) ?? c.scrollY
+			try renderLayer(comps, parent: c.id, ox: x - c.scrollX, oy: y - sy, pw: w, ph: h, state: state, into: &r)
+			if c.childIndex == -1, let sub = state.open[c.id] {
+				try renderInterface(sub, x: x, y: y, w: w, h: h, state: state, into: &r)
+			}
 		}
 	}
 
