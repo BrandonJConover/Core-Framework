@@ -85,6 +85,9 @@ public struct OverlayCanvas {
 
 	public var canProject: Bool { cam != nil && scene != nil }
 
+	/// The camera's yaw (0...2047) of the frame that was just rendered; 0 without a camera.
+	public var cameraYaw: Int { cam?.yaw ?? 0 }
+
 	/// A point `height` fine units above the ground at fine scene position (`xFine`, `zFine`) (128 per tile),
 	/// as a raster pixel; nil when behind the camera or off the map.
 	public func project(xFine: Int, zFine: Int, height: Int = 0) -> ScreenPoint? {

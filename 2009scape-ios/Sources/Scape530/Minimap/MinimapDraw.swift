@@ -76,6 +76,10 @@ extension WorldView {
 				plot.hintMarker(h.sprite, dx: dx, dz: dz, &r)
 			}
 		}
+		// Plugin markers (quest helper): steady, in the circle or as an edge arrow.
+		for m in minimapMarkers {
+			plot.hintMarker(0, dx: (m.x - ctx.originX) * 4 + 2 - me.xFine / 32, dz: (m.z - ctx.originZ) * 4 + 2 - me.zFine / 32, &r)
+		}
 		if let flag = mm.destination ?? destinationFlag.map({ (x: $0.x + ctx.originX, z: $0.z + ctx.originZ) }) {
 			plot.sprite("mapflag", 0, dx: (flag.x - ctx.originX) * 4 + 2 - plot.meX, dz: (flag.z - ctx.originZ) * 4 + 2 - plot.meZ, &r)
 		}

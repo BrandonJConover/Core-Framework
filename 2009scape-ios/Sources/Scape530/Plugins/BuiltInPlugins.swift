@@ -12,6 +12,7 @@ enum BuiltInPlugins {
 			IdleNotifierPlugin(),
 			ItemPricesPlugin(),
 			BoostsPlugin(),
+			QuestHelperPlugin(),
 		]
 	}
 }

@@ -101,6 +101,8 @@ public final class WorldView {
 	var groundModels: GroundItemModels?
 	/// rt4 `MiniMap.hintMapMarkers`: the four hint arrow slots (HINT_ARROW), drawn over their target and on the minimap.
 	public internal(set) var hintArrows = [ServerMessage.HintArrow?](repeating: nil, count: 4)
+	/// World tiles plugins want marked on the minimap (the quest helper's target), drawn like a tile hint arrow.
+	public var minimapMarkers: [(x: Int, z: Int)] = []
 	/// The moving click flag on the minimap (scene tile), set when a walk is sent (rt4 `LoginManager.mapFlagX/Z`).
 	public var destinationFlag: (x: Int, z: Int)?
 
