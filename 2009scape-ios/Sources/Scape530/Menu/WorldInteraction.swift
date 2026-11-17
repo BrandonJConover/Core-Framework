@@ -239,6 +239,10 @@ extension GameClient {
 			setCross(2, clickX, clickY)
 			sendOp(.examineObj(id: key))
 
+		case Menu.Action.componentOp, Menu.Action.componentOpHigh, Menu.Action.componentContinue, 8, 59, 51, 28:
+			doComponentAction(e)
+			return
+
 		default:
 			doTargetAction(menu, index, action: action, clickX: clickX, clickY: clickY)
 			return

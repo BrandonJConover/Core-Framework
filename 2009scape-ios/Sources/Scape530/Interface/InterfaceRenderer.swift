@@ -20,6 +20,9 @@ public struct InterfaceState {
 	/// CS2-created children (`cc_create`): parent layer id -> child index ->
 	/// component. Drawn after the layer's static children.
 	public var dynamic: [Int: [Int: Component]] = [:]
+	/// IF_SETEVENTS masks for CS2-created children (rt4 `InterfaceList.properties`, keyed by component id and
+	/// child index). They outlive the child, so scripts may rebuild a layer and keep the server's settings.
+	public var childEvents: [Int: [Int: Int32]] = [:]
 	/// Items of if1 inventory components (type 2), per component id then slot (rt4 `Component.objTypes`
 	/// / `objCounts`, filled by UPDATE_INV_*). Empty slots are absent.
 	public var invSlots: [Int: [Int: ServerMessage.InvItem]] = [:]
@@ -146,7 +149,7 @@ public final class InterfaceRenderer {
 		for d in drawn.reversed() where x >= d.x && y >= d.y && x < d.x + d.w && y < d.y + d.h {
 			let c = d.component
 			if c.hooks["onClickRepeat"] != nil || c.hooks["onOptionClick"] != nil || !c.ops.isEmpty || c.buttonType != 0 || c.option != nil
-				|| c.type == 2 || (c.events >> 11) & 0x7F != 0 {
+				|| c.type == 2 || (c.events >> 11) & 0x7F != 0 || c.events & 1 != 0 {
 				return c
 			}
 		}
@@ -171,7 +174,12 @@ public final class InterfaceRenderer {
 			}
 		}
 		if parent != -1, let made = state.dynamic[parent] {
-			for index in made.keys.sorted() { children.append(made[index]!) }
+			let masks = state.childEvents[parent]
+			for index in made.keys.sorted() {
+				var child = made[index]!
+				if let m = masks?[index] { child.events = Int(m) }
+				children.append(child)
+			}
 		}
 		for c in children {
 			let isStatic = c.childIndex == -1

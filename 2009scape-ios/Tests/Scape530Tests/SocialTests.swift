@@ -126,6 +126,9 @@ final class SocialTests: XCTestCase {
 		let s = try store()
 		let client = try GameClient(store: s, server: .init(host: "127.0.0.1", port: 1))
 		try replayResizable(client, session: "login-session", me: 11)
+		// The recording ends with a Tutorial Island dialogue (372) open in the chatbox, which (correctly) owns the keyboard; close it as the server would.
+		client.host.apply(.ifCloseSub(parent: Int32(752 << 16 | 12)))
+		for _ in 0..<10 { client.host.cycle() }
 		var sent: [ClientMessage] = []
 		client.host.send = { sent.append($0) }
 		try save(try client.frame(width: 1015, height: 469), "social-chat-box")
@@ -188,6 +191,9 @@ final class SocialTests: XCTestCase {
 		let s = try store()
 		let client = try GameClient(store: s, server: .init(host: "127.0.0.1", port: 1))
 		try replayResizable(client, session: "login-session", me: 11)
+		// The recording ends with a Tutorial Island dialogue (372) open in the chatbox, which (correctly) owns the keyboard; close it as the server would.
+		client.host.apply(.ifCloseSub(parent: Int32(752 << 16 | 12)))
+		for _ in 0..<10 { client.host.cycle() }
 		let world = client.world
 		let decoder = try XCTUnwrap(client.state.players)
 		let npcDecoder = try XCTUnwrap(client.state.npcs)
@@ -300,6 +306,9 @@ final class SocialTests: XCTestCase {
 		let s = try store()
 		let client = try GameClient(store: s, server: .init(host: "127.0.0.1", port: 1))
 		try replayResizable(client, session: "login-session", me: 11)
+		// The recording ends with a Tutorial Island dialogue (372) open in the chatbox, which (correctly) owns the keyboard; close it as the server would.
+		client.host.apply(.ifCloseSub(parent: Int32(752 << 16 | 12)))
+		for _ in 0..<10 { client.host.cycle() }
 		let codec = try XCTUnwrap(try WordPack.loadCodec(s))
 		let before = client.state.chatLog.size
 		client.handle(.message(.gameMessage("You find a coin.")))

@@ -33,6 +33,10 @@ public final class InterfaceScriptHost: ScriptHost {
 	/// Script failures since the last `takeErrors()`; scripts that fail are
 	/// dropped like rt4 does (it reports and carries on).
 	public private(set) var errors: [String] = []
+	/// Every script failure since the host was made, by message, plus the unported CS2 opcodes among
+	/// them (instrumentation for playthrough tests; never cleared).
+	public private(set) var errorCounts: [String: Int] = [:]
+	public private(set) var unportedOpcodes: [Int: Int] = [:]
 
 	// MARK: login state read by CS2 (rt4 `LoginManager`)
 
@@ -61,8 +65,6 @@ public final class InterfaceScriptHost: ScriptHost {
 	var varcLog = TransmitLog(), varcstrLog = TransmitLog()
 	var readers: [ComponentRef: Readers] = [:]
 	var openTypes: [Int: Int] = [:]
-	/// IF_SETEVENTS masks for child ranges of a component: id -> [(start, end, mask)].
-	var slotEvents: [Int: [(start: Int, end: Int, mask: Int32)]] = [:]
 	var keyQueue: [(code: Int, char: Int)] = []
 	/// rt4 `Chat.transmitAt` and friends: the transmit timer value of the last change.
 	var chatAt = 0, friendAt = 0, clanAt = 0, miscAt = 0
@@ -130,6 +132,8 @@ public final class InterfaceScriptHost: ScriptHost {
 			let id: String
 			if case .int(let s)? = request.args.first { id = "\(s)" } else { id = "?" }
 			errors.append("script \(id): \(error)")
+			errorCounts["\(error)", default: 0] += 1
+			if case ScriptError.unportedOpcode(let opcode, _, _, _) = error { unportedOpcodes[opcode, default: 0] += 1 }
 			log("script \(id): \(error)")
 			return false
 		}
@@ -157,9 +161,22 @@ public final class InterfaceScriptHost: ScriptHost {
 			game.interfaces.open[Int(parent)] = component
 			openTypes[Int(parent)] = type
 			runOnLoad(interface: component)
+			widgetsChanged()
 		case .ifCloseSub(let parent):
 			game.interfaces.open[Int(parent)] = nil
 			openTypes[Int(parent)] = nil
+			widgetsChanged()
+		case let .switchWidget(source, target):
+			// rt4 SWITCH_WIDGET: whatever is open at `target` closes, the interface at `source` moves there.
+			game.interfaces.open[Int(target)] = nil
+			openTypes[Int(target)] = nil
+			if let id = game.interfaces.open.removeValue(forKey: Int(source)) {
+				game.interfaces.open[Int(target)] = id
+				openTypes[Int(target)] = openTypes.removeValue(forKey: Int(source))
+			}
+			widgetsChanged()
+		case .dialogAbort:
+			if game.interfaces.top != -1 { runScripts(kind: 0, interface: game.interfaces.top) }
 		case .ifSetHide(let c, let h): mutate(ComponentRef(id: Int(c))) { $0.hidden = h }
 		case .ifSetText(let c, let t): mutate(ComponentRef(id: Int(c))) { $0.text = t }
 		case .ifSetColour(let c, let col):
@@ -169,12 +186,18 @@ public final class InterfaceScriptHost: ScriptHost {
 		case .ifSetPosition(let c, let x, let y): mutate(ComponentRef(id: Int(c))) { $0.baseX = x; $0.baseY = y }
 		case .ifSetScrollPos(let c, let pos): mutate(ComponentRef(id: Int(c))) { $0.scrollY = max(pos, 0) }
 		case let .ifSetEvents(c, start, end, mask):
-			if start == -1 && end == -1 {
-				mutate(ComponentRef(id: Int(c))) { $0.events = Int(mask) }
-			} else {
-				slotEvents[Int(c), default: []].append((start, end, mask))
+			// rt4 SET_INTERFACE_SETTINGS: one entry per index in start...end; index -1 is the component itself.
+			if start <= end {
+				for i in start...min(end, start + 4096) {
+					if i == -1 {
+						mutate(ComponentRef(id: Int(c))) { $0.events = Int(mask) }
+					} else {
+						game.interfaces.childEvents[Int(c), default: [:]][i] = mask
+					}
+				}
 			}
-		case let .ifSetObject(c, obj, count): mutate(ComponentRef(id: Int(c))) { $0.objId = obj; $0.objCount = Int(count) }
+		case let .ifSetObject(c, obj, count): setObject(ComponentRef(id: Int(c)), obj: obj, count: Int(count))
+		case let .ifSetAngle(c, pitch, yaw, scale): setView(ComponentRef(id: Int(c)), scale: scale, yaw: yaw, pitch: pitch)
 		case let .ifSetModel(c, model): mutate(ComponentRef(id: Int(c))) { $0.modelType = 1; $0.modelId = model }
 		case let .ifSetNpcHead(c, npc): mutate(ComponentRef(id: Int(c))) { $0.modelType = 2; $0.modelId = npc }
 		case .ifSetPlayerHead(let c): mutate(ComponentRef(id: Int(c))) { $0.modelType = 3; $0.modelId = 0 }
@@ -205,8 +228,45 @@ public final class InterfaceScriptHost: ScriptHost {
 		case .invFull(_, let inv, _), .invPartial(_, let inv, _):
 			game.apply(m)
 			invLog.note(inv & 0x7FFF)
+		case .deleteInventory(let inv):
+			game.inventories[inv] = nil
+			game.inventorySizes[inv] = nil
+			invLog.note(inv & 0x7FFF)
 		default:
 			game.apply(m)
+		}
+	}
+
+	/// rt4 `DelayedStateChange.updateView`: the component's model pitch, yaw and zoom. Item components rescale the
+	/// zoom to their width (`zoom * 32 / width`).
+	func setView(_ ref: ComponentRef, scale: Int, yaw: Int, pitch: Int) {
+		mutate(ref) { c in
+			c.modelXAngle = pitch
+			c.modelZoom = scale
+			c.modelYAngle = yaw
+			if c.objId != -1 && c.baseWidth > 0 { c.modelZoom = c.modelZoom * 32 / c.baseWidth }
+		}
+	}
+
+	/// rt4 IF_SETOBJECT: an if3 component shows the item's icon framed with the item's own 2d view; an if1 model
+	/// component (cooking and make-X choosers) becomes a type-4 model with the item's angles and `zoom2d * 100 / count`.
+	func setObject(_ ref: ComponentRef, obj: Int, count: Int) {
+		guard let c = component(ref) else { return }
+		if c.if3 {
+			mutate(ref) { $0.objId = obj; $0.objCount = count }
+			guard let t = (try? store.obj(obj)) ?? nil else { return }
+			setView(ref, scale: t.zoom2d, yaw: t.yAngle2D, pitch: t.xAngle2D)
+			mutate(ref) { $0.modelXOffset = t.xOffset2D; $0.modelYOffset = t.zAngle2D; $0.modelZOffset = t.yOffset2D }
+		} else if obj == -1 {
+			mutate(ref) { $0.modelType = 0 }
+		} else if let t = (try? store.obj(obj)) ?? nil {
+			mutate(ref) {
+				$0.modelXAngle = t.xAngle2D
+				$0.modelZoom = count != 0 ? t.zoom2d * 100 / count : t.zoom2d
+				$0.modelType = 4
+				$0.modelId = obj
+				$0.modelYAngle = t.yAngle2D
+			}
 		}
 	}
 
@@ -227,7 +287,9 @@ public final class InterfaceScriptHost: ScriptHost {
 	/// The component as scripts currently see it (rt4 `InterfaceList.getComponent`/`method1418`).
 	public func component(_ ref: ComponentRef) -> Component? {
 		if ref.child == -1 { return game.interfaces.overrides[ref.id] ?? base(ref.id) }
-		return game.interfaces.dynamic[ref.id]?[ref.child]
+		guard var c = game.interfaces.dynamic[ref.id]?[ref.child] else { return nil }
+		if let m = game.interfaces.childEvents[ref.id]?[ref.child] { c.events = Int(m) }
+		return c
 	}
 
 	func mutate(_ ref: ComponentRef, _ f: (inout Component) -> Void) {

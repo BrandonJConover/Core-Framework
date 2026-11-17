@@ -32,6 +32,40 @@ extension InterfaceScriptHost {
 		if let sub = game.interfaces.open[c.id] { walkInterface(sub, visit) }
 	}
 
+	// MARK: onDialogAbort / onWidgetsOpenClose
+
+	/// rt4 `InterfaceList.runScripts(kind, iface)` / `method7`: runs every component's `onDialogAbort` (kind 0,
+	/// server packet GAME_FRAME_UNK) or `onWidgetsOpenClose` (kind 1, after any sub-interface opens, closes or
+	/// moves) hook in `iface`, descending into created children and the interfaces open in layers. The chatbox
+	/// scripts use the latter to show the dialogue layer when a dialogue opens.
+	public func runScripts(kind: Int, interface iface: Int) {
+		guard iface != -1, let comps = try? renderer.components(iface) else { return }
+		let hook = kind == 0 ? "onDialogAbort" : "onWidgetsOpenClose"
+		for case let base? in comps {
+			guard let c = component(base.ref) else { continue }
+			runScripts(kind: kind, hook: hook, component: c)
+		}
+	}
+
+	private func runScripts(kind: Int, hook: String, component c: Component) {
+		if c.type == 0 {
+			if let made = game.interfaces.dynamic[c.id] {
+				for index in made.keys.sorted() { if let child = made[index] { runScripts(kind: kind, hook: hook, component: child) } }
+			}
+			if let sub = game.interfaces.open[c.id] { runScripts(kind: kind, interface: sub) }
+		}
+		if let args = c.hooks[hook] {
+			var req = ScriptRequest(args: args)
+			req.source = c.ref
+			run(req)
+		}
+	}
+
+	/// rt4 runs `runScripts(1, top)` after every sub-interface open, close and move.
+	func widgetsChanged() {
+		if game.interfaces.top != -1 { runScripts(kind: 1, interface: game.interfaces.top) }
+	}
+
 	// MARK: onLoad
 
 	/// rt4 `InterfaceList.method1626`: runs every component's onLoad hook when
@@ -219,6 +253,11 @@ extension InterfaceScriptHost {
 	/// The default (lowest enabled) option of `c`, if it has one.
 	func performOption(_ c: Component, localX: Int, localY: Int) -> Bool {
 		if c.if3 {
+			// rt4 `MiniMenu.addComponentEntries`: the "Continue" entry (action 41, events bit 0) is added last, so it is the default.
+			if c.events & 1 != 0 {
+				send(.ifContinue(component: c.id, child: c.childIndex))
+				return true
+			}
 			for i in 0..<min(c.ops.count, 10) where optionText(c, i) != nil {
 				clickOption(c, op: i + 1)
 				return true
