@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Scape530
 
 /// App-level flow: make sure the cache is present and current, then hand a
@@ -31,6 +32,10 @@ final class AppModel: ObservableObject {
 	private static let retiredHosts: Set<String> = ["", "127.0.0.1", "192.168.0.12", "192.168.0.30"]
 
 	init() {
+		#if canImport(Network)
+		// Game connections go through Network.framework (clear connect errors, hard timeout).
+		GameConnection.transportFactory = NWTransport.factory()
+		#endif
 		let saved = UserDefaults.standard.string(forKey: "server.host") ?? ""
 		let p = UserDefaults.standard.integer(forKey: "server.port")
 		if Self.retiredHosts.contains(saved) {
@@ -80,7 +85,7 @@ final class AppModel: ObservableObject {
 
 	private func openCache(updateError: Error?) {
 		guard hasLocalCache else {
-			phase = .failed("Could not download the game from \(host):\(port).\nCheck the server is running and the phone is on the same network.\n\(updateError.map { "\($0)" } ?? "")")
+			phase = .failed(updateError.map { "\($0)" } ?? "Could not download the game from \(host):\(port).")
 			return
 		}
 		do {
@@ -100,6 +105,16 @@ final class AppModel: ObservableObject {
 			phase = .ready(client)
 		} catch {
 			phase = .failed("The game cache could not be opened.\n\(error)")
+		}
+	}
+
+	/// Backgrounding pauses audio (rendering pauses in the game view); coming back resumes it. A connection
+	/// that died meanwhile is noticed by the session thread and rejoined by the client's reconnect logic.
+	func scenePhaseChanged(_ phase: ScenePhase) {
+		switch phase {
+		case .background: audioOutput?.pause()
+		case .active: audioOutput?.resume()
+		default: break
 		}
 	}
 

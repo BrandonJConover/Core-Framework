@@ -4,6 +4,8 @@ import Scape530
 struct RootView: View {
 	@EnvironmentObject var model: AppModel
 	@State private var showingServer = false
+	@State private var showingSettings = false
+	@Environment(\.scenePhase) private var scenePhase
 
 	var body: some View {
 		ZStack(alignment: .topTrailing) {
@@ -12,7 +14,7 @@ struct RootView: View {
 			case .updatingCache(let label, let fraction):
 				LoadingBar(label: label, fraction: fraction)
 			case .ready(let client):
-				GameView(client: client)
+				GameView(client: client).id(ObjectIdentifier(client))
 			case .failed(let message):
 				VStack(spacing: 16) {
 					Text(message)
@@ -27,14 +29,25 @@ struct RootView: View {
 				.padding()
 				.frame(maxWidth: .infinity, maxHeight: .infinity)
 			}
-			Button {
-				showingServer = true
-			} label: {
-				Image(systemName: "server.rack")
-					.foregroundColor(.white.opacity(0.6))
-					.padding(10)
+			HStack(spacing: 0) {
+				Button {
+					showingSettings = true
+				} label: {
+					Image(systemName: "slider.horizontal.3")
+						.foregroundColor(.white.opacity(0.6))
+						.frame(width: 44, height: 44)
+				}
+				Button {
+					showingServer = true
+				} label: {
+					Image(systemName: "server.rack")
+						.foregroundColor(.white.opacity(0.6))
+						.frame(width: 44, height: 44)
+				}
 			}
 		}
+		.onChange(of: scenePhase) { model.scenePhaseChanged($0) }
+		.sheet(isPresented: $showingSettings) { TouchSettingsView() }
 		.onAppear {
 			// First launch: there is no sensible default server for a phone.
 			if !model.hasConfiguredServer { showingServer = true }
@@ -101,6 +114,37 @@ struct ServerSettingsView: View {
 					}
 				}
 			}
+		}
+	}
+}
+
+/// Touch-layer options (bound to the keys in `MobileSettings`).
+struct TouchSettingsView: View {
+	@Environment(\.dismiss) private var dismiss
+	@AppStorage(MobileSettings.mobileMenuKey) private var mobileMenu = true
+	@AppStorage(MobileSettings.tapToDropKey) private var tapToDrop = false
+	@AppStorage(MobileSettings.smoothScalingKey) private var smoothScaling = true
+	@AppStorage(MobileSettings.hapticsKey) private var haptics = true
+
+	var body: some View {
+		NavigationStack {
+			Form {
+				Section("Touch") {
+					Toggle("Mobile options menu", isOn: $mobileMenu)
+					Toggle("Tap to drop items", isOn: $tapToDrop)
+					Toggle("Haptic feedback", isOn: $haptics)
+				}
+				Section("Display") {
+					Toggle("Smooth scaling", isOn: $smoothScaling)
+				}
+				Section {
+					Text("Tap does the first action. Touch and hold for the full options. Drag the world to turn the camera; two fingers tilt; pinch zooms.")
+						.font(.footnote)
+						.foregroundColor(.secondary)
+				}
+			}
+			.navigationTitle("Controls")
+			.toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
 		}
 	}
 }

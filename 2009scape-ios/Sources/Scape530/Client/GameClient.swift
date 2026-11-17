@@ -53,6 +53,17 @@ public final class GameClient {
 	/// Called once the server accepts the login (e.g. to save credentials).
 	public var onLoggedIn: (_ username: String, _ password: String) -> Void = { _, _ in }
 
+	/// Why the last connection attempt failed ("Can't reach host:port (...)"), for the shell to show. Cleared on the next login.
+	public private(set) var connectError: String?
+	/// Non-zero while a dropped game connection is being re-established (rt4 reconnect login, opcode 18).
+	public private(set) var reconnectAttempt = 0
+	public var maxReconnectAttempts = 4
+	private var lastRequest: Login.Request?
+	/// Mobile UI: tapping an inventory item runs its "Drop" option (like shift-drop).
+	public var tapToDrop = false
+	/// False when the shell draws the world menu itself (`popupRows` / `chooseMenuEntry`).
+	public var drawsClassicMenu = true
+
 	/// The login interface (rt4 `LoginManager.loginScreenId`), looked up by name.
 	let loginInterface: Int
 
@@ -223,7 +234,8 @@ public final class GameClient {
 		// One client cycle is 20 ms; always run at least one so scripts and
 		// timers advance on every frame, and never more than a few after a stall.
 		let now = Date()
-		let cycles = lastCycleAt.map { min(max(Int(now.timeIntervalSince($0) / 0.02), 1), 5) } ?? 1
+		// (0 is allowed after the first frame so a 60/120 Hz shell redraws without running the game faster than rt4's 50 Hz.)
+		let cycles = lastCycleAt.map { min(max(Int(now.timeIntervalSince($0) / 0.02), 0), 5) } ?? 1
 		lastCycleAt = lastCycleAt.map { $0.addingTimeInterval(Double(cycles) * 0.02) } ?? now
 		for _ in 0..<cycles {
 			host.cycle()
@@ -285,6 +297,7 @@ public final class GameClient {
 	/// A tap in game pixels: press and release of the primary button.
 	public func tap(x: Int, y: Int) {
 		if inGame, interaction.popup == nil {
+			if tapToDrop, dropTap(x: x, y: y) { return }
 			if inventoryTap(x: x, y: y) { keyboardRequested = false; return }
 			if componentTargetTap(x: x, y: y) { return }
 		}
@@ -361,9 +374,34 @@ public final class GameClient {
 		req.windowMode = 2
 		req.canvasWidth = max(lastSize.w, 765)
 		req.canvasHeight = max(lastSize.h, 503)
+		connectError = nil
+		lastRequest = req
 		let s = GameSession(host: server.host, port: server.port, request: req)
 		session = s
 		s.start()
+	}
+
+	/// Re-logs-in after the connection dropped mid-game (rt4 `LoginManager` reconnecting state): same
+	/// credentials with login opcode 18, keeping the world on screen. False once attempts run out.
+	private func reconnect() -> Bool {
+		guard inGame, var req = lastRequest, reconnectAttempt < maxReconnectAttempts else { return false }
+		reconnectAttempt += 1
+		req.reconnecting = true
+		req.canvasWidth = max(lastSize.w, 765)
+		req.canvasHeight = max(lastSize.h, 503)
+		let s = GameSession(host: server.host, port: server.port, request: req)
+		s.startDelay = reconnectAttempt == 1 ? 0.5 : 3
+		session = s
+		log("reconnecting (attempt \(reconnectAttempt))")
+		s.start()
+		return true
+	}
+
+	/// Gives up on a dead game connection: back to the login screen with an explanation.
+	private func connectionLost(_ reason: String?) {
+		let requested = host.game.loggedOut
+		logout()
+		if !requested { connectError = reason ?? "Connection lost." }
 	}
 
 	public func logout() {
@@ -465,9 +503,14 @@ public final class GameClient {
 			host.apply(e)
 			host.loginReply = 2
 			inGame = true
+			reconnectAttempt = 0
 			onLoggedIn(username, password)
 		case .loginFailed(let reply):
 			session = nil
+			if inGame {
+				if !reconnect() { connectionLost("Could not rejoin the game.") }
+				return
+			}
 			switch reply {
 			case .failure(let code): host.loginReply = Int32(code)
 			case .hopDelay: host.loginReply = 21
@@ -478,9 +521,12 @@ public final class GameClient {
 			session = nil
 			if inGame {
 				log("disconnected: \(reason ?? "closed")")
-				logout()
+				// A logout the player asked for ends with the server's LOGOUT packet; anything else is a drop.
+				if reason != nil, !host.game.loggedOut, reconnect() { return }
+				connectionLost(reason)
 			} else {
 				host.loginReply = -5
+				connectError = reason
 			}
 		case .decodeFailed(let op, let err):
 			log("decode failed for opcode \(op): \(err)")

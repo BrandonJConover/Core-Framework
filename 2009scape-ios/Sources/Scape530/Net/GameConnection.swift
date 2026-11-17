@@ -3,7 +3,7 @@
 /// REBUILD_NORMAL map packet) is returned too.
 public enum GameConnection {
 	public struct Session {
-		public let socket: BlockingSocket
+		public let socket: any ByteTransport
 		public let account: Login.Success
 		public let firstPacket: [UInt8]
 		public var outCipher: IsaacRandom
@@ -23,8 +23,13 @@ public enum GameConnection {
 		}
 	}
 
+	/// Opens the game connection. The iOS app replaces this with a Network.framework transport.
+	public static var transportFactory: (_ host: String, _ port: Int) throws -> any ByteTransport = { host, port in
+		try BlockingSocket(host: host, port: port)
+	}
+
 	public static func login(host: String, port: Int, request: Login.Request) throws -> Session {
-		let s = try BlockingSocket(host: host, port: port)
+		let s = try transportFactory(host, port)
 		try s.write(Login.handshake(username: request.username))
 		let status = Int(try s.readExactly(1)[0])
 		guard status == 0 else { throw Failure(reply: .failure(status)) }

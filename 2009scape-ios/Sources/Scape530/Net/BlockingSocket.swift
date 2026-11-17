@@ -25,10 +25,11 @@ public final class BlockingSocket {
 		var res: UnsafeMutablePointer<addrinfo>?
 		let rc = getaddrinfo(host, String(port), &hints, &res)
 		guard rc == 0, let first = res else {
-			throw Failure(description: "cannot resolve \(host)")
+			throw ConnectFailure(host: host, port: port, reason: "unknown host")
 		}
 		defer { freeaddrinfo(res) }
 		var ai: UnsafeMutablePointer<addrinfo>? = first
+		var lastErrno: Int32 = 0
 		while let a = ai {
 			let s = socket(a.pointee.ai_family, a.pointee.ai_socktype, a.pointee.ai_protocol)
 			if s >= 0 {
@@ -41,11 +42,12 @@ public final class BlockingSocket {
 					fd = s
 					return
 				}
+				lastErrno = errno
 				BlockingSocket.closeFD(s)
 			}
 			ai = a.pointee.ai_next
 		}
-		throw Failure(description: "cannot connect to \(host):\(port)")
+		throw ConnectFailure(host: host, port: port, reason: lastErrno == 0 ? "" : String(cString: strerror(lastErrno)).lowercased())
 	}
 
 	deinit { close() }
