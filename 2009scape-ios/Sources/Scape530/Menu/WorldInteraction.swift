@@ -155,7 +155,7 @@ extension GameClient {
 		if interaction.popup == nil, let text = interaction.preview, let font = try store.font(named: "b12_full") {
 			font.drawLeft(text, x: 4, y: 15, color: 0xFFFFFF, shadow: 0, into: &r)
 		}
-		guard let p = interaction.popup, let font = try store.font(named: "b12_full") else { return }
+		guard drawsClassicMenu, let p = interaction.popup, let font = try store.font(named: "b12_full") else { return }
 		r.fillRect(p.x, p.y, p.width, p.height, 0x5D5447)
 		r.fillRect(p.x + 1, p.y + 1, p.width - 2, 16, 0)
 		r.drawRect(p.x + 1, p.y + 18, p.width - 2, p.height - 19, 0)

@@ -18,12 +18,20 @@ targets:
     dependencies:
       - package: Scape530
         product: Scape530
+      - sdk: Metal.framework
+      - sdk: QuartzCore.framework
+      - sdk: Network.framework
+      - sdk: AVFoundation.framework
+      - sdk: GameController.framework
     info:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: "2009scape"
         UILaunchScreen: {}
         UIRequiresFullScreen: true
+        # ProMotion: allow display rates above 60 Hz on iPhone.
+        CADisableMinimumFrameDurationOnPhone: true
+        UIApplicationSupportsIndirectInputEvents: true
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
         UISupportedInterfaceOrientations:

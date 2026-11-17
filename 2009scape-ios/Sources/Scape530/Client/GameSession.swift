@@ -25,6 +25,8 @@ public final class GameSession {
 	private var outbox: [ClientMessage] = []
 	private var stopping = false
 	private var thread: Thread?
+	/// Seconds to wait before connecting (reconnect back-off).
+	public var startDelay: TimeInterval = 0
 
 	public init(host: String, port: Int, request: Login.Request) {
 		self.host = host
@@ -60,6 +62,9 @@ public final class GameSession {
 	}
 
 	private func run() {
+		if startDelay > 0 { Thread.sleep(forTimeInterval: startDelay) }
+		lock.lock(); let cancelled = stopping; lock.unlock()
+		if cancelled { post(.disconnected(nil)); return }
 		let session: GameConnection.Session
 		do {
 			session = try GameConnection.login(host: host, port: port, request: request)

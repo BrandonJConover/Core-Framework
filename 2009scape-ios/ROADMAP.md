@@ -59,8 +59,12 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 - [x] `GameSession` network thread (login, framing, PLAYER/NPC_INFO, keepalive)
       feeding `GameState` on the UI thread; resizable game frame (746) renders
       after login. A test drives the full flow against a live server.
-- [ ] First run on a device via the MacBook Air; move frame upload to Metal.
-- [ ] Non-blocking transport on `Network.framework`.
+- [ ] First run on a device via the MacBook Air. **All App-layer code below is written but un-compiled** (no Xcode/iOS SDK where it was written); expect a round of compile fixes on the Mac.
+- [x] Frame upload via Metal (`App/Sources/MetalFramePresenter.swift`: texture ring, aspect-fit quad, nearest/bilinear), game thread (`GameLoop.swift`) off the main thread. Un-compiled.
+- [x] Non-blocking transport on `Network.framework` (`Net/NWTransport.swift` behind `ByteTransport`; `BlockingSocket` stays the Linux/test path), connect timeout and clear "Can't reach host:port (reason)" errors. Library part builds on Linux; NWTransport un-compiled.
+- [x] Lifecycle: display link and audio pause in background, audio interruption/route handling, reconnect (login opcode 18, up to 4 tries) with banner. Un-compiled.
+- [x] Mobile UI: tap = default action, 350 ms long press + haptic opens a big-row options menu (`MobileMenuView.swift`, toggle in the controls sheet), tap-to-drop, two-finger tilt, pinch, trackpad/mouse (right click, hover, scroll zoom), GameController, ProMotion/thermal/low-power frame rate. Un-compiled.
+- [ ] Fixed 765x503 mode (needs the interface layer to support rt4 interface 548), compact native HUD, menu entry swapper, haptics for level-ups/hitsplats, larger-font classic menu.
 
 ## M3: See the world
 
