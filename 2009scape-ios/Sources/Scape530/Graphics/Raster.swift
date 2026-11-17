@@ -37,8 +37,6 @@ public struct Raster {
 
 	public mutating func resetClip() { setClip(0, 0, width, height) }
 
-	/// Blends `rgb` over the pixel at `i` with `opacity` 0...256 (rt4 style).
-	@inline(__always)
 	/// Straight-alpha "over" onto a transparent / translucent pixel (GPU mode's 2D layer). `a` is 1...255.
 	@inline(__always)
 	static func overTranslucent(_ d: UInt32, _ rgb: UInt32, _ a: UInt32) -> UInt32 {
@@ -51,6 +49,8 @@ public struct Raster {
 		return (ra << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)
 	}
 
+	/// Blends `rgb` over the pixel at `i` with `opacity` 0...256 (rt4 style).
+	@inline(__always)
 	mutating func blend(_ i: Int, _ rgb: UInt32, _ opacity: Int) {
 		if opacity >= 256 {
 			pixels[i] = 0xFF00_0000 | rgb
