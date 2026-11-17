@@ -133,6 +133,8 @@ extension GameClient {
 		guard let cand = interaction.dragCandidate, host.game.interfaces.inventoryUI.dragging != nil,
 			let hit = inventorySlot(atX: x, y: y), hit.component.id == cand.component, hit.slot != cand.slot else { return }
 		var slots = host.game.interfaces.invSlots[cand.component] ?? [:]
+		// rt4 `Protocol`: insert mode (varp clientCode 9) applies to component clientCode 206 and a non-empty source slot.
+		let inserting = host.varpClient.inserting == 1 && hit.component.clientCode == 206 && slots[cand.slot] != nil
 		if (hit.component.events >> 29) & 1 != 0 {
 			slots[hit.slot] = slots[cand.slot]
 			slots[cand.slot] = nil
@@ -140,7 +142,7 @@ extension GameClient {
 			(slots[cand.slot], slots[hit.slot]) = (slots[hit.slot], slots[cand.slot])
 		}
 		host.game.interfaces.invSlots[cand.component] = slots
-		sendOp(.moveItem(component: cand.component, from: cand.slot, to: hit.slot, insert: false))
+		sendOp(.moveItem(component: cand.component, from: cand.slot, to: hit.slot, insert: inserting))
 	}
 
 	/// One client cycle of the pressed-slot highlight (15 cycles, rt4 `MiniMenu.anInt2043`).

@@ -261,48 +261,19 @@ public final class ScriptRunner {
 
 	// MARK: params (rt4 ParamType / StructType)
 
-	struct ParamInfo {
-		var isString = false
-		var defaultInt: Int32 = 0
-		var defaultString = ""
-	}
-
-	func paramInfo(_ id: Int) throws -> ParamInfo {
-		var info = ParamInfo()
-		guard let data = try store.file(archive: ConfigStore.Archive.configs, group: ConfigStore.ScriptArchive.paramGroup, file: id) else { return info }
-		var p = Packet(data)
-		while true {
-			let op = try p.g1()
-			if op == 0 { break }
-			switch op {
-			case 1: info.isString = try p.g1() == 115
-			case 2: info.defaultInt = try p.g4()
-			case 5: info.defaultString = try p.gjstr()
-			default: break
-			}
-		}
-		return info
-	}
-
-	func structParams(_ id: Int) throws -> [Int: ParamValue] {
-		var out: [Int: ParamValue] = [:]
-		guard let data = try store.file(archive: ConfigStore.Archive.configs, group: ConfigStore.ScriptArchive.structGroup, file: id) else { return out }
-		var p = Packet(data)
-		while true {
-			let op = try p.g1()
-			if op == 0 { break }
-			if op == 249 { try decodeParams(&p, into: &out) }
-		}
-		return out
-	}
-
+	/// Pushes param `param` of an entity's table, or the `ParamType` default (rt4 `ScriptRunner` item/npc/loc/struct
+	/// attribute opcodes: `ParamTypeList.get(id)`, then `getParam(default, id)` as int or string by `isString`).
 	func pushParam(_ params: [Int: ParamValue], param: Int) throws {
-		let info = try paramInfo(param)
-		if info.isString {
-			if case .string(let s)? = params[param] { try pushS(s) } else { try pushS(info.defaultString) }
-		} else {
-			if case .int(let v)? = params[param] { try pushI(v) } else { try pushI(info.defaultInt) }
+		let type = try store.param(param) ?? ParamType(id: param)
+		switch type.resolve(params) {
+		case .string(let s): try pushS(s)
+		case .int(let v): try pushI(v)
 		}
+	}
+
+	/// rt4 `StructTypeList.get`: a missing struct has no params, so every param falls back to its default.
+	func structParams(_ id: Int) throws -> [Int: ParamValue] {
+		try store.structType(id)?.params ?? [:]
 	}
 
 	// MARK: component addressing

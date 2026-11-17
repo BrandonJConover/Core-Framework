@@ -55,7 +55,7 @@ public final class Minimap {
 
 	func msiType(_ id: Int) -> MsiType? {
 		if let c = msiCache[id] { return c }
-		let t = try? MsiType(data: store.file(archive: ConfigStore.Archive.configs, group: 34, file: id))
+		let t = ((try? store.msi(id)) ?? nil) ?? MsiType(id: id)
 		msiCache[id] = .some(t)
 		return t
 	}

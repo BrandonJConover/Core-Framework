@@ -31,6 +31,16 @@ public final class ItemIcons {
 
 	public func clear() { cache = [:] }
 
+	/// rt4 `Rasteriser.setBrightness` gamma used for new icons (0.8 until the Options tab changes it).
+	public private(set) var brightness: Float = 0.8
+
+	/// A brightness change rebuilds the palette, so icons are redrawn (rt4 `ObjTypeList.clearSprites`).
+	public func setBrightness(_ gamma: Float) {
+		brightness = gamma
+		rasteriser = nil
+		cache = [:]
+	}
+
 	/// rt4 `Inv.getObjectSprite(selected, id, drawText, count, shadow)`. `selected` is the outline:
 	/// 0 none, 1 black, 2 black then white (a pressed inventory slot). Nil when the item has no model.
 	/// rt4 skips its cache when a texture had transparency; icons here are always cached.
@@ -57,7 +67,7 @@ public final class ItemIcons {
 		}
 		let r = Rasteriser3D(width: ItemSprite.width, height: ItemSprite.height)
 		r.unpackTextures(textures)
-		r.setBrightness(0.8, jitter: false)
+		r.setBrightness(brightness, jitter: false)
 		rasteriser = r
 		return r
 	}
