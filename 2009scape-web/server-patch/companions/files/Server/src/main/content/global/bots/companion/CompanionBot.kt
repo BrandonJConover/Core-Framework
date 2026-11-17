@@ -41,8 +41,9 @@ class CompanionBot(val owner: Player, val bot: AIPlayer) {
         bot.setAttribute(BotPacketTap.ATTR, true)
         bot.setAttribute("companion:owner", owner.username)
         bot.isHighPriority = true
-        // Pocket money for quest shopping (a bucket, a pot...).
-        if (!bot.inventory.contains(org.rs09.consts.Items.COINS_995, 1)) bot.inventory.add(core.game.node.item.Item(org.rs09.consts.Items.COINS_995, 200))
+        // Pocket money for quest shopping (a bucket, a pot...). It can be spent in shops but never
+        // traded to a player, otherwise summon/give/dismiss would be an infinite coin source.
+        bot.inventory.add(core.game.node.item.Item(COINS, STARTER_COINS))
         GameWorld.Pulser.submit(object : Pulse(1) {
             override fun pulse(): Boolean = tick()
         })
@@ -75,8 +76,19 @@ class CompanionBot(val owner: Player, val bot: AIPlayer) {
 
     fun stopQuest() { quest = null; if (mode == Mode.QUEST) mode = Mode.FOLLOW }
 
+    /** Coins the owner may take back: anything above the starter allowance it still holds. */
+    fun transferableCoins(): Int {
+        val coins = bot.inventory.getAmount(COINS)
+        return (coins - minOf(STARTER_COINS, coins)).coerceAtLeast(0)
+    }
+
     fun give(itemId: Int, amount: Int) {
-        pendingGive = itemId to amount
+        var n = amount
+        if (itemId == COINS) {
+            n = minOf(amount, transferableCoins())
+            if (n <= 0) { say("That's my quest money, I can't hand it over."); return }
+        }
+        pendingGive = itemId to n
         tradeCooldown = 0
     }
 
@@ -151,13 +163,17 @@ class CompanionBot(val owner: Player, val bot: AIPlayer) {
         pendingGive?.let { (id, amount) ->
             if (botTrade.stage == 0) {
                 val slot = bot.inventory.getSlot(core.game.node.item.Item(id))
-                if (slot >= 0) botTrade.container?.offer(slot, amount)
+                val n = if (id == COINS) minOf(amount, transferableCoins()) else amount
+                if (slot >= 0 && n > 0) botTrade.container?.offer(slot, n)
                 pendingGive = null
             }
         }
         if (ownerTrade.isAccepted && !botTrade.isAccepted) botTrade.setAccepted(true, true)
     }
 }
+
+private const val COINS = org.rs09.consts.Items.COINS_995
+private const val STARTER_COINS = 200
 
 object Companions {
     private val byOwner = HashMap<String, CompanionBot>()
