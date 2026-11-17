@@ -96,11 +96,12 @@ final class PlaythroughTests: XCTestCase {
 			return true
 		}
 
-		/// Scans the viewport for a point whose default (top) menu entry matches `match`.
-		func scanWorld(step: Int = 10, _ match: (Menu.Entry) -> Bool) -> (x: Int, y: Int, entry: Menu.Entry)? {
+		/// Scans the viewport for a point whose default (top) menu entry matches `match`, nearest the player first.
+		func scanWorld(step: Int = 10, radius: Int = 130, _ match: (Menu.Entry) -> Bool) -> (x: Int, y: Int, entry: Menu.Entry)? {
 			guard let v = client.viewport else { return nil }
-			for dy in stride(from: 20, to: v.h - 20, by: step) {
-				for dx in stride(from: 20, to: v.w - 20, by: step) {
+			let (cx, cy) = (v.w / 2, v.h / 2)
+			for dy in stride(from: max(20, cy - radius), to: min(v.h - 20, cy + radius), by: step) {
+				for dx in stride(from: max(20, cx - radius * 2), to: min(v.w - 20, cx + radius * 2), by: step) {
 					let px = v.x + dx, py = v.y + dy
 					guard client.isOverWorld(x: px, y: py), let (m, _) = client.buildMenu(x: px, y: py) else { continue }
 					let e = m.entries[m.top]
@@ -434,5 +435,218 @@ final class PlaythroughTests: XCTestCase {
 		XCTAssertTrue(l.pump(until: { l.client.screen != .game }, timeout: 10), "logged out")
 		l.shot("logged-out")
 		l.report()
+	}
+
+	/// True while some actor shows a hitsplat or health bar.
+	func combatVisible(_ l: Live) -> (hits: Int, bars: Int) {
+		let w = l.client.world
+		var hits = 0, bars = 0
+		for a in Array(w.ctx.npcs.values) + Array(w.ctx.players.values) {
+			for i in 0..<4 where a.hitVisibleUntil[i] > w.ctx.loop { hits += 1 }
+			if a.hitpointsBarVisibleUntil > w.ctx.loop { bars += 1 }
+		}
+		return (hits, bars)
+	}
+
+	/// Teleports to the chicken coop, attacks a chicken and waits for hitsplats, health bar and experience.
+	func testCombat() throws {
+		let l = try live("ptfight")
+		finishTutorial(l)
+		l.pump(2)
+		l.say("::empty")
+		l.say("::item 1205")
+		l.pump(1)
+		XCTAssertTrue(tapItem(l, 1205), "wield dagger")
+		l.say("::tele 3235 3296 0")
+		XCTAssertTrue(l.pump(until: { (l.client.state.selfWorld?.z ?? 0) > 3290 }, timeout: 10), "teleported: \(String(describing: l.client.state.selfWorld))")
+		l.pump(4)
+		l.client.cameraReset()
+		l.pump(1)
+		for (id, a) in l.client.world.ctx.npcs { print("NPC \(id) \(a.npcType?.name ?? "?") ops \(a.npcType?.ops.compactMap { $0 } ?? [])") }
+		l.shot("combat-before")
+		func combatXp() -> Int { (0...6).reduce(0) { $0 + Int(l.client.state.stats[$1]?.xp ?? 0) } }
+		let xp0 = combatXp()
+		var target = l.findNpc(op: "Attack", name: "chicken")
+		if target == nil { // turn the camera around once if nothing is on screen
+			l.client.cameraDrag(dx: 400, dy: 0)
+			l.pump(1)
+			target = l.findNpc(op: "Attack", name: "chicken")
+		}
+		let t = try XCTUnwrap(target, "a chicken to attack")
+		_ = l.takeSent()
+		l.client.tap(x: t.x, y: t.y)
+		print("COMBAT sent: \(l.takeSent())")
+		var sawHit = false, sawBar = false
+		var shots = 0
+		let until = Date().addingTimeInterval(25)
+		while Date() < until {
+			l.pump(0.3)
+			let c = combatVisible(l)
+			if c.hits > 0 && !sawHit { sawHit = true; l.shot("combat-hitsplat") }
+			if c.bars > 0 && !sawBar { sawBar = true; l.shot("combat-healthbar") }
+			if c.hits > 0 && shots < 1 { shots += 1 }
+			if combatXp() > xp0 && sawHit && sawBar { break }
+		}
+		print("COMBAT result: hit=\(sawHit) bar=\(sawBar) combat xp \(xp0)->\(combatXp())")
+		XCTAssertTrue(sawHit, "a hitsplat was shown")
+		XCTAssertTrue(sawBar, "a health bar was shown")
+		XCTAssertGreaterThan(combatXp(), xp0, "combat experience granted")
+		l.pump(1)
+		l.shot("combat-after")
+		l.report()
+		l.client.logout()
+	}
+
+	/// Opens the inventory tab unless it is showing (tapping the open tab folds the side panel away in resizable mode).
+	func showInventory(_ l: Live) {
+		if !l.client.ui.drawn.contains(where: { $0.component.type == 2 && $0.component.id >> 16 == 149 }) { l.tapOp("Inventory"); l.pump(0.5) }
+	}
+
+	func teleport(_ l: Live, _ x: Int, _ z: Int) {
+		l.say("::tele \(x) \(z) 0")
+		let ok = l.pump(until: { if let p = l.client.state.selfWorld { return abs(p.x - x) <= 2 && abs(p.z - z) <= 2 }; return false }, timeout: 10)
+		XCTAssertTrue(ok, "teleported to \(x),\(z): \(String(describing: l.client.state.selfWorld))")
+		l.pump(4)
+		l.client.cameraReset()
+		l.pump(1)
+	}
+
+	/// Talks to Hans (dialogue with options), uses a shop, lights a fire (item on item) and cooks (item on object).
+	func testWorldInteractions() throws {
+		let l = try live("ptworld")
+		finishTutorial(l)
+		l.pump(2)
+		l.say("::empty")
+
+		// Hans in Lumbridge castle: dialogue with options.
+		teleport(l, 3222, 3219)
+		var hans = l.findNpc(op: "Talk-to", name: "hans")
+		if hans == nil { l.client.cameraDrag(dx: 500, dy: 0); l.pump(1); hans = l.findNpc(op: "Talk-to", name: "hans") }
+		if let h = hans {
+			l.client.tap(x: h.x, y: h.y)
+			l.pump(4)
+			let t = l.driveDialogue(prefer: ["Who are you", "I'm looking for whoever is in charge", "Can you tell me"], rounds: 14, shots: "hans")
+			for line in t { print("HANS: \(line)") }
+			XCTAssertGreaterThan(t.count, 2, "a conversation took place")
+			l.pump(2)
+		} else {
+			print("HANS not found; npcs: \(l.client.world.ctx.npcs.values.compactMap { $0.npcType?.name })")
+			XCTFail("Hans on screen")
+		}
+		XCTAssertNil(l.dialogue, "dialogue ended: \(l.describe().prefix(300))")
+
+		// Fire: tinderbox on logs, then raw shrimp on the fire.
+		l.say("::item 590")
+		l.say("::item 1511")
+		l.say("::item 317 3")
+		l.pump(1)
+		l.shot("after-hans")
+		print("INV after items: \(l.client.state.inventories[93]?.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value.id)" } ?? []) \(l.describe().prefix(400))")
+		showInventory(l)
+		_ = l.takeSent()
+		XCTAssertTrue(tapItem(l, 590), "select tinderbox")
+		print("USE target after tinderbox: \(String(describing: l.client.interaction.target))")
+		l.shot("use-tinderbox")
+		XCTAssertTrue(tapItem(l, 1511), "tap logs")
+		print("USE sent: \(l.takeSent())")
+		l.pump(8)
+		print("FIRE chat: \(l.client.state.chatLog.lines.prefix(3).map(\.message))")
+		XCTAssertEqual(count(l, item: 1511), 0, "logs burned")
+		l.shot("fire")
+		// Cook shrimp on the fire.
+		l.client.cameraReset()
+		l.pump(1)
+		XCTAssertTrue(tapItem(l, 317), "select raw shrimp")
+		let fire = l.scanWorld(step: 12) { $0.op == "Use" && $0.base.lowercased().contains("fire") }
+		print("FIRE scan: \(String(describing: fire?.entry.base))")
+		if let f = fire {
+			l.client.tap(x: f.x, y: f.y)
+			l.pump(3)
+			print("COOK interfaces: \(l.describe().prefix(300))")
+			l.shot("cook-prompt")
+			print("COOK ui: \(l.uiSummary(Array(l.client.state.interfaces.open.values.filter { $0 > 200 && $0 < 800 && ![746, 747, 748, 749, 750, 751, 752, 754, 261, 274, 320, 387, 464, 550, 551, 589, 182, 187, 192, 271, 92, 149, 137].contains($0) })).prefix(14))")
+			for d in l.drawn(307) { print("COOK comp 307:\(d.component.id & 0xFFFF) type \(d.component.type) btn \(d.component.buttonType) option \(String(describing: d.component.option)) at \(d.x),\(d.y) \(d.w)x\(d.h)") }
+			if let d = l.drawn(307).first(where: { $0.component.type == 6 }) {
+				l.client.longPress(x: d.x + d.w / 2, y: d.y + d.h / 2)
+				print("COOK menu: \(l.client.interaction.popup.map { m in (0..<m.menu.count).map { m.menu.text($0) } } ?? [])")
+				l.shot("cook-menu")
+				l.client.dismissMenu()
+				l.tap(d)
+			}
+			l.pump(10)
+			print("COOK chat: \(l.client.state.chatLog.lines.prefix(3).map(\.message)) shrimp \(count(l, item: 317)) cooked \(count(l, item: 315))")
+		} else {
+			l.client.cameraDrag(dx: 400, dy: 0)
+			l.pump(1)
+			l.shot("fire-notfound")
+			XCTFail("fire visible")
+		}
+		l.report()
+		l.client.logout()
+	}
+
+	/// Lumbridge general store (shop interface, buy) and Wind Strike on a chicken (spell target mode).
+	func testShopAndMagic() throws {
+		let l = try live("ptshop")
+		finishTutorial(l)
+		l.pump(2)
+		l.say("::empty")
+		l.say("::item 995 1000")
+		l.pump(1)
+		teleport(l, 3212, 3248)
+		var keeper = l.findNpc(op: "Talk-to", name: "shopkeeper")
+		if keeper == nil { l.client.cameraDrag(dx: 500, dy: 0); l.pump(1); keeper = l.findNpc(op: "Talk-to", name: "shopkeeper") }
+		if let k = keeper {
+			l.client.longPress(x: k.x, y: k.y)
+			XCTAssertTrue(chooseMenu(l, "Trade"), "Trade option")
+			XCTAssertTrue(l.pump(until: { l.client.state.interfaces.open.values.contains(620) }, timeout: 8), "shop opens: \(l.describe().prefix(300))")
+			l.pump(1.5)
+			l.shot("shop")
+			print("SHOP ifaces: \(l.openInterfaces) type2 \(l.client.ui.drawn.filter { $0.component.type == 2 }.map { $0.component.id >> 16 })")
+			print("SHOP items drawn: \(l.client.ui.drawn.filter { $0.component.objId != -1 && $0.component.id >> 16 == 620 }.count)")
+			let item = l.client.ui.drawn.first { $0.component.objId != -1 && $0.component.id >> 16 == 620 && $0.w > 0 }
+			if let it = item {
+				l.client.longPress(x: it.x + it.w / 2, y: it.y + it.h / 2)
+				print("SHOP menu: \(l.client.interaction.popup.map { m in (0..<m.menu.count).map { m.menu.text($0) } } ?? [])")
+				l.shot("shop-menu")
+				let before = count(l, item: 995)
+				if chooseMenu(l, "Buy 1") {
+					l.pump(1.5)
+					print("SHOP bought: coins \(before) -> \(count(l, item: 995)) inv \(l.client.state.inventories[93]?.values.map(\.id) ?? [])")
+					XCTAssertLessThan(count(l, item: 995), before, "coins spent")
+				} else { l.client.dismissMenu(); XCTFail("Buy 1 option") }
+			} else { XCTFail("shop stock drawn") }
+			l.tapOp("Close")
+			l.pump(1)
+			XCTAssertFalse(l.client.state.interfaces.open.values.contains(620), "shop closed")
+		} else {
+			XCTFail("shopkeeper on screen: \(l.client.world.ctx.npcs.values.compactMap { $0.npcType?.name })")
+		}
+
+		// Wind Strike on a chicken.
+		l.say("::item 556 50")
+		l.say("::item 558 50")
+		teleport(l, 3235, 3296)
+		l.tapOp("Magic Spellbook")
+		l.pump(1)
+		l.shot("spellbook")
+		let spell = l.client.ui.drawn.first { $0.component.optionBase.contains("Wind Strike") || $0.component.option == "Cast" && $0.component.optionBase.contains("Wind") }
+		print("SPELL comp: \(String(describing: spell.map { ($0.component.id >> 16, $0.component.id & 0xFFFF, $0.component.optionBase, $0.component.ops.first ?? "") }))")
+		let sp = try XCTUnwrap(spell, "Wind Strike in the spellbook")
+		l.tap(sp)
+		print("SPELL target: \(String(describing: l.client.interaction.target))")
+		XCTAssertNotNil(l.client.interaction.target, "spell target mode")
+		var chicken = l.findNpc(op: "Cast", name: "chicken")
+		if chicken == nil { l.client.cameraDrag(dx: 400, dy: 0); l.pump(1); chicken = l.findNpc(op: "Cast", name: "chicken") }
+		let c = try XCTUnwrap(chicken, "chicken as spell target")
+		l.client.tap(x: c.x, y: c.y)
+		var hit = false
+		let until = Date().addingTimeInterval(15)
+		while Date() < until && !hit { l.pump(0.3); hit = combatVisible(l).hits > 0 }
+		l.shot("spell-hit")
+		XCTAssertTrue(hit, "the spell hit")
+		XCTAssertGreaterThan(l.client.state.stats[6]?.xp ?? 0, 0, "magic xp")
+		l.report()
+		l.client.logout()
 	}
 }

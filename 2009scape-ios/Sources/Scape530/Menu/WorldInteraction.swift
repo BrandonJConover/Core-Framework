@@ -223,7 +223,7 @@ extension GameClient {
 			setCross(2, clickX, clickY)
 			sendOp(.examineObj(id: key))
 
-		case Menu.Action.componentOp, Menu.Action.componentOpHigh, Menu.Action.componentContinue:
+		case Menu.Action.componentOp, Menu.Action.componentOpHigh, Menu.Action.componentContinue, 8, 59, 51, 28:
 			doComponentAction(e)
 			return
 

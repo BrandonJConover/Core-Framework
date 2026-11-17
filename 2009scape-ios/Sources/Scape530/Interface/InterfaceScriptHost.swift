@@ -185,7 +185,8 @@ public final class InterfaceScriptHost: ScriptHost {
 					}
 				}
 			}
-		case let .ifSetObject(c, obj, count): mutate(ComponentRef(id: Int(c))) { $0.objId = obj; $0.objCount = Int(count) }
+		case let .ifSetObject(c, obj, count): setObject(ComponentRef(id: Int(c)), obj: obj, count: Int(count))
+		case let .ifSetAngle(c, pitch, yaw, scale): setView(ComponentRef(id: Int(c)), scale: scale, yaw: yaw, pitch: pitch)
 		case let .ifSetModel(c, model): mutate(ComponentRef(id: Int(c))) { $0.modelType = 1; $0.modelId = model }
 		case let .ifSetNpcHead(c, npc): mutate(ComponentRef(id: Int(c))) { $0.modelType = 2; $0.modelId = npc }
 		case .ifSetPlayerHead(let c): mutate(ComponentRef(id: Int(c))) { $0.modelType = 3; $0.modelId = 0 }
@@ -222,6 +223,39 @@ public final class InterfaceScriptHost: ScriptHost {
 			invLog.note(inv & 0x7FFF)
 		default:
 			game.apply(m)
+		}
+	}
+
+	/// rt4 `DelayedStateChange.updateView`: the component's model pitch, yaw and zoom. Item components rescale the
+	/// zoom to their width (`zoom * 32 / width`).
+	func setView(_ ref: ComponentRef, scale: Int, yaw: Int, pitch: Int) {
+		mutate(ref) { c in
+			c.modelXAngle = pitch
+			c.modelZoom = scale
+			c.modelYAngle = yaw
+			if c.objId != -1 && c.baseWidth > 0 { c.modelZoom = c.modelZoom * 32 / c.baseWidth }
+		}
+	}
+
+	/// rt4 IF_SETOBJECT: an if3 component shows the item's icon framed with the item's own 2d view; an if1 model
+	/// component (cooking and make-X choosers) becomes a type-4 model with the item's angles and `zoom2d * 100 / count`.
+	func setObject(_ ref: ComponentRef, obj: Int, count: Int) {
+		guard let c = component(ref) else { return }
+		if c.if3 {
+			mutate(ref) { $0.objId = obj; $0.objCount = count }
+			guard let t = (try? store.obj(obj)) ?? nil else { return }
+			setView(ref, scale: t.zoom2d, yaw: t.yAngle2D, pitch: t.xAngle2D)
+			mutate(ref) { $0.modelXOffset = t.xOffset2D; $0.modelYOffset = t.zAngle2D; $0.modelZOffset = t.yOffset2D }
+		} else if obj == -1 {
+			mutate(ref) { $0.modelType = 0 }
+		} else if let t = (try? store.obj(obj)) ?? nil {
+			mutate(ref) {
+				$0.modelXAngle = t.xAngle2D
+				$0.modelZoom = count != 0 ? t.zoom2d * 100 / count : t.zoom2d
+				$0.modelType = 4
+				$0.modelId = obj
+				$0.modelYAngle = t.yAngle2D
+			}
 		}
 	}
 

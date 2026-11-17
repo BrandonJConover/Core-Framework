@@ -19,8 +19,21 @@ extension GameClient {
 		let p = (x: x, y: y)
 		for d in ui.drawn where host.inside(d, p) {
 			let c = d.component
-			guard c.if3 else { continue }
 			if c.type == 0 && c.noClickThrough { menu.reset() }
+			if !c.if3 {
+				// if1 buttons (rt4 `MiniMenu.addComponentEntries`): one entry each, the component's own `option`.
+				func addLegacy(_ op: String, _ action: Int) { menu.add(op: op, base: "", action: action, key: 0, x: -1, z: c.id) }
+				let option = c.option ?? ""
+				switch c.buttonType {
+				case 1: addLegacy(option, 8)
+				case 3: addLegacy("Close", 28)
+				case 4: addLegacy(option, 59)
+				case 5: addLegacy(option, 51)
+				case 6: addLegacy(option, Menu.Action.componentContinue)
+				default: break
+				}
+				continue
+			}
 			func add(_ op: String, _ action: Int, _ number: Int) {
 				menu.add(op: op, base: c.optionBase, action: action, key: Int64(number), x: c.childIndex, z: c.id)
 			}
@@ -40,7 +53,12 @@ extension GameClient {
 	/// Runs a component menu entry.
 	func doComponentAction(_ e: Menu.Entry) {
 		let ref = ComponentRef(id: e.z, child: e.x)
-		if e.action == Menu.Action.componentContinue {
+		if e.action == 8 || e.action == 59 || e.action == 51 {
+			send(.ifButtonLegacy(component: e.z))
+		} else if e.action == 28 {
+			host.closeModals()
+			send(.closeModal)
+		} else if e.action == Menu.Action.componentContinue {
 			send(.ifContinue(component: e.z, child: e.x))
 		} else if let c = host.component(ref) {
 			host.clickOption(c, op: Int(e.key))
