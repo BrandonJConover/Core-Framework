@@ -11,10 +11,12 @@ public struct Raster {
 	public private(set) var clipRight: Int
 	public private(set) var clipBottom: Int
 
-	public init(width: Int, height: Int, fill: UInt32 = 0) {
+	/// - Parameter transparent: starts fully transparent (alpha 0) instead of opaque black, for the 2D layer
+	///   the GPU renderer composites over its 3D scene. Partial blends then accumulate alpha (see `blend`).
+	public init(width: Int, height: Int, fill: UInt32 = 0, transparent: Bool = false) {
 		self.width = width
 		self.height = height
-		pixels = [UInt32](repeating: 0xFF00_0000 | fill, count: width * height)
+		pixels = [UInt32](repeating: transparent ? 0 : 0xFF00_0000 | fill, count: width * height)
 		clipRight = width
 		clipBottom = height
 	}
@@ -38,6 +40,16 @@ public struct Raster {
 		if opacity <= 0 { return }
 		let a = UInt32(opacity), ia = 256 - a
 		let d = pixels[i]
+		if d >> 24 != 0xFF {
+			// Over a transparent / translucent pixel (GPU mode's 2D layer): straight-alpha "over".
+			let da = d >> 24
+			if da == 0 { pixels[i] = (min(a, 255) << 24) | rgb; return }
+			let dw = (da * ia) >> 8
+			let ra = min(255, a + dw)
+			func ch(_ shift: UInt32) -> UInt32 { min(255, (((rgb >> shift) & 0xFF) * a + ((d >> shift) & 0xFF) * dw) / max(ra, 1)) }
+			pixels[i] = (ra << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)
+			return
+		}
 		let rb = ((rgb & 0xFF00FF) &* a &+ (d & 0xFF00FF) &* ia) >> 8 & 0xFF00FF
 		let g = ((rgb & 0x00FF00) &* a &+ (d & 0x00FF00) &* ia) >> 8 & 0x00FF00
 		pixels[i] = 0xFF00_0000 | rb | g

@@ -246,7 +246,9 @@ public final class GameClient {
 			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI() }
 		}
 		if inGame { updateAudio(); plugins.update(cycles: cycles) } // Plugins/
-		var r = Raster(width: width, height: height)
+		// GPU mode: the 2D layer starts transparent so the Metal scene shows through the viewport.
+		let transparent = inGame && world.gpuSettings != nil
+		var r = Raster(width: width, height: height, transparent: transparent)
 		let top = host.game.interfaces.top
 		let showInterface = top != -1 && !(inGame && top == loginInterface)
 		// The world is drawn first, inside the viewport component found while laying out the interface
@@ -259,7 +261,7 @@ public final class GameClient {
 			let changed = found.map { f in viewport.map { $0 != f } ?? true } ?? false
 			if let f = found { viewport = f }
 			if !(changed && drawnViewport) || pass == 1 { break }
-			r = Raster(width: width, height: height)
+			r = Raster(width: width, height: height, transparent: transparent)
 		}
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
 		if inGame { plugins.drawOverlays(.hud, into: &r) } // Plugins/
