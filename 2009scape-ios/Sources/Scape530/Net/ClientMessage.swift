@@ -10,6 +10,11 @@ public enum ClientMessage {
 	case publicChat(colour: Int, effect: Int, text: [UInt8])
 	/// Private message (rt4 `ScriptRunner` 5009) to `name37`; `text` packed by `WordPack.encode`.
 	case privateMessage(name37: Int64, text: [UInt8])
+	/// Quick chat (rt4 `ScriptRunner` 5059 / 5061, opcode 167): a phrase to public chat (`clan` false) or the clan channel;
+	/// `values` are the already encoded dynamic values (`QuickChatPhraseType.encodeMessage`).
+	case quickChat(clan: Bool, phrase: Int, values: [UInt8])
+	/// Private quick chat (rt4 `ScriptRunner` 5060, opcode 178) to `name37`.
+	case quickChatPrivate(name37: Int64, phrase: Int, values: [UInt8])
 	/// Walk to a world tile. `path` is the client pathfinder's turn points
 	/// before `dest`, in walking order (world coords); empty lets the server
 	/// path to `dest` itself.
@@ -109,6 +114,18 @@ public enum ClientMessage {
 			p.p1(colour)
 			p.p1(effect)
 			p.pdata(text)
+		case let .quickChat(clan, phrase, values):
+			op(ClientProt.quickChat)
+			p.p1(values.count + 3)
+			p.p1(clan ? 1 : 0)
+			p.p2(phrase)
+			p.pdata(values)
+		case let .quickChatPrivate(name37, phrase, values):
+			op(ClientProt.quickChatPrivate)
+			p.p1(values.count + 10)
+			p.p8(name37)
+			p.p2(phrase)
+			p.pdata(values)
 		case let .privateMessage(name37, text):
 			op(ClientProt.privateMessage)
 			p.p1(text.count + 8)

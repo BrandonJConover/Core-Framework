@@ -53,6 +53,7 @@ extension InterfaceScriptHost {
 		func r(_ v: Int) -> HostResult { HostResult(ints: [Int32(truncatingIfNeeded: v)]) }
 		func b(_ v: Bool) -> HostResult { r(v ? 1 : 0) }
 		if let result = performPreference(op, ints: a) { return result }
+		if let result = performQuickChat(op, ints: a, strings: s) { return result }
 		switch op.name {
 		// MARK: client actions
 		case "chatMessage":

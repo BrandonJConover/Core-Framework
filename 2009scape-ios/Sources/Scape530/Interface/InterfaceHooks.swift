@@ -85,7 +85,9 @@ extension InterfaceScriptHost {
 		}
 		keyQueue.removeAll()
 		collectPointerHooks(medium: &medium, low: &low)
+		collectHeldHooks(medium: &medium, low: &low)
 		for p in high + medium + low where component(p.source) != nil { run(p.request) }
+		if drag != nil { _ = stepDrag() }
 	}
 
 	// MARK: pointer
@@ -176,7 +178,7 @@ extension InterfaceScriptHost {
 	/// then the IF_BUTTON packet, rt4 `ClientProt.method4512`), and returns the
 	/// component that took the option, if any.
 	@discardableResult
-	public func tap(x: Int, y: Int) -> Component? {
+	public func tap(x: Int, y: Int, hooks: Bool = true, perform: Bool = true) -> Component? {
 		pointer = (x, y)
 		let p = (x: x, y: y)
 		var press: [Pending] = [], release: [Pending] = []
@@ -197,10 +199,10 @@ extension InterfaceScriptHost {
 				r.mouseY = y - d.y
 				return Pending(request: r, source: c.ref)
 			}
-			if let r = req("onClickRepeat") { press.append(r) }
-			if let r = req("onRelease") { release.append(r) }
+			if hooks, let r = req("onClickRepeat") { press.append(r) }
+			if hooks, let r = req("onRelease") { release.append(r) }
 		}
-		for d in renderer.drawn.reversed() where inside(d, p) {
+		for d in renderer.drawn.reversed() where inside(d, p) && perform {
 			let c = d.component
 			if c.type == 0 && c.noClickThrough && handled == nil {
 				// Nothing above this layer took the click; nothing below may.

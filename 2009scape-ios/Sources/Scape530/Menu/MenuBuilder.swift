@@ -8,9 +8,8 @@ public struct PlayerOption: Equatable {
 /// Ports of rt4's menu building for the 3D world: `MiniMenu.addEntries` (walk entry and one block per
 /// picked entity), `addNpcEntries`, `addPlayerEntries` and `getCombatLevelColor`.
 ///
-/// Not ported: the "stacked entities" branch that lists every npc and player on the clicked tile (rt4
-/// draws only one actor per tile, this port draws all of them, so each one is picked on its own), the
-/// "Use" / target-spell modes (item use) and the shift-click and examine options of components.
+/// A picked npc or player that stands exactly on its tile also lists every other actor inside its
+/// footprint (rt4 draws only one of them, see `WorldView.oneActorPerTile`): `addStacked`.
 enum MenuBuilder {
 	/// rt4 `MiniMenu.getCombatLevelColor` (colour tags the font renders).
 	static func combatLevelColor(other: Int, own: Int) -> String {
@@ -68,9 +67,11 @@ enum MenuBuilder {
 				addLoc(&menu, loc, key: key, x: x, z: z, target: target)
 			case 1:
 				guard let a = world.ctx.npcs[id] else { continue }
+				addStacked(&menu, picked: a, isNpc: true, index: id, world: world, options: playerOptions, target: target)
 				addNpc(&menu, a, index: id, world: world, target: target)
 			case 0:
 				guard let a = world.ctx.players[id] else { continue }
+				addStacked(&menu, picked: a, isNpc: false, index: id, world: world, options: playerOptions, target: target)
 				addPlayer(&menu, a, index: id, world: world, options: playerOptions, target: target)
 			case 3:
 				addObjs(&menu, world: world, x: x, z: z, target: target)
@@ -80,6 +81,46 @@ enum MenuBuilder {
 		}
 		menu.sort()
 		return menu
+	}
+
+	/// The "stacked actors" branches of rt4 `MiniMenu.addEntries` (entity types 1 and 0): when the picked actor stands
+	/// exactly on a tile (centre for odd sizes, corner for even ones; players only the centre), the npcs and then the
+	/// players whose footprint lies inside its own are added first, so the picked actor ends up as the default entry.
+	/// Arithmetic shifts on negative offsets are rt4's.
+	static func addStacked(_ menu: inout Menu, picked a: PathingActor, isNpc: Bool, index: Int, world: WorldView, options: [PlayerOption?], target: TargetMode?) {
+		let size = a.size
+		let x0: Int, z0: Int
+		if isNpc {
+			guard (size & 1 == 0 && a.xFine & 0x7F == 0 && a.zFine & 0x7F == 0) || (size & 1 == 1 && a.xFine & 0x7F == 64 && a.zFine & 0x7F == 64) else { return }
+			x0 = a.xFine + 64 - size * 64
+			z0 = a.zFine - (size - 1) * 64
+		} else {
+			guard a.xFine & 0x7F == 64 && a.zFine & 0x7F == 64 else { return }
+			x0 = a.xFine - (size - 1) * 64
+			z0 = a.zFine + 64 - size * 64
+		}
+		for (id, n) in world.ctx.npcs.sorted(by: { $0.key < $1.key }) {
+			let bx = n.xFine + 64 - n.size * 64, bz = n.zFine + 64 - n.size * 64
+			if isNpc && n === a { continue }
+			let zOK = isNpc ? z0 <= bz : bz >= z0
+			if bx >= x0 && size - ((bx - x0) >> 7) >= n.size && zOK && n.size <= size - ((bz - z0) >> 7) {
+				addNpc(&menu, n, index: id, world: world, target: target)
+			}
+		}
+		for (id, q) in world.ctx.players.sorted(by: { $0.key < $1.key }) {
+			let bx: Int, bz: Int
+			if isNpc {
+				bx = q.xFine + 64 - q.size * 64
+				bz = q.zFine + 64 - q.size * 64
+			} else {
+				if q === a { continue }
+				bx = q.xFine - (q.size - 1) * 64
+				bz = q.zFine + 64 - q.size * 64
+			}
+			if bx >= x0 && q.size <= size - ((bx - x0) >> 7) && bz >= z0 && q.size <= size - ((bz - z0) >> 7) {
+				addPlayer(&menu, q, index: id, world: world, options: options, target: target)
+			}
+		}
 	}
 
 	/// The loc block of rt4 `addEntries` (ops 4 down to 0, then Examine).

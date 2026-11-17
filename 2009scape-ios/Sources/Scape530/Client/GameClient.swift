@@ -157,6 +157,7 @@ public final class GameClient {
 			guard let self, AreaSoundManager.hasAreaSound(loc, store: self.store) else { return }
 			self.audio.effects.area.removeLoc(id: loc.id, x: x, z: z, level: level)
 		}
+		world.isQuickChatIgnored = { [weak self] name37 in self?.host.game.ignored.contains(name37) ?? false }
 		world.isChatIgnored = { [weak self] name37, rights in
 			guard let self else { return false }
 			return rights <= 1 && self.chatRestricted(name37)
@@ -295,7 +296,10 @@ public final class GameClient {
 	// MARK: input
 
 	/// A tap in game pixels: press and release of the primary button.
-	public func tap(x: Int, y: Int) {
+	public func tap(x: Int, y: Int) { performTap(x: x, y: y, hooks: true) }
+
+	/// `hooks` false when the press hooks already ran for a gesture that began as a drag.
+	func performTap(x: Int, y: Int, hooks: Bool) {
 		if inGame, interaction.popup == nil {
 			if tapToDrop, dropTap(x: x, y: y) { return }
 			if inventoryTap(x: x, y: y) { keyboardRequested = false; return }
@@ -304,7 +308,8 @@ public final class GameClient {
 		let hadTarget = interaction.target != nil
 		if inGame, worldTap(x: x, y: y) { keyboardRequested = false; return }
 		let hit = inGame ? ui.hitTest(x: x, y: y) : nil
-		if host.tap(x: x, y: y) == nil, inGame, let c = hit {
+		if inGame, interaction.popup == nil, openComponentMenuOnTap(x: x, y: y, hooks: hooks) { keyboardRequested = false; return }
+		if host.tap(x: x, y: y, hooks: hooks) == nil, inGame, let c = hit {
 			log("tap on \(c.id >> 16):\(c.id & 0xFFFF) (\(c.ops.first ?? c.option ?? "no op"))")
 		}
 		// rt4: a click that finds no target leaves target mode.
@@ -486,6 +491,25 @@ public final class GameClient {
 			let message = WordPack.display(WordPack.decode(text, codec: codec))
 			host.game.chatLog.add(type: 9, name: WordPack.chatIcon(rights: rights) + WordPack.displayName(name37), message: message, clan: WordPack.displayName(clan37))
 			host.chatAt = host.transmitTimer
+		case let .quickChatPrivate(name37, messageId, rights, phrase, values):
+			// rt4 MESSAGE_QUICKCHAT_PRIVATE: same dedupe and ignore rules as typed private messages, chat type 18.
+			if host.game.chatLog.hasSeen(messageId: messageId) { return }
+			if rights <= 1 && host.game.ignored.contains(name37) { return }
+			_ = host.game.chatLog.remember(messageId: messageId)
+			guard let message = quickChatText(phrase, values) else { return }
+			host.game.chatLog.add(type: 18, name: WordPack.chatIcon(rights: rights) + WordPack.displayName(name37), message: message, phraseId: phrase)
+			host.chatAt = host.transmitTimer
+		case let .quickChatClan(name37, clan37, messageId, rights, phrase, values):
+			if host.game.chatLog.hasSeen(messageId: messageId) { return }
+			if rights <= 1 && host.game.ignored.contains(name37) { return }
+			_ = host.game.chatLog.remember(messageId: messageId)
+			guard let message = quickChatText(phrase, values) else { return }
+			host.game.chatLog.add(type: 20, name: WordPack.chatIcon(rights: rights) + WordPack.displayName(name37), message: message, clan: WordPack.displayName(clan37), phraseId: phrase)
+			host.chatAt = host.transmitTimer
+		case let .quickChatPrivateEcho(name37, phrase, values):
+			guard let message = quickChatText(phrase, values) else { return }
+			host.game.chatLog.add(type: 19, name: WordPack.displayName(name37), message: message, phraseId: phrase)
+			host.chatAt = host.transmitTimer
 		case let .privateMessageEcho(name37, text):
 			guard let codec = (try? WordPack.loadCodec(store)) ?? nil else { return }
 			host.game.chatLog.add(type: 6, name: WordPack.displayName(name37), message: WordPack.display(WordPack.decode(text, codec: codec)))
@@ -493,6 +517,11 @@ public final class GameClient {
 		default:
 			break
 		}
+	}
+
+	/// rt4 `QuickChatPhraseTypeList.get(id).decodeMessage`: the phrase text with its dynamic values filled in.
+	private func quickChatText(_ phrase: Int, _ values: [UInt8]) -> String? {
+		QuickChat.message(phrase: phrase, values: values, store: store)
 	}
 
 	func handle(_ e: GameSession.Event) {
@@ -533,5 +562,25 @@ public final class GameClient {
 		default:
 			host.apply(e)
 		}
+	}
+}
+
+// MARK: if3 component drag (rt4 `Cs1ScriptRunner.method1015` / `method28`)
+
+extension GameClient {
+	/// A finger that went down at (x, y) started moving: true when an if3 component there takes the gesture (it can
+	/// be dragged, or it reacts to `onDrag` / `onHold`), so the caller leaves the camera alone.
+	public func beginComponentDrag(x: Int, y: Int) -> Bool {
+		guard inGame, interaction.popup == nil, interaction.target == nil else { return false }
+		return host.beginDragGesture(x: x, y: y)
+	}
+
+	public func moveComponentDrag(x: Int, y: Int) { host.moveDragGesture(x: x, y: y) }
+
+	/// The finger lifted: a finished drag ran its release hook and sent IF_DRAG; a press that never left the dead
+	/// zone is the tap it started as.
+	public func endComponentDrag(x: Int, y: Int) {
+		let r = host.endDragGesture(x: x, y: y)
+		if !r.dragged { performTap(x: r.start.x, y: r.start.y, hooks: false) }
 	}
 }

@@ -89,6 +89,10 @@ public struct Component {
 	public var optionSuffix = ""
 	public var events = 0
 	public var dragDeadzone = 0, dragDeadtime = 0
+	/// rt4 `dragRenderBehavior`: the dragged component is drawn in place at full opacity instead of floating at half.
+	public var dragRenderBehaviour = false
+	/// rt4 `aClass13_5` (CS2 op 1301): the layer this component may be dragged within, when the server's drag depth is 0.
+	public var dragLayer: ComponentRef?
 
 	// if1 client script (CS1)
 	public var cs1Comparisons: [(opcode: Int, operand: Int)] = []
@@ -217,7 +221,7 @@ public struct Component {
 		if cursors > 1 { _ = try p.g1(); _ = try p.g2() }
 		dragDeadzone = try p.g1()
 		dragDeadtime = try p.g1()
-		_ = try p.g1() // drag render behaviour
+		dragRenderBehaviour = try p.g1() == 1
 		optionCircumfix = try p.gjstr()
 		if (eventMask >> 11) & 0x7F != 0 {
 			targetParam = nullable(try p.g2())

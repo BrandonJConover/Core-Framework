@@ -46,6 +46,12 @@ public enum ServerMessage: Equatable {
 	case updateClan(name37: Int64, world: Int, rank: Int, worldName: String?, removed: Bool)
 	/// MESSAGE_CLANCHANNEL: a typed clan chat line (`text` is the huffman-packed body).
 	case clanMessage(name37: Int64, clan37: Int64, messageId: Int64, rights: Int, text: [UInt8])
+	/// MESSAGE_QUICKCHAT_PRIVATE (247): a private quick chat phrase; `values` are the undecoded dynamic values.
+	case quickChatPrivate(name37: Int64, messageId: Int64, rights: Int, phrase: Int, values: [UInt8])
+	/// MESSAGE_QUICKCHAT_PRIVATE_ECHO (141): our own private quick chat echoed back.
+	case quickChatPrivateEcho(name37: Int64, phrase: Int, values: [UInt8])
+	/// CLAN_QUICK_CHAT (81): a quick chat phrase in the clan channel.
+	case quickChatClan(name37: Int64, clan37: Int64, messageId: Int64, rights: Int, phrase: Int, values: [UInt8])
 	case lastLoginInfo(ip: Int32)
 
 	// Interfaces
@@ -270,6 +276,26 @@ public enum ServerMessage: Equatable {
 			let bot = try p.g3()
 			let rights = try p.g1()
 			return .clanMessage(name37: name, clan37: clan, messageId: Int64(bot) + (Int64(top) << 32), rights: rights, text: try p.gdata(p.remaining))
+		case ServerProt.messageQuickchatPrivate:
+			let name = try p.g8()
+			let top = try p.g2()
+			let bot = try p.g3()
+			let rights = try p.g1()
+			let phrase = try p.g2()
+			return .quickChatPrivate(name37: name, messageId: Int64(bot) + (Int64(top) << 32), rights: rights, phrase: phrase, values: try p.gdata(p.remaining))
+		case ServerProt.messageQuickchatPrivateEcho:
+			let name = try p.g8()
+			let phrase = try p.g2()
+			return .quickChatPrivateEcho(name37: name, phrase: phrase, values: try p.gdata(p.remaining))
+		case ServerProt.clanQuickChat:
+			let name = try p.g8()
+			_ = try p.g1b()
+			let clan = try p.g8()
+			let top = try p.g2()
+			let bot = try p.g3()
+			let rights = try p.g1()
+			let phrase = try p.g2()
+			return .quickChatClan(name37: name, clan37: clan, messageId: Int64(bot) + (Int64(top) << 32), rights: rights, phrase: phrase, values: try p.gdata(p.remaining))
 		case ServerProt.lastLoginInfo:
 			return .lastLoginInfo(ip: try p.img4())
 

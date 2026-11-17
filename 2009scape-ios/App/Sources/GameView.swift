@@ -40,6 +40,8 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 	private var gameSize = (w: 0, h: 0)
 	/// True once a long press opened a menu during the current touch, so its lift is not also a tap.
 	private var longPressFired = false
+	/// The current pan drags an if3 component (rt4 `Cs1ScriptRunner.aClass13_14`) instead of the camera.
+	private var draggingComponent = false
 	private var draggingCamera = false
 	private var pressPoint = CGPoint.zero
 	private var menuView: MobileMenuView?
@@ -369,10 +371,17 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 			let p = g.location(in: self)
 			let t = g.translation(in: self)
 			let (sx, sy) = toGame(CGPoint(x: p.x - t.x, y: p.y - t.y))
-			draggingCamera = !longPressFired && loop.sync { $0.isOverWorld(x: sx, y: sy) }
-			if draggingCamera { loop.async { $0.clearPreview() } }
+			let fired = longPressFired
+			draggingComponent = !fired && loop.sync { $0.beginComponentDrag(x: sx, y: sy) }
+			draggingCamera = !draggingComponent && !fired && loop.sync { $0.isOverWorld(x: sx, y: sy) }
+			if draggingCamera || draggingComponent { loop.async { $0.clearPreview() } }
 			g.setTranslation(.zero, in: self)
 		case .changed:
+			if draggingComponent {
+				let (x, y) = toGame(g.location(in: self))
+				loop.async { $0.moveComponentDrag(x: x, y: y) }
+				return
+			}
 			guard draggingCamera else { return }
 			let t = g.translation(in: self)
 			let k = Double(pixelsPerPoint)
@@ -380,6 +389,11 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 			loop.async { $0.cameraDrag(dx: dx, dy: dy) }
 			g.setTranslation(.zero, in: self)
 		default:
+			if draggingComponent {
+				let (x, y) = toGame(g.location(in: self))
+				loop.async { $0.endComponentDrag(x: x, y: y) }
+				draggingComponent = false
+			}
 			draggingCamera = false
 		}
 	}
