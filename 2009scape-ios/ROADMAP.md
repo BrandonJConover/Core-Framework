@@ -173,7 +173,8 @@ third-party code must be audited before use.
    and ambient occlusion, falling back to shadow maps on older devices. The
    faithful software look stays selectable. Use MetalFX (spatial/temporal
    upscaling) so the HD and ray-traced tiers render below native resolution.
-3. **Helper tools.** Quest helper (shares quest-step data with the planned
+3. **Helper tools.** Quest helper (done for the F2P quests: the `Quests/` module
+   plus the Quest Helper plugin and App Quests panel; shares quest-step data with the planned
    quest-companion bots), skill calculators, wiki lookup, clue scroll help.
 4. **Optional HD texture pack.** Upscale the cache's textures offline with an
    ML super-resolution model, ship as a toggleable pack (no runtime ML cost).

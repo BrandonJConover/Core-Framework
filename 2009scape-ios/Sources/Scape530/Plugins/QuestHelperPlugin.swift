@@ -89,7 +89,8 @@ public final class QuestHelperPlugin: ClientPlugin {
 	public var entries: [QuestListEntry] { lock.lock(); defer { lock.unlock() }; return entriesCache }
 
 	/// Picks the quest to follow; nil goes back to following the last quest that changed.
-	public func setActive(_ id: String?, _ ctx: PluginContext? = nil) {
+	public func setActive(_ id: String?, _ context: PluginContext? = nil) {
+		let ctx = context ?? lastContext
 		lock.lock()
 		activeId = id.flatMap { catalogById[$0] != nil ? $0 : nil }
 		lock.unlock()
@@ -98,7 +99,8 @@ public final class QuestHelperPlugin: ClientPlugin {
 	}
 
 	/// "I did this": passes over the current step of the followed quest until the quest's status changes.
-	public func skipCurrentStep(_ ctx: PluginContext? = nil) {
+	public func skipCurrentStep(_ context: PluginContext? = nil) {
+		let ctx = context ?? lastContext
 		lock.lock()
 		if let e = evalCache, let step = e.step { flags[e.questId, default: []].insert(QuestEngine.skipFlag(step)) }
 		lock.unlock()
@@ -108,7 +110,7 @@ public final class QuestHelperPlugin: ClientPlugin {
 
 	// MARK: events
 
-	public func startUp(_ ctx: PluginContext) { ensureLoaded(ctx.manager) }
+	public func startUp(_ ctx: PluginContext) { ensureLoaded(ctx.manager); refresh(ctx) }
 
 	public func onLogin(_ ctx: PluginContext) {
 		lock.lock(); baselineSet = false; baselineVarps = [:]; lastChangedId = nil; autoId = nil; journals = [:]; lock.unlock()
@@ -139,7 +141,11 @@ public final class QuestHelperPlugin: ClientPlugin {
 		return f
 	}
 
+	/// The context of the last refresh, so the App can call `setActive` / `skipCurrentStep` without holding one.
+	private weak var lastContext: PluginContext?
+
 	func refresh(_ ctx: PluginContext) {
+		lastContext = ctx
 		ensureLoaded(ctx.manager)
 		var facts = makeFacts(ctx)
 		if testFacts == nil, let j = QuestJournal.parse(texts: ctx.state.interfaces.text) {

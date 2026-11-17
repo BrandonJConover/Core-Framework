@@ -195,7 +195,7 @@ final class PluginTests: XCTestCase {
 
 	func testBuiltInsRegisterWithMenuSwapperOnByDefault() {
 		let m = PluginManager()
-		XCTAssertEqual(m.plugins.map(\.id), ["menuSwapper", "groundItems", "indicators", "xpDrops", "xpTracker", "idleNotifier", "itemPrices", "boosts"])
+		XCTAssertEqual(m.plugins.map(\.id), ["menuSwapper", "groundItems", "indicators", "xpDrops", "xpTracker", "idleNotifier", "itemPrices", "boosts", "questHelper"])
 		XCTAssertEqual(m.plugins.filter(\.enabled).map(\.id), ["menuSwapper"])
 		XCTAssertEqual(Set(m.plugins.map(\.id)).count, m.plugins.count)
 	}

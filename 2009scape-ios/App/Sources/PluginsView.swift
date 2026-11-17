@@ -16,6 +16,7 @@ struct PluginsView: View {
 			}
 			Section("Panels") {
 				NavigationLink("XP tracker") { XpTrackerView(manager: manager) }
+				NavigationLink("Quests") { QuestsView(manager: manager) }
 			}
 		}
 		.navigationTitle("Plugins")
@@ -191,5 +192,95 @@ struct XpTrackerView: View {
 	static func duration(_ seconds: Int) -> String {
 		let h = seconds / 3600, m = (seconds % 3600) / 60
 		return h > 0 ? "\(h)h \(m)m" : "\(m)m \(seconds % 60)s"
+	}
+}
+
+/// The Quest Helper's quest list: every guided quest with its status, tap one to follow it (or "Automatic" to follow
+/// whichever quest changed last).
+struct QuestsView: View {
+	let manager: PluginManager
+	@State private var rows: [QuestListEntry] = []
+	@State private var automatic = true
+	private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+	private var helper: QuestHelperPlugin? { manager.plugin(ofType: QuestHelperPlugin.self) }
+
+	var body: some View {
+		List {
+			if helper?.enabled != true {
+				Section {
+					Button("Turn on the Quest Helper") { manager.setEnabled(true, id: "questHelper"); reload() }
+				} footer: {
+					Text("The helper shows the current step, highlights the target and outlines the items you need.")
+				}
+			}
+			Section {
+				Button {
+					helper?.setActive(nil); reload()
+				} label: {
+					HStack {
+						Text("Automatic")
+						Spacer()
+						if automatic { Image(systemName: "checkmark") }
+					}
+				}
+			} footer: {
+				Text("Automatic follows the quest whose progress changed last.")
+			}
+			Section("Quests") {
+				ForEach(rows, id: \.id) { row in
+					Button {
+						helper?.setActive(row.id); reload()
+					} label: {
+						QuestRow(row: row)
+					}
+					.foregroundColor(.primary)
+				}
+			}
+			if rows.contains(where: { $0.isActive && $0.status == .inProgress }) {
+				Section {
+					Button("I did this step") { helper?.skipCurrentStep(); reload() }
+				} footer: {
+					Text("Use it when the helper is stuck on a step you have already done.")
+				}
+			}
+		}
+		.navigationTitle("Quests")
+		.onAppear { reload() }
+		.onReceive(timer) { _ in reload() }
+	}
+
+	private func reload() {
+		rows = helper?.entries ?? []
+		automatic = helper?.isAutomatic ?? true
+	}
+}
+
+private struct QuestRow: View {
+	let row: QuestListEntry
+
+	private var colour: Color {
+		switch row.status {
+		case .notStarted: return .red
+		case .inProgress: return .yellow
+		case .complete: return .green
+		}
+	}
+
+	var body: some View {
+		VStack(alignment: .leading, spacing: 2) {
+			HStack {
+				Circle().fill(colour).frame(width: 10, height: 10)
+				Text(row.name).font(.headline)
+				Spacer()
+				if row.isActive { Image(systemName: "location.fill").foregroundColor(.accentColor) }
+			}
+			if let step = row.stepText, row.status == .inProgress {
+				Text(step).font(.footnote)
+			}
+			if row.status == .notStarted, !row.requirements.isEmpty {
+				Text(row.requirements.joined(separator: ", ")).font(.footnote).foregroundColor(.secondary)
+			}
+		}
 	}
 }
