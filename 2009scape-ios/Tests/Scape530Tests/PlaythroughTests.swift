@@ -211,14 +211,16 @@ final class PlaythroughTests: XCTestCase {
 		let env = ProcessInfo.processInfo.environment
 		guard let dir = env["SCAPE530_CACHE"], let server = env["SCAPE530_SERVER"] else { throw XCTSkip("needs SCAPE530_CACHE and SCAPE530_SERVER") }
 		let store = ConfigStore(disk: try DiskCache(directory: URL(fileURLWithPath: dir)))
-		return try Live(store: store, server: server, user: "\(name)\(Int.random(in: 100...999))")
+		return try Live(store: store, server: server, user: "\(name)\(Int.random(in: 10000...99999))")
 	}
 
 	/// Fresh account: character design, then skip Tutorial Island through Skippy and Terrova.
 	func finishTutorial(_ l: Live, afterDesign: () -> Void = {}) {
 		if l.client.state.interfaces.open.values.contains(771) {
 			l.shot("design-00")
-			XCTAssertTrue(l.tapOp("Select 2-button mouse"))
+			// The server's two mouse buttons are varp 170 = 0, the default: both "Select ... mouse" buttons only toggle it,
+			// so tapping one would switch a fresh account to single mouse button mode (a tap then opens menus).
+			XCTAssertEqual(l.client.host.varpClient.mouseButtons, 0, "two mouse buttons by default")
 			for step in 0..<8 where l.client.state.interfaces.open.values.contains(771) {
 				if step == 1 { l.shot("design-01") }
 				if !(l.tapOp("Select next") || l.tapOp("Confirm changes")) { break }

@@ -308,7 +308,8 @@ final class InteractTests: XCTestCase {
 		_ = try client.frame(width: w, height: h)
 		let d = try XCTUnwrap(client.ui.drawn.last { $0.component.id == client.loginInterface << 16 | 250 })
 		client.tap(x: d.x + d.w / 2, y: d.y + d.h / 2)
-		client.type("interact\ntester\n")
+		// A fresh account every run: a reused one keeps wherever the last run left it (possibly walled in on Tutorial Island).
+		client.type("interact\(Int.random(in: 1000...9999))\ntester\n")
 		let deadline = Date().addingTimeInterval(20)
 		var r = try client.frame(width: w, height: h)
 		while Date() < deadline && (client.screen != .game || client.state.ticks < 12) {
