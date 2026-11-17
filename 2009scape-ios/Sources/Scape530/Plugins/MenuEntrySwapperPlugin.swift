@@ -1,7 +1,7 @@
 import Foundation
 
 /// Chooses which option a tap runs. A tap on something runs the default (last) menu entry; this plugin moves the
-/// option a rule names to that place, so "Bank" can be the tap on bankers and "Pickpocket" on men, while a
+/// option a rule names to that place, so "Bank" can be the tap on bankers, while a
 /// long press still lists everything.
 public final class MenuEntrySwapperPlugin: ClientPlugin {
 	public let id = "menuSwapper"
@@ -12,8 +12,6 @@ public final class MenuEntrySwapperPlugin: ClientPlugin {
 	public static let defaultRules = [
 		"Banker=Bank",
 		"Bank booth=Bank",
-		"Man=Pickpocket",
-		"Woman=Pickpocket",
 		"Furnace=Smelt",
 		"Spinning wheel=Spin",
 		"Anvil=Smith",
