@@ -155,7 +155,12 @@ third-party code must be audited before use.
    notification), Grand Exchange item prices, boosts and timers, menu entry
    swapper (choose the tap/default action).
 2. **Metal scene renderer (GPU).** Longer draw distance, anti-aliasing,
-   anisotropic filtering, fog, later HD-style lighting and shadows. The
+   anisotropic filtering, fog. Then an HD tier in the spirit of RuneLite's
+   117 HD: per-pixel lighting, point lights (torches, fires), shadow maps,
+   material/normal maps, reflective water, ground texture blending, sky and
+   area environments. Then a ray-traced tier using Metal hardware ray tracing
+   (A17 Pro / M3 and later, e.g. the iPhone 15 Pro) for shadows, reflections
+   and ambient occlusion, falling back to shadow maps on older devices. The
    faithful software look stays selectable.
 3. **Helper tools.** Quest helper (shares quest-step data with the planned
    quest-companion bots), skill calculators, wiki lookup, clue scroll help.
