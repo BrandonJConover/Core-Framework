@@ -39,6 +39,18 @@ public struct Raster {
 
 	/// Blends `rgb` over the pixel at `i` with `opacity` 0...256 (rt4 style).
 	@inline(__always)
+	/// Straight-alpha "over" onto a transparent / translucent pixel (GPU mode's 2D layer). `a` is 1...255.
+	@inline(__always)
+	static func overTranslucent(_ d: UInt32, _ rgb: UInt32, _ a: UInt32) -> UInt32 {
+		let ia = 256 - a
+		let da = d >> 24
+		if da == 0 { return (min(a, 255) << 24) | rgb }
+		let dw = (da * ia) >> 8
+		let ra = min(255, a + dw)
+		func ch(_ shift: UInt32) -> UInt32 { min(255, (((rgb >> shift) & 0xFF) * a + ((d >> shift) & 0xFF) * dw) / max(ra, 1)) }
+		return (ra << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)
+	}
+
 	mutating func blend(_ i: Int, _ rgb: UInt32, _ opacity: Int) {
 		if opacity >= 256 {
 			pixels[i] = 0xFF00_0000 | rgb
@@ -48,13 +60,7 @@ public struct Raster {
 		let a = UInt32(opacity), ia = 256 - a
 		let d = pixels[i]
 		if d >> 24 != 0xFF {
-			// Over a transparent / translucent pixel (GPU mode's 2D layer): straight-alpha "over".
-			let da = d >> 24
-			if da == 0 { pixels[i] = (min(a, 255) << 24) | rgb; return }
-			let dw = (da * ia) >> 8
-			let ra = min(255, a + dw)
-			func ch(_ shift: UInt32) -> UInt32 { min(255, (((rgb >> shift) & 0xFF) * a + ((d >> shift) & 0xFF) * dw) / max(ra, 1)) }
-			pixels[i] = (ra << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)
+			pixels[i] = Raster.overTranslucent(d, rgb, a)
 			return
 		}
 		let rb = ((rgb & 0xFF00FF) &* a &+ (d & 0xFF00FF) &* ia) >> 8 & 0xFF00FF
@@ -80,6 +86,7 @@ public struct Raster {
 				let row = base + yy * stride
 				for xx in x0..<x1 {
 					let d = row[xx]
+					if d >> 24 != 0xFF { row[xx] = Raster.overTranslucent(d, rgb, a); continue }
 					let rb = (srb &+ (d & 0xFF00FF) &* ia) >> 8 & 0xFF00FF
 					let g = (sg &+ (d & 0x00FF00) &* ia) >> 8 & 0x00FF00
 					row[xx] = 0xFF00_0000 | rb | g
@@ -145,6 +152,7 @@ public struct Raster {
 						let rgb = c & 0xFFFFFF
 						let ao = UInt32(o), ia = 256 - ao
 						let d = drow[sx]
+						if d >> 24 != 0xFF { drow[sx] = Raster.overTranslucent(d, rgb, ao); continue }
 						let rb = ((rgb & 0xFF00FF) &* ao &+ (d & 0xFF00FF) &* ia) >> 8 & 0xFF00FF
 						let g = ((rgb & 0x00FF00) &* ao &+ (d & 0x00FF00) &* ia) >> 8 & 0x00FF00
 						drow[sx] = 0xFF00_0000 | rb | g
@@ -187,6 +195,7 @@ public struct Raster {
 						let rgb = c & 0xFFFFFF
 						let ao = UInt32(o), ia = 256 - ao
 						let d = drow[dx]
+						if d >> 24 != 0xFF { drow[dx] = Raster.overTranslucent(d, rgb, ao); continue }
 						let rb = ((rgb & 0xFF00FF) &* ao &+ (d & 0xFF00FF) &* ia) >> 8 & 0xFF00FF
 						let g = ((rgb & 0x00FF00) &* ao &+ (d & 0x00FF00) &* ia) >> 8 & 0x00FF00
 						drow[dx] = 0xFF00_0000 | rb | g
