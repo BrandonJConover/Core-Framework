@@ -1,0 +1,13 @@
+diff --git a/Server/src/main/core/net/packet/PacketRepository.java b/Server/src/main/core/net/packet/PacketRepository.java
+index e2656b0..3e2cd9d 100644
+--- a/Server/src/main/core/net/packet/PacketRepository.java
++++ b/Server/src/main/core/net/packet/PacketRepository.java
+@@ -88,7 +88,7 @@ public final class PacketRepository {
+ 	 */
+ 	@SuppressWarnings({ "rawtypes", "unchecked" })
+ 	public static void send(Class<? extends OutgoingPacket> clazz, Context context) {
+-                if(context.getPlayer() instanceof AIPlayer) return;
++                if(context.getPlayer() instanceof AIPlayer) { core.game.bots.BotPacketTap.tap(context); return; }
+ 		if(context.getPlayer().getSession() == null) return;
+ 		OutgoingPacket p = OUTGOING_PACKETS.get(clazz);
+ 		if (p == null) {

@@ -17,6 +17,12 @@ else
     echo "[1/4] 2009scape server already cloned, skipping."
 fi
 
+# ── Step 1b: Add AI companions to the server (server-patch/companions) ──
+if [ -x "$SCRIPT_DIR/server-patch/companions/apply.sh" ]; then
+    echo "[1b] Adding AI companions to the server..."
+    "$SCRIPT_DIR/server-patch/companions/apply.sh" "$SCRIPT_DIR/2009scape"
+fi
+
 # ── Step 2: Clone the 377 web client as our base ──
 if [ ! -d "$SCRIPT_DIR/client" ]; then
     echo "[2/4] Cloning runescape-web-client-377 as base client..."
