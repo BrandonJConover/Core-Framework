@@ -99,7 +99,9 @@ final class AppModel: ObservableObject {
 			let client = try GameClient(store: store, server: .init(host: host, port: port))
 			client.username = UserDefaults.standard.string(forKey: "account.username") ?? ""
 			if !client.username.isEmpty { client.password = Keychain.password(for: client.username) ?? "" }
-			client.onLoggedIn = { user, pass in
+			client.onLoggedIn = { [weak client] user, pass in
+				// Quest helper flags are saved per account.
+				client?.plugins.plugin(ofType: QuestHelperPlugin.self)?.accountKey = user.lowercased()
 				UserDefaults.standard.set(user, forKey: "account.username")
 				Keychain.setPassword(pass, for: user)
 			}
