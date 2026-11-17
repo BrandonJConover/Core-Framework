@@ -17,15 +17,21 @@ public struct WorldCamera {
 	public var zoom = WorldCamera.defaultZoom
 	/// rt4 `Camera.cameraX/Z`: the followed point in fine units, eased towards the player.
 	public var followX = 0, followZ = 0
+	/// `followX/Z` before the latest `follow` (render-side interpolation).
+	var prevFollowX = 0, prevFollowZ = 0
 	var initialised = false
 
 	public init() {}
 
 	/// rt4 `Camera.method4273`: eases towards the player by 1/16 of the gap each cycle, snapping when far.
 	public mutating func follow(playerXFine: Int, playerZFine: Int) {
+		prevFollowX = followX
+		prevFollowZ = followZ
 		if !initialised || followX - playerXFine < -500 || followX - playerXFine > 500 || followZ - playerZFine < -500 || followZ - playerZFine > 500 {
 			followX = playerXFine
 			followZ = playerZFine
+			prevFollowX = followX
+			prevFollowZ = followZ
 			initialised = true
 		}
 		if followZ != playerZFine { followZ += (playerZFine - followZ) / 16 }

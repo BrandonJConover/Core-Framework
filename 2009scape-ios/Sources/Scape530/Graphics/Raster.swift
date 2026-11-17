@@ -19,6 +19,13 @@ public struct Raster {
 		clipBottom = height
 	}
 
+	/// Back to a blank opaque frame with the full clip, reusing the pixel buffer when nothing else holds it.
+	public mutating func clear(fill: UInt32 = 0) {
+		let c = 0xFF00_0000 | fill
+		pixels.withUnsafeMutableBufferPointer { $0.update(repeating: c) }
+		clipLeft = 0; clipTop = 0; clipRight = width; clipBottom = height
+	}
+
 	public mutating func setClip(_ x0: Int, _ y0: Int, _ x1: Int, _ y1: Int) {
 		clipLeft = max(0, x0)
 		clipTop = max(0, y0)
@@ -46,10 +53,26 @@ public struct Raster {
 	public mutating func fillRect(_ x: Int, _ y: Int, _ w: Int, _ h: Int, _ rgb: UInt32, opacity: Int = 256) {
 		let x0 = max(x, clipLeft), x1 = min(x + w, clipRight)
 		let y0 = max(y, clipTop), y1 = min(y + h, clipBottom)
-		guard x0 < x1, y0 < y1 else { return }
-		for yy in y0..<y1 {
-			let row = yy * width
-			for xx in x0..<x1 { blend(row + xx, rgb, opacity) }
+		guard x0 < x1, y0 < y1, opacity > 0 else { return }
+		let stride = width
+		pixels.withUnsafeMutableBufferPointer { buf in
+			let base = buf.baseAddress!
+			if opacity >= 256 {
+				let c = 0xFF00_0000 | rgb
+				for yy in y0..<y1 { (base + yy * stride + x0).update(repeating: c, count: x1 - x0) }
+				return
+			}
+			let a = UInt32(opacity), ia = 256 - a
+			let srb = (rgb & 0xFF00FF) &* a, sg = (rgb & 0x00FF00) &* a
+			for yy in y0..<y1 {
+				let row = base + yy * stride
+				for xx in x0..<x1 {
+					let d = row[xx]
+					let rb = (srb &+ (d & 0xFF00FF) &* ia) >> 8 & 0xFF00FF
+					let g = (sg &+ (d & 0x00FF00) &* ia) >> 8 & 0x00FF00
+					row[xx] = 0xFF00_0000 | rb | g
+				}
+			}
 		}
 	}
 
@@ -88,41 +111,77 @@ public struct Raster {
 	public mutating func draw(_ f: SpriteFrame, x: Int, y: Int, opacity: Int = 256, hFlip: Bool = false, vFlip: Bool = false) {
 		let ox = x + (hFlip ? f.width - f.xOffset - f.innerWidth : f.xOffset)
 		let oy = y + (vFlip ? f.height - f.yOffset - f.innerHeight : f.yOffset)
-		let src = f.argb
-		for sy in 0..<f.innerHeight {
-			let dy = oy + sy
-			guard dy >= clipTop && dy < clipBottom else { continue }
-			let row = (vFlip ? f.innerHeight - 1 - sy : sy) * f.innerWidth
-			for sx in 0..<f.innerWidth {
-				let dx = ox + sx
-				guard dx >= clipLeft && dx < clipRight else { continue }
-				let c = src[row + (hFlip ? f.innerWidth - 1 - sx : sx)]
-				let a = Int(c >> 24)
-				guard a != 0 else { continue }
-				blend(dy * width + dx, c & 0xFFFFFF, a == 255 ? opacity : (a * opacity) >> 8)
+		let iw = f.innerWidth, ih = f.innerHeight
+		// Columns of the sprite that land inside the clip rectangle.
+		let sx0 = max(0, clipLeft - ox), sx1 = min(iw, clipRight - ox)
+		guard sx0 < sx1, opacity > 0 else { return }
+		let w = width, top = clipTop, bottom = clipBottom
+		f.argb.withUnsafeBufferPointer { src in pixels.withUnsafeMutableBufferPointer { dst in
+			for sy in 0..<ih {
+				let dy = oy + sy
+				guard dy >= top && dy < bottom else { continue }
+				let srow = src.baseAddress! + (vFlip ? ih - 1 - sy : sy) * iw
+				let drow = dst.baseAddress! + dy * w + ox
+				for sx in sx0..<sx1 {
+					let c = srow[hFlip ? iw - 1 - sx : sx]
+					let a = Int(c >> 24)
+					guard a != 0 else { continue }
+					let o = a == 255 ? opacity : (a * opacity) >> 8
+					if o >= 256 {
+						drow[sx] = 0xFF00_0000 | (c & 0xFFFFFF)
+					} else if o > 0 {
+						let rgb = c & 0xFFFFFF
+						let ao = UInt32(o), ia = 256 - ao
+						let d = drow[sx]
+						let rb = ((rgb & 0xFF00FF) &* ao &+ (d & 0xFF00FF) &* ia) >> 8 & 0xFF00FF
+						let g = ((rgb & 0x00FF00) &* ao &+ (d & 0x00FF00) &* ia) >> 8 & 0x00FF00
+						drow[sx] = 0xFF00_0000 | rb | g
+					}
+				}
 			}
-		}
+		} }
 	}
 
 	/// rt4 `renderResized`: scales the whole canvas (offsets included) into w×h.
 	public mutating func drawScaled(_ f: SpriteFrame, x: Int, y: Int, w: Int, h: Int, opacity: Int = 256) {
 		guard w > 0, h > 0, f.width > 0, f.height > 0 else { return }
-		let src = f.argb
 		let y0 = max(y, clipTop), y1 = min(y + h, clipBottom)
 		let x0 = max(x, clipLeft), x1 = min(x + w, clipRight)
 		guard x0 < x1, y0 < y1 else { return }
-		for dy in y0..<y1 {
-			let cy = (dy - y) * f.height / h - f.yOffset
-			guard cy >= 0 && cy < f.innerHeight else { continue }
-			for dx in x0..<x1 {
-				let cx = (dx - x) * f.width / w - f.xOffset
-				guard cx >= 0 && cx < f.innerWidth else { continue }
-				let c = src[cy * f.innerWidth + cx]
-				let a = Int(c >> 24)
-				guard a != 0 else { continue }
-				blend(dy * width + dx, c & 0xFFFFFF, a == 255 ? opacity : (a * opacity) >> 8)
-			}
+		let iw = f.innerWidth, ih = f.innerHeight, fw = f.width, fh = f.height, fxo = f.xOffset, fyo = f.yOffset
+		let stride = width
+		// Source column for every destination column (the per-pixel divide hoisted out of the row loop).
+		var cols = [Int](repeating: -1, count: x1 - x0)
+		for dx in x0..<x1 {
+			let cx = (dx - x) * fw / w - fxo
+			if cx >= 0 && cx < iw { cols[dx - x0] = cx }
 		}
+		f.argb.withUnsafeBufferPointer { src in pixels.withUnsafeMutableBufferPointer { dst in cols.withUnsafeBufferPointer { cols in
+			for dy in y0..<y1 {
+				let cy = (dy - y) * fh / h - fyo
+				guard cy >= 0 && cy < ih else { continue }
+				let srow = src.baseAddress! + cy * iw
+				let drow = dst.baseAddress! + dy * stride
+				for dx in x0..<x1 {
+					let cx = cols[dx - x0]
+					guard cx >= 0 else { continue }
+					let c = srow[cx]
+					let a = Int(c >> 24)
+					guard a != 0 else { continue }
+					let o = a == 255 ? opacity : (a * opacity) >> 8
+					if o >= 256 {
+						drow[dx] = 0xFF00_0000 | (c & 0xFFFFFF)
+					} else if o > 0 {
+						let rgb = c & 0xFFFFFF
+						let ao = UInt32(o), ia = 256 - ao
+						let d = drow[dx]
+						let rb = ((rgb & 0xFF00FF) &* ao &+ (d & 0xFF00FF) &* ia) >> 8 & 0xFF00FF
+						let g = ((rgb & 0x00FF00) &* ao &+ (d & 0x00FF00) &* ia) >> 8 & 0x00FF00
+						drow[dx] = 0xFF00_0000 | rb | g
+					}
+				}
+			}
+		} } }
 	}
 
 	/// Repeats a frame across a rectangle (interface sprite tiling).

@@ -44,7 +44,7 @@ final class GameLoop: @unchecked Sendable {
 	}
 
 	/// Renders one frame at `width` x `height` game pixels unless the previous one is still running.
-	func requestFrame(width: Int, height: Int, smooth: Bool) {
+	func requestFrame(width: Int, height: Int, smooth: Bool, smoothMotion: Bool = false) {
 		lock.lock()
 		if busy { lock.unlock(); return }
 		busy = true
@@ -52,6 +52,7 @@ final class GameLoop: @unchecked Sendable {
 		queue.async { [self] in
 			defer { lock.lock(); busy = false; lock.unlock() }
 			controller.poll(client)
+			client.smoothMotion = smoothMotion
 			do {
 				let raster = try client.frame(width: width, height: height)
 				presenter?.smoothScaling = smooth

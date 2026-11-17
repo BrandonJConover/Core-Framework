@@ -78,6 +78,12 @@ public final class WorldView {
 	var overlayCamera: OverlayCamera?
 	/// Incremented every time the scene is rebuilt.
 	public private(set) var buildCount = 0
+	/// Render-side motion smoothing (see `WorldView+Interpolation.swift`). Off = rt4's faithful 50 Hz look.
+	public var smoothMotion = false
+	/// How far between the previous client cycle (0) and the latest one (1) the frame being drawn is.
+	public var renderAlpha = 1.0
+	var interpSaved: [(actor: PathingActor, x: Int, z: Int, yaw: Int)] = []
+	var interpCameraSaved: (x: Int, z: Int)?
 
 	/// Collision maps for the four levels of the current scene (rt4 `PathFinder.collisionMaps`),
 	/// built with every scene rebuild and updated by loc add/delete packets.
@@ -191,6 +197,8 @@ public final class WorldView {
 			for a in ctx.npcs.values { shift(a, dx, dz) }
 			camera.followX -= dx * 128
 			camera.followZ -= dz * 128
+			camera.prevFollowX -= dx * 128
+			camera.prevFollowZ -= dz * 128
 		}
 		rebuildStamp += 1
 		projectiles = []
@@ -208,6 +216,8 @@ public final class WorldView {
 	private func shift(_ a: PathingActor, _ dx: Int, _ dz: Int) {
 		a.xFine -= dx * 128
 		a.zFine -= dz * 128
+		a.prevXFine -= dx * 128
+		a.prevZFine -= dz * 128
 		for i in 0..<10 { a.queueX[i] -= dx; a.queueZ[i] -= dz }
 	}
 
@@ -311,6 +321,8 @@ public final class WorldView {
 		env.loop = ctx.loop
 		env.varps = varps
 		for (id, a) in ctx.npcs { resolveType(a, id) }
+		for a in ctx.players.values { a.snapshotForInterpolation() }
+		for a in ctx.npcs.values { a.snapshotForInterpolation() }
 		for (id, a) in ctx.players { a.cycle(isSelf: id == selfIndex) }
 		for a in ctx.npcs.values { a.cycle(isSelf: false) }
 		updateMotionEffects()
@@ -464,9 +476,17 @@ public final class WorldView {
 			drawLoadingBox(into: &raster, rect: rect)
 			return true
 		}
+		let t0 = PerfStats.now()
+		beginInterpolation()
+		defer { endInterpolation() }
 		guard let r3 = renderScene(rect: rect, pick: nil) else { return false }
+		PerfStats.add(.scene, since: t0)
+		let t1 = PerfStats.now()
 		r3.copy(into: &raster, x: rect.x, y: rect.y)
+		PerfStats.add(.copy3D, since: t1)
+		let t2 = PerfStats.now()
 		drawOverlays(into: &raster, rect: rect)
+		PerfStats.add(.overlays, since: t2)
 		return true
 	}
 
@@ -481,6 +501,7 @@ public final class WorldView {
 			let r3 = Rasteriser3D(width: rect.w, height: rect.h)
 			r3.unpackTextures(textures)
 			r3.setBrightness(brightness, jitter: false)
+			textures?.prewarm(brightness: r3.brightness)
 			raster3D = r3
 		}
 		guard let r3 = raster3D else { return nil }
@@ -504,6 +525,7 @@ public final class WorldView {
 		defer { picker.allowInput = false; picker.tileRequested = false }
 
 		// Temporary entities of the last frame go, this frame's actors come in (rt4 method3711 / method3240).
+		let tPlace = PerfStats.now()
 		for s in scene.sceneryList { scene.removeScenery(s) }
 		let level = scene.centralPlane
 		func place(_ a: PathingActor, key: Int64) {
@@ -519,6 +541,7 @@ public final class WorldView {
 		}
 		placeActors(place: { place($0, key: $1) }, placeSpot: { placeSpot($0, key: $1) })
 		placeMotionEffects(scene: scene, level: level)
+		PerfStats.add(.place, since: tPlace)
 
 		camera.clampAngles()
 		let groundY = scene.tileHeight(level: level, xFine: me.xFine, zFine: me.zFine)
@@ -528,6 +551,8 @@ public final class WorldView {
 		let playerTile = (x: me.xFine >> 7, z: me.zFine >> 7)
 		// rt4 `ScriptRunner.method4302`: roofs above the player (or where the camera ray enters a building) are hidden.
 		roofs.update(scene: scene, plane: level, playerTile: playerTile, cameraX: eye.x, cameraZ: eye.z, pitch: eye.pitch)
+		let tDraw = PerfStats.now()
+		defer { PerfStats.add(.sceneDraw, since: tDraw) }
 		scene.draw(into: r3, cameraX: eye.x, cameraY: eye.y, cameraZ: eye.z, pitch: eye.pitch, yaw: eye.yaw, plane: 3,
 		           playerTile: (playerTile.x, playerTile.z),
 		           hideMask: removeRoofs ? roofs.mask : nil, hideFromLevel: level + 1, hideValue: roofs.hideValue, roofBoxes: roofs.boxes)

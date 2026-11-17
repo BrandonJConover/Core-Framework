@@ -40,6 +40,9 @@ final class ModelRenderScratch {
 	let overflowCount = ModelRenderScratch.buffer(0, count: ModelRenderScratch.overflowRows)
 	let overflow = ModelRenderScratch.buffer(0, count: ModelRenderScratch.overflowRows * ModelRenderScratch.overflowSize)
 	var overflowRowsUsed = 0
+	/// Highest depth bucket the previous model filed a triangle into (-1 when the buckets are all empty), so the next
+	/// model only clears what was dirtied instead of all 1600 buckets.
+	var dirtyDepthMax = -1
 
 	// Priority lists (rt4 priorityTriangles etc.): 12 priorities.
 	let priorityCounts = ModelRenderScratch.buffer(0, count: 12)
@@ -268,14 +271,16 @@ extension SoftwareModel {
 	private func drawProjected(_ r: Rasteriser3D, _ s: ModelRenderScratch, _ anyBehind: Bool, _ depthOffset: Int, _ bucketLimit: Int, pickKey: Int64 = 0) {
 		var pickKey = pickKey
 		if bucketLimit >= ModelRenderScratch.depthBuckets { return }
-		s.bucketCount.update(repeating: 0, count: ModelRenderScratch.depthBuckets)
-		s.overflowCount.update(repeating: 0, count: ModelRenderScratch.overflowRows)
+		if s.dirtyDepthMax >= 0 { s.bucketCount.update(repeating: 0, count: s.dirtyDepthMax + 1) }
+		if s.overflowRowsUsed > 0 { s.overflowCount.update(repeating: 0, count: s.overflowRowsUsed) }
+		s.dirtyDepthMax = -1
 		s.overflowRowsUsed = 0
 		let width = Int(r.width)
 
 		/// Files triangle `i` into the bucket for `depth`.
 		func file(_ i: Int, _ depth: Int) {
 			guard depth >= 0 && depth < ModelRenderScratch.depthBuckets else { return } // rt4: AIOOBE, model aborted
+			if depth > s.dirtyDepthMax { s.dirtyDepthMax = depth }
 			let n = s.bucketCount[depth]
 			if n < ModelRenderScratch.bucketSize {
 				s.buckets[depth * ModelRenderScratch.bucketSize + n] = i

@@ -138,6 +138,30 @@ public final class TextureStore: TextureSource {
 		return px
 	}
 
+	private var prewarmed: Set<UInt32> = []
+
+	/// Generates every defined texture for `brightness` on a background queue, so the first frames that show a
+	/// texture do not stall on its procedural generation (a few ms each). Call from the frame thread; safe to
+	/// call every frame (each brightness is warmed once). The generation runs on a private copy of the config
+	/// store (the shared one is not thread-safe) and only publishes finished texels into this store's cache.
+	/// Does nothing when the config store cannot be copied (not disk-backed).
+	public func prewarm(brightness b: Float) {
+		lock.lock()
+		let fresh = prewarmed.insert(b.bitPattern).inserted
+		lock.unlock()
+		guard fresh, let copy = config.isolatedCopy(), let helper = try? TextureStore(config: copy, lowDetail: lowDetail) else { return }
+		let ids = definedIds
+		DispatchQueue.global(qos: .utility).async { [self] in
+			for id in ids {
+				let key = CacheKey(id: id, brightness: b.bitPattern)
+				lock.lock(); let have = cache[key] != nil; lock.unlock()
+				if have { continue }
+				guard let px = try? helper.generate(id, brightness: b) else { continue }
+				lock.lock(); if cache[key] == nil { cache[key] = px }; lock.unlock()
+			}
+		}
+	}
+
 	/// rt4 `GlTexture.method4297`: used when one texture reads another (brightness 1.0, no flip).
 	func nestedPixels(_ id: Int) -> [Int]? {
 		guard id >= 0, id < meta.count, let g = try? graph(id) else { return nil }

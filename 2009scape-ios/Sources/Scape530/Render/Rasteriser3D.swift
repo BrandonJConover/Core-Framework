@@ -48,7 +48,7 @@ public final class Rasteriser3D {
 	/// rt4 `Rasteriser.offsets`: row start index for each viewport row.
 	var offsets = [Int32](repeating: 0, count: 1024)
 	/// rt4 `Rasteriser.textureProvider`.
-	public var textureProvider: TextureSource?
+	public var textureProvider: TextureSource? { didSet { texelCache = [[Int32]?](repeating: nil, count: 2048) } }
 
 	public var centerX: Int32 = 0
 	public var centerY: Int32 = 0
@@ -137,13 +137,31 @@ public final class Rasteriser3D {
 	}
 
 	/// rt4 `unpackTextures`.
-	public func unpackTextures(_ provider: TextureSource?) { textureProvider = provider }
+	public func unpackTextures(_ provider: TextureSource?) {
+		textureProvider = provider
+	}
+
+	/// Texels of the textures seen so far at the current brightness, so a textured triangle does not go through the
+	/// provider's lock and dictionary every time. Only available textures are kept (a nil answer may change).
+	private var texelCache = [[Int32]?](repeating: nil, count: 2048)
+
+	@inline(__always) private func cachedTexels(_ tp: TextureSource, _ textureId: Int32) -> [Int32]? {
+		let i = Int(textureId)
+		if i >= 0 && i < 2048 {
+			if let t = texelCache[i] { return t }
+			let t = tp.texels(i, brightness: brightness)
+			texelCache[i] = t
+			return t
+		}
+		return tp.texels(i, brightness: brightness)
+	}
 
 	/// rt4 `Rasteriser.setBrightness`: rebuilds the palette. rt4 jitters the
 	/// gamma by +-0.015 with `Math.random`; pass `jitter: false` for a
 	/// deterministic palette.
 	public func setBrightness(_ value: Float, jitter: Bool = true) {
 		brightness = value
+		texelCache = [[Int32]?](repeating: nil, count: 2048)
 		if jitter { brightness = Float(Double(brightness) + Double.random(in: 0..<1) * 0.03 - 0.015) }
 		calculateBrightness()
 	}
@@ -209,13 +227,19 @@ public final class Rasteriser3D {
 	/// the raster's clip rectangle.
 	public func copy(into raster: inout Raster, x: Int = 0, y: Int = 0) {
 		let w = Int(stride), h = Int(bufferHeight)
-		for sy in 0..<h {
-			let dy = y + sy
-			guard dy >= raster.clipTop && dy < raster.clipBottom else { continue }
-			for sx in 0..<w {
-				let dx = x + sx
-				guard dx >= raster.clipLeft && dx < raster.clipRight else { continue }
-				raster.pixels[dy * raster.width + dx] = 0xFF00_0000 | UInt32(bitPattern: px[sy * w + sx])
+		// Source columns that land inside the destination clip.
+		let sx0 = max(0, raster.clipLeft - x), sx1 = min(w, raster.clipRight - x)
+		guard sx0 < sx1 else { return }
+		let dstWidth = raster.width, clipTop = raster.clipTop, clipBottom = raster.clipBottom
+		let src = px
+		raster.pixels.withUnsafeMutableBufferPointer { dst in
+			let base = dst.baseAddress!
+			for sy in 0..<h {
+				let dy = y + sy
+				guard dy >= clipTop && dy < clipBottom else { continue }
+				let s = src + sy * w
+				let d = base + dy * dstWidth + x
+				for sx in sx0..<sx1 { d[sx] = 0xFF00_0000 | UInt32(bitPattern: s[sx]) }
 			}
 		}
 	}
@@ -243,7 +267,7 @@ public final class Rasteriser3D {
 		var viewZC = viewZC
 		var textureId = textureId
 		guard let tp = textureProvider else { return }
-		let texelsOpt = tp.texels(Int(textureId), brightness: brightness)
+		let texelsOpt = cachedTexels(tp, textureId)
 		if texelsOpt == nil {
 		let averageColor = Int32(truncatingIfNeeded: tp.averageColor(Int(textureId)))
 		fillGouraudTriangle(yA, yB, yC, xA, xB, xC, multiplyLightness(averageColor, colorA), multiplyLightness(averageColor, colorB), multiplyLightness(averageColor, colorC))
@@ -915,7 +939,7 @@ public final class Rasteriser3D {
 		var viewZC = viewZC
 		var textureId = textureId
 		guard let tp = textureProvider else { return }
-		let texelsOpt = tp.texels(Int(textureId), brightness: brightness)
+		let texelsOpt = cachedTexels(tp, textureId)
 		if texelsOpt == nil || alpha > 10 {
 		let average = Int32(truncatingIfNeeded: tp.averageColor(Int(textureId)))
 		textureHasTransparency = true
