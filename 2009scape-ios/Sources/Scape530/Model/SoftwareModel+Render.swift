@@ -68,6 +68,7 @@ extension SoftwareModel {
 	/// is set, a model whose screen box holds the mouse reports its key (see
 	/// `ScenePicker`). The particle system and rt4's `arg9` are not ported.
 	public func render(_ r: Rasteriser3D, yaw: Int, sinPitch sinCameraPitch: Int, cosPitch cosCameraPitch: Int, sinYaw sinCameraYaw: Int, cosYaw cosCameraYaw: Int, x sceneX: Int, y sceneY: Int, z sceneZ: Int, key: Int64 = 0) {
+		if let capture = GPUModelCapture.active { capture.record(self, yaw: yaw, x: sceneX, y: sceneY, z: sceneZ); return } // GPU/
 		ensureBounds()
 		let a = (sceneZ * cosCameraYaw - sceneX * sinCameraYaw) >> 16
 		let b = (sceneY * sinCameraPitch + a * cosCameraPitch) >> 16

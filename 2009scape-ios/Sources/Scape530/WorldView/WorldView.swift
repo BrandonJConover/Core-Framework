@@ -14,6 +14,9 @@ public final class WorldView {
 	public var scene: Scene? { isBuilding ? nil : liveScene }
 	var liveScene: Scene?
 	var raster3D: Rasteriser3D?
+	/// GPU renderer: nil draws with the software rasteriser; set it to draw through `gpuFrame` instead (see `GPU/`).
+	public var gpuSettings: GPURenderSettings?
+	let gpu = GPUWorldState()
 	/// Rasteriser gamma (rt4 `Rasteriser.setBrightness`); a change rebuilds the 3D buffer's palette and textures.
 	public var brightness: Float = 0.8 {
 		didSet { if brightness != oldValue { raster3D = nil } }
@@ -473,12 +476,15 @@ public final class WorldView {
 	public func draw(into raster: inout Raster, rect: (x: Int, y: Int, w: Int, h: Int)) -> Bool {
 		updateBuild()
 		if isBuilding {
+			gpu.frame = nil
 			drawLoadingBox(into: &raster, rect: rect)
 			return true
 		}
 		let t0 = PerfStats.now()
 		beginInterpolation()
 		defer { endInterpolation() }
+		if let g = gpuSettings { return drawGPU(into: &raster, rect: rect, settings: g) } // GPU/
+		gpu.frame = nil
 		guard let r3 = renderScene(rect: rect, pick: nil) else { return false }
 		PerfStats.add(.scene, since: t0)
 		let t1 = PerfStats.now()
@@ -564,7 +570,7 @@ public final class WorldView {
 	/// the actors on every tile centre first; an actor on a tile with a count above one is skipped and
 	/// decrements it, so the last actor of a pass is the one drawn, and an actor drawn by an earlier pass
 	/// hides all later ones. rt4 walks `PlayerList.ids` / `NpcList.ids` (entry order); ascending index is used here.
-	private func placeActors(place: (PathingActor, Int64) -> Void, placeSpot: (PathingActor, Int64) -> Void) {
+	func placeActors(place: (PathingActor, Int64) -> Void, placeSpot: (PathingActor, Int64) -> Void) {
 		var counts = [Int](repeating: 0, count: oneActorPerTile ? 104 * 104 : 0)
 		func covered(_ a: PathingActor, forDraw: Bool) -> (x0: Int, x1: Int, z0: Int, z1: Int)? {
 			let size = a.size

@@ -21,6 +21,8 @@ final class GameLoop: @unchecked Sendable {
 	private let client: GameClient
 	private let queue = DispatchQueue(label: "scape530.game", qos: .userInteractive)
 	private let presenter: MetalFramePresenter?
+	/// The GPU scene renderer (nil when Metal cannot build it); used while `MobileSettings.gpuRenderer` is on.
+	private let scenePresenter: MetalScenePresenter?
 	/// Set by the view right after it is created (the layer exists only then).
 	var layer: CAMetalLayer?
 	private let controller = ControllerInput()
@@ -32,6 +34,7 @@ final class GameLoop: @unchecked Sendable {
 	init(client: GameClient, presenter: MetalFramePresenter?) {
 		self.client = client
 		self.presenter = presenter
+		scenePresenter = presenter.flatMap { MetalScenePresenter(device: $0.device) }
 	}
 
 	func async(_ work: @escaping (GameClient) -> Void) {
@@ -54,9 +57,20 @@ final class GameLoop: @unchecked Sendable {
 			controller.poll(client)
 			client.smoothMotion = smoothMotion
 			do {
+				// Software mode draws the whole frame into the raster; GPU mode leaves the 3D viewport transparent
+				// and draws the scene in Metal under the raster (see `WorldView.gpuFrame`).
+				let gpu = MobileSettings.gpuRenderer && scenePresenter != nil
+				client.world.gpuSettings = gpu ? MobileSettings.gpuSettings : nil
 				let raster = try client.frame(width: width, height: height)
 				presenter?.smoothScaling = smooth
-				if let layer { presenter?.present(raster, in: layer) }
+				if let layer {
+					if gpu, client.screen == .game, let frame = client.world.gpuFrame, let sp = scenePresenter {
+						sp.smoothScaling = smooth
+						sp.present(raster, frame: frame, world: client.world, in: layer)
+					} else {
+						presenter?.present(raster, in: layer)
+					}
+				}
 			} catch {
 				print("[frame] \(error)")
 			}

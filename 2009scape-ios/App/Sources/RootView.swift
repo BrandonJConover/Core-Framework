@@ -128,6 +128,10 @@ struct TouchSettingsView: View {
 	@AppStorage(MobileSettings.smoothScalingKey) private var smoothScaling = true
 	@AppStorage(MobileSettings.hapticsKey) private var haptics = true
 	@AppStorage(MobileSettings.smoothMotionKey) private var smoothMotion = true
+	@AppStorage(MobileSettings.gpuRendererKey) private var gpuRenderer = false
+	@AppStorage(MobileSettings.gpuDrawDistanceKey) private var drawDistance = 56.0
+	@AppStorage(MobileSettings.gpuFogKey) private var gpuFog = true
+	@AppStorage(MobileSettings.gpuAntialiasKey) private var gpuAntialias = true
 
 	var body: some View {
 		NavigationStack {
@@ -140,6 +144,20 @@ struct TouchSettingsView: View {
 				Section("Display") {
 					Toggle("Smooth scaling", isOn: $smoothScaling)
 					Toggle("Smooth motion (60/120 Hz)", isOn: $smoothMotion)
+				}
+				Section("3D renderer") {
+					Toggle("GPU renderer (Metal)", isOn: $gpuRenderer)
+					if gpuRenderer {
+						VStack(alignment: .leading) {
+							Text("Draw distance: \(Int(drawDistance)) tiles")
+							Slider(value: $drawDistance, in: 25...100, step: 1)
+						}
+						Toggle("Distance fog", isOn: $gpuFog)
+						Toggle("Anti-aliasing (4x MSAA)", isOn: $gpuAntialias)
+					}
+					Text(gpuRenderer ? "Longer draw distance, smoothed edges and filtered textures. Turn off for the exact software look (25 tiles)." : "Off: the faithful software renderer (25 tiles).")
+						.font(.footnote)
+						.foregroundColor(.secondary)
 				}
 				if let plugins {
 					Section("Plugins") {

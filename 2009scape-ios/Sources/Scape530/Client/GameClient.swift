@@ -259,7 +259,9 @@ public final class GameClient {
 			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI() }
 		}
 		if inGame { updateAudio(); plugins.update(cycles: cycles) } // Plugins/
-		var r = takeFrameBuffer(width: width, height: height)
+		// GPU mode: the 2D layer starts transparent so the Metal scene shows through the viewport.
+		let transparent = inGame && world.gpuSettings != nil
+		var r = takeFrameBuffer(width: width, height: height, transparent: transparent)
 		let top = host.game.interfaces.top
 		let showInterface = top != -1 && !(inGame && top == loginInterface)
 		// The world is drawn first, inside the viewport component found while laying out the interface
@@ -272,7 +274,7 @@ public final class GameClient {
 			let changed = found.map { f in viewport.map { $0 != f } ?? true } ?? false
 			if let f = found { viewport = f }
 			if !(changed && drawnViewport) || pass == 1 { break }
-			r.clear()
+			r.clear(transparent: transparent)
 		}
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
 		if inGame { plugins.drawOverlays(.hud, into: &r) } // Plugins/
@@ -288,10 +290,10 @@ public final class GameClient {
 	/// (copy-on-write makes it a fresh buffer otherwise), so a 60/120 Hz shell does not allocate megabytes per frame.
 	private var frameBuffer: Raster?
 
-	private func takeFrameBuffer(width: Int, height: Int) -> Raster {
-		guard var r = frameBuffer, r.width == width, r.height == height else { return Raster(width: width, height: height) }
+	private func takeFrameBuffer(width: Int, height: Int, transparent: Bool = false) -> Raster {
+		guard var r = frameBuffer, r.width == width, r.height == height else { return Raster(width: width, height: height, transparent: transparent) }
 		frameBuffer = nil
-		r.clear()
+		r.clear(transparent: transparent)
 		return r
 	}
 

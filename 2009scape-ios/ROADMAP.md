@@ -160,7 +160,11 @@ third-party code must be audited before use.
    NPC and tile highlights, XP tracker and XP drops, idle notifier (iOS
    notification), Grand Exchange item prices, boosts and timers, menu entry
    swapper (choose the tap/default action).
-2. **Metal scene renderer (GPU).** Longer draw distance, anti-aliasing,
+2. **Metal scene renderer (GPU).** *(Tier 1 done, optional and off by default: `Sources/Scape530/GPU/`
+   builds terrain, scenery and actor vertex buffers from the decoded scene, `App/Sources/GPU/` draws them with
+   Metal: draw distance up to 100 tiles, 4x MSAA, anisotropic textures, rt4-style distance fog, the software
+   2D layer composited on top; Controls sheet "3D renderer". The software renderer stays the default. Vertex
+   normals, unlit base colours and a material table are kept for the tiers below.)* Longer draw distance, anti-aliasing,
    anisotropic filtering, fog. Then an HD tier in the spirit of RuneLite's
    117 HD: per-pixel lighting, point lights (torches, fires), shadow maps,
    material/normal maps, reflective water, ground texture blending, sky and
