@@ -132,7 +132,7 @@ public final class InterfaceRenderer {
 		for d in drawn.reversed() where x >= d.x && y >= d.y && x < d.x + d.w && y < d.y + d.h {
 			let c = d.component
 			if c.hooks["onClickRepeat"] != nil || c.hooks["onOptionClick"] != nil || !c.ops.isEmpty || c.buttonType != 0 || c.option != nil
-				|| c.type == 2 || (c.events >> 11) & 0x7F != 0 {
+				|| c.type == 2 || (c.events >> 11) & 0x7F != 0 || c.events & 1 != 0 {
 				return c
 			}
 		}

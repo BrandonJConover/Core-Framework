@@ -54,6 +54,12 @@ public enum ServerMessage: Equatable {
 	/// rt4 names opcode 155 IF_OPENTOP, but it opens `component` inside `parent`.
 	case ifOpenSub(parent: Int32, component: Int, type: Int)
 	case ifCloseSub(parent: Int32)
+	/// SWITCH_WIDGET (176): the interface open at `source` moves to `target`.
+	case switchWidget(source: Int32, target: Int32)
+	/// GAME_FRAME_UNK (209): runs the `onDialogAbort` hooks of the top-level interface.
+	case dialogAbort
+	/// DELETE_INVENTORY (191).
+	case deleteInventory(inv: Int)
 	case ifSetHide(component: Int32, hidden: Bool)
 	case ifSetText(component: Int32, text: String)
 	case ifSetAnim(component: Int32, seq: Int)
@@ -287,6 +293,14 @@ public enum ServerMessage: Equatable {
 		case ServerProt.ifClosesub:
 			_ = try p.g2()
 			return .ifCloseSub(parent: try p.g4())
+		case ServerProt.switchWidget:
+			let source = try p.img4()
+			_ = try p.g2add() // tracknum
+			return .switchWidget(source: source, target: try p.img4())
+		case ServerProt.gameFrameUnk:
+			return .dialogAbort
+		case ServerProt.deleteInventory:
+			return .deleteInventory(inv: try p.ig2())
 		case ServerProt.ifSethide:
 			let hidden = try p.g1neg()
 			_ = try p.g2()

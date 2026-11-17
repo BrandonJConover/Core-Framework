@@ -457,7 +457,21 @@ public final class GameClient {
 		}
 	}
 
+	/// Instrumentation for playthrough tests: what the client received but could not act on.
+	public struct Diagnostics {
+		/// Server opcodes that were framed but have no decoder (opcode -> count).
+		public var unhandledPackets: [Int: Int] = [:]
+		/// Server opcodes whose payload failed to decode (opcode -> count).
+		public var decodeFailures: [Int: Int] = [:]
+	}
+	public private(set) var diagnostics = Diagnostics()
+	/// CS2 opcodes that hit the unported branch.
+	public var unportedScriptOpcodes: [Int: Int] { host.unportedOpcodes }
+	public var scriptErrorCounts: [String: Int] { host.errorCounts }
+
 	func handle(_ e: GameSession.Event) {
+		if case .message(.unhandled(let op, _)) = e { diagnostics.unhandledPackets[op, default: 0] += 1 }
+		if case .decodeFailed(let op, _) = e { diagnostics.decodeFailures[op, default: 0] += 1 }
 		world.handle(e, varps: host.game.varps)
 		if case .message(let m) = e { interaction.handle(m); receiveChat(m); playAudio(m) }
 		switch e {

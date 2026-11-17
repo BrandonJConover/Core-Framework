@@ -33,6 +33,10 @@ public final class InterfaceScriptHost: ScriptHost {
 	/// Script failures since the last `takeErrors()`; scripts that fail are
 	/// dropped like rt4 does (it reports and carries on).
 	public private(set) var errors: [String] = []
+	/// Every script failure since the host was made, by message, plus the unported CS2 opcodes among
+	/// them (instrumentation for playthrough tests; never cleared).
+	public private(set) var errorCounts: [String: Int] = [:]
+	public private(set) var unportedOpcodes: [Int: Int] = [:]
 
 	// MARK: login state read by CS2 (rt4 `LoginManager`)
 
@@ -119,6 +123,8 @@ public final class InterfaceScriptHost: ScriptHost {
 			let id: String
 			if case .int(let s)? = request.args.first { id = "\(s)" } else { id = "?" }
 			errors.append("script \(id): \(error)")
+			errorCounts["\(error)", default: 0] += 1
+			if case ScriptError.unportedOpcode(let opcode, _, _, _) = error { unportedOpcodes[opcode, default: 0] += 1 }
 			log("script \(id): \(error)")
 			return false
 		}
@@ -146,9 +152,22 @@ public final class InterfaceScriptHost: ScriptHost {
 			game.interfaces.open[Int(parent)] = component
 			openTypes[Int(parent)] = type
 			runOnLoad(interface: component)
+			widgetsChanged()
 		case .ifCloseSub(let parent):
 			game.interfaces.open[Int(parent)] = nil
 			openTypes[Int(parent)] = nil
+			widgetsChanged()
+		case let .switchWidget(source, target):
+			// rt4 SWITCH_WIDGET: whatever is open at `target` closes, the interface at `source` moves there.
+			game.interfaces.open[Int(target)] = nil
+			openTypes[Int(target)] = nil
+			if let id = game.interfaces.open.removeValue(forKey: Int(source)) {
+				game.interfaces.open[Int(target)] = id
+				openTypes[Int(target)] = openTypes.removeValue(forKey: Int(source))
+			}
+			widgetsChanged()
+		case .dialogAbort:
+			if game.interfaces.top != -1 { runScripts(kind: 0, interface: game.interfaces.top) }
 		case .ifSetHide(let c, let h): mutate(ComponentRef(id: Int(c))) { $0.hidden = h }
 		case .ifSetText(let c, let t): mutate(ComponentRef(id: Int(c))) { $0.text = t }
 		case .ifSetColour(let c, let col):
@@ -193,6 +212,10 @@ public final class InterfaceScriptHost: ScriptHost {
 			statLog.note(s)
 		case .invFull(_, let inv, _), .invPartial(_, let inv, _):
 			game.apply(m)
+			invLog.note(inv & 0x7FFF)
+		case .deleteInventory(let inv):
+			game.inventories[inv] = nil
+			game.inventorySizes[inv] = nil
 			invLog.note(inv & 0x7FFF)
 		default:
 			game.apply(m)
