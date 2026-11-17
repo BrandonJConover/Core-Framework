@@ -17,7 +17,7 @@ public struct Menu {
 	}
 
 	/// rt4 `MiniMenu.ops` etc. in insertion order; `entries[0]` is Cancel.
-	public private(set) var entries: [Entry] = []
+	public internal(set) var entries: [Entry] = []
 
 	/// rt4 `MiniMenu` action codes used by this port.
 	public enum Action {

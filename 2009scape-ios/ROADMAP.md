@@ -153,7 +153,9 @@ more faithful pixel output, more code, and heavier on battery.
 Brandon wants the client to feel like RuneLite on a phone. Ideas only; any
 third-party code must be audited before use.
 
-1. **Plugin system.** Toggleable client plugins with hooks for overlays,
+1. **Plugin system.** *(Done: `Sources/Scape530/Plugins/`, Plugins section of the
+   controls sheet; Grand Exchange prices still use the cache's shop value.)*
+   Toggleable client plugins with hooks for overlays,
    menu entries and game events. First batch: ground items (names, prices),
    NPC and tile highlights, XP tracker and XP drops, idle notifier (iOS
    notification), Grand Exchange item prices, boosts and timers, menu entry

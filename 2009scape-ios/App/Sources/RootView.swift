@@ -47,7 +47,7 @@ struct RootView: View {
 			}
 		}
 		.onChange(of: scenePhase) { model.scenePhaseChanged($0) }
-		.sheet(isPresented: $showingSettings) { TouchSettingsView() }
+		.sheet(isPresented: $showingSettings) { TouchSettingsView(plugins: model.plugins) }
 		.onAppear {
 			// First launch: there is no sensible default server for a phone.
 			if !model.hasConfiguredServer { showingServer = true }
@@ -121,6 +121,8 @@ struct ServerSettingsView: View {
 /// Touch-layer options (bound to the keys in `MobileSettings`).
 struct TouchSettingsView: View {
 	@Environment(\.dismiss) private var dismiss
+	/// The plugins of the running client (nil while the cache is still loading).
+	var plugins: PluginManager?
 	@AppStorage(MobileSettings.mobileMenuKey) private var mobileMenu = true
 	@AppStorage(MobileSettings.tapToDropKey) private var tapToDrop = false
 	@AppStorage(MobileSettings.smoothScalingKey) private var smoothScaling = true
@@ -136,6 +138,12 @@ struct TouchSettingsView: View {
 				}
 				Section("Display") {
 					Toggle("Smooth scaling", isOn: $smoothScaling)
+				}
+				if let plugins {
+					Section("Plugins") {
+						NavigationLink("Plugins") { PluginsView(manager: plugins) }
+						NavigationLink("XP tracker") { XpTrackerView(manager: plugins) }
+					}
 				}
 				Section {
 					Text("Tap does the first action. Touch and hold for the full options. Drag the world to turn the camera; two fingers tilt; pinch zooms.")

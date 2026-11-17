@@ -63,6 +63,8 @@ public final class GameClient {
 	public var tapToDrop = false
 	/// False when the shell draws the world menu itself (`popupRows` / `chooseMenuEntry`).
 	public var drawsClassicMenu = true
+	/// Toggleable plugins (overlays, menu swaps, trackers); see `Plugins/`.
+	public let plugins = PluginManager()
 
 	/// The login interface (rt4 `LoginManager.loginScreenId`), looked up by name.
 	let loginInterface: Int
@@ -84,6 +86,7 @@ public final class GameClient {
 		world = WorldView(store: store)
 		bindHost()
 		openLoginScreen()
+		plugins.attach(self) // Plugins/
 	}
 
 	private func bindHost() {
@@ -242,7 +245,7 @@ public final class GameClient {
 			host.cycle()
 			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI() }
 		}
-		if inGame { updateAudio() }
+		if inGame { updateAudio(); plugins.update(cycles: cycles) } // Plugins/
 		var r = Raster(width: width, height: height)
 		let top = host.game.interfaces.top
 		let showInterface = top != -1 && !(inGame && top == loginInterface)
@@ -250,6 +253,7 @@ public final class GameClient {
 		// (the previous frame's rectangle; a changed rectangle repeats the frame once).
 		for pass in 0..<2 {
 			let drawnViewport = inGame && drawWorld(into: &r, width: width, height: height)
+			if drawnViewport { plugins.drawOverlays(.scene, into: &r) } // Plugins/
 			if showInterface { try ui.render(top, state: host.game.interfaces, into: &r) }
 			let found = showInterface ? ui.drawn.first(where: { $0.component.clientCode == 1337 }).map { (x: $0.x, y: $0.y, w: $0.w, h: $0.h) } : nil
 			let changed = found.map { f in viewport.map { $0 != f } ?? true } ?? false
@@ -258,6 +262,7 @@ public final class GameClient {
 			r = Raster(width: width, height: height)
 		}
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
+		if inGame { plugins.drawOverlays(.hud, into: &r) } // Plugins/
 		if inGame { try drawInteraction(into: &r); try drawTargetHint(into: &r) }
 		if inGame, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
 			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 32, color: 0xFFFF00, shadow: 0, into: &r)
@@ -414,6 +419,7 @@ public final class GameClient {
 		audioLoader.async { music.stop() }
 		audio.effects.clear()
 		audio.effects.area.clearAll()
+		if inGame { plugins.loggedOut() } // Plugins/
 		session?.close()
 		session = nil
 		inGame = false
@@ -532,6 +538,7 @@ public final class GameClient {
 			host.apply(e)
 			host.loginReply = 2
 			inGame = true
+			plugins.loggedIn() // Plugins/
 			reconnectAttempt = 0
 			onLoggedIn(username, password)
 		case .loginFailed(let reply):

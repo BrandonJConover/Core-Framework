@@ -76,6 +76,7 @@ extension GameClient {
 			add("Examine", Menu.Action.itemExamine)
 		}
 		menu.sort()
+		plugins.modifyMenu(&menu, source: .inventory) // Plugins/
 		return menu
 	}
 

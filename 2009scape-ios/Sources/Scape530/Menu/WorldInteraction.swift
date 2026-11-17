@@ -129,7 +129,8 @@ extension GameClient {
 	/// Entries for a touch point, via a picking draw of the scene (rt4 builds them every frame).
 	func buildMenu(x: Int, y: Int) -> (Menu, WorldPick)? {
 		guard let v = viewport, let pick = world.pick(x: x, y: y, rect: v) else { return nil }
-		let menu = MenuBuilder.build(world: world, pick: pick, walkText: interaction.walkText, playerOptions: interaction.playerOptions, target: interaction.target)
+		var menu = MenuBuilder.build(world: world, pick: pick, walkText: interaction.walkText, playerOptions: interaction.playerOptions, target: interaction.target)
+		plugins.modifyMenu(&menu, source: .world) // Plugins/
 		return (menu, pick)
 	}
 

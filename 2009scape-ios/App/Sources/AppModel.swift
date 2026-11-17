@@ -50,6 +50,12 @@ final class AppModel: ObservableObject {
 		start()
 	}
 
+	/// The running client's plugins, for the settings sheet; nil until the cache is open.
+	var plugins: PluginManager? {
+		if case .ready(let client) = phase { return client.plugins }
+		return nil
+	}
+
 	/// False until the player has entered a server address.
 	var hasConfiguredServer: Bool { !host.isEmpty }
 
@@ -98,6 +104,10 @@ final class AppModel: ObservableObject {
 				Keychain.setPassword(pass, for: user)
 			}
 			client.log = { print("[client] \($0)") }
+			// Plugins: settings in UserDefaults, notifications (idle, low hitpoints) to the system.
+			client.plugins.useSettingsStore(UserDefaultsPluginSettingsStore())
+			client.plugins.onNotification = { PluginNotifier.shared.handle($0) }
+			if client.plugins.isEnabled("idleNotifier") { PluginNotifier.shared.requestAuthorization() }
 			audioOutput?.stop()
 			let output = AudioOutput(mixer: client.audio)
 			output.start()
