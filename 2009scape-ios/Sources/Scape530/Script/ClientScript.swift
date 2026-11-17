@@ -73,8 +73,6 @@ public struct ClientScript {
 extension ConfigStore {
 	public enum ScriptArchive {
 		public static let scripts = 12
-		public static let paramGroup = 11
-		public static let structGroup = 26
 	}
 
 	/// rt4 `ClientScriptList.get`: script `id` from archive 12, memoised.

@@ -42,6 +42,17 @@ public final class InterfaceScriptHost: ScriptHost {
 	/// rt4 `Player.worldId` shown on the login screen.
 	public var worldId: Int32 = 1
 
+	// MARK: client settings
+
+	/// Options-tab settings (rt4 `Preferences`), edited by cs2 ops 6001-6028.
+	public var prefs = ClientPreferences()
+	/// Told after a setting changes so the platform can apply it (volumes to audio, brightness to the rasteriser).
+	public var onPreferenceChange: (ClientPreferences.Change) -> Void = { _ in }
+	/// State derived from varps with a `clientCode` (rt4 `VarpDomain.refreshMagicVarp`).
+	public internal(set) var varpClient = VarpClientState()
+	/// Called after a varp with a non-zero `clientCode` changed, with that code and the new value.
+	public var onVarpClientCode: (_ code: Int, _ value: Int) -> Void = { _, _ in }
+
 	// MARK: variables
 
 	var varcs: [Int: Int32] = [:]
@@ -174,7 +185,7 @@ public final class InterfaceScriptHost: ScriptHost {
 		case let .varbit(id, v): writeVarbit(id, v)
 		case let .varc(id, v): setVarc(id, v)
 		case .resetClientVarcache:
-			game.varps = [:]
+			resetVarps()
 			varpLog.writer += 32
 		case .forceVarpRefresh: varpLog.writer += 32
 		case .updateStat(let s, _, _):
@@ -268,6 +279,7 @@ public final class InterfaceScriptHost: ScriptHost {
 	public func setVarp(_ id: Int, _ value: Int32) {
 		if (game.varps[id] ?? 0) != value || game.varps[id] == nil { varpLog.note(id) }
 		game.varps[id] = value
+		refreshMagicVarp(id)
 	}
 
 	func writeVarbit(_ id: Int, _ value: Int32) {

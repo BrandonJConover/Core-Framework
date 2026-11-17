@@ -14,6 +14,10 @@ public final class WorldView {
 	public var scene: Scene? { isBuilding ? nil : liveScene }
 	var liveScene: Scene?
 	var raster3D: Rasteriser3D?
+	/// Rasteriser gamma (rt4 `Rasteriser.setBrightness`); a change rebuilds the 3D buffer's palette and textures.
+	public var brightness: Float = 0.8 {
+		didSet { if brightness != oldValue { raster3D = nil } }
+	}
 	/// rt4 `Preferences.removeRoofsSelectively` (false = `neverRemoveRoofs`, roofs always drawn).
 	public var removeRoofs = true
 	var roofs = RoofHider()
@@ -476,7 +480,7 @@ public final class WorldView {
 		if raster3D == nil || Int(raster3D!.stride) != rect.w || Int(raster3D!.bufferHeight) != rect.h {
 			let r3 = Rasteriser3D(width: rect.w, height: rect.h)
 			r3.unpackTextures(textures)
-			r3.setBrightness(0.8, jitter: false)
+			r3.setBrightness(brightness, jitter: false)
 			raster3D = r3
 		}
 		guard let r3 = raster3D else { return nil }

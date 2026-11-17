@@ -79,8 +79,37 @@ public final class GameClient {
 		host.send = { [weak self] in self?.send($0) }
 		host.onDirectLogin = { [weak self] user, pass in self?.beginLogin(username: user, password: pass) }
 		host.log = { [weak self] in self?.log($0) }
+		host.onPreferenceChange = { [weak self] in self?.applyPreference($0) }
+		host.onVarpClientCode = { [weak self] code, value in
+			if code == VarpClientCode.chatEffects { self?.world.chatEffectsDisabled = value != 0 }
+		}
 		bindWorld()
 		bindModels()
+	}
+
+	/// Applies an Options-tab change the way rt4's `ScriptRunner` ops 6001-6020 do: volumes go to the audio
+	/// players (`MusicPlayer`/`SoundEffectPlayer`), brightness to every software rasteriser.
+	func applyPreference(_ change: ClientPreferences.Change) {
+		switch change {
+		case .brightness(let gamma):
+			world.brightness = gamma
+			ui.models.brightness = gamma
+			ui.icons.setBrightness(gamma)
+		case let .musicVolume(old, new):
+			// rt4: from silence the current song restarts; to silence it stops (the song id is kept).
+			let music = audio.music
+			let song = music.currentSongId
+			music.volume = new
+			if old == 0, song != -1 {
+				if audioSharesStore { music.play(songId: song) } else { audioLoader.async { music.play(songId: song) } }
+			} else if new == 0 {
+				music.stop()
+				music.play(songId: song)
+			}
+		case .soundEffectVolume(let v): audio.effects.effectVolume = v
+		case .ambientVolume(let v): audio.effects.ambientVolume = v
+		case .scene: break
+		}
 	}
 
 	/// Gives the interface model renderer (chat heads, player models) its view of the world.

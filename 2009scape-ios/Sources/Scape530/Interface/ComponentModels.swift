@@ -16,6 +16,10 @@ public final class ComponentModels {
 	let store: ConfigStore
 	public let actors: ActorModels
 	private var rasteriser: Rasteriser3D?
+	/// Rasteriser gamma for models drawn into interfaces (rt4 `Rasteriser.setBrightness`).
+	public var brightness: Float = 0.8 {
+		didSet { if brightness != oldValue { rasteriser = nil } }
+	}
 	private var rasterWidth = 0, rasterHeight = 0
 	private weak var icons: ItemIcons?
 
@@ -182,7 +186,7 @@ public final class ComponentModels {
 		let w = max(rasterWidth, width), h = max(rasterHeight, height)
 		let r = Rasteriser3D(width: w, height: h)
 		r.unpackTextures(icons?.textureStore())
-		r.setBrightness(0.8, jitter: false)
+		r.setBrightness(brightness, jitter: false)
 		rasteriser = r
 		rasterWidth = w
 		rasterHeight = h

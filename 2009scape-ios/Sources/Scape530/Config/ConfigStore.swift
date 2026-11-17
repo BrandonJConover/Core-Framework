@@ -13,6 +13,9 @@ public final class ConfigStore {
 		public static let seqs = 20
 		public static let spotAnims = 21
 		public static let varbits = 22
+		/// rt4 `js5Archive24` / `js5Archive25`: quick chat definitions (ids below / from 0x8000).
+		public static let quickChatPrimary = 24
+		public static let quickChatSecondary = 25
 	}
 
 	public enum ConfigGroup {
@@ -20,6 +23,13 @@ public final class ConfigStore {
 		public static let idk = 3
 		public static let flo = 4
 		public static let bas = 32
+		public static let inv = 5
+		public static let param = 11
+		public static let varp = 16
+		public static let structs = 26
+		public static let light = 31
+		public static let cursor = 33
+		public static let msi = 34
 	}
 
 	let source: (Int, Int) -> [UInt8]?

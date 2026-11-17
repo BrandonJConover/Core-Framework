@@ -1,33 +1,5 @@
 import Foundation
 
-/// rt4 `MsiType` (client!aa, config archive 2 group 34): a "map scene" icon drawn into the minimap
-/// image for scenery such as trees, rocks and rooftops.
-struct MsiType {
-	/// rt4 `spriteId`: sprite group in archive 8, -1 for none.
-	var spriteId = 0
-	/// rt4 `anInt11`: 0xRRGGBB tint multiplied into the sprite palette, 0 for none.
-	var tint = 0
-	/// rt4 `aBoolean2`: stretch the sprite over the loc's footprint (4 px per tile).
-	var stretch = false
-
-	/// rt4 `MsiType.decode`.
-	init(data: [UInt8]?) throws {
-		guard let data = data else { return }
-		var p = Packet(data)
-		while true {
-			let op = try p.g1()
-			if op == 0 { return }
-			switch op {
-			case 1: spriteId = try p.g2()
-			case 2: tint = try p.g3()
-			case 3: stretch = true
-			case 4: spriteId = -1
-			default: break
-			}
-		}
-	}
-}
-
 /// rt4 `SoftwareIndexedSprite` as the minimap uses it: palette indices (0 transparent) that can be
 /// turned by 90 degrees (`flipVertical`) and blitted scaled.
 struct IndexedMapSprite {

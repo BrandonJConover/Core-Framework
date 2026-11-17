@@ -52,6 +52,7 @@ extension InterfaceScriptHost {
 		func i(_ n: Int) -> Int { n < a.count ? Int(a[n]) : 0 }
 		func r(_ v: Int) -> HostResult { HostResult(ints: [Int32(truncatingIfNeeded: v)]) }
 		func b(_ v: Bool) -> HostResult { r(v ? 1 : 0) }
+		if let result = performPreference(op, ints: a) { return result }
 		switch op.name {
 		// MARK: client actions
 		case "chatMessage":
@@ -72,10 +73,8 @@ extension InterfaceScriptHost {
 			var n = 0
 			for it in (game.inventories[i(0)] ?? [:]).values where it.id == i(1) { n += Int(it.count) }
 			return r(n)
-		case "invSize": return r(game.inventorySizes[i(0)] ?? 0)
-		case "invFreeSlots":
-			let inv = i(0)
-			return r(max((game.inventorySizes[inv] ?? 0) - (game.inventories[inv]?.count ?? 0), 0))
+		case "invSize": return r(inventorySize(i(0)))
+		case "invFreeSlots": return r(inventoryFreeSlots(i(0)))
 		case "statLevel": return r(statLevel(i(0)))
 		case "statBaseLevel": return r(statBase(i(0)))
 		case "statXp": return r(Int(game.stats[i(0)]?.xp ?? 0))
@@ -198,6 +197,15 @@ extension InterfaceScriptHost {
 			break
 		}
 		return HostResult()
+	}
+
+	/// rt4 `InvTypeList.get(id).size` (opcode `getItemContainerLength`): the configured slot count.
+	func inventorySize(_ inv: Int) -> Int { ((try? store.inv(inv)) ?? nil)?.size ?? 0 }
+
+	/// rt4 `Inv.getFreeSpace`: the configured size less the occupied slots; a negative id has no room.
+	func inventoryFreeSlots(_ inv: Int) -> Int {
+		if inv < 0 { return 0 }
+		return max(inventorySize(inv) - (game.inventories[inv]?.count ?? 0), 0)
 	}
 
 	/// A friend row for a script index, or nil when it is out of range.
