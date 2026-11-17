@@ -165,9 +165,15 @@ third-party code must be audited before use.
    area environments. Then a ray-traced tier using Metal hardware ray tracing
    (A17 Pro / M3 and later, e.g. the iPhone 15 Pro) for shadows, reflections
    and ambient occlusion, falling back to shadow maps on older devices. The
-   faithful software look stays selectable.
+   faithful software look stays selectable. Use MetalFX (spatial/temporal
+   upscaling) so the HD and ray-traced tiers render below native resolution.
 3. **Helper tools.** Quest helper (shares quest-step data with the planned
    quest-companion bots), skill calculators, wiki lookup, clue scroll help.
+4. **Optional HD texture pack.** Upscale the cache's textures offline with an
+   ML super-resolution model, ship as a toggleable pack (no runtime ML cost).
+5. **On-device AI.** Quest companions and bots that chat and decide using
+   Apple's on-device Foundation Models (iOS 26), working offline with the
+   on-device server; voice chat input via the Speech framework.
 
 ## Build environments
 
