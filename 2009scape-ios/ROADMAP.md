@@ -144,6 +144,22 @@ fit for iOS and keeps frame times low on phones. The alternative is to port
 the software rasteriser line by line and blit its framebuffer through Metal:
 more faithful pixel output, more code, and heavier on battery.
 
+## After the port is playable: RuneLite-inspired phases
+
+Brandon wants the client to feel like RuneLite on a phone. Ideas only; any
+third-party code must be audited before use.
+
+1. **Plugin system.** Toggleable client plugins with hooks for overlays,
+   menu entries and game events. First batch: ground items (names, prices),
+   NPC and tile highlights, XP tracker and XP drops, idle notifier (iOS
+   notification), Grand Exchange item prices, boosts and timers, menu entry
+   swapper (choose the tap/default action).
+2. **Metal scene renderer (GPU).** Longer draw distance, anti-aliasing,
+   anisotropic filtering, fog, later HD-style lighting and shadows. The
+   faithful software look stays selectable.
+3. **Helper tools.** Quest helper (shares quest-step data with the planned
+   quest-companion bots), skill calculators, wiki lookup, clue scroll help.
+
 ## Build environments
 
 - Cloud containers: `docker run --rm -v "$PWD":/pkg -w /pkg swift:6.0-jammy swift test`
