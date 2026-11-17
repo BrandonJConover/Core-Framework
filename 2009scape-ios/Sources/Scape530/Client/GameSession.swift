@@ -149,7 +149,7 @@ public final class GameSession {
 				default:
 					let m = try ServerMessage.decode(pkt)
 					switch m {
-					case .rebuildNormal(let r):
+					case .rebuildNormal(let r), .rebuildRegion(let r):
 						if let z = zone {
 							players.rebase(dx: (r.zoneX - z.x) * 8, dz: (r.zoneZ - z.z) * 8)
 							npcs.rebase(dx: (r.zoneX - z.x) * 8, dz: (r.zoneZ - z.z) * 8)

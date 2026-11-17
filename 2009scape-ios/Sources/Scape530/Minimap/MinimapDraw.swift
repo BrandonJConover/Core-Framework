@@ -58,6 +58,24 @@ extension WorldView {
 			let friend = a.appearance.map { mm.friends[$0.name37] != nil } ?? false
 			plot.sprite("mapdots", friend ? 3 : 2, dx: dx, dz: dz, &r)
 		}
+		// rt4 hint arrows: blink with the cycle, in the circle as `hint_mapmarkers` or on its edge as `hint_mapedge`.
+		if ctx.loop % 20 < 10, let me = selfActor {
+			for case let h? in hintArrows where h.type != 0 {
+				var dx = 0, dz = 0
+				switch h.type {
+				case 1:
+					guard let a = ctx.npcs[h.target] else { continue }
+					dx = a.xFine / 32 - me.xFine / 32; dz = a.zFine / 32 - me.zFine / 32
+				case 2:
+					dx = (h.tileX - ctx.originX) * 4 + 2 - me.xFine / 32; dz = (h.tileZ - ctx.originZ) * 4 + 2 - me.zFine / 32
+				case 10:
+					guard let a = ctx.players[h.target] else { continue }
+					dx = a.xFine / 32 - me.xFine / 32; dz = a.zFine / 32 - me.zFine / 32
+				default: continue
+				}
+				plot.hintMarker(h.sprite, dx: dx, dz: dz, &r)
+			}
+		}
 		if let flag = mm.destination ?? destinationFlag.map({ (x: $0.x + ctx.originX, z: $0.z + ctx.originZ) }) {
 			plot.sprite("mapflag", 0, dx: (flag.x - ctx.originX) * 4 + 2 - plot.meX, dz: (flag.z - ctx.originZ) * 4 + 2 - plot.meZ, &r)
 		}
@@ -121,6 +139,50 @@ struct Plotter {
 				let c = argb[iy * f.innerWidth + ix]
 				if c >> 24 != 0 { r.pixels[py * r.width + px] = 0xFF00_0000 | c & 0xFFFFFF }
 			}
+		}
+	}
+
+	/// rt4 `MiniMap.method1960`: a hint marker inside the map circle, or its edge arrow pointing the way.
+	func hintMarker(_ index: Int, dx: Int, dz: Int, _ r: inout Raster) {
+		let dist = dx * dx + dz * dz
+		if dist > 360000 { return }
+		var radius = min(d.w / 2, d.h / 2)
+		if radius * radius >= dist { sprite("hint_mapmarkers", index, dx: dx, dz: dz, &r); return }
+		radius -= 10
+		let (sn, cs) = mm.rotation(theta: theta)
+		let sx = (dz * sn + cs * dx) >> 16
+		let sy = (dz * cs - sn * dx) >> 16
+		let angle = atan2(Double(sx), Double(sy))
+		let ox = Int(sin(angle) * Double(radius)), oz = Int(cos(angle) * Double(radius))
+		guard let sheet = mm.sheet("hint_mapedge"), index >= 0, index < sheet.frames.count else { return }
+		edgeSprite(sheet.frames[index], x: ox + d.w / 2 + d.x - 10, y: d.h / 2 - 10 + d.y - oz, angle: angle, &r)
+	}
+
+	/// rt4 `SoftwareSprite.method306`: the sprite turned by `angle`, sampled into a 20x20 square.
+	func edgeSprite(_ f: SpriteFrame, x: Int, y: Int, angle: Double, _ r: inout Raster) {
+		var canvas = [UInt32](repeating: 0, count: f.width * f.height)
+		for (i, c) in f.argb.enumerated() where c >> 24 != 0 {
+			canvas[(i / f.innerWidth + f.yOffset) * f.width + i % f.innerWidth + f.xOffset] = c & 0xFFFFFF
+		}
+		let s = Int(sin(angle) * 65536.0), c = Int(cos(angle) * 65536.0)
+		var u0 = s * -10 + c * -10 + 983040
+		var v0 = c * -10 + 983040 - s * -10
+		for row in 0..<20 {
+			var u = u0, v = v0
+			for col in 0..<20 {
+				let sxp = u >> 16, syp = v >> 16
+				// rt4 catches the out-of-range read and abandons the sprite.
+				guard sxp >= 0, sxp < f.width, syp >= 0, syp < f.height else { return }
+				let p = canvas[sxp + syp * f.width]
+				let px = x + col, py = y + row
+				if p != 0, px >= r.clipLeft, px < r.clipRight, py >= r.clipTop, py < r.clipBottom {
+					r.pixels[py * r.width + px] = 0xFF00_0000 | p
+				}
+				u += c
+				v -= s
+			}
+			u0 += s
+			v0 += c
 		}
 	}
 

@@ -71,6 +71,12 @@ public struct RebuildNormal: Equatable {
 	public var plane: Int
 	/// XTEA keys for each map square's `l` (locations) group, in region order.
 	public var xteaKeys: [[Int32]]
+	/// REBUILD_REGION only: the 4 x 13 x 13 chunk template, indexed `(level * 13 + x) * 13 + z`. Each entry is -1 (no
+	/// chunk) or `rotation << 1 | chunkZ << 3 | chunkX << 14 | level << 24` of the 8x8 tile chunk copied there.
+	public var chunks: [Int]?
+
+	/// True for a dynamic (instanced) region.
+	public var isDynamic: Bool { chunks != nil }
 
 	public struct Region: Equatable {
 		public let x: Int
@@ -96,9 +102,53 @@ public struct RebuildNormal: Equatable {
 		localZ = try p.g2add()
 	}
 
-	/// The map squares rt4 loads around the central zone (same order as `xteaKeys`).
+	/// REBUILD_REGION (opcode 214): the dynamic branch of rt4 `Protocol.readRebuildPacket`.
+	public init(dynamicPayload payload: [UInt8]) throws {
+		var p = Packet(payload)
+		localX = try p.ig2add()
+		zoneX = try p.ig2add()
+		plane = try p.g1sub()
+		localZ = try p.ig2add()
+		// rt4 `accessBits`: 1 flag bit per chunk, then 26 bits when it is set.
+		var bit = p.offset * 8
+		func bits(_ n: Int) throws -> Int {
+			var v = 0
+			for _ in 0..<n {
+				guard bit >> 3 < payload.count else { throw PacketUnderflow(offset: bit >> 3, wanted: 1, size: payload.count) }
+				v = v << 1 | Int(payload[bit >> 3] >> (7 - UInt8(bit & 7))) & 1
+				bit += 1
+			}
+			return v
+		}
+		var table = [Int](repeating: -1, count: 4 * 13 * 13)
+		for level in 0..<4 {
+			for x in 0..<13 {
+				for z in 0..<13 {
+					if try bits(1) == 1 { table[(level * 13 + x) * 13 + z] = try bits(26) }
+				}
+			}
+		}
+		p.offset = (bit + 7) >> 3
+		let keyCount = (payload.count - p.offset) / 16
+		var keys: [[Int32]] = []
+		for _ in 0..<keyCount { keys.append([try p.mg4(), try p.mg4(), try p.mg4(), try p.mg4()]) }
+		xteaKeys = keys
+		zoneZ = try p.g2()
+		chunks = table
+	}
+
+	/// The map squares rt4 loads around the central zone (same order as `xteaKeys`). For a dynamic region these are the
+	/// squares the chunks are copied from, in order of first use (level, then x, then z).
 	public var regions: [Region] {
 		var out: [Region] = []
+		if let table = chunks {
+			var seen = Set<Int>()
+			for packed in table where packed != -1 {
+				let region = Region(x: (packed >> 14 & 0x3FF) / 8, z: (packed >> 3 & 0x7FF) / 8)
+				if seen.insert(region.id).inserted { out.append(region) }
+			}
+			return out
+		}
 		for x in ((zoneX - 6) / 8)...((zoneX + 6) / 8) {
 			for z in ((zoneZ - 6) / 8)...((zoneZ + 6) / 8) {
 				out.append(Region(x: x, z: z))

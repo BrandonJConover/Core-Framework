@@ -36,6 +36,8 @@ public final class InterfaceScriptHost: ScriptHost {
 	/// Every script failure since the host was made, by message, plus the unported CS2 opcodes among
 	/// them (instrumentation for playthrough tests; never cleared).
 	public private(set) var errorCounts: [String: Int] = [:]
+	/// The world camera for the CS2 camera opcodes; returns the value to push for the getters, nil when not handled.
+	public var cameraOp: (String, [Int]) -> Int? = { _, _ in nil }
 	public private(set) var unportedOpcodes: [Int: Int] = [:]
 
 	// MARK: login state read by CS2 (rt4 `LoginManager`)
@@ -68,6 +70,8 @@ public final class InterfaceScriptHost: ScriptHost {
 	var keyQueue: [(code: Int, char: Int)] = []
 	/// rt4 `Chat.transmitAt` and friends: the transmit timer value of the last change.
 	var chatAt = 0, friendAt = 0, clanAt = 0, miscAt = 0
+	/// rt4 `StockMarketManager.transmitAt`: when a GRAND_EXCHANGE_OFFERS packet last arrived (wakes `onStockTransmit`).
+	var stockAt = 0
 	var hovering: Set<ComponentRef> = []
 	/// if3 drag state (rt4 `Cs1ScriptRunner.aClass13_14` & co), see `ComponentDrag.swift`.
 	var drag: DragState?
@@ -196,6 +200,25 @@ public final class InterfaceScriptHost: ScriptHost {
 					}
 				}
 			}
+		case let .widgetStructSetting(c, start, end, param):
+			// rt4 WIDGETSTRUCT_SETTING: like SET_INTERFACE_SETTINGS but for the target param; index -1 is the component itself.
+			if start <= end {
+				for i in start...min(end, start + 4096) {
+					if i == -1 {
+						mutate(ComponentRef(id: Int(c))) { $0.targetParam = param }
+					} else {
+						game.interfaces.childTargetParams[Int(c), default: [:]][i] = param
+					}
+				}
+			}
+		case let .chatHeadFromBody(c, kit1, kit2, kit3):
+			// rt4 `DelayedStateChange.updateComponentModel(v1, 7, id, v2 << 16 | v3)`: a type-7 head from three kits.
+			mutate(ComponentRef(id: Int(c))) { $0.modelType = 7; $0.modelId = kit1 << 16 | kit2; $0.modelExtra = kit3 }
+		case let .modelRotation(c, pitchStep, yawStep):
+			mutate(ComponentRef(id: Int(c))) { $0.modelRotationSpeed = Int(Int32(truncatingIfNeeded: yawStep + (pitchStep << 16))) }
+		case .grandExchangeOffer:
+			game.apply(m)
+			stockAt = transmitTimer
 		case let .ifSetObject(c, obj, count): setObject(ComponentRef(id: Int(c)), obj: obj, count: Int(count))
 		case let .ifSetAngle(c, pitch, yaw, scale): setView(ComponentRef(id: Int(c)), scale: scale, yaw: yaw, pitch: pitch)
 		case let .ifSetModel(c, model): mutate(ComponentRef(id: Int(c))) { $0.modelType = 1; $0.modelId = model }
@@ -289,6 +312,7 @@ public final class InterfaceScriptHost: ScriptHost {
 		if ref.child == -1 { return game.interfaces.overrides[ref.id] ?? base(ref.id) }
 		guard var c = game.interfaces.dynamic[ref.id]?[ref.child] else { return nil }
 		if let m = game.interfaces.childEvents[ref.id]?[ref.child] { c.events = Int(m) }
+		if let t = game.interfaces.childTargetParams[ref.id]?[ref.child] { c.targetParam = t }
 		return c
 	}
 

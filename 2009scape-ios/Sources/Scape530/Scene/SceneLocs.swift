@@ -90,6 +90,16 @@ public final class DynamicLoc: SceneEntity {
 		if let l = try? store.loc(locId), l.multiLocs != nil { followsVariant = true }
 	}
 
+	/// rt4 `Loc` constructor with a predecessor: a loc that already plays this same sequence (and is not an
+	/// exact-move one) keeps the old frame, delay and start cycle instead of restarting.
+	func inherit(from previous: SceneEntity?) {
+		guard let old = previous as? DynamicLoc, let s = seq, s.exactMove == 0, old.seq?.id == s.id else { return }
+		frame = old.frame
+		startLoop = old.startLoop
+		step = old.step
+		nextFrame = old.nextFrame
+	}
+
 	public func getMinY() -> Int { -32768 }
 
 	public func updateWhileHidden(yaw: Int, level: Int, y: Int, x: Int, z: Int) { advance() }
@@ -198,6 +208,14 @@ public final class LocPlacer {
 
 	public init(scene: Scene, store: ConfigStore, builder: LocModelBuilder, env: LocEnvironment) {
 		self.scene = scene; self.store = store; self.builder = builder; self.env = env
+	}
+
+	/// rt4 `new Loc(id, shape, rotation, level, x, z, seqId, false, previous)` as `SceneGraph.method1881` makes it for LOC_ANIM:
+	/// the entity that replaces `previous` on its tile, playing `seq` (-1 plays none).
+	public func animatedLoc(id: Int, shape: Int, rotation: Int, level: Int, x: Int, z: Int, seq: Int, previous: SceneEntity?) -> SceneEntity {
+		let loc = DynamicLoc(env: env, scene: scene, store: store, builder: builder, locId: id, shape: shape, rotation: rotation, level: level, x: x, z: z, seqId: seq, randomise: false)
+		loc.inherit(from: previous)
+		return loc
 	}
 
 	/// rt4 `SceneGraph.addLoc(currentPlane, lowmem, plane, highmem, map, locIndex, locType, x, z, orientation)`

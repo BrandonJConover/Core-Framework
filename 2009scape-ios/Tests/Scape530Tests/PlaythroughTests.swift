@@ -215,7 +215,7 @@ final class PlaythroughTests: XCTestCase {
 	}
 
 	/// Fresh account: character design, then skip Tutorial Island through Skippy and Terrova.
-	func finishTutorial(_ l: Live) {
+	func finishTutorial(_ l: Live, afterDesign: () -> Void = {}) {
 		if l.client.state.interfaces.open.values.contains(771) {
 			l.shot("design-00")
 			XCTAssertTrue(l.tapOp("Select 2-button mouse"))
@@ -227,16 +227,21 @@ final class PlaythroughTests: XCTestCase {
 			XCTAssertFalse(l.client.state.interfaces.open.values.contains(771), "design screens closed")
 			l.pump(2)
 		}
+		afterDesign()
 		guard l.client.state.interfaces.open.values.contains(372) || l.findNpc(op: "Talk-to", name: "skippy") != nil || l.dialogue != nil else { return }
 		if let f = l.findNpc(op: "Talk-to", name: "skippy") {
 			l.client.tap(x: f.x, y: f.y)
-			l.pump(4)
+			l.pump(1)
+			if l.client.interaction.popup != nil { _ = chooseMenu(l, "Talk-to") }
+			l.pump(3)
 			l.driveDialogue(prefer: ["Yes, I'd like to skip"], shots: "skippy")
 			l.pump(2)
 		}
 		if let t = l.findNpc(op: "Talk-to", name: "instructor") {
 			l.client.tap(x: t.x, y: t.y)
-			l.pump(4)
+			l.pump(1)
+			if l.client.interaction.popup != nil { _ = chooseMenu(l, "Talk-to") }
+			l.pump(3)
 			l.driveDialogue(prefer: ["Yes, I'm ready", "I'm ready now"], shots: "terrova")
 			l.pump(4)
 		}
@@ -357,6 +362,57 @@ final class PlaythroughTests: XCTestCase {
 		l.pump(1.5)
 		XCTAssertEqual(count(l, item: 361), 4, "tuna dropped")
 		l.report()
+		l.client.logout()
+	}
+
+	/// The packets added for full protocol coverage, triggered the way a server operator would: the Tutorial Island hint
+	/// arrow on a fresh account, then the camera and animation admin commands.
+	func testProtocolCoverageLive() throws {
+		let l = try live("ptcov")
+		// A fresh account stands on Tutorial Island; once the designer closes the guide wears a hint arrow.
+		var arrows: [ServerMessage.HintArrow] = []
+		var guestName: String?
+		finishTutorial(l) {
+			// Stage 1 asks for the options tab (the flashing spanner); stage 2 puts the arrow on the guide.
+			l.pump(3)
+			print("COV options tab tapped: \(l.tapOp("Options"))")
+			_ = l.pump(until: { !l.client.world.hintArrows.compactMap { $0 }.isEmpty }, timeout: 8)
+			arrows = l.client.world.hintArrows.compactMap { $0 }
+			guestName = arrows.first.flatMap { l.client.world.ctx.npcs[$0.target]?.npcType?.name }
+			print("COV arrow target: \(String(describing: guestName)) hint icons drawn: \(l.client.world.hintArrows.compactMap { $0 }.count)")
+			l.shot("hint-arrow")
+		}
+		print("COV hint arrows: \(arrows))")
+		if let a = arrows.first {
+			XCTAssertEqual(a.type, 1, "the guide is an npc")
+			XCTAssertEqual(guestName, "RuneScape guide", "the arrow's npc was in the scene")
+		} else {
+			XCTFail("no hint arrow over the tutorial guide")
+		}
+		l.pump(2)
+		// The skip may leave the tap menu open; it would swallow the typed command.
+		_ = chooseMenu(l, "Cancel")
+		l.pump(1)
+		l.say("::anim 861")
+		// Camera: panning to a tile takes the camera off the player, resetting hands it back.
+		l.say("::poscam 34 26 300")
+		l.say("::rotcam 33 30 0 100")
+		l.pump(1)
+		XCTAssertNotNil(l.client.world.camera.scripted, "::poscam scripted the camera")
+		l.shot("camera-scripted")
+		l.say("::movcam 36 36 300 50")
+		l.pump(1)
+		l.say("::shakecam 3 5 10 100 2")
+		l.pump(1)
+		XCTAssertTrue(l.client.world.camera.shakes[3].active, "::shakecam shook the yaw axis")
+		l.say("::resetcam")
+		l.pump(1)
+		XCTAssertNil(l.client.world.camera.scripted, "::resetcam gave the camera back")
+		XCTAssertFalse(l.client.world.camera.shakes[3].active)
+		let d = l.client.diagnostics
+		print("COV unhandled \(d.unhandledPackets) failures \(d.decodeFailures) unported cs2 \(l.client.unportedScriptOpcodes)")
+		XCTAssertTrue(d.decodeFailures.isEmpty, "no packet failed to decode: \(d.decodeFailures)")
+		XCTAssertTrue(d.unhandledPackets.isEmpty, "no packet went unhandled: \(d.unhandledPackets)")
 		l.client.logout()
 	}
 

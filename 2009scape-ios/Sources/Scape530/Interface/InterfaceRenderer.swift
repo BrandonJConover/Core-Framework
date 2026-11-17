@@ -23,6 +23,8 @@ public struct InterfaceState {
 	/// IF_SETEVENTS masks for CS2-created children (rt4 `InterfaceList.properties`, keyed by component id and
 	/// child index). They outlive the child, so scripts may rebuild a layer and keep the server's settings.
 	public var childEvents: [Int: [Int: Int32]] = [:]
+	/// WIDGETSTRUCT_SETTING target params of CS2-created children, like `childEvents` (rt4 `ServerActiveProperties.targetParam`).
+	public var childTargetParams: [Int: [Int: Int]] = [:]
 	/// Items of if1 inventory components (type 2), per component id then slot (rt4 `Component.objTypes`
 	/// / `objCounts`, filled by UPDATE_INV_*). Empty slots are absent.
 	public var invSlots: [Int: [Int: ServerMessage.InvItem]] = [:]
@@ -341,6 +343,18 @@ public final class InterfaceRenderer {
 	public func advanceModelAnimations(_ state: inout InterfaceState, cycles: Int = 1) {
 		for d in drawn where d.component.type == 6 {
 			let c = d.component
+			// rt4 turns if1 models by `modelRotationSpeed` (pitch step in the high half, yaw step in the low half) per cycle.
+			if c.modelRotationSpeed != 0 && !c.if3 {
+				// `drawn` is the last frame's snapshot; the angles accumulate on the live copy between frames.
+				var turned = (c.childIndex == -1 ? state.overrides[c.id] : state.dynamic[c.id]?[c.childIndex]) ?? c
+				turned.modelXAngle = (turned.modelXAngle + (c.modelRotationSpeed >> 16) * cycles) & 0x7FF
+				turned.modelYAngle = (turned.modelYAngle + Int(Int16(truncatingIfNeeded: c.modelRotationSpeed)) * cycles) & 0x7FF
+				if c.childIndex == -1 {
+					state.overrides[c.id] = turned
+				} else if state.dynamic[c.id]?[c.childIndex] != nil {
+					state.dynamic[c.id]?[c.childIndex] = turned
+				}
+			}
 			guard c.modelSeqId != -1, let seq = try? store.seq(c.modelSeqId), !seq.frames.isEmpty, seq.frameDelays.count == seq.frames.count else { continue }
 			var a = state.modelAnim[c.ref] ?? ModelAnim()
 			a.cycles += cycles

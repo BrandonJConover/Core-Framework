@@ -62,6 +62,9 @@ public struct Component {
 	public var modelExtra = 0
 	/// rt4 `ServerActiveProperties.targetParam`: the param id a spell target must have, -1 for none.
 	public var targetParam = -1
+	/// rt4 `Component.modelRotationSpeed` (INTERFACE_ANIMATE_ROTATE): pitch step per cycle in the high 16 bits (signed),
+	/// yaw step in the low 16; an if1 type-6 component turns by it every cycle.
+	public var modelRotationSpeed = 0
 
 	// Text
 	public var font = -1

@@ -29,6 +29,11 @@ public struct GameState {
 	}
 	/// Game messages as plain strings, oldest first (kept for callers that only want the text).
 	public var chat: [String] { chatLog.lines.reversed().filter { $0.type == 0 }.map(\.message) }
+	/// Grand Exchange offer slots (rt4 `StockMarketManager.offers`); a fresh client starts with six empty (not started) slots.
+	public var stockOffers = [ServerMessage.StockOffer](repeating: GameState.emptyOffer, count: 6)
+	public static let emptyOffer = ServerMessage.StockOffer(status: 0, type: 0, item: 0, price: 0, count: 0, completedCount: 0, completedGold: 0)
+	/// rt4 `client.settings`, from SET_SETTINGS_STRING.
+	public var settingsString = ""
 	public var rebuild: RebuildNormal?
 	public var players: PlayerInfoDecoder?
 	public var npcs: NpcInfoDecoder?
@@ -56,7 +61,9 @@ public struct GameState {
 	public mutating func apply(_ m: ServerMessage) {
 		if interfaces.apply(m) { return }
 		switch m {
-		case .rebuildNormal(let r): rebuild = r
+		case .rebuildNormal(let r), .rebuildRegion(let r): rebuild = r
+		case let .grandExchangeOffer(slot, offer): if slot >= 0 && slot < stockOffers.count { stockOffers[slot] = offer ?? Self.emptyOffer }
+		case .settingsString(let s): settingsString = s
 		case .varp(let id, let v): varps[id] = v
 		case .updateStat(let s, let l, let xp): stats[s] = (l, xp)
 		case .runEnergy(let e): runEnergy = e

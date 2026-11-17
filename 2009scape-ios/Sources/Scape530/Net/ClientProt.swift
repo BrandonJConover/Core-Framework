@@ -2,6 +2,8 @@
 /// Generated from reference/rt4-client `ClientProt.java`; names are rt4's (with its NXT-naming notes).
 public enum ClientProt {
 	public static let clientCheat = 44
+	/// rt4 `ReflectionCheck.loop` (`p1isaac(163)`).
+	public static let reflectionCheckReply = 163
 	/// rt4 `ScriptRunner` op 5008 (`p1isaac(237)`): public chat with colour and effect bytes.
 	public static let publicChat = 237
 	/// rt4 `ScriptRunner` op 5009 (`p1isaac(201)`): private message to a base-37 name.

@@ -9,6 +9,9 @@ public struct MapSquare {
 	/// [level][x][z]
 	public var heights = [[[Int]]](repeating: [[Int]](repeating: [Int](repeating: 0, count: 65), count: 65), count: 4)
 	public var underlays = [[[Int]]](repeating: [[Int]](repeating: [Int](repeating: 0, count: 64), count: 64), count: 4)
+	/// The height byte as stored (after rt4's `1 -> 0` fix), or -1 where the tile states none and the height comes
+	/// from the noise function. Dynamic regions (`Scene.loadChunks`) re-derive heights from these on their own level.
+	public var rawHeights = [[[Int]]](repeating: [[Int]](repeating: [Int](repeating: -1, count: 64), count: 64), count: 4)
 	/// Overlay FloType id + 1 (0 = none).
 	public var overlays = [[[Int]]](repeating: [[Int]](repeating: [Int](repeating: 0, count: 64), count: 64), count: 4)
 	public var shapes = [[[Int]]](repeating: [[Int]](repeating: [Int](repeating: 0, count: 64), count: 64), count: 4)
@@ -36,6 +39,7 @@ public struct MapSquare {
 						if op == 1 {
 							var h = try p.g1()
 							if h == 1 { h = 0 }
+							rawHeights[level][x][z] = h
 							heights[level][x][z] = level == 0 ? -h * 8 : heights[level - 1][x][z] - h * 8
 							break
 						}

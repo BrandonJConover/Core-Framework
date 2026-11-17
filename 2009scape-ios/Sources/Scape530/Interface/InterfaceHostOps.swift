@@ -66,6 +66,16 @@ extension InterfaceScriptHost {
 		case "sendNameInput": send(.resumeName(s.first ?? ""))
 		case "sendStringInput": send(.resumeString(s.first ?? ""))
 		case "clientCycle": return r(loop)
+		case "geOfferIsSelling": return r(stockOffer(i(0)).type)
+		case "geOfferItem": return r(stockOffer(i(0)).item)
+		case "geOfferPrice": return r(Int(stockOffer(i(0)).price))
+		case "geOfferCount": return r(Int(stockOffer(i(0)).count))
+		case "geOfferCompletedCount": return r(Int(stockOffer(i(0)).completedCount))
+		case "geOfferCompletedGold": return r(Int(stockOffer(i(0)).completedGold))
+		case "geOfferNotStarted": return b(stockOffer(i(0)).status == 0)
+		case "geOfferStatus2": return b(stockOffer(i(0)).status == 2)
+		case "geOfferDone": return b(stockOffer(i(0)).status == 5)
+		case "geOfferStatus1": return b(stockOffer(i(0)).status == 1)
 
 		// MARK: player state
 		case "invItemId": return r(game.inventories[i(0)]?[i(1)]?.id ?? -1)
@@ -194,10 +204,17 @@ extension InterfaceScriptHost {
 		case "lastWorld": return HostResult(ints: [worldId])
 		case "setLastWorld": break
 
+		case "cameraMoveTo", "cameraPointAt", "cameraUnlock", "cameraSetAngles", "cameraPitch", "cameraYaw":
+			if let v = cameraOp(op.name, a.map(Int.init)), op.name == "cameraPitch" || op.name == "cameraYaw" { return r(v) }
 		default:
 			break
 		}
 		return HostResult()
+	}
+
+	/// rt4 `StockMarketManager.offers[slot]`; an out-of-range slot reads as an empty offer.
+	func stockOffer(_ slot: Int) -> ServerMessage.StockOffer {
+		slot >= 0 && slot < game.stockOffers.count ? game.stockOffers[slot] : GameState.emptyOffer
 	}
 
 	/// rt4 `InvTypeList.get(id).size` (opcode `getItemContainerLength`): the configured slot count.

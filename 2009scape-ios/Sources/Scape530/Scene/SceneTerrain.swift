@@ -50,6 +50,107 @@ extension Scene {
 		try buildTiles(underlays: underlays, overlays: overlays, shapes: shapes, angles: angles)
 	}
 
+	/// rt4 `SceneGraph.rotateX` / `rotateZ`: where a tile (`x`, `z`) of an 8x8 chunk lands when the chunk is turned `rotation` quarter turns.
+	static func rotateChunkX(_ rotation: Int, x: Int, z: Int) -> Int {
+		switch rotation & 3 { case 0: return x; case 1: return z; case 2: return 7 - x; default: return 7 - z }
+	}
+	static func rotateChunkZ(_ rotation: Int, x: Int, z: Int) -> Int {
+		switch rotation & 3 { case 0: return z; case 1: return 7 - x; case 2: return 7 - z; default: return x }
+	}
+
+	/// What `loadChunks` learned about the dynamic region.
+	public struct ChunkTerrain {
+		/// [level][x][z]: the tile belongs to a copied chunk (rt4 clears the collision map's "not loaded" bit there).
+		public var loaded: [[[Bool]]]
+	}
+
+	/// Dynamic (instanced) regions, rt4 `LoginManager.method1835` + `SceneGraph.method4228` / `readTile` / `method645`:
+	/// each of the 4 x 13 x 13 chunk slots copies one 8x8 tile chunk, turned by its rotation, from a map square of the
+	/// cache (`table` is `RebuildNormal.chunks`, `square(regionX, regionZ)` loads one). Heights are derived on the
+	/// destination level, from the noise function at the destination tile for level 0. Slots without a chunk are
+	/// flattened like rt4 `method645`. `beforeBuild` places the locs, as in `loadMapSquares`.
+	public func loadChunks(_ table: [Int], square: (Int, Int) -> MapSquare?, centralPlane: Int = 0, beforeBuild: ((Scene) throws -> Void)? = nil) throws -> ChunkTerrain {
+		self.centralPlane = centralPlane
+		clear()
+		let W = width, L = length
+		var underlays = [[[Int]]](repeating: [[Int]](repeating: [Int](repeating: 0, count: L), count: W), count: 4)
+		var overlays = underlays, shapes = underlays, angles = underlays
+		var loaded = [[[Bool]]](repeating: [[Bool]](repeating: [Bool](repeating: false, count: L), count: W), count: 4)
+		for l in 0..<4 {
+			for x in 0..<W { for z in 0..<L { renderFlags[l][x][z] = 0 } }
+			for x in 0...W { for z in 0...L { tileHeights[l][x][z] = 0; shadowmap[l][x][z] = 0; occludeFlags[l][x][z] = 0 } }
+		}
+		for level in 0..<4 {
+			for cx in 0..<13 {
+				for cz in 0..<13 {
+					let packed = table[(level * 13 + cx) * 13 + cz]
+					var copied = false
+					if packed != -1 {
+						let srcLevel = packed >> 24 & 3, rotation = packed >> 1 & 3
+						let chunkX = packed >> 14 & 0x3FF, chunkZ = packed >> 3 & 0x7FF
+						if let sq = square(chunkX / 8, chunkZ / 8) {
+							copied = true
+							for tx in 0..<8 {
+								for tz in 0..<8 {
+									let sx = (chunkX & 7) * 8 + tx, sz = (chunkZ & 7) * 8 + tz
+									let z = Self.rotateChunkZ(rotation, x: tx, z: tz) + cz * 8
+									let x = Self.rotateChunkX(rotation, x: tx, z: tz) + cx * 8
+									guard x >= 0, x < W, z >= 0, z < L else { continue }
+									loaded[level][x][z] = true
+									renderFlags[level][x][z] = sq.flags[srcLevel][sx][sz]
+									let raw = sq.rawHeights[srcLevel][sx][sz]
+									if raw < 0 {
+										tileHeights[level][x][z] = level == 0 ? -PerlinNoise.tileHeight(z + 556238, x + 932731) * 8 : tileHeights[level - 1][x][z] - 240
+									} else {
+										tileHeights[level][x][z] = level == 0 ? -raw * 8 : tileHeights[level - 1][x][z] - raw * 8
+									}
+									overlays[level][x][z] = sq.overlays[srcLevel][sx][sz]
+									shapes[level][x][z] = sq.shapes[srcLevel][sx][sz]
+									angles[level][x][z] = (sq.rotations[srcLevel][sx][sz] + rotation) & 3
+									underlays[level][x][z] = sq.underlays[srcLevel][sx][sz]
+								}
+							}
+						}
+					}
+					if !copied { flattenChunk(level: level, x: cx * 8, z: cz * 8) }
+				}
+			}
+		}
+		try beforeBuild?(self)
+		try buildTiles(underlays: underlays, overlays: overlays, shapes: shapes, angles: angles)
+		return ChunkTerrain(loaded: loaded)
+	}
+
+	/// rt4 `SceneGraph.method645(level, z, x, 8, 8)`: an empty chunk is flat, at the height of the level below.
+	func flattenChunk(level: Int, x x0: Int, z z0: Int) {
+		let size = 8
+		for z in z0...(z0 + size) { for x in x0...(x0 + size) where x >= 0 && x < 104 && z >= 0 && z < 104 { shadowmap[level][x][z] = 127 } }
+		for z in z0..<(z0 + size) {
+			for x in x0..<(x0 + size) where x >= 0 && x < 104 && z >= 0 && z < 104 {
+				tileHeights[level][x][z] = level <= 0 ? 0 : tileHeights[level - 1][x][z]
+			}
+		}
+		if x0 > 0 && x0 < 104 {
+			for z in (z0 + 1)..<(z0 + size) where z >= 0 && z < 104 { tileHeights[level][x0][z] = tileHeights[level][x0 - 1][z] }
+		}
+		if z0 > 0 && z0 < 104 {
+			for x in (x0 + 1)..<(x0 + size) where x >= 0 && x < 104 { tileHeights[level][x][z0] = tileHeights[level][x][z0 - 1] }
+		}
+		guard x0 >= 0, z0 >= 0, x0 < 104, z0 < 104 else { return }
+		var h = tileHeights[level]
+		if level == 0 {
+			if x0 > 0 && h[x0 - 1][z0] != 0 { h[x0][z0] = h[x0 - 1][z0] }
+			else if z0 > 0 && h[x0][z0 - 1] != 0 { h[x0][z0] = h[x0][z0 - 1] }
+			else if x0 > 0 && z0 > 0 && h[x0 - 1][z0 - 1] != 0 { h[x0][z0] = h[x0 - 1][z0 - 1] }
+		} else {
+			let below = tileHeights[level - 1]
+			if x0 > 0 && below[x0 - 1][z0] != h[x0 - 1][z0] { h[x0][z0] = h[x0 - 1][z0] }
+			else if z0 > 0 && h[x0][z0 - 1] != below[x0][z0 - 1] { h[x0][z0] = h[x0][z0 - 1] }
+			else if x0 > 0 && z0 > 0 && h[x0 - 1][z0 - 1] != below[x0 - 1][z0 - 1] { h[x0][z0] = h[x0 - 1][z0 - 1] }
+		}
+		tileHeights[level] = h
+	}
+
 	/// rt4 `SceneGraph.method1169` (non-GL, non-underwater).
 	func buildTiles(underlays: [[[Int]]], overlays: [[[Int]]], shapes: [[[Int]]], angles: [[[Int]]]) throws {
 		let W = width, L = length

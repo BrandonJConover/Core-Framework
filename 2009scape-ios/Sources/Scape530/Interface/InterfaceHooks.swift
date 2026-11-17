@@ -110,6 +110,7 @@ extension InterfaceScriptHost {
 			if chatAt > rd.lastTransmit { queue("onMsg", into: &low) }
 			if friendAt > rd.lastTransmit { queue("onFriendTransmit", into: &low) }
 			if clanAt > rd.lastTransmit { queue("onClanTransmit", into: &low) }
+			if stockAt > rd.lastTransmit { queue("onStockTransmit", into: &low) }
 			if miscAt > rd.lastTransmit { queue("onMiscTransmit", into: &low) }
 			rd.lastTransmit = transmitTimer
 			readers[ref] = rd

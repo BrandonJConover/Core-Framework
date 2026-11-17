@@ -38,6 +38,9 @@ public enum ClientMessage {
 	case clanJoinLeave(name37: Int64)
 	/// CLAN_KICKUSER (rt4 `ClanChat.kick`).
 	case clanKick(name37: Int64)
+	/// REFLECTION_CHECK_REPLY (rt4 `ReflectionCheck.loop`, opcode 163): the answer to a REFLECTION_CHECK request. This
+	/// client cannot run the checks, so every one is reported with `error` (rt4's -1: class not found).
+	case reflectionReply(id: Int32, entries: Int, error: Int)
 	/// Opcode 77: walk toward an interaction target; same layout as `walk` (rt4 `method3502` with argument 2).
 	case walkInteract(destX: Int, destZ: Int, path: [(x: Int, z: Int)] = [], ctrlRun: Bool = false)
 	/// OPNPC1...5 (`option` 1...5) on npc index `index` (rt4 `MiniMenu` actions 17, 16, 4, 19, 2).
@@ -156,6 +159,16 @@ public enum ClientMessage {
 			p.p8(n)
 		case .clanJoinLeave(let n): op(ClientProt.clanJoinchatLeavechat); p.p8(n)
 		case .clanKick(let n): op(ClientProt.clanKickuser); p.p8(n)
+		case let .reflectionReply(id, entries, error):
+			op(ClientProt.reflectionCheckReply)
+			var body = Packet(capacity: 8 + entries)
+			body.p4(id)
+			for _ in 0..<entries { body.p1(error) }
+			// rt4 `addcrc`: a CRC-32 of the body, appended to it.
+			let crc = Crc32.checksum(body.written)
+			body.p4(crc)
+			p.p1(body.written.count)
+			p.pdata(body.written)
 		case .songEnd(let id):
 			op(ClientProt.soundSongend)
 			p.p4(Int32(truncatingIfNeeded: id))

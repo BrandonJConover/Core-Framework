@@ -99,6 +99,8 @@ public final class WorldView {
 	public internal(set) var objStacks: [Int: [GroundObj]] = [:]
 	/// Models of ground items (see `Items/GroundItems.swift`).
 	var groundModels: GroundItemModels?
+	/// rt4 `MiniMap.hintMapMarkers`: the four hint arrow slots (HINT_ARROW), drawn over their target and on the minimap.
+	public internal(set) var hintArrows = [ServerMessage.HintArrow?](repeating: nil, count: 4)
 	/// The moving click flag on the minimap (scene tile), set when a walk is sent (rt4 `LoginManager.mapFlagX/Z`).
 	public var destinationFlag: (x: Int, z: Int)?
 
@@ -145,11 +147,12 @@ public final class WorldView {
 			reset()
 			selfIndex = a.selfId
 			ctx.selfIndex = a.selfId
-		case .message(.rebuildNormal(let r)):
+		case .message(.rebuildNormal(let r)), .message(.rebuildRegion(let r)):
 			applyRebuild(r)
 		case .message(.spotAnimEntity(let delay, let height, let target, let gfx)):
 			applySpotAnimMessage(delay: delay, height: height, target: target, gfx: gfx)
 		case .message(let m):
+			if applyWorldPacket(m) { break }
 			if isBuilding { deferredZone.append(m) } else { applyZone(m) }
 		case .players(let result, let decoder):
 			env.varps = varps
@@ -189,6 +192,7 @@ public final class WorldView {
 		placer = nil
 		objStacks = [:]
 		destinationFlag = nil
+		hintArrows = [ServerMessage.HintArrow?](repeating: nil, count: 4)
 	}
 
 	/// rt4 `LoginManager` region change: the scene is rebuilt around the new zone, actors keep their
@@ -202,6 +206,7 @@ public final class WorldView {
 			camera.followZ -= dz * 128
 			camera.prevFollowX -= dx * 128
 			camera.prevFollowZ -= dz * 128
+			camera.shiftScripted(dx: dx, dz: dz)
 		}
 		rebuildStamp += 1
 		projectiles = []
@@ -329,7 +334,12 @@ public final class WorldView {
 		for (id, a) in ctx.players { a.cycle(isSelf: id == selfIndex) }
 		for a in ctx.npcs.values { a.cycle(isSelf: false) }
 		updateMotionEffects()
-		if let me = selfActor { camera.follow(playerXFine: me.xFine, playerZFine: me.zFine) }
+		if camera.scripted != nil {
+			camera.updateScripted(tileHeight: groundHeight)
+		} else if let me = selfActor {
+			camera.follow(playerXFine: me.xFine, playerZFine: me.zFine)
+		}
+		camera.tickShakes()
 		// rt4 clears the minimap flag once the player stands on it.
 		if let f = destinationFlag, let t = selfSceneTile, t.x == f.x, t.z == f.z { destinationFlag = nil }
 	}
@@ -424,30 +434,34 @@ public final class WorldView {
 			// rt4 defaults `Preferences.allLevelsVisible` to true: every level is built so roofs exist to be hidden.
 			s.allLevelsVisible = true
 			let baseX = (r.zoneX - 6) * 8, baseZ = (r.zoneZ - 6) * 8
-			var squares: [MapSquare] = []
-			var collisionSquares: [CollisionBuilder.Square] = []
-			var regionLocs: [[MapLoc]] = []
-			for (i, region) in r.regions.enumerated() {
-				let sq = try store.mapSquare(x: region.x, z: region.z)
-				if let sq = sq { squares.append(sq) }
-				let key = i < r.xteaKeys.count ? r.xteaKeys[i] : [0, 0, 0, 0]
-				let locs = (try? store.mapLocs(x: region.x, z: region.z, key: key)) ?? nil
-				regionLocs.append(locs ?? [])
-				if let sq = sq { collisionSquares.append(CollisionBuilder.Square(terrain: sq, locs: locs ?? [])) }
-			}
-			out.collision = (try? CollisionBuilder.build(baseX: baseX, baseZ: baseZ, squares: collisionSquares, locType: { try store.loc($0) }))
-				?? (0..<4).map { _ in CollisionMap(width: 104, length: 104) }
 			let placer = LocPlacer(scene: s, store: store, builder: builder, env: input.env)
 			var placed: [LocPlacement] = []
-			placer.onPlaced = { placed.append($0) }
 			var failures = 0
-			try s.loadMapSquares(squares, baseTileX: baseX, baseTileZ: baseZ, centralPlane: plane) { scene in
+			if let table = r.chunks {
+				failures = try buildDynamic(r, table: table, scene: s, placer: placer, placed: &placed, out: out, store: store)
+			} else {
+				var squares: [MapSquare] = []
+				var collisionSquares: [CollisionBuilder.Square] = []
+				var regionLocs: [[MapLoc]] = []
 				for (i, region) in r.regions.enumerated() {
-					let locs = regionLocs[i]
-					for loc in locs {
-						let tx = region.x * 64 + loc.x - baseX, tz = region.z * 64 + loc.z - baseZ
-						guard tx > 0 && tz > 0 && tx < 103 && tz < 103 else { continue }
-						do { try placer.addLoc(plane: loc.level, locIndex: loc.id, shape: loc.shape, x: tx, z: tz, orientation: loc.rotation) } catch { failures += 1 }
+					let sq = try store.mapSquare(x: region.x, z: region.z)
+					if let sq = sq { squares.append(sq) }
+					let key = i < r.xteaKeys.count ? r.xteaKeys[i] : [0, 0, 0, 0]
+					let locs = (try? store.mapLocs(x: region.x, z: region.z, key: key)) ?? nil
+					regionLocs.append(locs ?? [])
+					if let sq = sq { collisionSquares.append(CollisionBuilder.Square(terrain: sq, locs: locs ?? [])) }
+				}
+				out.collision = (try? CollisionBuilder.build(baseX: baseX, baseZ: baseZ, squares: collisionSquares, locType: { try store.loc($0) }))
+					?? (0..<4).map { _ in CollisionMap(width: 104, length: 104) }
+				placer.onPlaced = { placed.append($0) }
+				try s.loadMapSquares(squares, baseTileX: baseX, baseTileZ: baseZ, centralPlane: plane) { scene in
+					for (i, region) in r.regions.enumerated() {
+						let locs = regionLocs[i]
+						for loc in locs {
+							let tx = region.x * 64 + loc.x - baseX, tz = region.z * 64 + loc.z - baseZ
+							guard tx > 0 && tz > 0 && tx < 103 && tz < 103 else { continue }
+							do { try placer.addLoc(plane: loc.level, locIndex: loc.id, shape: loc.shape, x: tx, z: tz, orientation: loc.rotation) } catch { failures += 1 }
+						}
 					}
 				}
 			}

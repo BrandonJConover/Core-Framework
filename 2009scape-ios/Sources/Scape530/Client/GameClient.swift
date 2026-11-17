@@ -53,6 +53,9 @@ public final class GameClient {
 	/// Called once the server accepts the login (e.g. to save credentials).
 	public var onLoggedIn: (_ username: String, _ password: String) -> Void = { _, _ in }
 
+	/// Called when the server asks the client to open a web page (rt4 `URL_OPEN`).
+	public var onOpenURL: (String) -> Void = { _ in }
+
 	/// Why the last connection attempt failed ("Can't reach host:port (...)"), for the shell to show. Cleared on the next login.
 	public private(set) var connectError: String?
 	/// Non-zero while a dropped game connection is being re-established (rt4 reconnect login, opcode 18).
@@ -128,6 +131,7 @@ public final class GameClient {
 
 	/// Gives the interface model renderer (chat heads, player models) its view of the world.
 	private func bindModels() {
+		host.cameraOp = { [weak self] name, args in self?.world.cameraScript(name, args) }
 		ui.models.selfLook = { [weak self] in self?.world.selfActor?.appearance.map(PlayerLook.init) }
 		ui.models.playerLook = { [weak self] i in self?.world.ctx.players[i]?.appearance.map(PlayerLook.init) }
 		ui.models.resolveNpc = { [weak self] t in
@@ -574,6 +578,12 @@ public final class GameClient {
 		if case .decodeFailed(let op, _) = e { diagnostics.decodeFailures[op, default: 0] += 1 }
 		world.handle(e, varps: host.game.varps)
 		if case .message(let m) = e { interaction.handle(m); receiveChat(m); playAudio(m) }
+		switch e {
+		case .message(.urlOpen(let url)): onOpenURL(url)
+		// rt4 `ReflectionCheck`: this client runs no checks, so every entry answers "class not found" (-1).
+		case .message(.reflectionCheck(let id, let entries)): send(.reflectionReply(id: id, entries: entries, error: -1))
+		default: break
+		}
 		switch e {
 		case .loggedIn:
 			host.apply(e)

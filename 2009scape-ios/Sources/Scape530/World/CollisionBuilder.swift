@@ -56,6 +56,41 @@ public enum CollisionBuilder {
 		return maps
 	}
 
+	/// A loc placed into a dynamic region, in scene tiles on its destination level.
+	public struct PlacedLoc {
+		public var id: Int, level: Int, x: Int, z: Int, shape: Int, rotation: Int
+		public init(id: Int, level: Int, x: Int, z: Int, shape: Int, rotation: Int) {
+			self.id = id; self.level = level; self.x = x; self.z = z; self.shape = shape; self.rotation = rotation
+		}
+	}
+
+	/// The collision maps of a dynamic region: rt4 `SceneGraph.method4228` clears the "not loaded" bit on the tiles of
+	/// every copied chunk, `method1169` flags floor-blocked tiles from `render` ([level][x][z] tile render flags) and
+	/// `method3771` flags each loc as `addLoc` places it.
+	public static func build(render: [[[Int]]], loaded: [[[Bool]]], locs: [PlacedLoc], locType: (Int) throws -> LocType?) throws -> [CollisionMap] {
+		let maps = (0..<4).map { _ in CollisionMap(width: 104, length: 104) }
+		for level in 0..<4 {
+			for x in 0..<104 { for z in 0..<104 where loaded[level][x][z] { maps[level].markLoaded(x: x, z: z) } }
+		}
+		for level in 0..<4 {
+			for x in 0..<104 {
+				for z in 0..<104 where (render[level][x][z] & 0x1) == 1 {
+					var target = level
+					if (render[1][x][z] & 0x2) == 2 { target = level - 1 }
+					if target >= 0 { maps[target].flagTile(x: x, z: z) }
+				}
+			}
+		}
+		for loc in locs {
+			guard loc.x > 0, loc.z > 0, loc.x < 103, loc.z < 103 else { continue }
+			var marking = loc.level
+			if (render[1][loc.x][loc.z] & 0x2) == 2 { marking -= 1 }
+			guard marking >= 0, let type = try locType(loc.id) else { continue }
+			flagLoc(maps[marking], type: type, shape: loc.shape, rotation: loc.rotation, x: loc.x, z: loc.z)
+		}
+		return maps
+	}
+
 	/// Convenience: loads the squares covering the scene from the cache, using
 	/// `keys(regionX, regionZ)` for the loc XTEA keys (all-zero keys mean plain).
 	public static func build(store: ConfigStore, baseX: Int, baseZ: Int, keys: (Int, Int) -> [Int32]) throws -> [CollisionMap] {

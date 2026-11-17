@@ -174,6 +174,12 @@ public final class ComponentModels {
 		case 6:
 			guard c.modelId != -1, let t = try store.npc(c.modelId), let r = resolveNpc(t) else { return nil }
 			return try actors.npc(r, action: pose)
+		case 7:
+			// rt4 `PlayerAppearance.method1946`: three identity-kit heads in the local player's colours.
+			guard let me = selfLook() else { return nil }
+			let kits = [(c.modelId >> 16) & 0xFFFF, c.modelId & 0xFFFF, c.modelExtra]
+			let look = PlayerLook(female: me.female, slots: kits.map { Int(Int32.min) | $0 }, colours: me.colours, basId: -1)
+			return try animate(try playerHead(look))
 		default:
 			return nil
 		}

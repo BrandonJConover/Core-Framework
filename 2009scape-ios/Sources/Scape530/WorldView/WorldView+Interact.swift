@@ -81,6 +81,8 @@ extension WorldView {
 			applyZoneUpdate(u)
 		case .clearMinimapFlag:
 			destinationFlag = nil
+		case let .locAnimSpecific(level, x, z, shape, rotation, seq):
+			animateLoc(level: level, x: x - ctx.originX, z: z - ctx.originZ, shape: shape, rotation: rotation, seq: seq)
 		default:
 			break
 		}
@@ -94,6 +96,8 @@ extension WorldView {
 		switch u {
 		case .projectile, .spotAnim:
 			applyMotionUpdate(u)
+		case let .locAnim(x, z, shape, rotation, seq):
+			if let t = tile(x, z) { animateLoc(level: plane, x: t.x, z: t.z, shape: shape, rotation: rotation, seq: seq) }
 		case let .soundArea(x, z, id, radius, loops, delay):
 			if let t = tile(x, z) { onSoundArea?(id, t.x, t.z, radius, loops, delay) }
 		case let .locDel(x, z, shape, _):

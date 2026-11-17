@@ -51,6 +51,7 @@ extension WorldView {
 		let prayers = ((try? store.sprite(named: "headicons_prayer")) ?? nil)?.frames ?? []
 		let skulls = ((try? store.sprite(named: "headicons_pk")) ?? nil)?.frames ?? []
 		let loop = ctx.loop
+		let hintIcons = hintArrows.contains(where: { $0 != nil }) ? (((try? store.sprite(named: "hint_headicons")) ?? nil)?.frames ?? []) : []
 
 		// Clip to the viewport (rt4 sets the viewport clip before drawing overheads).
 		let savedClip = (r.clipLeft, r.clipTop, r.clipRight, r.clipBottom)
@@ -71,19 +72,28 @@ extension WorldView {
 			func at(_ h: Int) -> (x: Int, y: Int)? { project(cam, xFine: a.xFine, zFine: a.zFine, height: h, scene: scene) }
 
 			// Prayer and skull icons.
+			var iconOffset = 30
 			if let t = type {
 				if t.headIcon >= 0 && t.headIcon < prayers.count, let p = at((iconHeight ?? a.modelHeight) + 15) {
 					r.draw(prayers[t.headIcon], x: rect.x + p.x - 12, y: rect.y + p.y - 30)
 				}
+				// rt4: a hint arrow on this npc blinks above its head (10 of every 20 cycles).
+				if loop % 20 < 10, hintArrows.contains(where: { $0?.type == 1 && $0?.target == a.index }), let p = at((iconHeight ?? a.modelHeight) + 15) {
+					for h in hintArrows { if let h = h, h.type == 1, h.target == a.index, h.sprite < hintIcons.count { r.draw(hintIcons[h.sprite], x: rect.x + p.x - 12, y: rect.y + p.y - 28) } }
+				}
 			} else if let ap = a.appearance, ap.skullIcon != -1 || ap.prayerIcon != -1, let p = at(a.modelHeight + 15) {
-				var offset = 30
 				if ap.skullIcon >= 0 && ap.skullIcon < skulls.count {
-					r.draw(skulls[ap.skullIcon], x: rect.x + p.x - 12, y: rect.y + p.y - offset)
-					offset += 25
+					r.draw(skulls[ap.skullIcon], x: rect.x + p.x - 12, y: rect.y + p.y - iconOffset)
 				}
+				if ap.skullIcon != -1 { iconOffset += 25 }
 				if ap.prayerIcon >= 0 && ap.prayerIcon < prayers.count {
-					r.draw(prayers[ap.prayerIcon], x: rect.x + p.x - 12, y: rect.y + p.y - offset)
+					r.draw(prayers[ap.prayerIcon], x: rect.x + p.x - 12, y: rect.y + p.y - iconOffset)
 				}
+				if ap.prayerIcon != -1 { iconOffset += 25 }
+			}
+			// A hint arrow on a player sits above its prayer icons.
+			if type == nil, hintArrows.contains(where: { $0?.type == 10 && $0?.target == a.index }), let p = at(a.modelHeight + 15) {
+				for h in hintArrows { if let h = h, h.type == 10, h.target == a.index, h.sprite < hintIcons.count { r.draw(hintIcons[h.sprite], x: rect.x + p.x - 12, y: rect.y + p.y - iconOffset) } }
 			}
 
 			// Overhead chat is collected now and drawn after all bars and splats.
@@ -124,6 +134,18 @@ extension WorldView {
 		}
 
 		drawOverheadChat(lines, b12, rect: rect, into: &r)
+		drawTileHintArrows(hintIcons, cam: cam, scene: scene, rect: rect, into: &r)
+	}
+
+	/// rt4 `MiniMap.method4000`: hint arrows on a tile float above it, blinking like the others. Types 3...6 were turned
+	/// into type 2 with an offset to one edge of the tile when they were read.
+	func drawTileHintArrows(_ icons: [SpriteFrame], cam: OverlayCamera, scene: Scene, rect: (x: Int, y: Int, w: Int, h: Int), into r: inout Raster) {
+		for case let h? in hintArrows where h.type == 2 && h.sprite < icons.count {
+			let xFine = ((h.tileX - ctx.originX) << 7) + h.offsetX, zFine = ((h.tileZ - ctx.originZ) << 7) + h.offsetZ
+			if let p = project(cam, xFine: xFine, zFine: zFine, height: h.height * 2, scene: scene), ctx.loop % 20 < 10 {
+				r.draw(icons[h.sprite], x: rect.x + p.x - 12, y: rect.y + p.y - 28)
+			}
+		}
 	}
 
 	/// rt4 colour effects 6 to 11 for overhead chat (`anInt3325` is the cycle counter).
