@@ -125,6 +125,7 @@ struct TouchSettingsView: View {
 	@AppStorage(MobileSettings.tapToDropKey) private var tapToDrop = false
 	@AppStorage(MobileSettings.smoothScalingKey) private var smoothScaling = true
 	@AppStorage(MobileSettings.hapticsKey) private var haptics = true
+	@AppStorage(MobileSettings.smoothMotionKey) private var smoothMotion = true
 
 	var body: some View {
 		NavigationStack {
@@ -136,6 +137,7 @@ struct TouchSettingsView: View {
 				}
 				Section("Display") {
 					Toggle("Smooth scaling", isOn: $smoothScaling)
+					Toggle("Smooth motion (60/120 Hz)", isOn: $smoothMotion)
 				}
 				Section {
 					Text("Tap does the first action. Touch and hold for the full options. Drag the world to turn the camera; two fingers tilt; pinch zooms.")

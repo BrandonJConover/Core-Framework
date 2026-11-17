@@ -22,6 +22,8 @@ extension WorldView {
 	/// Returns nil when the world is not ready or the point is outside `rect`.
 	public func pick(x: Int, y: Int, rect: (x: Int, y: Int, w: Int, h: Int)) -> WorldPick? {
 		guard x >= rect.x, y >= rect.y, x < rect.x + rect.w, y < rect.y + rect.h else { return nil }
+		beginInterpolation()
+		defer { endInterpolation() }
 		guard renderScene(rect: rect, pick: (x, y)) != nil else { return nil }
 		let picker = ScenePicker.shared
 		var hits = picker.hits

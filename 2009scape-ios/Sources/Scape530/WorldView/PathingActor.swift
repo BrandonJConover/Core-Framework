@@ -44,7 +44,8 @@ final class PathingActor: SceneEntity {
 	let index: Int
 
 	// Appearance.
-	var look: PlayerLook?
+	var look: PlayerLook? { didSet { lookVersion &+= 1 } }
+	private var lookVersion = 0
 	var appearance: PlayerAppearance?
 	var npcType: NpcType?
 	/// rt4 `anInt3365`: the unresolved type's BAS, used when the resolved variant has none.
@@ -89,7 +90,7 @@ final class PathingActor: SceneEntity {
 
 	/// One layered animation (rt4 `PathingEntity_Class147`): plays on the model parts of its slot
 	/// on top of the action and movement animations.
-	struct LayerAnim {
+	struct LayerAnim: Equatable {
 		/// `anInt5396`
 		var seq: Int
 		/// `anInt5398`: the next frame for tweening, -1 for none.
@@ -129,6 +130,10 @@ final class PathingActor: SceneEntity {
 	var spotAnimStart = 0
 	var spotFrame = 0, spotNext = -1, spotStep = 0
 	var spotAnimY = 0
+
+	/// Position and facing at the start of the latest client cycle, for render-side interpolation.
+	var prevXFine = 0, prevZFine = 0, prevYaw = 0
+	@inline(__always) func snapshotForInterpolation() { prevXFine = xFine; prevZFine = zFine; prevYaw = yaw }
 
 	/// rt4 `PathingEntity.anInt3424`: ground height at the actor.
 	var groundY = 0
@@ -829,8 +834,32 @@ final class PathingActor: SceneEntity {
 
 	// MARK: rendering
 
+	/// Everything the posed model is a function of. The pose only changes on client cycles, so with 60/120 Hz
+	/// drawing most frames reuse the model built for the previous one (it is never mutated after building).
+	private struct ModelSignature: Equatable {
+		var lookVersion: Int, npcId: Int, bas: Int
+		var seqId: Int, seqDelay: Int, seqFrame: Int, seqNext: Int, seqStep: Int
+		var moveSeqId: Int, moveFrame: Int, moveNext: Int, moveStep: Int
+		var layers: [LayerAnim?]
+	}
+	/// Turn off to rebuild the pose on every draw (benchmark A/B).
+	nonisolated(unsafe) static var cacheModels = true
+	private var cachedModel: SoftwareModel?
+	private var cachedSignature: ModelSignature?
+
 	/// The posed model for this cycle (rt4 `Player.render` / `Npc.render` model building).
 	func buildModel() -> SoftwareModel? {
+		let sig = ModelSignature(lookVersion: lookVersion, npcId: npcType?.id ?? -1, bas: currentBasId,
+		                         seqId: seqId, seqDelay: seqDelay, seqFrame: seqFrame, seqNext: seqNext, seqStep: seqStep,
+		                         moveSeqId: moveSeqId, moveFrame: moveFrame, moveNext: moveNext, moveStep: moveStep, layers: layers)
+		if Self.cacheModels, let m = cachedModel, cachedSignature == sig { return m }
+		let m = buildModelUncached()
+		cachedModel = m
+		cachedSignature = m == nil ? nil : sig
+		return m
+	}
+
+	private func buildModelUncached() -> SoftwareModel? {
 		let store = ctx.store
 		let action: SeqType? = (seqId != -1 && seqDelay == 0) ? ((try? store.seq(seqId)) ?? nil) : nil
 		let b = currentBas

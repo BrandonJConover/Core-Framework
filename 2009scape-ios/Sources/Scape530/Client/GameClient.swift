@@ -223,6 +223,19 @@ public final class GameClient {
 	/// least 765x503; shells below that (phones) should pick a larger game size and scale the result down
 	/// (`App/Sources/GameView.swift` does: `scale = max(1, 503 / h, 765 / w)`) instead of asking for a smaller canvas.
 	public func frame(width: Int, height: Int) throws -> Raster {
+		try frame(width: width, height: height, at: Date())
+	}
+
+	/// Render-side smoothing of actor and camera motion between 50 Hz client cycles (see `WorldView+Interpolation`).
+	/// Off is rt4's faithful stepping; on suits 60/120 Hz displays.
+	public var smoothMotion: Bool {
+		get { world.smoothMotion }
+		set { world.smoothMotion = newValue }
+	}
+
+	/// `frame(width:height:)` with the display timestamp supplied by the shell (e.g. `CADisplayLink.targetTimestamp`
+	/// converted to a `Date`), so cycles and interpolation follow the time the frame will be shown.
+	public func frame(width: Int, height: Int, at now: Date) throws -> Raster {
 		lastSize = (width, height)
 		host.resize(width: width, height: height)
 		world.publicFilter = host.game.chatFilters.public
@@ -233,16 +246,16 @@ public final class GameClient {
 		}
 		// One client cycle is 20 ms; always run at least one so scripts and
 		// timers advance on every frame, and never more than a few after a stall.
-		let now = Date()
 		// (0 is allowed after the first frame so a 60/120 Hz shell redraws without running the game faster than rt4's 50 Hz.)
 		let cycles = lastCycleAt.map { min(max(Int(now.timeIntervalSince($0) / 0.02), 0), 5) } ?? 1
 		lastCycleAt = lastCycleAt.map { $0.addingTimeInterval(Double(cycles) * 0.02) } ?? now
+		world.renderAlpha = lastCycleAt.map { min(max(now.timeIntervalSince($0) / 0.02, 0), 1) } ?? 1
 		for _ in 0..<cycles {
 			host.cycle()
 			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI() }
 		}
 		if inGame { updateAudio() }
-		var r = Raster(width: width, height: height)
+		var r = takeFrameBuffer(width: width, height: height)
 		let top = host.game.interfaces.top
 		let showInterface = top != -1 && !(inGame && top == loginInterface)
 		// The world is drawn first, inside the viewport component found while laying out the interface
@@ -254,13 +267,25 @@ public final class GameClient {
 			let changed = found.map { f in viewport.map { $0 != f } ?? true } ?? false
 			if let f = found { viewport = f }
 			if !(changed && drawnViewport) || pass == 1 { break }
-			r = Raster(width: width, height: height)
+			r.clear()
 		}
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
 		if inGame { try drawInteraction(into: &r); try drawTargetHint(into: &r) }
 		if inGame, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
 			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 32, color: 0xFFFF00, shadow: 0, into: &r)
 		}
+		frameBuffer = r
+		return r
+	}
+
+	/// The last frame's pixels: reused for the next frame once the shell has let go of the returned raster
+	/// (copy-on-write makes it a fresh buffer otherwise), so a 60/120 Hz shell does not allocate megabytes per frame.
+	private var frameBuffer: Raster?
+
+	private func takeFrameBuffer(width: Int, height: Int) -> Raster {
+		guard var r = frameBuffer, r.width == width, r.height == height else { return Raster(width: width, height: height) }
+		frameBuffer = nil
+		r.clear()
 		return r
 	}
 

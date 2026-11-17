@@ -398,7 +398,9 @@ extension Scene {
 
 	@inline(__always)
 	func renderEntity(_ e: SceneEntity?, _ r: Rasteriser3D, yaw: Int, x: Int, y: Int, z: Int, key: Int64) {
+		let t0 = PerfStats.now()
 		e?.render(r, yaw: yaw, sinPitch: sinPitch, cosPitch: cosPitch, sinYaw: sinYaw, cosYaw: cosYaw, x: x, y: y, z: z, key: key)
+		PerfStats.add(.models, since: t0)
 	}
 
 	/// rt4 `SceneGraph.method4245`: paints `start` and everything that has to come after it, taking tiles
@@ -651,6 +653,8 @@ extension Scene {
 
 	/// rt4 `SceneGraph.method2610`: draws a PlainTile as two triangles.
 	func drawPlainTile(_ r: Rasteriser3D, _ tile: PlainTile, level: Int, x: Int, z: Int, drawPixels: Bool = true) {
+		let t0 = PerfStats.now()
+		defer { PerfStats.add(.ground, since: t0) }
 		let cxs = Int(r.centerX), cys = Int(r.centerY), w = Int(r.width)
 		let h = tileHeights[level]
 		let x0 = (x << 7) - cameraX, z0 = (z << 7) - cameraZ
@@ -711,6 +715,8 @@ extension Scene {
 
 	/// rt4 `SceneGraph.method2762`: draws a ShapedTile's triangles.
 	func drawShapedTile(_ r: Rasteriser3D, _ tile: ShapedTile, x tileX: Int, z tileZ: Int, drawPixels: Bool = true) {
+		let t0 = PerfStats.now()
+		defer { PerfStats.add(.ground, since: t0) }
 		let cxs = Int(r.centerX), cys = Int(r.centerY), w = Int(r.width)
 		let n = tile.vertexX.count
 		var sx = [Int](repeating: 0, count: n), sy = sx, vx = sx, vy = sx, vz = sx

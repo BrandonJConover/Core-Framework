@@ -14,16 +14,28 @@ public struct SpriteFrame {
 	public let alpha: [UInt8]?
 	public let palette: [UInt32]
 
-	/// 0xAARRGGBB pixels of the trimmed block, ready to blend.
-	public var argb: [UInt32] {
+	/// 0xAARRGGBB pixels of the trimmed block, ready to blend. Computed once when the frame is decoded:
+	/// the blitters read it for every draw.
+	public let argb: [UInt32]
+
+	public init(width: Int, height: Int, xOffset: Int, yOffset: Int, innerWidth: Int, innerHeight: Int,
+	            indices: [UInt8], alpha: [UInt8]?, palette: [UInt32]) {
+		self.width = width; self.height = height
+		self.xOffset = xOffset; self.yOffset = yOffset
+		self.innerWidth = innerWidth; self.innerHeight = innerHeight
+		self.indices = indices; self.alpha = alpha; self.palette = palette
 		var out = [UInt32](repeating: 0, count: indices.count)
-		for i in 0..<indices.count {
-			let idx = Int(indices[i])
-			guard idx != 0 else { continue }
-			let a = UInt32(alpha?[i] ?? 255)
-			out[i] = a << 24 | (palette[idx] & 0xFFFFFF)
+		out.withUnsafeMutableBufferPointer { o in
+			palette.withUnsafeBufferPointer { pal in
+				for i in 0..<indices.count {
+					let idx = Int(indices[i])
+					guard idx != 0 else { continue }
+					let a = alpha.map { UInt32($0[i]) } ?? 255
+					o[i] = a << 24 | (pal[idx] & 0xFFFFFF)
+				}
+			}
 		}
-		return out
+		argb = out
 	}
 }
 

@@ -86,6 +86,9 @@ public struct InterfaceState {
 public final class InterfaceRenderer {
 	let store: ConfigStore
 	var groups: [Int: [Component?]] = [:]
+	/// Per interface: layer id (or -1 for the roots) -> indices of its static children in `groups`, so a frame does not
+	/// scan every component of the interface for each layer.
+	var childIndex: [Int: [Int: [Int]]] = [:]
 	/// Every component drawn in the last `render`, in draw order, with its
 	/// screen rectangle (clipped to its parents). Used for touch hit tests.
 	public private(set) var drawn: [(component: Component, x: Int, y: Int, w: Int, h: Int)] = []
@@ -112,6 +115,9 @@ public final class InterfaceRenderer {
 			out[f] = try Component(id: interface << 16 | f, data: data)
 		}
 		groups[interface] = out
+		var children: [Int: [Int]] = [:]
+		for i in out.indices { if let p = out[i]?.parent { children[p, default: []].append(i) } }
+		childIndex[interface] = children
 		return out
 	}
 
@@ -141,14 +147,21 @@ public final class InterfaceRenderer {
 
 	func renderInterface(_ interface: Int, x: Int, y: Int, w: Int, h: Int, state: InterfaceState, into r: inout Raster) throws {
 		let comps = try components(interface)
-		try renderLayer(comps, parent: -1, ox: x, oy: y, pw: w, ph: h, state: state, into: &r)
+		try renderLayer(comps, interface: interface, parent: -1, ox: x, oy: y, pw: w, ph: h, state: state, into: &r)
 	}
 
-	func renderLayer(_ comps: [Component?], parent: Int, ox: Int, oy: Int, pw: Int, ph: Int, state: InterfaceState, into r: inout Raster) throws {
+	func renderLayer(_ comps: [Component?], interface: Int, parent: Int, ox: Int, oy: Int, pw: Int, ph: Int, state: InterfaceState, into r: inout Raster) throws {
 		let clip = (r.clipLeft, r.clipTop, r.clipRight, r.clipBottom)
 		defer { r.setClip(clip.0, clip.1, clip.2, clip.3) }
 		var children: [Component] = []
-		for case let base? in comps where base.parent == parent { children.append(state.overrides[base.id] ?? base) }
+		if let indices = childIndex[interface]?[parent] {
+			children.reserveCapacity(indices.count)
+			if state.overrides.isEmpty {
+				for i in indices { children.append(comps[i]!) }
+			} else {
+				for i in indices { let base = comps[i]!; children.append(state.overrides[base.id] ?? base) }
+			}
+		}
 		if parent != -1, let made = state.dynamic[parent] {
 			for index in made.keys.sorted() { children.append(made[index]!) }
 		}
@@ -173,7 +186,7 @@ public final class InterfaceRenderer {
 			try draw(c, x: x, y: y, w: w, h: h, state: state, into: &r)
 			if c.type == 0 {
 				let sy = (isStatic ? state.scroll[c.id] : nil) ?? c.scrollY
-				try renderLayer(comps, parent: c.id, ox: x - c.scrollX, oy: y - sy, pw: w, ph: h, state: state, into: &r)
+				try renderLayer(comps, interface: interface, parent: c.id, ox: x - c.scrollX, oy: y - sy, pw: w, ph: h, state: state, into: &r)
 				if isStatic, let sub = state.open[c.id] {
 					try renderInterface(sub, x: x, y: y, w: w, h: h, state: state, into: &r)
 				}

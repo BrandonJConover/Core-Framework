@@ -172,12 +172,14 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		link?.isPaused = UIApplication.shared.applicationState != .active
 	}
 
-	/// ProMotion devices may run up to 120 Hz, but the client only advances at rt4's 50 Hz cycle (extra frames
-	/// just redraw), so 60 is the working rate; low power mode and thermal pressure drop to 30.
+	/// ProMotion devices may run up to 120 Hz. The client advances at rt4's 50 Hz cycle; with "Smooth motion" on,
+	/// actors and the camera are drawn between cycles (`GameClient.smoothMotion`), so the display link asks for
+	/// 120 Hz; with it off extra frames only redraw and 60 is the working rate. Low power mode and thermal
+	/// pressure drop to 30.
 	@objc private func updateFrameRate() {
 		let info = ProcessInfo.processInfo
 		let throttled = info.isLowPowerModeEnabled || info.thermalState == .serious || info.thermalState == .critical
-		link?.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: throttled ? 30 : 120, preferred: throttled ? 30 : 60)
+		link?.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: throttled ? 30 : 120, preferred: throttled ? 30 : (MobileSettings.smoothMotion ? 120 : 60))
 	}
 
 	/// rt4's resizable mode needs at least 765x503; below that we draw at 503 game pixels high and let the
@@ -195,7 +197,7 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		guard w > 0 else { return }
 		gameSize = (w, h)
 		syncSettings()
-		loop.requestFrame(width: w, height: h, smooth: MobileSettings.smoothScaling)
+		loop.requestFrame(width: w, height: h, smooth: MobileSettings.smoothScaling, smoothMotion: MobileSettings.smoothMotion)
 	}
 
 	private func syncSettings() {
