@@ -65,8 +65,6 @@ public final class InterfaceScriptHost: ScriptHost {
 	var varcLog = TransmitLog(), varcstrLog = TransmitLog()
 	var readers: [ComponentRef: Readers] = [:]
 	var openTypes: [Int: Int] = [:]
-	/// IF_SETEVENTS masks for child ranges of a component: id -> [(start, end, mask)].
-	var slotEvents: [Int: [(start: Int, end: Int, mask: Int32)]] = [:]
 	var keyQueue: [(code: Int, char: Int)] = []
 	/// rt4 `Chat.transmitAt` and friends: the transmit timer value of the last change.
 	var chatAt = 0, friendAt = 0, clanAt = 0, miscAt = 0
@@ -177,10 +175,15 @@ public final class InterfaceScriptHost: ScriptHost {
 		case .ifSetPosition(let c, let x, let y): mutate(ComponentRef(id: Int(c))) { $0.baseX = x; $0.baseY = y }
 		case .ifSetScrollPos(let c, let pos): mutate(ComponentRef(id: Int(c))) { $0.scrollY = max(pos, 0) }
 		case let .ifSetEvents(c, start, end, mask):
-			if start == -1 && end == -1 {
-				mutate(ComponentRef(id: Int(c))) { $0.events = Int(mask) }
-			} else {
-				slotEvents[Int(c), default: []].append((start, end, mask))
+			// rt4 SET_INTERFACE_SETTINGS: one entry per index in start...end; index -1 is the component itself.
+			if start <= end {
+				for i in start...min(end, start + 4096) {
+					if i == -1 {
+						mutate(ComponentRef(id: Int(c))) { $0.events = Int(mask) }
+					} else {
+						game.interfaces.childEvents[Int(c), default: [:]][i] = mask
+					}
+				}
 			}
 		case let .ifSetObject(c, obj, count): mutate(ComponentRef(id: Int(c))) { $0.objId = obj; $0.objCount = Int(count) }
 		case let .ifSetModel(c, model): mutate(ComponentRef(id: Int(c))) { $0.modelType = 1; $0.modelId = model }
@@ -239,7 +242,9 @@ public final class InterfaceScriptHost: ScriptHost {
 	/// The component as scripts currently see it (rt4 `InterfaceList.getComponent`/`method1418`).
 	public func component(_ ref: ComponentRef) -> Component? {
 		if ref.child == -1 { return game.interfaces.overrides[ref.id] ?? base(ref.id) }
-		return game.interfaces.dynamic[ref.id]?[ref.child]
+		guard var c = game.interfaces.dynamic[ref.id]?[ref.child] else { return nil }
+		if let m = game.interfaces.childEvents[ref.id]?[ref.child] { c.events = Int(m) }
+		return c
 	}
 
 	func mutate(_ ref: ComponentRef, _ f: (inout Component) -> Void) {

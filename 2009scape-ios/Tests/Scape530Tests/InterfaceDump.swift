@@ -27,3 +27,29 @@ extension InterfaceDump {
 		}
 	}
 }
+
+extension InterfaceDump {
+	/// DUMP_SCRIPT=108,109 prints each script's opcodes and operands.
+	func testDumpScripts() throws {
+		guard let ids = ProcessInfo.processInfo.environment["DUMP_SCRIPT"], let dir = ProcessInfo.processInfo.environment["SCAPE530_CACHE"] else { return }
+		let s = ConfigStore(disk: try DiskCache(directory: URL(fileURLWithPath: dir)))
+		for id in ids.split(separator: ",").compactMap({ Int($0) }) {
+			guard let sc = try s.script(id) else { print("SCRIPT \(id) missing"); continue }
+			print("SCRIPT \(id) name=\(sc.name ?? "-") ints=\(sc.intArgs) strs=\(sc.stringArgs) locals=\(sc.intLocals)/\(sc.stringLocals)")
+			for i in 0..<sc.opcodes.count { print("  \(i): \(sc.opcodes[i]) \(sc.stringOperands[i].map { "\"\($0)\"" } ?? "\(sc.intOperands[i])")") }
+		}
+	}
+}
+
+extension InterfaceDump {
+	/// DUMP_FIND=3104,3105 lists the scripts that use those opcodes.
+	func testFindOpcodes() throws {
+		guard let ops = ProcessInfo.processInfo.environment["DUMP_FIND"], let dir = ProcessInfo.processInfo.environment["SCAPE530_CACHE"] else { return }
+		let s = ConfigStore(disk: try DiskCache(directory: URL(fileURLWithPath: dir)))
+		let want = Set(ops.split(separator: ",").compactMap { Int($0) })
+		for id in 0..<20000 {
+			guard let sc = try? s.script(id) else { continue }
+			for (i, op) in sc.opcodes.enumerated() where want.contains(op) { print("FIND script \(id) pc \(i) op \(op)") }
+		}
+	}
+}

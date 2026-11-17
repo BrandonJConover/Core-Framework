@@ -91,6 +91,7 @@ extension GameClient {
 	public func longPress(x: Int, y: Int) -> Bool {
 		if interaction.popup != nil { interaction.popup = nil }
 		if screen == .game, openInventoryMenu(x: x, y: y) { return true }
+		if screen == .game, let menu = componentMenu(x: x, y: y) { openMenu(menu, atX: x, y: y); return true }
 		guard screen == .game, isOverWorld(x: x, y: y), let (menu, _) = buildMenu(x: x, y: y) else { return false }
 		openMenu(menu, atX: x, y: y)
 		return true
@@ -221,6 +222,10 @@ extension GameClient {
 		case Menu.Action.objExamine:
 			setCross(2, clickX, clickY)
 			sendOp(.examineObj(id: key))
+
+		case Menu.Action.componentOp, Menu.Action.componentOpHigh, Menu.Action.componentContinue:
+			doComponentAction(e)
+			return
 
 		default:
 			doTargetAction(menu, index, action: action, clickX: clickX, clickY: clickY)
