@@ -180,7 +180,6 @@ extension InterfaceScriptHost {
 		case "displayModeCount": return r(1)
 		case "displayModeSize": return HostResult(ints: [Int32(canvas.w), Int32(canvas.h)])
 		case "currentDisplayModeIndex": return r(0)
-		case "favouriteWorlds": return r(0)
 		case "viewportSize": return HostResult(ints: [Int32(canvas.w), Int32(canvas.h)])
 		case "viewportMax6204", "viewportMax6205": return HostResult(ints: [Int32(canvas.w), Int32(canvas.h)])
 
@@ -191,24 +190,41 @@ extension InterfaceScriptHost {
 
 		// MARK: login (rt4 `LoginManager`)
 		case "directLogin":
-			if loginReply != -3 { onDirectLogin(s.first ?? "", s.count > 1 ? s[1] : "") }
-		case "resetLoginReply": if loginReply != -3 { loginReply = -2 }
+			if loginReply != -3 {
+				loginWorldSelector = i(0)
+				onDirectLogin(s.first ?? "", s.count > 1 ? s[1] : "")
+			}
+		case "resetLoginReply": if loginReply != -3, loginReply != 1 { loginReply = -2 }
 		case "loginReply": return HostResult(ints: [loginReply])
 		case "loginDetailedReply": return HostResult(ints: [loginDisallowResult])
-		case "worldSwitchTimer": return r(0)
+		case "worldSwitchTimer": return r(Int(worldSwitchTimer))
 		case "lastLoginAddress": return HostResult(strings: [""])
 		case "isUsingWebsiteLogin": return r(0)
+		// rt4 `ScriptRunner` 5601 `LoginManager.method3395`: release a login held at reply 1 (the video-advert wait).
+		case "skipLoginStage10": onSkipLoginStage()
 
-		// MARK: world list: just the world we are connecting to
-		case "worldListFetch": return r(1)
-		case "worldFirst": return HostResult(ints: [worldId, 0, 0, 0], strings: ["-", "2009scape"])
-		case "worldNext": return HostResult(ints: [-1, 0, 0, 0], strings: ["", ""])
+		// MARK: world list (rt4 `WorldList`, CS2 6500-6507; see `Net/WorldList.swift`)
+		// Only on the login screen (rt4 requires `gameState == 10` and no login or list request in progress).
+		case "worldListFetch":
+			guard loginReply != -3 else { return r(1) }
+			return r(worldList.fetch() == -1 ? 0 : 1)
+		case "worldFirst": return worldRow(worldList.firstWorld())
+		case "worldNext": return worldRow(worldList.nextWorld())
 		case "worldInfo":
-			guard Int32(i(0)) == worldId else { return HostResult(ints: [-1, 0, 0], strings: ["", ""]) }
-			return HostResult(ints: [0, 0, 0], strings: ["-", "2009scape"])
-		case "worldHop": return r(0)
-		case "lastWorld": return HostResult(ints: [worldId])
-		case "setLastWorld": break
+			// 6506 leaves out the id the walk ops lead with; an unknown world reads flags -1.
+			guard let w = worldList.world(i(0)) ?? pendingWorld(i(0)) else { return HostResult(ints: [-1, 0, 0], strings: ["", ""]) }
+			return HostResult(ints: Array(worldRow(w).ints.dropFirst()), strings: worldRow(w).strings)
+		case "worldHop":
+			guard loginReply != -3, let w = worldList.world(i(0)) ?? pendingWorld(i(0)) else { return r(0) }
+			return r(onWorldHop(w) ? 1 : 0)
+		case "lastWorld": return r(prefs.lastWorldId)
+		case "setLastWorld": prefs.lastWorldId = i(0)
+		case "worldSort":
+			worldList.sort(primaryKey: i(0), primaryReverse: i(1) == 1, secondaryKey: i(2), secondaryReverse: i(3) == 1)
+		case "setFavouriteWorlds": prefs.favouriteWorlds = (0...2).contains(i(0)) ? i(0) : 0
+		case "favouriteWorlds": return r(prefs.favouriteWorlds)
+		case "setPref6600": prefs.pref6600 = i(0) == 1
+		case "pref6601": return b(prefs.pref6600)
 
 		case "cameraMoveTo", "cameraPointAt", "cameraUnlock", "cameraSetAngles", "cameraPitch", "cameraYaw":
 			if let v = cameraOp(op.name, a.map(Int.init)), op.name == "cameraPitch" || op.name == "cameraYaw" { return r(v) }
@@ -221,6 +237,21 @@ extension InterfaceScriptHost {
 	/// rt4 `StockMarketManager.offers[slot]`; an out-of-range slot reads as an empty offer.
 	func stockOffer(_ slot: Int) -> ServerMessage.StockOffer {
 		slot >= 0 && slot < game.stockOffers.count ? game.stockOffers[slot] : GameState.emptyOffer
+	}
+
+	/// Until the list has arrived the world we are on stands in for itself. rt4 never asks earlier (it loads the list
+	/// before the login screen opens); the login script reads this world's flags to see whether it is a PvP world.
+	func pendingWorld(_ id: Int) -> WorldEntry? {
+		guard !worldList.loaded, id == Int(worldId) else { return nil }
+		return WorldEntry(id: id, country: 0, flags: 0, activity: "-", hostname: "")
+	}
+
+	/// The values rt4 pushes for `getFirstWorldData` / `getNextWorldData` / 6506: id, flags, country flag, players
+	/// and the activity and country name strings; -1 for the id (and zeros) when there is no such world.
+	func worldRow(_ w: WorldEntry?) -> HostResult {
+		guard let w else { return HostResult(ints: [-1, 0, 0, 0], strings: ["", ""]) }
+		let c = worldList.country(of: w)
+		return HostResult(ints: [Int32(w.id), w.flags, Int32(c.flag), Int32(w.players)], strings: [w.activity, c.name])
 	}
 
 	/// rt4 `InvTypeList.get(id).size` (opcode `getItemContainerLength`): the configured slot count.

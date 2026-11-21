@@ -106,6 +106,15 @@ public enum ClientMessage {
 	/// IF_DRAG (opcode 79): a draggable if3 component released over another one.
 	case ifDrag(component: Int, child: Int, targetComponent: Int, targetChild: Int)
 
+	/// TRANSMITVAR_VERIFYID (177): rt4 `Protocol.transmitVerifyId`, the sequence number of the last tracked packet plus one.
+	case verifyId(Int)
+	/// EVENT_APPLET_FOCUS (22): the window gained (true) or lost (false) focus.
+	case appletFocus(Bool)
+	/// EVENT_CAMERA_POSITION (21): `Camera.pitchTarget` / `yawTarget` after the player turned the view.
+	case cameraPosition(pitch: Int, yaw: Int)
+	/// WINDOW_STATUS (243): rt4 `ClientProt.sendWindowDetails`; `mode` 1 fixed, 2 resizable, 3 fullscreen.
+	case windowStatus(mode: Int, width: Int, height: Int, antiAliasing: Int)
+
 	/// rt4 `ClientProt.method4512`: the opcode for IF_BUTTON1...10.
 	static let ifButtonOpcodes = [155, 196, 124, 199, 234, 168, 166, 64, 53, 9]
 
@@ -115,6 +124,22 @@ public enum ClientMessage {
 		switch self {
 		case .keepAlive:
 			op(ClientProt.noTimeout)
+		case .verifyId(let id):
+			op(ClientProt.transmitvarVerifyid)
+			p.p2(id)
+		case .appletFocus(let focused):
+			op(ClientProt.eventAppletFocus)
+			p.p1(focused ? 1 : 0)
+		case let .cameraPosition(pitch, yaw):
+			op(ClientProt.eventCameraPosition)
+			p.p2add(pitch)
+			p.ip2(yaw)
+		case let .windowStatus(mode, width, height, aa):
+			op(ClientProt.windowStatus)
+			p.p1(mode)
+			p.p2(width)
+			p.p2(height)
+			p.p1(aa)
 		case .command(let c):
 			op(ClientProt.clientCheat)
 			p.p1(Cp1252.encode(c).count + 1)

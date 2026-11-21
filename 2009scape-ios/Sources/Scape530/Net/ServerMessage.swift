@@ -195,11 +195,17 @@ public enum ServerMessage: Equatable {
 	}
 
 	public static func decode(_ packet: GamePacket) throws -> ServerMessage {
+		try decodeTracked(packet).message
+	}
+
+	/// `decode` plus the packet's "tracknum": the 16-bit sequence number rt4 `Protocol` reads in every interface /
+	/// CS2 / camera packet and feeds to `setVerifyId` (nil for packets that carry none).
+	public static func decodeTracked(_ packet: GamePacket) throws -> (message: ServerMessage, track: Int?) {
 		var p = Packet(packet.payload)
 		let msg: ServerMessage
 		do {
 			guard let m = try decodeBody(packet.opcode, &p) else {
-				return .unhandled(opcode: packet.opcode, payload: packet.payload)
+				return (.unhandled(opcode: packet.opcode, payload: packet.payload), nil)
 			}
 			msg = m
 		} catch let e as PacketUnderflow {
@@ -208,7 +214,7 @@ public enum ServerMessage: Equatable {
 		guard p.offset == packet.payload.count else {
 			throw DecodeError(opcode: packet.opcode, detail: "consumed \(p.offset) of \(packet.payload.count) bytes")
 		}
-		return msg
+		return (msg, p.track)
 	}
 
 	static func nullable(_ v: Int) -> Int { v == 65535 ? -1 : v }
@@ -265,12 +271,12 @@ public enum ServerMessage: Equatable {
 			let id = try p.ig2add()
 			return .varbit(id: id, value: v)
 		case ServerProt.clientSetvarcSmall:
-			_ = try p.ig2() // tracknum
+			p.track = try p.ig2()
 			let v = try p.g1neg()
 			let id = try p.ig2add()
 			return .varc(id: id, value: Int32(v))
 		case ServerProt.clientSetvarcLarge:
-			_ = try p.ig2add()
+			p.track = try p.ig2add()
 			let v = try p.g4()
 			let id = try p.g2add()
 			return .varc(id: id, value: v)
@@ -386,20 +392,20 @@ public enum ServerMessage: Equatable {
 		case ServerProt.ifOpentop:
 			let type = try p.g1()
 			let parent = try p.mg4()
-			_ = try p.g2add() // tracknum
+			p.track = try p.g2add()
 			let component = try p.g2()
 			return .ifOpenSub(parent: parent, component: component, type: type)
 		case ServerProt.ifOpensub:
 			let id = try p.ig2add()
 			let reset = try p.g1add()
-			_ = try p.ig2add() // tracknum
+			p.track = try p.ig2add()
 			return .ifOpenTop(id: id, reset: reset)
 		case ServerProt.ifClosesub:
-			_ = try p.g2()
+			p.track = try p.g2()
 			return .ifCloseSub(parent: try p.g4())
 		case ServerProt.switchWidget:
 			let source = try p.img4()
-			_ = try p.g2add() // tracknum
+			p.track = try p.g2add()
 			return .switchWidget(source: source, target: try p.img4())
 		case ServerProt.gameFrameUnk:
 			return .dialogAbort
@@ -407,61 +413,61 @@ public enum ServerMessage: Equatable {
 			return .deleteInventory(inv: try p.ig2())
 		case ServerProt.ifSethide:
 			let hidden = try p.g1neg()
-			_ = try p.g2()
+			p.track = try p.g2()
 			let id = try p.ig4()
 			return .ifSetHide(component: id, hidden: hidden == 1)
 		case ServerProt.ifSettext1:
 			let id = try p.mg4()
 			let text = try p.gjstr()
-			_ = try p.g2add()
+			p.track = try p.g2add()
 			return .ifSetText(component: id, text: text)
 		case ServerProt.ifSettext2:
-			_ = try p.g2()
+			p.track = try p.g2()
 			let text = try p.gjstr()
 			let id = try p.ig2add()
 			return .ifSetText(component: Int32(id), text: text)
 		case ServerProt.ifSettext3:
 			let id = try p.ig2()
-			_ = try p.g2add()
+			p.track = try p.g2add()
 			let text = try p.gjstr()
 			return .ifSetText(component: Int32(id), text: text)
 		case ServerProt.ifSetanim:
 			let id = try p.mg4()
 			let seq = try p.ig2b()
-			_ = try p.g2add()
+			p.track = try p.g2add()
 			return .ifSetAnim(component: id, seq: seq)
 		case ServerProt.ifSetmodel:
 			let id = try p.ig4()
-			_ = try p.ig2add()
+			p.track = try p.ig2add()
 			let model = try p.g2add()
 			return .ifSetModel(component: id, model: nullable(model))
 		case ServerProt.ifSetnpchead:
 			let npc = nullable(try p.g2add())
 			let id = try p.ig4()
-			_ = try p.ig2()
+			p.track = try p.ig2()
 			return .ifSetNpcHead(component: id, npc: npc)
 		case ServerProt.ifSetplayerhead:
-			_ = try p.ig2add()
+			p.track = try p.ig2add()
 			return .ifSetPlayerHead(component: try p.img4())
 		case ServerProt.ifSetobject:
 			let zoom = try p.g4()
 			let id = try p.mg4()
 			let obj = nullable(try p.ig2add())
-			_ = try p.ig2()
+			p.track = try p.ig2()
 			return .ifSetObject(component: id, obj: obj, zoomOrCount: zoom)
 		case ServerProt.ifSetcolour:
 			let id = try p.img4()
-			_ = try p.g2add()
+			p.track = try p.g2add()
 			return .ifSetColour(component: id, colour: try p.ig2add())
 		case ServerProt.ifSetposition:
-			_ = try p.g2add()
+			p.track = try p.g2add()
 			let id = try p.ig4()
 			let x = try p.g2b()
 			let y = try p.g2badd()
 			return .ifSetPosition(component: id, x: x, y: y)
 		case ServerProt.ifSetangle:
 			let pitch = try p.g2()
-			_ = try p.g2add()
+			p.track = try p.g2add()
 			let scale = try p.ig2add()
 			let yaw = try p.ig2add()
 			let id = try p.g4()
@@ -469,17 +475,17 @@ public enum ServerMessage: Equatable {
 		case ServerProt.ifSetscrollpos:
 			let id = try p.mg4()
 			let pos = try p.ig2()
-			_ = try p.g2()
+			p.track = try p.g2()
 			return .ifSetScrollPos(component: id, pos: pos)
 		case ServerProt.setInterfaceSettings:
-			_ = try p.ig2()
+			p.track = try p.ig2()
 			let end = nullable(try p.ig2())
 			let id = try p.g4()
 			let start = nullable(try p.g2add())
 			let mask = try p.img4()
 			return .ifSetEvents(component: id, start: start, end: end, mask: mask)
 		case ServerProt.runCs2:
-			_ = try p.g2()
+			p.track = try p.g2()
 			let types = Array(try p.gjstr())
 			var args = [ScriptArg](repeating: .int(0), count: types.count)
 			for i in stride(from: types.count - 1, through: 0, by: -1) {
@@ -536,12 +542,12 @@ public enum ServerMessage: Equatable {
 		case ServerProt.widgetstructSetting:
 			let value = try p.ig2add()
 			let parent = try p.ig4()
-			_ = try p.g2add()
+			p.track = try p.g2add()
 			let end = nullable(try p.ig2())
 			let start = nullable(try p.g2add())
 			return .widgetStructSetting(component: parent, start: start, end: end, param: value)
 		case ServerProt.generateChatHeadFromBody:
-			_ = try p.g2add()
+			p.track = try p.g2add()
 			let id = try p.mg4()
 			let v1 = try p.ig2add()
 			let v2 = try p.ig2()
@@ -549,7 +555,7 @@ public enum ServerMessage: Equatable {
 			return .chatHeadFromBody(component: id, kit1: v2, kit2: v3, kit3: v1)
 		case ServerProt.interfaceAnimateRotate:
 			let id = try p.mg4()
-			_ = try p.g2add()
+			p.track = try p.g2add()
 			let pitchStep = try p.g2()
 			let yawStep = try p.g2add()
 			return .modelRotation(component: id, pitchStep: pitchStep, yawStep: yawStep)
@@ -583,30 +589,30 @@ public enum ServerMessage: Equatable {
 			return .resetAnims
 
 		case ServerProt.cameraDetach:
-			_ = try p.g2()
+			p.track = try p.g2()
 			let x = try p.g1(), z = try p.g1()
 			let height = try p.g2()
 			let speed = try p.g1(), rotationSpeed = try p.g1()
 			return .camMoveTo(x: x, z: z, height: height, speed: speed, rotationSpeed: rotationSpeed)
 		case ServerProt.camLookat:
-			_ = try p.g2()
+			p.track = try p.g2()
 			let x = try p.g1(), z = try p.g1()
 			let height = try p.g2()
 			let speed = try p.g1(), rotationSpeed = try p.g1()
 			return .camLookAt(x: x, z: z, height: height, speed: speed, rotationSpeed: rotationSpeed)
 		case ServerProt.camForceangle:
 			let yaw = try p.ig2()
-			_ = try p.g2()
+			p.track = try p.g2()
 			let pitch = try p.g2()
 			return .camForceAngle(yaw: yaw, pitch: pitch)
 		case ServerProt.camShake:
-			_ = try p.g2()
+			p.track = try p.g2()
 			let axis = try p.g1()
 			let jitter = try p.g1(), amplitude = try p.g1(), frequency = try p.g1()
 			let phase = try p.g2()
 			return .camShake(axis: axis, jitter: jitter, amplitude: amplitude, frequency: frequency, phase: phase)
 		case ServerProt.camReset:
-			_ = try p.g2()
+			p.track = try p.g2()
 			return .camReset
 
 		case ServerProt.grandExchangeOffers:

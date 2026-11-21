@@ -18,11 +18,9 @@ playthrough tests (tutorial, combat, bank, shop, magic, woodcutting, fires, cook
 - [ ] Scrolling lists (onScroll, wheel and finger drag) for bank, quests, chat history
 
 ## To do
+- Done: world list (`Net/WorldList.swift`, fetched with `[255][checksum]` on the game port) and hopping, login replies 1/15/21/23/29 with the cache script's texts, TRANSMITVAR_VERIFYID / EVENT_APPLET_FOCUS / EVENT_CAMERA_POSITION / WINDOW_STATUS. Not done on purpose: the EVENT_MOUSE_* recorder (the 2009scape server never sets the login flag and the packets are a touch-device no-op).
 - [ ] Full interface sweep (all 483) clean
-- [ ] World list and world hopping (ops 6500-6507, 5309, 6600/6601)
 - [ ] Hardware keyboard (iPad/BT keyboards): arrow-key camera, F-keys, Esc, modifiers, Ctrl-run
-- [ ] Login reply messages for every rt4 reply code
-- [ ] Housekeeping packets: TRANSMITVAR_VERIFYID, applet focus, camera position, window status
 - [ ] Fixed 765x503 mode (interface 548)
 - [ ] Large-creature terrain tilt (PathingEntity.method2685) and BAS roll/pitch (method2687)
 - [ ] RoofHider mode 1, client-local ::commands
