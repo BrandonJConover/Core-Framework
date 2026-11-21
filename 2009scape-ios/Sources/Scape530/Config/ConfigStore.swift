@@ -36,6 +36,8 @@ public final class ConfigStore {
 	var indexes: [Int: Js5Index] = [:]
 	var groups: [Int: [Int: [UInt8]]] = [:]
 	var cache: [String: Any] = [:]
+	/// rt4 `client.aShortArray87/88` (one shared array): HSL colours CS2 sets for `ObjType.recol_p`.
+	var palette = [Int](repeating: 0, count: 256)
 	/// The cache directory this store reads, when it was made with `init(disk:)`.
 	private var diskDirectory: URL?
 

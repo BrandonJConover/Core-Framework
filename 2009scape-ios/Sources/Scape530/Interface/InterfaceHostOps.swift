@@ -52,6 +52,7 @@ extension InterfaceScriptHost {
 		func i(_ n: Int) -> Int { n < a.count ? Int(a[n]) : 0 }
 		func r(_ v: Int) -> HostResult { HostResult(ints: [Int32(truncatingIfNeeded: v)]) }
 		func b(_ v: Bool) -> HostResult { r(v ? 1 : 0) }
+		if let result = performClientOps(op, ints: a, strings: s) { return result }
 		if let result = performPreference(op, ints: a) { return result }
 		if let result = performQuickChat(op, ints: a, strings: s) { return result }
 		if let result = performWorldMap(op, ints: a, strings: s) { return result } // WorldMap/
@@ -102,7 +103,7 @@ extension InterfaceScriptHost {
 		case "blackmarks": return r(game.account?.blackmarks ?? 0)
 		case "isUnderageNoConsent": return b((game.account?.underage ?? false) && !(game.account?.parentalChatConsent ?? false))
 		case "isQuickChatOnly": return b(game.account?.mapQuickChat ?? false)
-		case "loginTypeInfo", "language", "affiliate", "hasManyBlackmarks", "isFemale": return r(0)
+		case "loginTypeInfo", "language", "affiliate", "hasManyBlackmarks": return r(0)
 
 		// MARK: friends / ignore / clan (rt4 `ScriptRunner` 3600-3629, backed by `game.social`)
 		case "friendCount":
@@ -160,7 +161,6 @@ extension InterfaceScriptHost {
 		case "publicChatFilter": return r(game.chatFilters.public)
 		case "privateChatFilter": return r(game.chatFilters.private)
 		case "tradeChatFilter": return r(game.chatFilters.trade)
-		case "setChatFilters": game.chatFilters = (i(0), i(1), i(2))
 		case "myName":
 			if let n = game.players?.players[game.players?.selfIndex ?? -1]?.appearance?.name37, n != 0 { return HostResult(strings: [WordPack.displayName(n)]) }
 			return HostResult(strings: [varcstr(32)])
