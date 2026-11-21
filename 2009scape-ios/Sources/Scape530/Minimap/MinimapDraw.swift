@@ -207,7 +207,7 @@ struct Plotter {
 extension GameClient {
 	/// A tap on the minimap to a world tile (for walking), nil when (x, y) is not on the drawn map.
 	public func minimapTileAt(x: Int, y: Int) -> (tileX: Int, tileZ: Int)? {
-		world.minimapTileAt(x: x, y: y)
+		mapInput(x, y) { world.minimapTileAt(x: $0, y: $1) }
 	}
 
 	/// The walk destination flag on the minimap, in world tiles; nil removes it.

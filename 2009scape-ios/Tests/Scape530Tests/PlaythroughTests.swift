@@ -9,16 +9,18 @@ final class PlaythroughTests: XCTestCase {
 	/// A logged-in client plus helpers to pump frames and click things.
 	final class Live {
 		let client: GameClient
-		let w = 1015, h = 469
+		var w = 1015, h = 469
 		var last: Raster
 		var outDir: URL?
 		/// Every client message sent since the last `takeSent()`.
 		var sent: [ClientMessage] = []
 		func takeSent() -> [ClientMessage] { defer { sent = [] }; return sent }
 
-		init(store: ConfigStore, server: String, user: String) throws {
+		init(store: ConfigStore, server: String, user: String, mode: WindowMode = .resizable, size: (w: Int, h: Int)? = nil) throws {
 			let parts = server.split(separator: ":")
 			client = try GameClient(store: store, server: .init(host: String(parts[0]), port: Int(parts[1]) ?? 43595))
+			client.windowMode = mode
+			if let size { (w, h) = size }
 			last = try client.frame(width: w, height: h)
 			if let o = ProcessInfo.processInfo.environment["SCAPE530_OUT"] { outDir = URL(fileURLWithPath: o) }
 			client.log = { print("client log: \($0)") }
@@ -30,7 +32,8 @@ final class PlaythroughTests: XCTestCase {
 		func login(_ user: String) throws {
 			last = try client.frame(width: w, height: h)
 			let d = try XCTUnwrap(client.ui.drawn.last { $0.component.id == client.loginInterface << 16 | 250 })
-			client.tap(x: d.x + d.w / 2, y: d.y + d.h / 2)
+			let c = client.toCanvas(x: d.x + d.w / 2, y: d.y + d.h / 2)
+			client.tap(x: c.x, y: c.y)
 			client.type("\(user)\ntester\n")
 			let deadline = Date().addingTimeInterval(40)
 			while Date() < deadline && (client.screen != .game || client.state.ticks < 12) { pump(0.02) }
@@ -75,7 +78,8 @@ final class PlaythroughTests: XCTestCase {
 		var openInterfaces: [Int] { Array(client.state.interfaces.open.values).sorted() }
 
 		func tap(_ d: (component: Component, x: Int, y: Int, w: Int, h: Int)) {
-			client.tap(x: d.x + d.w / 2, y: d.y + d.h / 2)
+			let c = client.toCanvas(x: d.x + d.w / 2, y: d.y + d.h / 2)
+			client.tap(x: c.x, y: c.y)
 			pump(0.4)
 		}
 
@@ -207,11 +211,11 @@ final class PlaythroughTests: XCTestCase {
 		}
 	}
 
-	func live(_ name: String) throws -> Live {
+	func live(_ name: String, mode: WindowMode = .resizable, size: (w: Int, h: Int)? = nil) throws -> Live {
 		let env = ProcessInfo.processInfo.environment
 		guard let dir = env["SCAPE530_CACHE"], let server = env["SCAPE530_SERVER"] else { throw XCTSkip("needs SCAPE530_CACHE and SCAPE530_SERVER") }
 		let store = ConfigStore(disk: try DiskCache(directory: URL(fileURLWithPath: dir)))
-		return try Live(store: store, server: server, user: "\(name)\(Int.random(in: 10000...99999))")
+		return try Live(store: store, server: server, user: "\(name)\(Int.random(in: 10000...99999))", mode: mode, size: size)
 	}
 
 	/// Fresh account: character design, then skip Tutorial Island through Skippy and Terrova.
@@ -247,6 +251,56 @@ final class PlaythroughTests: XCTestCase {
 			l.driveDialogue(prefer: ["Yes, I'm ready", "I'm ready now"], shots: "terrova")
 			l.pump(4)
 		}
+	}
+
+	/// Fixed 765x503 mode (interface 548): login, walk by tapping, open a tab, switch to resizable and back.
+	func testFixedMode() throws {
+		let l = try live("fixed", mode: .fixed, size: (765, 503))
+		XCTAssertEqual(l.client.state.interfaces.top, 548, "the server opened the fixed pane for windowMode 0")
+		finishTutorial(l)
+		l.pump(2)
+		XCTAssertEqual(l.client.state.interfaces.top, 548)
+		// Show it in a bigger canvas: centred and scaled, taps mapped back to game pixels.
+		(l.w, l.h) = (1000, 700)
+		l.pump(1)
+		let v = try XCTUnwrap(l.client.viewport)
+		XCTAssertEqual([v.x, v.y, v.w, v.h], [4, 4, 512, 334])
+		XCTAssertEqual(l.client.lastSize.w, 765)
+		var shotDir = URL(fileURLWithPath: "/mnt/project-files/2009scape-ios/screens/fixed")
+		try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+		shotDir.appendPathComponent("fixed-548.png")
+
+		// Walk: tap a ground point inside the viewport (canvas coordinates).
+		let before = try XCTUnwrap(l.client.state.selfWorld)
+		let target = try XCTUnwrap(l.scanWorld(radius: 100) { $0.op == "Walk here" }, "a walkable ground point in the viewport")
+		let c = l.client.toCanvas(x: target.x, y: target.y)
+		XCTAssertTrue(l.client.isOverWorld(x: c.x, y: c.y))
+		l.client.tap(x: c.x, y: c.y)
+		XCTAssertTrue(l.pump(until: { l.client.state.selfWorld.map { $0.x != before.x || $0.z != before.z } ?? false }, timeout: 8), "the character walked")
+		l.pump(2)
+
+		// A tab opens: a fresh account on Tutorial Island only has the flashing spanner (Options, 548:94 = 261) unlocked.
+		let opened = l.tapOp("Options") || l.tapOp("Inventory")
+		l.pump(1.5)
+		print("FIXEDTAB tapped=\(opened) \(l.describe())")
+		XCTAssertTrue(opened, "a tab stone is tappable")
+		XCTAssertTrue(l.drawn(261).count > 0 || l.drawn(149).count > 0, "the tab's panel is drawn")
+		l.pump(1)
+		try Data(PNG.encode(l.last)).write(to: shotDir)
+		XCTAssertEqual(l.client.state.interfaces.top, 548)
+
+		// In-game mode change (CS2 5307 path): the server swaps the pane, 746 and back.
+		l.client.windowMode = .resizable
+		XCTAssertTrue(l.pump(until: { l.client.state.interfaces.top == 746 }, timeout: 10), "resizable pane \(l.describe())")
+		XCTAssertEqual(l.client.lastSize.w, l.w)
+		l.client.windowMode = .fixed
+		XCTAssertTrue(l.pump(until: { l.client.state.interfaces.top == 548 }, timeout: 10), "fixed pane again")
+		l.pump(1)
+		XCTAssertNotNil(l.client.viewport)
+		l.client.logout()
+		// Verify the PNG landed (network mount).
+		Thread.sleep(forTimeInterval: 10)
+		XCTAssertGreaterThan((try? Data(contentsOf: shotDir).count) ?? 0, 1000)
 	}
 
 	func testTutorialDialogue() throws {
