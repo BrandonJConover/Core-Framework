@@ -112,7 +112,7 @@ final class AppModel: ObservableObject {
 				UserDefaults.standard.set(user, forKey: "account.username")
 				Keychain.setPassword(pass, for: user)
 			}
-			client.log = { print("[client] \($0)") }
+			client.log = { ClientLogFile.shared.write($0) }
 			// Plugins: settings in UserDefaults, notifications (idle, low hitpoints) to the system.
 			client.plugins.useSettingsStore(UserDefaultsPluginSettingsStore())
 			client.plugins.onNotification = { PluginNotifier.shared.handle($0) }
@@ -144,5 +144,36 @@ final class AppModel: ObservableObject {
 			client.server = .init(host: host, port: port)
 		}
 		start()
+	}
+}
+
+/// The client's log lines (disconnect reasons, decode failures) in Documents/client.log, kept to the last ~256 KB,
+/// so a session on the phone can be diagnosed afterwards (`xcrun devicectl device copy from --domain-type
+/// appDataContainer`). Also sent to the unified log (NSLog).
+final class ClientLogFile {
+	static let shared = ClientLogFile()
+	private let queue = DispatchQueue(label: "scape530.log", qos: .utility)
+	private let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("client.log")
+	private let stamp: DateFormatter = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"; return f }()
+
+	func write(_ line: String) {
+		NSLog("[client] %@", line)
+		let now = Date()
+		queue.async { [self] in
+			let text = "\(stamp.string(from: now)) \(line)\n"
+			guard let data = text.data(using: .utf8) else { return }
+			if let h = try? FileHandle(forWritingTo: url) {
+				defer { try? h.close() }
+				let size = (try? h.seekToEnd()) ?? 0
+				if size > 256 * 1024, let old = try? Data(contentsOf: url) {
+					try? Data(old.suffix(128 * 1024)).write(to: url)
+					if let h2 = try? FileHandle(forWritingTo: url) { _ = try? h2.seekToEnd(); try? h2.write(contentsOf: data); try? h2.close() }
+					return
+				}
+				try? h.write(contentsOf: data)
+			} else {
+				try? data.write(to: url)
+			}
+		}
 	}
 }

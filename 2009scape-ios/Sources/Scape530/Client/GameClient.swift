@@ -594,6 +594,7 @@ public final class GameClient {
 			inGame = true
 			plugins.loggedIn() // Plugins/
 			reconnectAttempt = 0
+			log("logged in to \(server.host):\(server.port)")
 			onLoggedIn(username, password)
 		case .loginFailed(let reply):
 			session = nil
