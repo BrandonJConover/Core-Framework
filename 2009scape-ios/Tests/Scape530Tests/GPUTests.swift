@@ -505,6 +505,20 @@ final class GPUTests: XCTestCase {
 		XCTAssertTrue(c.x > 0 && c.x < Float(frame.viewport.w) && c.y > 0 && c.y < Float(frame.viewport.h))
 	}
 
+	func testGPUViewportLeavesOutsideOpaque() throws {
+		let client = try replayedClient()
+		let world = client.world
+		world.gpuSettings = GPURenderSettings()
+		var raster = Raster(width: 1015, height: 469)
+		let viewport = (x: 20, y: 30, w: 700, h: 380)
+		XCTAssertTrue(world.draw(into: &raster, rect: viewport))
+		XCTAssertEqual(raster.pixels[0] >> 24, 255)
+		XCTAssertEqual(raster.pixels[(viewport.y - 1) * raster.width + viewport.x] >> 24, 255)
+		XCTAssertEqual(raster.pixels[viewport.y * raster.width + viewport.x] >> 24, 0)
+		XCTAssertEqual(raster.pixels[(viewport.y + viewport.h - 1) * raster.width + viewport.x + viewport.w - 1] >> 24, 0)
+		XCTAssertEqual(raster.pixels[(viewport.y + viewport.h) * raster.width + viewport.x] >> 24, 255)
+	}
+
 	func testGPUModeLeavesViewportTransparentAndDrawsOverlays() throws {
 		let client = try replayedClient()
 		let (world, r, frame) = try gpuFrame(client)

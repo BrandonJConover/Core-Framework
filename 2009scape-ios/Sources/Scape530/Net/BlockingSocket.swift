@@ -10,6 +10,8 @@ import Glibc
 public final class BlockingSocket {
 	public struct Failure: Error, CustomStringConvertible {
 		public let description: String
+		public let timedOut: Bool
+		public init(description: String, timedOut: Bool = false) { self.description = description; self.timedOut = timedOut }
 	}
 
 	private var fd: Int32 = -1
@@ -92,7 +94,10 @@ public final class BlockingSocket {
 	public func readSome(max: Int = 65536) throws -> [UInt8] {
 		var buf = [UInt8](repeating: 0, count: max)
 		let n = buf.withUnsafeMutableBytes { recv(fd, $0.baseAddress, max, 0) }
-		guard n >= 0 else { throw Failure(description: "recv failed or timed out") }
+		guard n >= 0 else {
+			let error = errno
+			throw Failure(description: "recv failed or timed out", timedOut: error == EAGAIN || error == EWOULDBLOCK)
+		}
 		return Array(buf[0..<n])
 	}
 

@@ -4,6 +4,7 @@ public final class Js5Client {
 	public let socket: BlockingSocket
 	private var parser = Js5Protocol.ResponseParser()
 	private var ready: [Int: Js5Protocol.Response] = [:]
+	private let loggedIn: Bool
 
 	public struct Rejected: Error, CustomStringConvertible {
 		public let status: Int
@@ -11,11 +12,16 @@ public final class Js5Client {
 	}
 
 	public init(host: String, port: Int, revision: Int = Js5Protocol.revision, loggedIn: Bool = false) throws {
-		socket = try BlockingSocket(host: host, port: port)
+		self.loggedIn = loggedIn
+		// Large reference tables (notably archive 7) can take longer than the
+		// small connection timeout on a Raspberry Pi while the cache is read
+		// from USB storage. Keep the socket alive during an initial cache sync.
+		socket = try BlockingSocket(host: host, port: port, timeoutSeconds: 60)
 		try socket.write(Js5Protocol.handshake(revision: revision))
 		let status = Int(try socket.readExactly(1)[0])
 		guard status == 0 else { throw Rejected(status: status) }
 		try socket.write(Js5Protocol.sessionStart(loggedIn: loggedIn))
+		socket.setReadTimeout(milliseconds: 1000)
 	}
 
 	/// Requests several groups at once (rt4 keeps up to 20 in flight) and
@@ -30,8 +36,17 @@ public final class Js5Client {
 			try socket.write(req)
 			for w in batch {
 				let key = w.archive << 16 | w.group
+				var idleIntervals = 0
 				while ready[key] == nil {
-					let chunk = try socket.readSome()
+					let chunk: [UInt8]
+					do { chunk = try socket.readSome() }
+					catch let failure as BlockingSocket.Failure where failure.timedOut {
+						idleIntervals += 1
+						guard idleIntervals < 60 else { throw failure }
+						try socket.write(Js5Protocol.keepAlive(loggedIn: loggedIn))
+						continue
+					}
+					idleIntervals = 0
 					guard !chunk.isEmpty else { throw BlockingSocket.Failure(description: "JS5 connection closed") }
 					for r in try parser.feed(chunk) { ready[r.archive << 16 | r.group] = r }
 				}

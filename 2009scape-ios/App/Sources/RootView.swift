@@ -37,12 +37,16 @@ struct RootView: View {
 						.foregroundColor(.white.opacity(0.6))
 						.frame(width: 44, height: 44)
 				}
-				Button {
-					showingServer = true
-				} label: {
-					Image(systemName: "server.rack")
-						.foregroundColor(.white.opacity(0.6))
-						.frame(width: 44, height: 44)
+				// Server configuration belongs to setup and error states; on the game screen it would cover
+				// gameplay and catch stray taps.
+				if !model.isReady {
+					Button {
+						showingServer = true
+					} label: {
+						Image(systemName: "server.rack")
+							.foregroundColor(.white.opacity(0.6))
+							.frame(width: 44, height: 44)
+					}
 				}
 			}
 		}

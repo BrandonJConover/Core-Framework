@@ -2,9 +2,27 @@ import XCTest
 @testable import Scape530
 
 final class ProtocolTests: XCTestCase {
+	func testLargeFragmentedJs5Response() throws {
+		let payload = (0..<300_000).map { UInt8(truncatingIfNeeded: $0) }
+		var wire: [UInt8] = [255, 0, 7, 0, 0, 4, 0x93, 0xE0]
+		var blockPosition = 8
+		for byte in payload {
+			if blockPosition == 512 { wire.append(0xFF); blockPosition = 1 }
+			wire.append(byte); blockPosition += 1
+		}
+		var parser = Js5Protocol.ResponseParser()
+		var result: [Js5Protocol.Response] = []
+		for start in stride(from: 0, to: wire.count, by: 1021) { result += try parser.feed(wire[start..<min(start + 1021, wire.count)]) }
+		XCTAssertEqual(result.count, 1)
+		XCTAssertEqual(result.first?.archive, 255)
+		XCTAssertEqual(result.first?.group, 7)
+		XCTAssertEqual(Array(try XCTUnwrap(result.first).container.dropFirst(5)), payload)
+	}
 	func testJs5Handshake() {
 		XCTAssertEqual(Js5Protocol.handshake(), [15, 0, 0, 2, 18])
 		XCTAssertEqual(Js5Protocol.request(archive: 255, group: 255), [1, 255, 0, 255])
+		XCTAssertEqual(Js5Protocol.keepAlive(loggedIn: false), [3, 0, 0, 0])
+		XCTAssertEqual(Js5Protocol.keepAlive(loggedIn: true), [2, 0, 0, 0])
 	}
 
 	/// Builds a server response the way 2009scape chunks it and feeds it

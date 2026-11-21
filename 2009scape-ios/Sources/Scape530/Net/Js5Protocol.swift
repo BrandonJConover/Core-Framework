@@ -18,6 +18,10 @@ public enum Js5Protocol {
 		[6, 0, 0, 3, loggedIn ? 2 : 3, 0, 0, 0]
 	}
 
+	/// Reassert the existing connection state; also wakes servers whose
+	/// nonblocking writer has pending data but has not woken its selector.
+	public static func keepAlive(loggedIn: Bool) -> [UInt8] { [loggedIn ? 2 : 3, 0, 0, 0] }
+
 	/// [urgent ? 1 : 0][archive:1][group:2]
 	public static func request(archive: Int, group: Int, urgent: Bool = true) -> [UInt8] {
 		[urgent ? 1 : 0, UInt8(truncatingIfNeeded: archive), UInt8(truncatingIfNeeded: group >> 8), UInt8(truncatingIfNeeded: group)]
@@ -51,19 +55,20 @@ public enum Js5Protocol {
 			var out: [Response] = []
 			for raw in bytes {
 				let b = raw ^ xorKey
-				if var c = current {
+				if current != nil {
 					if blockPosition == 512 {
 						guard b == 0xFF else { throw ProtocolError(description: "missing 0xFF block marker") }
 						blockPosition = 1
 						continue
 					}
-					c.buf.append(b)
+					// Mutate the buffered response in place. Copying `current` into a
+					// local value on every byte forces Array copy-on-write for the entire
+					// accumulated container and makes large tables quadratic to parse.
+					current!.buf.append(b)
 					blockPosition += 1
-					if c.buf.count == c.total {
+					if current!.buf.count == current!.total, let c = current {
 						out.append(Response(archive: c.archive, group: c.group, prefetch: c.prefetch, container: c.buf))
 						current = nil
-					} else {
-						current = c
 					}
 					continue
 				}

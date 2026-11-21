@@ -57,6 +57,9 @@ final class AppModel: ObservableObject {
 	}
 
 	/// False until the player has entered a server address.
+	/// True once the cache is open and the client runs (title screen or game).
+	var isReady: Bool { if case .ready = phase { return true } else { return false } }
+
 	var hasConfiguredServer: Bool { !host.isEmpty }
 
 	var hasLocalCache: Bool {
