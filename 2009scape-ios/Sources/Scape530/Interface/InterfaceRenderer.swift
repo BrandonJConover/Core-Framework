@@ -183,7 +183,7 @@ public final class InterfaceRenderer {
 	public func hitTest(x: Int, y: Int) -> Component? {
 		for d in drawn.reversed() where x >= d.x && y >= d.y && x < d.x + d.w && y < d.y + d.h {
 			let c = d.component
-			if c.hooks["onClickRepeat"] != nil || c.hooks["onOptionClick"] != nil || !c.ops.isEmpty || c.buttonType != 0 || c.option != nil
+			if c.hooks["onClickRepeat"] != nil || c.hooks["onOptionClick"] != nil || c.hasRealOp || c.buttonType != 0 || c.option != nil
 				|| c.type == 2 || (c.events >> 11) & 0x7F != 0 || c.events & 1 != 0 {
 				return c
 			}
@@ -200,7 +200,7 @@ public final class InterfaceRenderer {
 			// Only small buttons (tabs, chat filters, dialogue options) get the slop: a near miss on a big panel is more
 			// likely a tap on the world beside it.
 			guard d.w > 0, d.h > 0, d.w <= 64, d.h <= 40, c.type != 2, c.clientCode != 1337 else { continue }
-			guard c.hooks["onOptionClick"] != nil || c.hooks["onClickRepeat"] != nil || !c.ops.isEmpty || c.buttonType != 0
+			guard c.hooks["onOptionClick"] != nil || c.hooks["onClickRepeat"] != nil || c.hasRealOp || c.buttonType != 0
 				|| c.option != nil || (c.events >> 11) & 0x7F != 0 || c.events & 1 != 0 else { continue }
 			let dx = max(d.x - x, 0, x - (d.x + d.w - 1)), dy = max(d.y - y, 0, y - (d.y + d.h - 1))
 			let dist = max(dx, dy)

@@ -14,13 +14,12 @@ extension PlaythroughTests {
 		let ops = Set(l.drawn(771).flatMap { $0.component.ops }.filter { !$0.isEmpty })
 		print("DESIGN ops: \(ops.sorted())")
 		_ = l.takeSent()
-		// A colour swatch or style arrow: anything but the mouse-button and confirm buttons.
-		let candidates = l.drawn(771).filter { d in d.component.ops.contains { o in !o.isEmpty && !o.lowercased().contains("mouse") && !o.lowercased().contains("confirm") } }
-		for d in l.drawn(771) where d.component.hooks["onOp"] != nil || d.component.hooks["onClick"] != nil {
-			print("DESIGN hookcomp \(d.component.id & 0xFFFF) type \(d.component.type) ops \(d.component.ops.filter { !$0.isEmpty }) at \(d.x),\(d.y) \(d.w)x\(d.h) hidden? hooks \(d.component.hooks.keys.sorted())")
-		}
-		for d in candidates.prefix(6) {
-			print("DESIGN tap \(d.component.id & 0xFFFF) ops \(d.component.ops.filter { !$0.isEmpty })")
+		XCTAssertTrue(l.tapOp("Select body options"))
+		l.pump(1.5)
+		let skip: Set<Int> = [14, 16, 18, 20, 37, 40, 46]
+		let swatches = l.drawn(771).filter { d in !skip.contains(d.component.id & 0xFFFF) && d.w < 80 && d.h < 80 && (d.component.hooks["onOptionClick"] != nil || d.component.hooks["onClick"] != nil || d.component.ops.contains { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) }
+		print("DESIGN body comps: \(swatches.map { "\($0.component.id & 0xFFFF):\($0.component.ops.filter { !$0.isEmpty }):\($0.component.hooks.keys.sorted())" }.prefix(30))")
+		for d in swatches.prefix(4) {
 			l.tap(d)
 			l.pump(0.6)
 		}

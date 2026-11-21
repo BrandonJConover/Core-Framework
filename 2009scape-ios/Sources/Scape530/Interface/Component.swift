@@ -430,3 +430,9 @@ public struct Component {
 		return (x, y)
 	}
 }
+
+extension Component {
+	/// True when at least one op has visible text: rt4's Component.getOp returns null for blank or whitespace-only
+	/// ops, so a layer whose ops are all padding (e.g. 771's "    ") doesn't swallow taps meant for the world.
+	public var hasRealOp: Bool { ops.contains { !$0.trimmingCharacters(in: .whitespaces).isEmpty } }
+}

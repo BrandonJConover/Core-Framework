@@ -309,7 +309,10 @@ public final class WorldView {
 			let isNew = ctx.players[id] == nil
 			let a = ctx.players[id] ?? PathingActor(kind: .player, index: id, ctx: ctx)
 			if isNew { ctx.players[id] = a }
-			if let ap = e.appearance, ap != a.appearance || a.look != PlayerLook(ap) {
+			// An appearance block in this update (rt4 `PlayerList` mask 0x4) replaces the look, including designer
+			// preview edits (CS2 403 / 404 / 410); the decoder keeps the last block, so only a fresh one counts.
+			let fresh = r.updated[id]?.appearance ?? (isNew ? e.appearance : nil)
+			if let ap = fresh ?? (a.appearance == nil ? e.appearance : nil), ap != a.appearance || a.look != PlayerLook(ap) {
 				a.appearance = ap
 				a.look = PlayerLook(ap)
 				a.size = ap.size
