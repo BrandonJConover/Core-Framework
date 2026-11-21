@@ -69,6 +69,22 @@ enum Keychain {
 		return String(data: data, encoding: .utf8)
 	}
 
+	/// True if a password is saved for `account`, without showing Face ID (the item is not read).
+	static func hasPassword(for account: String) -> Bool {
+		let context = LAContext()
+		context.interactionNotAllowed = true
+		let query: [String: Any] = [
+			kSecClass as String: kSecClassGenericPassword,
+			kSecAttrService as String: service,
+			kSecAttrAccount as String: account,
+			kSecReturnAttributes as String: true,
+			kSecMatchLimit as String: kSecMatchLimitOne,
+			kSecUseAuthenticationContext as String: context,
+		]
+		let status = SecItemCopyMatching(query as CFDictionary, nil)
+		return status == errSecSuccess || status == errSecInteractionNotAllowed
+	}
+
 	static func password(for account: String) -> String? {
 		let query: [String: Any] = [
 			kSecClass as String: kSecClassGenericPassword,

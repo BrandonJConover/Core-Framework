@@ -18,7 +18,12 @@ final class GameLoop: @unchecked Sendable {
 		var isDraggingItem: Bool
 		/// "fps / ms per frame / client cycles per second", refreshed once a second.
 		var stats: String
+		/// Mobile login zoom targets (game pixels): with the keyboard up / down. Nil off the login screens.
+		var loginFocusKeyboard: CGRect?
+		var loginFocus: CGRect?
 	}
+	private var faceIDUser = ""
+	private var faceIDCheckedAt = Date.distantPast
 
 	// Frame statistics (game queue only).
 	private var statFrames = 0
@@ -56,7 +61,7 @@ final class GameLoop: @unchecked Sendable {
 	}
 
 	/// Renders one frame at `width` x `height` game pixels unless the previous one is still running.
-	func requestFrame(width: Int, height: Int, smooth: Bool, smoothMotion: Bool = false) {
+	func requestFrame(width: Int, height: Int, smooth: Bool, smoothMotion: Bool = false, zoom: (scale: Double, tx: Double, ty: Double)? = nil) {
 		lock.lock()
 		if busy { lock.unlock(); return }
 		busy = true
@@ -64,6 +69,11 @@ final class GameLoop: @unchecked Sendable {
 		queue.async { [self] in
 			defer { lock.lock(); busy = false; lock.unlock() }
 			let t0 = Date()
+			if client.screen == .loginForm, client.username != faceIDUser || Date().timeIntervalSince(faceIDCheckedAt) > 5 {
+				faceIDUser = client.username
+				faceIDCheckedAt = Date()
+				client.faceIDAvailable = !faceIDUser.isEmpty && Keychain.hasPassword(for: faceIDUser)
+			}
 			controller.poll(client)
 			client.smoothMotion = smoothMotion
 			do {
@@ -74,6 +84,7 @@ final class GameLoop: @unchecked Sendable {
 				client.ui.opaqueSprites = MobileSettings.opaqueSidePanel ? [1131] : []
 				let raster = try client.frame(width: width, height: height)
 				presenter?.smoothScaling = smooth
+				presenter?.zoom = zoom
 				if let layer {
 					if gpu, client.screen == .game, let frame = client.world.gpuFrame, let sp = scenePresenter {
 						sp.smoothScaling = smooth
@@ -100,7 +111,9 @@ final class GameLoop: @unchecked Sendable {
 			let snap = Snapshot(
 				screen: client.screen, wantsKeyboard: client.wantsKeyboard, connectError: client.connectError,
 				reconnectAttempt: client.reconnectAttempt, maxReconnectAttempts: client.maxReconnectAttempts,
-				menuRows: client.popupRows, isDraggingItem: client.isDraggingItem, stats: statText)
+				menuRows: client.popupRows, isDraggingItem: client.isDraggingItem, stats: statText,
+				loginFocusKeyboard: client.loginFocusRect(keyboard: true).map { CGRect(x: $0.x, y: $0.y, width: $0.w, height: $0.h) },
+				loginFocus: client.loginFocusRect(keyboard: false).map { CGRect(x: $0.x, y: $0.y, width: $0.w, height: $0.h) })
 			DispatchQueue.main.async { [onSnapshot] in onSnapshot(snap) }
 		}
 	}

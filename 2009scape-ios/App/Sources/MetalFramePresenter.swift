@@ -12,10 +12,10 @@ final class MetalFramePresenter {
 	#include <metal_stdlib>
 	using namespace metal;
 	struct VOut { float4 position [[position]]; float2 uv; };
-	vertex VOut frameVertex(uint vid [[vertex_id]], constant float2 &scale [[buffer(0)]]) {
+	vertex VOut frameVertex(uint vid [[vertex_id]], constant float4 &place [[buffer(0)]]) {
 		float2 c = float2((vid & 1) != 0 ? 1.0 : -1.0, (vid & 2) != 0 ? 1.0 : -1.0);
 		VOut o;
-		o.position = float4(c * scale, 0.0, 1.0);
+		o.position = float4(c * place.xy + place.zw, 0.0, 1.0);
 		o.uv = float2((c.x + 1.0) * 0.5, (1.0 - c.y) * 0.5);
 		return o;
 	}
@@ -28,6 +28,9 @@ final class MetalFramePresenter {
 
 	/// Scaling quality: true smooths non-integer scales (bilinear); false is always pixel-exact (nearest).
 	var smoothScaling = true
+	/// Extra zoom applied after the aspect fit, as a scale about the drawable's centre and a translation in
+	/// drawable fractions (the mobile login zoom; see `GameCanvasView.updateZoom`). Identity when nil.
+	var zoom: (scale: Double, tx: Double, ty: Double)?
 
 	let device: MTLDevice
 	private let queue: MTLCommandQueue
@@ -112,11 +115,14 @@ final class MetalFramePresenter {
 
 		// Aspect fit: the largest uniform scale that keeps the whole frame inside the drawable.
 		let fit = min(Double(dw) / Double(w), Double(dh) / Double(h))
-		var scale = SIMD2<Float>(Float(Double(w) * fit / Double(dw)), Float(Double(h) * fit / Double(dh)))
+		let z = zoom ?? (1, 0, 0)
+		// NDC: x right, y up; the translation is given in drawable fractions with y down.
+		var place = SIMD4<Float>(Float(Double(w) * fit * z.scale / Double(dw)), Float(Double(h) * fit * z.scale / Double(dh)),
+		                         Float(z.tx * 2), Float(-z.ty * 2))
 		// Whole-number magnification stays pixel-exact; anything else is smoothed.
-		let integral = !smoothScaling || (fit >= 1 && abs(fit - fit.rounded()) < 0.01)
+		let integral = !smoothScaling || (fit * z.scale >= 1 && abs(fit * z.scale - (fit * z.scale).rounded()) < 0.01)
 		enc.setRenderPipelineState(pipeline)
-		enc.setVertexBytes(&scale, length: MemoryLayout<SIMD2<Float>>.size, index: 0)
+		enc.setVertexBytes(&place, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
 		enc.setFragmentTexture(texture, index: 0)
 		enc.setFragmentSamplerState(integral ? nearest : linear, index: 0)
 		enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)

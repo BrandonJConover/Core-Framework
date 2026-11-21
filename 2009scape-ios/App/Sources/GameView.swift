@@ -220,7 +220,9 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		guard w > 0 else { return }
 		gameSize = (w, h)
 		syncSettings()
-		loop.requestFrame(width: w, height: h, smooth: MobileSettings.smoothScaling, smoothMotion: MobileSettings.smoothMotion)
+		stepZoom()
+		let z = zoom.s == 1 && zoom.tx == 0 && zoom.ty == 0 ? nil : (scale: Double(zoom.s), tx: Double(zoom.tx / max(bounds.width, 1)), ty: Double(zoom.ty / max(bounds.height, 1)))
+		loop.requestFrame(width: w, height: h, smooth: MobileSettings.smoothScaling, smoothMotion: MobileSettings.smoothMotion, zoom: z)
 	}
 
 	private func syncSettings() {
@@ -241,6 +243,11 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		}
 		lastKeyboardWanted = s.wantsKeyboard
 		keyboardButton.isHidden = true // the shell's keyboard button lives in the screen margin (RootView)
+		if s.loginFocus != loginFocus || s.loginFocusKeyboard != loginFocusKeyboard {
+			loginFocus = s.loginFocus
+			loginFocusKeyboard = s.loginFocusKeyboard
+			updateZoom(animated: true)
+		}
 		statsLabel.isHidden = !MobileSettings.frameStats
 		if MobileSettings.frameStats { statsLabel.text = " \(s.stats) " }
 
@@ -295,11 +302,20 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 	// MARK: coordinates
 
 	/// Where the game image sits in the view (aspect fit, the same rule the Metal presenter uses).
-	private var contentRect: CGRect {
+	/// The aspect-fitted game image before the login zoom.
+	private var fittedRect: CGRect {
 		guard gameSize.w > 0, gameSize.h > 0, bounds.width > 0, bounds.height > 0 else { return bounds }
 		let f = min(bounds.width / CGFloat(gameSize.w), bounds.height / CGFloat(gameSize.h))
 		let w = CGFloat(gameSize.w) * f, h = CGFloat(gameSize.h) * f
 		return CGRect(x: (bounds.width - w) / 2, y: (bounds.height - h) / 2, width: w, height: h)
+	}
+
+	/// Where the game image sits on screen, the login zoom included (touch mapping uses this).
+	private var contentRect: CGRect {
+		let r = fittedRect
+		let mid = CGPoint(x: bounds.midX, y: bounds.midY)
+		let s = zoom.s
+		return CGRect(x: mid.x + s * (r.minX - mid.x) + zoom.tx, y: mid.y + s * (r.minY - mid.y) + zoom.ty, width: r.width * s, height: r.height * s)
 	}
 
 	/// View point to game pixel.
@@ -319,14 +335,59 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 
 	// MARK: keyboard shift
 
-	/// In landscape the keyboard covers the lower half; slide the game up so the focused login field stays visible.
+	/// How much of the view (untransformed, points) the keyboard covers from the bottom.
+	private var keyboardOverlap: CGFloat = 0
+	private var loginFocus: CGRect?
+	private var loginFocusKeyboard: CGRect?
+
 	@objc private func keyboardChanged(_ n: Notification) {
-		guard let end = (n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue, let window else { return }
+		guard let end = (n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue, let sv = superview else { return }
 		let hiding = n.name == UIResponder.keyboardWillHideNotification
-		let overlap = hiding ? 0 : max(0, convert(bounds, to: window).maxY - end.minY)
-		UIView.animate(withDuration: 0.25) {
-			self.transform = CGAffineTransform(translationX: 0, y: -overlap * 0.6)
+		let layoutBottomInWindow = sv.convert(CGPoint(x: 0, y: center.y + bounds.height / 2), to: nil).y
+		keyboardOverlap = hiding ? 0 : max(0, layoutBottomInWindow - end.minY)
+		updateZoom(animated: true)
+	}
+
+	/// Mobile login zoom: scale about the view centre and translation (points). Applied by the Metal presenter and
+	/// used by `contentRect` for touch mapping; identity in game.
+	private var zoom: (s: CGFloat, tx: CGFloat, ty: CGFloat) = (1, 0, 0)
+	private var zoomTarget: (s: CGFloat, tx: CGFloat, ty: CGFloat) = (1, 0, 0)
+	private var zoomAnimStart = Date.distantPast
+	private var zoomFrom: (s: CGFloat, tx: CGFloat, ty: CGFloat) = (1, 0, 0)
+
+	/// Mobile login (and in-game typing): on the title and login screens the image zooms onto the RuneScape scroll,
+	/// and with the keyboard up onto the Username/Password fields and Log In, fitted into the space above the
+	/// keyboard. In game the view only slides up while the keyboard is shown.
+	private func updateZoom(animated: Bool) {
+		var target: (s: CGFloat, tx: CGFloat, ty: CGFloat) = (1, 0, 0)
+		var slide: CGFloat = 0
+		let focus = keyboardOverlap > 0 ? (loginFocusKeyboard ?? loginFocus) : loginFocus
+		if let f = focus, gameSize.w > 0 {
+			let c = fittedRect
+			let k = c.width / CGFloat(gameSize.w)
+			let fv = CGRect(x: c.minX + f.minX * k, y: c.minY + f.minY * k, width: f.width * k, height: f.height * k)
+			let safe = bounds.inset(by: safeAreaInsets)
+			let area = CGRect(x: safe.minX, y: safe.minY, width: safe.width, height: max(40, min(safe.maxY, bounds.height - keyboardOverlap) - safe.minY)).insetBy(dx: 8, dy: 6)
+			let s = min(max(min(area.width / fv.width, area.height / fv.height), 1), 4)
+			let mid = CGPoint(x: bounds.midX, y: bounds.midY)
+			target = (s, area.midX - mid.x - s * (fv.midX - mid.x), area.midY - mid.y - s * (fv.midY - mid.y))
+		} else if keyboardOverlap > 0 {
+			slide = -keyboardOverlap * 0.6
 		}
+		if abs(target.s - zoomTarget.s) > 0.01 || abs(target.tx - zoomTarget.tx) > 1 || abs(target.ty - zoomTarget.ty) > 1 {
+			zoomFrom = zoom
+			zoomTarget = target
+			zoomAnimStart = animated ? Date() : .distantPast
+		}
+		let t = CGAffineTransform(translationX: 0, y: slide)
+		if transform != t { UIView.animate(withDuration: 0.25) { self.transform = t } }
+	}
+
+	/// Advances the zoom animation (0.25 s ease-out) once per frame.
+	private func stepZoom() {
+		let p = min(Date().timeIntervalSince(zoomAnimStart) / 0.25, 1)
+		let e = CGFloat(1 - pow(1 - p, 3))
+		zoom = (zoomFrom.s + (zoomTarget.s - zoomFrom.s) * e, zoomFrom.tx + (zoomTarget.tx - zoomFrom.tx) * e, zoomFrom.ty + (zoomTarget.ty - zoomFrom.ty) * e)
 	}
 
 	@objc private func keyboardButtonTapped() {

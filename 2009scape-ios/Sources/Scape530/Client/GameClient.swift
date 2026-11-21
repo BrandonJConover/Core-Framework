@@ -227,6 +227,57 @@ public final class GameClient {
 	/// Set by the shell: asked for the saved password of an account (e.g. behind Face ID) when the player presses
 	/// Log In with the password field empty. The completion must run on the thread that drives this client.
 	public var savedPasswordProvider: ((String, @escaping (String?) -> Void) -> Void)?
+	/// Set by the shell: a Face ID-protected password is saved for the typed username, so the login form shows an
+	/// RS-styled "Use Face ID" link beside Log In.
+	public var faceIDAvailable = false
+	/// Where the "Use Face ID" link was drawn last frame (game pixels).
+	private var faceIDLink: (x: Int, y: Int, w: Int, h: Int)?
+
+	/// Mobile login: the rectangle (game pixels) the shell should zoom onto. With the keyboard up, the Username and
+	/// Password fields and the Log In line; otherwise the logo and scroll. Nil off the login screens.
+	public func loginFocusRect(keyboard: Bool) -> (x: Int, y: Int, w: Int, h: Int)? {
+		guard !inGame, host.game.interfaces.top == loginInterface else { return nil }
+		var minX = Int.max, minY = Int.max, maxX = Int.min, maxY = Int.min
+		let form = (loginInterface << 16 | 335)...(loginInterface << 16 | 347)
+		for d in ui.drawn where d.component.id >> 16 == loginInterface && d.w > 0 && d.h > 0 {
+			if keyboard && screen == .loginForm {
+				guard form.contains(d.component.id) else { continue }
+			} else if d.component.type == 0 || d.w >= lastSize.w * 9 / 10 || d.h >= lastSize.h * 9 / 10 {
+				continue // layers and the full-screen background
+			}
+			minX = min(minX, d.x); minY = min(minY, d.y); maxX = max(maxX, d.x + d.w); maxY = max(maxY, d.y + d.h)
+		}
+		if let l = faceIDLink, keyboard { minX = min(minX, l.x); maxX = max(maxX, l.x + l.w) }
+		guard minX < maxX, minY < maxY else { return nil }
+		return (minX, minY, maxX - minX, maxY - minY)
+	}
+
+	/// Draws the "Use Face ID" link to the right of the form's Log In (same font and colour as Log In).
+	private func drawFaceIDLink(into r: inout Raster) {
+		faceIDLink = nil
+		guard screen == .loginForm, faceIDAvailable, savedPasswordProvider != nil,
+		      let login = ui.drawn.last(where: { $0.component.id == loginInterface << 16 | 347 }),
+		      let font = try? store.font(591) else { return }
+		let text = "Use Face ID"
+		let w = font.stringWidth(text)
+		let logInWidth = font.stringWidth("Log In")
+		let cx = login.x + login.w / 2
+		let x = cx + logInWidth / 2 + 24
+		let y = login.y + login.h - 4
+		font.drawLeft(text, x: x, y: y, color: 0x663300, into: &r)
+		faceIDLink = (x - 6, login.y - 4, w + 12, login.h + 8)
+	}
+
+	/// Asks the shell for the saved password (Face ID) and logs in with it.
+	public func loginWithSavedPassword() {
+		guard screen == .loginForm, !username.isEmpty, let provider = savedPasswordProvider else { return }
+		let user = username
+		provider(user) { [weak self] pw in
+			guard let self, let pw, !pw.isEmpty, self.username == user, self.screen == .loginForm else { return }
+			self.password = pw
+			self.submit()
+		}
+	}
 
 	/// Client cycles run since the shell last read `takeCycleCount()` (for the frame-time counter).
 	var cyclesThisSecond = 0
@@ -295,6 +346,7 @@ public final class GameClient {
 			if !(changed && drawnViewport) || pass == 1 { break }
 			r.clear(transparent: transparent)
 		}
+		if !inGame { drawFaceIDLink(into: &r) }
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
 		if inGame { plugins.drawOverlays(.hud, into: &r) } // Plugins/
 		if inGame { try drawInteraction(into: &r); try drawTargetHint(into: &r) }
@@ -368,16 +420,31 @@ public final class GameClient {
 
 	/// `hooks` false when the press hooks already ran for a gesture that began as a drag.
 	func performTap(x: Int, y: Int, hooks: Bool) {
-		// Log In with an empty password on a saved account: ask the shell for the saved password (Face ID) first.
-		if screen == .loginForm, password.isEmpty, !username.isEmpty, let provider = savedPasswordProvider,
-		   let hit = ui.hitTest(x: x, y: y), hit.id == loginInterface << 16 | 347 {
-			let user = username
-			provider(user) { [weak self] pw in
-				guard let self, let pw, !pw.isEmpty, self.username == user, self.screen == .loginForm else { return }
-				self.password = pw
-				self.submit()
+		if screen == .loginForm {
+			if let l = faceIDLink, x >= l.x, y >= l.y, x < l.x + l.w, y < l.y + l.h {
+				loginWithSavedPassword()
+				return
 			}
-			return
+			// Log In with an empty password on a saved account: ask the shell for the saved password (Face ID) first.
+			if password.isEmpty, !username.isEmpty, savedPasswordProvider != nil,
+			   let hit = ui.hitTest(x: x, y: y), hit.id == loginInterface << 16 | 347 {
+				loginWithSavedPassword()
+				return
+			}
+			// Touch: a tap on (or near) a field's box focuses that field (login stage 1 username, 2 password).
+			for (box, stage) in [(339, 1), (345, 2)] {
+				let ids = [box - 3, box - 2, box - 1, box].map { loginInterface << 16 | $0 }
+				let rects = ui.drawn.filter { ids.contains($0.component.id) }
+				guard let r0 = rects.first else { continue }
+				let minX = rects.map(\.x).min()!, maxX = rects.map { $0.x + $0.w }.max()!
+				let minY = rects.map(\.y).min()!, maxY = rects.map { $0.y + $0.h }.max()!
+				_ = r0
+				if x >= minX - 8, x < maxX + 8, y >= minY - 4, y < maxY + 4 {
+					host.setVarc(LoginVar.stage, Int32(stage))
+					host.cycle()
+					return
+				}
+			}
 		}
 		if inGame, interaction.popup == nil {
 			if tapToDrop, dropTap(x: x, y: y) { return }

@@ -14,7 +14,8 @@ struct RootView: View {
 			case .updatingCache(let label, let fraction):
 				LoadingBar(label: label, fraction: fraction)
 			case .ready(let client):
-				GameView(client: client).id(ObjectIdentifier(client))
+				// The game view zooms itself above the keyboard (GameCanvasView.updateZoom); SwiftUI must not resize it.
+				GameView(client: client).id(ObjectIdentifier(client)).ignoresSafeArea(.keyboard)
 			case .failed(let message):
 				VStack(spacing: 16) {
 					Text(message)
