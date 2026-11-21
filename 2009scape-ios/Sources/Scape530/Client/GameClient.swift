@@ -347,6 +347,7 @@ public final class GameClient {
 			r.clear(transparent: transparent)
 		}
 		if !inGame { drawFaceIDLink(into: &r) }
+		if !showInterface { ui.worldMap.isShown = false }
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
 		if inGame { plugins.drawOverlays(.hud, into: &r) } // Plugins/
 		if inGame { try drawInteraction(into: &r); try drawTargetHint(into: &r) }
@@ -377,10 +378,16 @@ public final class GameClient {
 	// MARK: camera (rt4 Camera: yawTarget / pitchTarget / ZOOM)
 
 	/// One-finger drag over the world, in game pixels: horizontal turns the camera, vertical tilts it.
-	public func cameraDrag(dx: Double, dy: Double) { world.camera.drag(dx: dx, dy: dy) }
+	/// While the world map is open the drag pans the map instead (see `worldMapDrag`).
+	public func cameraDrag(dx: Double, dy: Double) {
+		if worldMapIsOpen { worldMapDrag(dx: dx, dy: dy) } else { world.camera.drag(dx: dx, dy: dy) }
+	}
 
 	/// Pinch gesture: `scale` > 1 zooms in, < 1 out (use the change since the last callback).
-	public func cameraPinch(scale: Double) { world.camera.pinch(scale: scale) }
+	/// While the world map is open the pinch zooms the map instead (see `worldMapZoom`).
+	public func cameraPinch(scale: Double) {
+		if worldMapIsOpen { worldMapZoom(scale: scale) } else { world.camera.pinch(scale: scale) }
+	}
 
 	/// Back to rt4's default zoom, facing north.
 	public func cameraReset() {
@@ -392,6 +399,7 @@ public final class GameClient {
 	/// True when a drag starting at (x, y) belongs to the camera: inside the world viewport and not
 	/// on an interactive interface component.
 	public func isOverWorld(x: Int, y: Int) -> Bool {
+		if inGame, worldMapIsOpen { return isOverWorldMap(x: x, y: y) }
 		guard inGame, !interaction.isMenuOpen, let v = viewport else { return false }
 		return x >= v.x && y >= v.y && x < v.x + v.w && y < v.y + v.h && ui.hitTest(x: x, y: y) == nil
 	}
@@ -751,5 +759,49 @@ extension GameClient {
 	public func endComponentDrag(x: Int, y: Int) {
 		let r = host.endDragGesture(x: x, y: y)
 		if !r.dragged { performTap(x: r.start.x, y: r.start.y, hooks: false) }
+	}
+}
+
+// MARK: world map (WorldMap/)
+
+extension GameClient {
+	/// True while a world map component was drawn in the last frame (the interface the server opens from the minimap
+	/// orb). `cameraDrag`, `cameraPinch` and `isOverWorld` then act on the map, so a shell that already forwards those
+	/// gestures to the camera needs no change; the explicit calls below are for shells that route gestures themselves.
+	public var worldMapIsOpen: Bool { inGame && ui.worldMap.isShown && ui.worldMap.current != nil }
+
+	/// The map component's rectangle from the last frame (game pixels), nil when the map is not shown.
+	public var worldMapRect: (x: Int, y: Int, w: Int, h: Int)? {
+		guard worldMapIsOpen, let d = ui.drawn.last(where: { $0.component.clientCode == 1400 }) else { return nil }
+		return (d.x, d.y, d.w, d.h)
+	}
+
+	/// Is (x, y) on the map picture (not on a button or panel above it)? Use it to start a map pan or pinch.
+	public func isOverWorldMap(x: Int, y: Int) -> Bool {
+		guard let r = worldMapRect, x >= r.x, y >= r.y, x < r.x + r.w, y < r.y + r.h else { return false }
+		// Controls drawn over the map (zoom buttons, search box) keep their own taps.
+		for d in ui.drawn.reversed() where x >= d.x && y >= d.y && x < d.x + d.w && y < d.y + d.h {
+			if d.component.clientCode == 1400 { return true }
+			if d.component.hooks["onOptionClick"] != nil || d.component.hooks["onClickRepeat"] != nil { return false }
+		}
+		return true
+	}
+
+	/// One-finger pan inside the map: `dx` / `dy` are the finger's travel in game pixels since the last call.
+	public func worldMapDrag(dx: Double, dy: Double) { ui.worldMap.drag(dx: dx, dy: dy) }
+
+	/// Pinch inside the map: `scale` is the change since the last callback (> 1 zooms in). Call `worldMapZoomEnded()`
+	/// when the pinch ends to settle on the nearest zoom level.
+	public func worldMapZoom(scale: Double) { ui.worldMap.zoom(by: scale) }
+
+	public func worldMapZoomEnded() { ui.worldMap.snapZoom() }
+
+	/// A tap or drag on the overview (client code 1401) at (x, y): centres the main map there. True when it hit.
+	@discardableResult
+	public func worldMapOverviewTouch(x: Int, y: Int) -> Bool {
+		guard worldMapIsOpen, let d = ui.drawn.last(where: { $0.component.clientCode == 1401 }),
+		      x >= d.x, y >= d.y, x < d.x + d.w, y < d.y + d.h else { return false }
+		ui.worldMap.centre(overviewX: x - d.x, y: y - d.y, w: d.w, h: d.h)
+		return true
 	}
 }

@@ -88,6 +88,7 @@ extension InterfaceScriptHost {
 		loop += 1
 		transmitTimer += 1
 		renderer.advanceModelAnimations(&game.interfaces)
+		renderer.worldMap.cycle() // WorldMap/: zoom easing, gliding and the flash timer
 		var high: [Pending] = [], medium: [Pending] = [], low: [Pending] = []
 		walk { c in
 			guard !c.hooks.isEmpty else { return }
