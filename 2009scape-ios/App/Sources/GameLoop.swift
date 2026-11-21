@@ -16,7 +16,16 @@ final class GameLoop: @unchecked Sendable {
 		var maxReconnectAttempts: Int
 		var menuRows: [MenuRow]?
 		var isDraggingItem: Bool
+		/// "fps / ms per frame / client cycles per second", refreshed once a second.
+		var stats: String
 	}
+
+	// Frame statistics (game queue only).
+	private var statFrames = 0
+	private var statBusy: Double = 0
+	private var statStart = Date()
+	private var statText = ""
+	private var statLogAt = Date()
 
 	private let client: GameClient
 	private let queue = DispatchQueue(label: "scape530.game", qos: .userInteractive)
@@ -54,6 +63,7 @@ final class GameLoop: @unchecked Sendable {
 		lock.unlock()
 		queue.async { [self] in
 			defer { lock.lock(); busy = false; lock.unlock() }
+			let t0 = Date()
 			controller.poll(client)
 			client.smoothMotion = smoothMotion
 			do {
@@ -75,10 +85,22 @@ final class GameLoop: @unchecked Sendable {
 			} catch {
 				print("[frame] \(error)")
 			}
+			statFrames += 1
+			statBusy += Date().timeIntervalSince(t0)
+			let span = Date().timeIntervalSince(statStart)
+			if span >= 1 {
+				let cps = Double(client.takeCycleCount()) / span
+				statText = String(format: "%.0f fps  %.1f ms  %.0f cycles/s", Double(statFrames) / span, statBusy * 1000 / Double(statFrames), cps)
+				if Date().timeIntervalSince(statLogAt) >= 30, client.screen == .game {
+					client.log("perf: \(statText) at \(width)x\(height)")
+					statLogAt = Date()
+				}
+				statFrames = 0; statBusy = 0; statStart = Date()
+			}
 			let snap = Snapshot(
 				screen: client.screen, wantsKeyboard: client.wantsKeyboard, connectError: client.connectError,
 				reconnectAttempt: client.reconnectAttempt, maxReconnectAttempts: client.maxReconnectAttempts,
-				menuRows: client.popupRows, isDraggingItem: client.isDraggingItem)
+				menuRows: client.popupRows, isDraggingItem: client.isDraggingItem, stats: statText)
 			DispatchQueue.main.async { [onSnapshot] in onSnapshot(snap) }
 		}
 	}

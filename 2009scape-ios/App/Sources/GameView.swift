@@ -51,6 +51,7 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 	private var lastKeyboardWanted = false
 
 	private let keyboardButton = UIButton(type: .system)
+	private let statsLabel = UILabel()
 	private let banner = PaddedLabel()
 	private var pinch: UIPinchGestureRecognizer!
 	private var twoFingerPan: UIPanGestureRecognizer!
@@ -68,11 +69,19 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		inputAssistantItem.leadingBarButtonGroups = []
 		inputAssistantItem.trailingBarButtonGroups = []
 		loop.onSnapshot = { [weak self] s in self?.apply(s) }
+		// Face ID only when the player presses Log In with the password empty (never on launch).
+		let gameLoop = loop
+		client.savedPasswordProvider = { user, done in
+			Keychain.password(for: user, prompt: "Log in to 2009scape as \(user)") { pw in gameLoop.async { _ in done(pw) } }
+		}
 
-		addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped(_:))))
+		let tap = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
+		tap.delegate = self
+		addGestureRecognizer(tap)
 		// Long press = rt4's right click (opens the menu at the touch point). 350 ms like a mobile client.
 		let press = UILongPressGestureRecognizer(target: self, action: #selector(pressed(_:)))
 		press.minimumPressDuration = 0.35
+		press.delegate = self
 		addGestureRecognizer(press)
 		// A mouse or trackpad secondary click does the same.
 		let rightClick = UITapGestureRecognizer(target: self, action: #selector(rightClicked(_:)))
@@ -82,6 +91,7 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		// One-finger drag over the world turns the camera.
 		let pan = UIPanGestureRecognizer(target: self, action: #selector(panned(_:)))
 		pan.maximumNumberOfTouches = 1
+		pan.delegate = self
 		addGestureRecognizer(pan)
 		// Two fingers: vertical drag tilts (horizontal turns), together with pinch zoom.
 		twoFingerPan = UIPanGestureRecognizer(target: self, action: #selector(twoFingerPanned(_:)))
@@ -125,6 +135,14 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		keyboardButton.isHidden = true
 		addSubview(keyboardButton)
 
+		statsLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+		statsLabel.textColor = .yellow
+		statsLabel.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+		statsLabel.translatesAutoresizingMaskIntoConstraints = false
+		statsLabel.isUserInteractionEnabled = false
+		statsLabel.isHidden = true
+		addSubview(statsLabel)
+
 		banner.numberOfLines = 0
 		banner.textAlignment = .center
 		banner.textColor = .white
@@ -143,6 +161,8 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 			keyboardButton.heightAnchor.constraint(equalToConstant: 44),
 			keyboardButton.topAnchor.constraint(equalTo: safe.topAnchor, constant: 8),
 			keyboardButton.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -96),
+			statsLabel.topAnchor.constraint(equalTo: safe.topAnchor, constant: 2),
+			statsLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
 			banner.centerXAnchor.constraint(equalTo: centerXAnchor),
 			banner.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -16),
 			banner.widthAnchor.constraint(lessThanOrEqualTo: safe.widthAnchor, multiplier: 0.9),
@@ -221,6 +241,8 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		}
 		lastKeyboardWanted = s.wantsKeyboard
 		keyboardButton.isHidden = true // the shell's keyboard button lives in the screen margin (RootView)
+		statsLabel.isHidden = !MobileSettings.frameStats
+		if MobileSettings.frameStats { statsLabel.text = " \(s.stats) " }
 
 		if s.reconnectAttempt > 0 && s.screen == .game {
 			banner.text = "Connection lost. Reconnecting (\(s.reconnectAttempt)/\(s.maxReconnectAttempts))..."
@@ -336,7 +358,8 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 	@objc private func tapped(_ g: UITapGestureRecognizer) {
 		guard !longPressFired else { return }
 		let (x, y) = toGame(g.location(in: self))
-		loop.async { $0.tap(x: x, y: y) }
+		let slop = Int((10 * pixelsPerPoint).rounded()) // about 10 pt around small buttons
+		loop.async { $0.touchSlop = slop; $0.tap(x: x, y: y) }
 	}
 
 	@objc private func pressed(_ g: UILongPressGestureRecognizer) {
@@ -348,9 +371,12 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 			longPressFired = loop.sync { $0.longPress(x: x, y: y) }
 			if longPressFired { Haptics.shared.menuOpened() }
 		case .changed:
+			// With the options menu open, the held finger slides over its rows (OSRS mobile style).
+			if let m = menuView { m.track(convert(p, to: m)); return }
 			// Moving the finger after a long press on an inventory slot drags the item (rt4 drag/swap).
 			loop.async { $0.dragMove(x: x, y: y) }
 		case .ended:
+			if let m = menuView { m.release(convert(p, to: m)); return }
 			loop.async { if $0.isDraggingItem { $0.dragEnd(x: x, y: y) } }
 		case .cancelled, .failed:
 			loop.async { if $0.isDraggingItem { $0.dragEnd(x: -1, y: -1) } }
@@ -428,6 +454,12 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		guard g.state == .changed || g.state == .began else { return }
 		let (x, y) = toGame(g.location(in: self))
 		loop.async { $0.hover(x: x, y: y) }
+	}
+
+	/// Touches on the options menu belong to the menu (it does its own forgiving hit-testing).
+	func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+		guard let m = menuView, let v = touch.view else { return true }
+		return !v.isDescendant(of: m)
 	}
 
 	func gestureRecognizer(_ a: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith b: UIGestureRecognizer) -> Bool {

@@ -166,6 +166,36 @@ public final class InterfaceRenderer {
 		return nil
 	}
 
+	/// Touch helper (not in rt4): the centre of the nearest small interactive component within `slop` pixels of
+	/// (x, y), for taps that land just beside a button. Big areas (the 3D viewport, layers, inventories) are skipped.
+	public func nearestInteractive(x: Int, y: Int, slop: Int) -> (x: Int, y: Int)? {
+		var best: (d: Int, x: Int, y: Int)?
+		for d in drawn {
+			let c = d.component
+			guard d.w > 0, d.h > 0, d.w * d.h <= 160 * 60, c.type != 2, c.clientCode != 1337 else { continue }
+			guard c.hooks["onOptionClick"] != nil || c.hooks["onClickRepeat"] != nil || !c.ops.isEmpty || c.buttonType != 0
+				|| c.option != nil || (c.events >> 11) & 0x7F != 0 || c.events & 1 != 0 else { continue }
+			let dx = max(d.x - x, 0, x - (d.x + d.w - 1)), dy = max(d.y - y, 0, y - (d.y + d.h - 1))
+			let dist = max(dx, dy)
+			guard dist <= slop else { continue }
+			if best == nil || dist < best!.d { best = (dist, d.x + d.w / 2, d.y + d.h / 2) }
+		}
+		return best.map { ($0.x, $0.y) }
+	}
+
+	/// Touch helper (OSRS mobile style): when a dialogue shows "Click here to continue", the rectangle of that
+	/// dialogue's interface and the continue component's centre, so a tap anywhere on the dialogue continues.
+	public func dialogueContinue() -> (area: (x: Int, y: Int, w: Int, h: Int), x: Int, y: Int)? {
+		guard let cont = drawn.last(where: { $0.component.type == 4 && $0.component.text.lowercased().hasPrefix("click here to continue") }) else { return nil }
+		let iface = cont.component.id >> 16
+		var minX = Int.max, minY = Int.max, maxX = Int.min, maxY = Int.min
+		for d in drawn where d.component.id >> 16 == iface && d.w > 0 && d.h > 0 {
+			minX = min(minX, d.x); minY = min(minY, d.y); maxX = max(maxX, d.x + d.w); maxY = max(maxY, d.y + d.h)
+		}
+		guard minX < maxX, minY < maxY else { return nil }
+		return ((minX, minY, maxX - minX, maxY - minY), cont.x + cont.w / 2, cont.y + cont.h / 2)
+	}
+
 	func renderInterface(_ interface: Int, x: Int, y: Int, w: Int, h: Int, state: InterfaceState, into r: inout Raster) throws {
 		let comps = try components(interface)
 		try renderLayer(comps, interface: interface, parent: -1, ox: x, oy: y, pw: w, ph: h, state: state, into: &r)

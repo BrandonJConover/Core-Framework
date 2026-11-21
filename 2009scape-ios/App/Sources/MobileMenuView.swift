@@ -1,16 +1,30 @@
 import UIKit
 import Scape530
 
-/// The "mobile UI" option list: the library's own menu entries (`GameClient.popupRows`) shown as large
-/// touch rows (44 pt minimum) near where the finger pressed, kept inside the safe area, with a clear
-/// Cancel row. Tapping outside the panel dismisses it.
+/// The long-press option menu drawn in rt4's own menu style (`MiniMenu`: 0x5D5447 body, black border, black
+/// "Choose Option" header, white entries with coloured names) but sized for fingers like the OSRS mobile client:
+/// rows at least 44 pt tall, placed under the finger and kept on screen.
+///
+/// Touch is forgiving: the row is the nearest row centre to the touch point (shifted down a few points, since
+/// iOS reports touches slightly above where people aim), anywhere within the menu extended by `slop` on each
+/// side. The row under the finger is highlighted while it is held and chosen on lift, so a finger can slide to
+/// correct before releasing. A finger that long-pressed to open the menu can keep sliding and release on a row.
+/// Lifting outside (beyond the slop) cancels.
 final class MobileMenuView: UIView {
-	private let panel = UIScrollView()
-	private let stack = UIStackView()
+	static let body = UIColor(red: 0x5D / 255, green: 0x54 / 255, blue: 0x47 / 255, alpha: 1)
 	private let rows: [MenuRow]
 	private let anchor: CGPoint
 	private let onSelect: (MenuRow) -> Void
 	private let onDismiss: () -> Void
+	private var panel = CGRect.zero
+	private var rowHeight: CGFloat = 44
+	private let headerHeight: CGFloat = 30
+	private let slop: CGFloat = 20
+	/// iOS touch points sit a little above the finger's centre of contact.
+	private let fingerOffset: CGFloat = 6
+	private var highlighted: Int?
+	private var labels: [NSAttributedString] = []
+	private var finished = false
 
 	init(rows: [MenuRow], anchor: CGPoint, onSelect: @escaping (MenuRow) -> Void, onDismiss: @escaping () -> Void) {
 		self.rows = rows
@@ -18,73 +32,113 @@ final class MobileMenuView: UIView {
 		self.onSelect = onSelect
 		self.onDismiss = onDismiss
 		super.init(frame: .zero)
-		backgroundColor = UIColor.black.withAlphaComponent(0.25)
-		addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(backdropTapped)))
-
-		panel.backgroundColor = UIColor(red: 0x5D / 255, green: 0x54 / 255, blue: 0x47 / 255, alpha: 0.97)
-		panel.layer.cornerRadius = 10
-		panel.layer.borderWidth = 1.5
-		panel.layer.borderColor = UIColor.black.cgColor
-		panel.clipsToBounds = true
-		panel.showsVerticalScrollIndicator = true
-		panel.delaysContentTouches = false
-		addSubview(panel)
-
-		stack.axis = .vertical
-		stack.spacing = 1
-		stack.translatesAutoresizingMaskIntoConstraints = false
-		panel.addSubview(stack)
-		NSLayoutConstraint.activate([
-			stack.topAnchor.constraint(equalTo: panel.contentLayoutGuide.topAnchor),
-			stack.bottomAnchor.constraint(equalTo: panel.contentLayoutGuide.bottomAnchor),
-			stack.leadingAnchor.constraint(equalTo: panel.contentLayoutGuide.leadingAnchor),
-			stack.trailingAnchor.constraint(equalTo: panel.contentLayoutGuide.trailingAnchor),
-			stack.widthAnchor.constraint(equalTo: panel.frameLayoutGuide.widthAnchor),
-		])
-		for (i, row) in rows.enumerated() {
-			let b = UIButton(type: .custom)
-			b.tag = i
-			b.contentHorizontalAlignment = .left
-			b.contentEdgeInsets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
-			b.titleLabel?.numberOfLines = 2
-			b.titleLabel?.lineBreakMode = .byTruncatingTail
-			b.setAttributedTitle(Self.attributed(row.text, cancel: row.isCancel), for: .normal)
-			b.backgroundColor = row.isCancel ? UIColor(white: 0.1, alpha: 0.9) : UIColor(white: 0, alpha: i == 0 ? 0.55 : 0.35)
-			b.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
-			b.addTarget(self, action: #selector(rowTapped(_:)), for: .touchUpInside)
-			b.addTarget(self, action: #selector(rowDown), for: .touchDown)
-			stack.addArrangedSubview(b)
-		}
+		backgroundColor = UIColor.black.withAlphaComponent(0.15)
+		isOpaque = false
+		contentMode = .redraw
+		isMultipleTouchEnabled = false
+		labels = rows.map { Self.attributed($0.text, cancel: $0.isCancel) }
 	}
 
 	required init?(coder: NSCoder) { fatalError("not used") }
 
-	@objc private func backdropTapped() { onDismiss() }
-	@objc private func rowDown() { Haptics.shared.rowSelected() }
-	@objc private func rowTapped(_ b: UIButton) {
-		guard b.tag < rows.count else { return }
-		onSelect(rows[b.tag])
-	}
-
 	override func layoutSubviews() {
 		super.layoutSubviews()
-		let safe = bounds.inset(by: safeAreaInsets).insetBy(dx: 8, dy: 8)
+		let safe = bounds.inset(by: safeAreaInsets).insetBy(dx: 6, dy: 6)
 		guard safe.width > 0, safe.height > 0 else { return }
-		let width = min(max(260, safe.width * 0.4), safe.width)
-		stack.layoutIfNeeded()
-		let fitting = stack.systemLayoutSizeFitting(CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
-			withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
-		let height = min(fitting, safe.height)
+		let textWidth = labels.map { ceil($0.size().width) }.max() ?? 100
+		let width = min(max(textWidth + 32, 220), safe.width)
+		rowHeight = max(44, min(52, (safe.height - headerHeight - 4) / CGFloat(max(rows.count, 1))))
+		let height = min(headerHeight + rowHeight * CGFloat(rows.count) + 4, safe.height)
+		rowHeight = (height - headerHeight - 4) / CGFloat(max(rows.count, 1))
+		// rt4 centres the menu on the click; here the first row (the default action) lands under the finger.
 		var x = anchor.x - width / 2
-		var y = anchor.y - 22 // first row (the default action) lands under the finger
+		var y = anchor.y - headerHeight - rowHeight / 2
 		x = min(max(x, safe.minX), safe.maxX - width)
 		y = min(max(y, safe.minY), safe.maxY - height)
-		panel.frame = CGRect(x: x, y: y, width: width, height: height)
+		panel = CGRect(x: x, y: y, width: width, height: height)
+		setNeedsDisplay()
+	}
+
+	override func draw(_ rect: CGRect) {
+		guard let ctx = UIGraphicsGetCurrentContext(), panel.width > 0 else { return }
+		ctx.setFillColor(Self.body.cgColor)
+		ctx.fill(panel)
+		ctx.setStrokeColor(UIColor.black.cgColor)
+		ctx.setLineWidth(2)
+		ctx.stroke(panel.insetBy(dx: 1, dy: 1))
+		// Header: black bar with "Choose Option" in the body colour (rt4 `MiniMenu.draw`).
+		let header = CGRect(x: panel.minX + 2, y: panel.minY + 2, width: panel.width - 4, height: headerHeight - 4)
+		ctx.setFillColor(UIColor.black.cgColor)
+		ctx.fill(header)
+		let title = NSAttributedString(string: "Choose Option", attributes: [.font: UIFont.systemFont(ofSize: 15, weight: .bold), .foregroundColor: Self.body])
+		title.draw(at: CGPoint(x: header.minX + 6, y: header.midY - title.size().height / 2))
+		for (i, label) in labels.enumerated() {
+			let r = rowRect(i)
+			if i == highlighted {
+				ctx.setFillColor(UIColor(white: 1, alpha: 0.18).cgColor)
+				ctx.fill(r.insetBy(dx: 2, dy: 1))
+			}
+			if i > 0 {
+				ctx.setFillColor(UIColor.black.withAlphaComponent(0.25).cgColor)
+				ctx.fill(CGRect(x: r.minX + 6, y: r.minY, width: r.width - 12, height: 1))
+			}
+			label.draw(at: CGPoint(x: r.minX + 10, y: r.midY - label.size().height / 2))
+		}
+	}
+
+	private func rowRect(_ i: Int) -> CGRect {
+		CGRect(x: panel.minX, y: panel.minY + headerHeight + CGFloat(i) * rowHeight, width: panel.width, height: rowHeight)
+	}
+
+	/// Nearest row to a touch, within the panel grown by `slop`; nil outside.
+	private func row(at p: CGPoint) -> Int? {
+		let q = CGPoint(x: p.x, y: p.y + fingerOffset)
+		guard panel.insetBy(dx: -slop, dy: -slop).contains(q), !rows.isEmpty else { return nil }
+		let i = Int(floor((q.y - panel.minY - headerHeight) / rowHeight))
+		return min(max(i, 0), rows.count - 1)
+	}
+
+	private func setHighlight(_ i: Int?) {
+		guard i != highlighted else { return }
+		highlighted = i
+		if i != nil { Haptics.shared.rowSelected() }
+		setNeedsDisplay()
+	}
+
+	private func finish(_ i: Int?) {
+		guard !finished else { return }
+		finished = true
+		if let i { onSelect(rows[i]) } else { onDismiss() }
+	}
+
+	// Taps and slides after the menu is open.
+	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+		if let t = touches.first { setHighlight(row(at: t.location(in: self))) }
+	}
+	override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+		if let t = touches.first { setHighlight(row(at: t.location(in: self))) }
+	}
+	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+		guard let t = touches.first else { return }
+		finish(row(at: t.location(in: self)))
+	}
+	override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { setHighlight(nil) }
+
+	// The long press that opened the menu, still held (`GameCanvasView` forwards it).
+	private var moved = false
+	func track(_ p: CGPoint) {
+		if hypot(p.x - anchor.x, p.y - anchor.y) > 10 { moved = true }
+		if moved { setHighlight(row(at: p)) }
+	}
+	/// Lift of the opening press: chooses only if the finger slid onto a row; lifting in place keeps the menu open.
+	func release(_ p: CGPoint) {
+		guard moved, let i = row(at: p) else { setHighlight(nil); return }
+		finish(i)
 	}
 
 	/// rt4 text with `<col=rrggbb>` tags to attributed text (white until the first tag); other tags are dropped.
 	static func attributed(_ text: String, cancel: Bool) -> NSAttributedString {
-		let font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+		let font = UIFont.systemFont(ofSize: 17, weight: .bold)
 		let out = NSMutableAttributedString()
 		var color = cancel ? UIColor(red: 1, green: 0.55, blue: 0.5, alpha: 1) : UIColor.white
 		var chars = Substring(text)

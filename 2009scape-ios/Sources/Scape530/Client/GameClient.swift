@@ -224,6 +224,14 @@ public final class GameClient {
 	/// In-game typing: set when a tap lands on the chatbox, cleared by a tap on the world.
 	public var keyboardRequested = false
 
+	/// Set by the shell: asked for the saved password of an account (e.g. behind Face ID) when the player presses
+	/// Log In with the password field empty. The completion must run on the thread that drives this client.
+	public var savedPasswordProvider: ((String, @escaping (String?) -> Void) -> Void)?
+
+	/// Client cycles run since the shell last read `takeCycleCount()` (for the frame-time counter).
+	var cyclesThisSecond = 0
+	public func takeCycleCount() -> Int { defer { cyclesThisSecond = 0 }; return cyclesThisSecond }
+
 	/// Shows or hides the keyboard in game (for a button in the shell).
 	public func toggleKeyboard() { keyboardRequested.toggle() }
 
@@ -257,8 +265,12 @@ public final class GameClient {
 		// One client cycle is 20 ms; always run at least one so scripts and
 		// timers advance on every frame, and never more than a few after a stall.
 		// (0 is allowed after the first frame so a 60/120 Hz shell redraws without running the game faster than rt4's 50 Hz.)
-		let cycles = lastCycleAt.map { min(max(Int(now.timeIntervalSince($0) / 0.02), 0), 5) } ?? 1
+		// rt4 `NanoTimer.count`: up to 10 cycles per frame; time beyond that is dropped (the timer jumps to now)
+		// rather than owed, so a long stall does not make the game race afterwards.
+		let cycles = lastCycleAt.map { min(max(Int(now.timeIntervalSince($0) / 0.02), 0), 10) } ?? 1
 		lastCycleAt = lastCycleAt.map { $0.addingTimeInterval(Double(cycles) * 0.02) } ?? now
+		if let t = lastCycleAt, now.timeIntervalSince(t) > 0.02 { lastCycleAt = now }
+		cyclesThisSecond += cycles
 		world.renderAlpha = lastCycleAt.map { min(max(now.timeIntervalSince($0) / 0.02, 0), 1) } ?? 1
 		for _ in 0..<cycles {
 			host.cycle()
@@ -335,10 +347,38 @@ public final class GameClient {
 	// MARK: input
 
 	/// A tap in game pixels: press and release of the primary button.
-	public func tap(x: Int, y: Int) { performTap(x: x, y: y, hooks: true) }
+	public func tap(x: Int, y: Int) {
+		var (x, y) = (x, y)
+		if inGame, interaction.popup == nil {
+			// Touch forgiveness (OSRS mobile style, not in rt4): a tap anywhere on a dialogue with "Click here to
+			// continue" continues it, and a tap just beside a small button presses the nearest one.
+			if let c = ui.dialogueContinue(),
+			   x >= c.area.x, y >= c.area.y, x < c.area.x + c.area.w, y < c.area.y + c.area.h,
+			   ui.hitTest(x: x, y: y) == nil {
+				(x, y) = (c.x, c.y)
+			} else if ui.hitTest(x: x, y: y) == nil, let n = ui.nearestInteractive(x: x, y: y, slop: touchSlop) {
+				(x, y) = n
+			}
+		}
+		performTap(x: x, y: y, hooks: true)
+	}
+
+	/// Game pixels a tap may miss a small button by and still press it (set by the shell from its points scale).
+	public var touchSlop = 12
 
 	/// `hooks` false when the press hooks already ran for a gesture that began as a drag.
 	func performTap(x: Int, y: Int, hooks: Bool) {
+		// Log In with an empty password on a saved account: ask the shell for the saved password (Face ID) first.
+		if screen == .loginForm, password.isEmpty, !username.isEmpty, let provider = savedPasswordProvider,
+		   let hit = ui.hitTest(x: x, y: y), hit.id == loginInterface << 16 | 347 {
+			let user = username
+			provider(user) { [weak self] pw in
+				guard let self, let pw, !pw.isEmpty, self.username == user, self.screen == .loginForm else { return }
+				self.password = pw
+				self.submit()
+			}
+			return
+		}
 		if inGame, interaction.popup == nil {
 			if tapToDrop, dropTap(x: x, y: y) { return }
 			if inventoryTap(x: x, y: y) { keyboardRequested = false; return }
