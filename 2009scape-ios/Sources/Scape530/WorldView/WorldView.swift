@@ -12,7 +12,7 @@ public final class WorldView {
 	var textures: TextureStore?
 	/// The built scene. Hidden (nil) while a rebuild is in flight: its coordinates no longer match the actors.
 	public var scene: Scene? { isBuilding ? nil : liveScene }
-	var liveScene: Scene?
+	var liveScene: Scene? { didSet { ctx.scene = liveScene } }
 	var raster3D: Rasteriser3D?
 	/// GPU renderer: nil draws with the software rasteriser; set it to draw through `gpuFrame` instead (see `GPU/`).
 	public var gpuSettings: GPURenderSettings?

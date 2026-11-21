@@ -452,6 +452,7 @@ public final class GameClient {
 	/// Draws the 3D world into the viewport (the whole raster until the interface has told us where it is).
 	private func drawWorld(into r: inout Raster, width: Int, height: Int) -> Bool {
 		let v = viewport.flatMap { $0.x + $0.w <= width && $0.y + $0.h <= height ? $0 : nil } ?? (x: 0, y: 0, w: width, h: height)
+		world.ctx.characterShadows = host.prefs.characterShadows
 		return world.draw(into: &r, rect: v)
 	}
 

@@ -92,6 +92,8 @@ extension WorldView {
 		guard a.spotAnimId != -1, a.spotFrame >= 0, let t = (try? store.spotAnim(a.spotAnimId)) ?? nil,
 		      let m = try? store.spotAnimModel(t, frame: a.spotFrame, nextFrame: a.spotNext, step: a.spotStep) else { return nil }
 		m.translate(0, -a.spotAnimY, 0)
+		// rt4 `SpotAnimType.aBoolean100` (opcode 9): the graphic lies on the slope like its creature.
+		if t.opcode9 { a.footprintTilt(orientation: a.yaw).apply(to: m) }
 		return m
 	}
 }

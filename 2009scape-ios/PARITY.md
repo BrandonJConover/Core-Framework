@@ -22,7 +22,7 @@ playthrough tests (tutorial, combat, bank, shop, magic, woodcutting, fires, cook
 - [ ] Full interface sweep (all 483) clean
 - [ ] Hardware keyboard (iPad/BT keyboards): arrow-key camera, F-keys, Esc, modifiers, Ctrl-run
 - [ ] Fixed 765x503 mode (interface 548)
-- [ ] Large-creature terrain tilt (PathingEntity.method2685) and BAS roll/pitch (method2687)
+- [x] Large-creature terrain tilt (PathingEntity.method2685), BAS roll/pitch (method2687) and SD character shadows (ShadowModelList; scenery shadows in SD are the baked `shadowmap`, the sprite shadows are GL-only)
 - [ ] RoofHider mode 1, client-local ::commands
 - [ ] Account creation (ops 5603-5610), probably not needed for a private server
 - [ ] HD (GL) paths: lighting, shadows, water, overlay edge blend (Metal renderer roadmap)
