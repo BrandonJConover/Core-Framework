@@ -15,9 +15,29 @@ let package = Package(
     ],
     dependencies: [],
     targets: [
+        // rsc-c (the same C engine as the WebAssembly browser client) compiled
+        // natively, with an SDL2-subset shim. See RSCEngine/README.md.
+        .target(
+            name: "RSCEngine",
+            path: "RSCEngine",
+            exclude: ["tools", "rsc-cache", "README.md", "rsc-c-src/COPYING"],
+            sources: ["rsc-c-src", "shim"],
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("shim"),
+                .define("SDL2"),
+                .define("RENDER_SW"),
+                // rsc-c's "ANDROID" path is its mobile SDL2 target: touch
+                // input, 360px-tall scaled UI, SDL_GetPrefPath config.
+                .define("ANDROID"),
+                // rsc-c's main() runs on the engine thread as rsc_c_main().
+                .define("main", to: "rsc_c_main"),
+                .unsafeFlags(["-std=gnu99", "-fwrapv", "-w"])
+            ]
+        ),
         .target(
             name: "OpenRSC",
-            dependencies: [],
+            dependencies: ["RSCEngine"],
             path: "OpenRSC/Sources",
             resources: [
                 .process("Rendering/Shaders.metal"),

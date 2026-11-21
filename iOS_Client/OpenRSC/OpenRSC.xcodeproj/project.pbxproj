@@ -8,163 +8,570 @@
 
 /* Begin PBXBuildFile section */
 		000976800475318BA8C73DE6 /* CharacterBillboards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA8AE1F76A6030168425450 /* CharacterBillboards.swift */; };
+		034CD96FC242FA2786D73464 /* options.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = E054C4FFEE327FFC2F0A56A7 /* options.h */; };
+		03BCB97956F77C69099370C2 /* trade.c in Sources */ = {isa = PBXBuildFile; fileRef = 72962EB29E56F834727BECD5 /* trade.c */; };
 		0499D33505237234EC1FEEB2 /* TradePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77082BCCC301983216C93E70 /* TradePanel.swift */; };
 		056348FA1DEC564CF4D734D0 /* RSCLoginHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D4A8C89190272EFC205D26A /* RSCLoginHandler.swift */; };
+		0577B9DF47C2AFB7DDDDD690 /* bank.c in Sources */ = {isa = PBXBuildFile; fileRef = 4FAB0A49C2D370BDEDC17035 /* bank.c */; };
 		0719CA5F2460CB24784BB821 /* MinimapPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A2C8E3EE280E9D4EC285120 /* MinimapPanel.swift */; };
 		0950957DF00260DAA0754C38 /* OpenRSCApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5969C636EE8BFAC20BDCE024 /* OpenRSCApp.swift */; };
+		0A9AC1B94236998881D7B059 /* bank.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = BC63366914FBB9308EF74650 /* bank.h */; };
 		0B5B96679272F4061595F185 /* ServerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82C6EF63288E0ECBA6862BC3 /* ServerProfile.swift */; };
 		0DA666740B06BC98390E1A70 /* SleepPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D699C23A0F9C4835F522B84 /* SleepPanel.swift */; };
+		0F0479F78947A6362FBB3AAA /* utility.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9FA84417F2E74F5329E1285A /* utility.h */; };
+		0F8F699EC82727BC69217CC3 /* diverse-npcs.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = C72668244F0389200C203448 /* diverse-npcs.h */; };
+		1673CD1080346B357BE8212F /* SDL.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 65603A97DA510447ACDDACB4 /* SDL.h */; };
 		173ADFFA4E8DB40C15342E6B /* Audio in Resources */ = {isa = PBXBuildFile; fileRef = 8B57ED468FC1209E7D5335BC /* Audio */; };
+		176BDCF05D179AF60F8EBCAA /* bn.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 09B6D6F273992CD793510E24 /* bn.h */; };
+		1B4061034715A557694754B2 /* lost-connection.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 4A50A713EA7A8595E3825DD8 /* lost-connection.h */; };
+		1BF4D03B50F5127D1EC928C1 /* client-opcodes.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 621E44A453AEAA9BD3BBDA2D /* client-opcodes.h */; };
 		1C69A0A877D02C70BAB61037 /* LandscapeLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6B9F41201F6AE4126D67AF /* LandscapeLoader.swift */; };
 		1F05133FAB0524EC26661315 /* GraphicsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C023BDFCCE3322E38787E6 /* GraphicsController.swift */; };
 		1F13FB4369B1983A1DA68B2D /* AnimationDefs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FBC620FEE34BCB304CCA49 /* AnimationDefs.swift */; };
+		24BD07F1AA4B6DFB2734D5BB /* bn.c in Sources */ = {isa = PBXBuildFile; fileRef = A2BC953C3BFB197B4BD1770C /* bn.c */; };
+		2591B03818A86E95A86617E8 /* shop.c in Sources */ = {isa = PBXBuildFile; fileRef = F1FE28F61B2CFC01AC56636B /* shop.c */; };
+		25DB4A170CCB5C69FE2739EC /* scene.c in Sources */ = {isa = PBXBuildFile; fileRef = 6F0E61838465D517FA40DCE2 /* scene.c */; };
 		267F7DDF56BBD1DBEC777E95 /* RSCStringCipher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768F1EA39D6B57B64CD4E728 /* RSCStringCipher.swift */; };
+		28AF223226C071D779171CC6 /* mudclient-sdl2.c in Sources */ = {isa = PBXBuildFile; fileRef = 6AE22CB9A5C6AFA56D0E66FD /* mudclient-sdl2.c */; };
+		2915048B17F0EB9683683A59 /* polygon.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 95F135063AA16D833109EE61 /* polygon.h */; };
 		295E2A677F0E7DADBE03EC41 /* ObjectNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED06FB5405C413FFB721D92 /* ObjectNames.swift */; };
+		300E4D04B224AC93196C4EB0 /* stats-tab.c in Sources */ = {isa = PBXBuildFile; fileRef = 8D454E7CCCFF14CD8000F4C1 /* stats-tab.c */; };
 		3014C9952753A6CE34CE0042 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85989A2D185A0C6B9D712DC5 /* RegisterView.swift */; };
+		324C87E86D8CC9202FCB55FB /* rsc_sdl_shim.c in Sources */ = {isa = PBXBuildFile; fileRef = 1D8D09753C1766479BB4C212 /* rsc_sdl_shim.c */; };
 		338FA91C1E0E26BAAEA38C25 /* WebClient in Resources */ = {isa = PBXBuildFile; fileRef = E51923D95FF7E811C424EE3D /* WebClient */; };
+		34B350F87148B0AF0E6351C6 /* diverse-npcs.c in Sources */ = {isa = PBXBuildFile; fileRef = CC0CDD0A8C5613191466BC64 /* diverse-npcs.c */; };
+		355CAC7AB93E23FFD93F3977 /* magic-tab.c in Sources */ = {isa = PBXBuildFile; fileRef = 0402B84A513AF91882B3C5E8 /* magic-tab.c */; };
+		35776F9D5A1556E7802B73AD /* chat-message.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = AE5013CED6E3B45B9F3488FE /* chat-message.h */; };
 		378B96EA683C267A82C4C8AA /* TouchTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38223850597085ADCA3EE8A3 /* TouchTranslator.swift */; };
+		38D47E706BA4F92C67CC599A /* mudclient.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = E49BEB0F62E0906C06BA9449 /* mudclient.h */; };
+		39612513261F3BCE70CFF7AF /* login.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 51D1AE61D2B44AD140F1C06E /* login.h */; };
+		398B99843487BE910D66B513 /* wilderness-warning.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 69C161AB89680BB56B3FD73A /* wilderness-warning.h */; };
 		3AA1A652B3144AB124C777AA /* ByteBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62F92BCAA91ED7CB2C887F6F /* ByteBuffer.swift */; };
+		3B0FD55B8CF7C247F0D590AA /* experience-drops.c in Sources */ = {isa = PBXBuildFile; fileRef = 06A85A977E16879F40D894EB /* experience-drops.c */; };
 		3D751413D47F84684101DEC1 /* Polygon.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2188BC35B6FD7A3DFDBCA4 /* Polygon.swift */; };
+		3F210DDA4E78F8301BE11FB4 /* rsa-openssl.c in Sources */ = {isa = PBXBuildFile; fileRef = E88B6C401087D577C3036EC5 /* rsa-openssl.c */; };
 		406DA2FFE25D7DA56EC24D73 /* models.orsc in Resources */ = {isa = PBXBuildFile; fileRef = F96FB7917C1BE2A428AA3513 /* models.orsc */; };
+		40C9E7CB1ADA152E65A0BD26 /* surface.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = A5A695EF68F329A20BD6BB15 /* surface.h */; };
+		4251D181CC7A2CFFCA13551A /* confirm.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 926C9E55150A54575F563C63 /* confirm.h */; };
 		42639A01C5A6A4A50E55E50F /* Authentic_Landscape.orsc in Resources */ = {isa = PBXBuildFile; fileRef = 66DF674CB40A4F01E8EBEEC1 /* Authentic_Landscape.orsc */; };
 		4273B54AE7E39DF3ECE163A2 /* UserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D9BF081F24BC3018C86C2F /* UserPreferences.swift */; };
 		476AD837C7512706C19396F1 /* SpriteLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8ADEBB716923D01590135A4 /* SpriteLoader.swift */; };
 		48198E65F85056BF3CD2BCE6 /* ModelArchiveLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9F6A909F89CE0F94742AF5 /* ModelArchiveLoader.swift */; };
+		4996C36EC378E91390E7292F /* locolour.c in Sources */ = {isa = PBXBuildFile; fileRef = 036EC4452F8C6237AF74571D /* locolour.c */; };
 		49BE2E9E20608DF7F8491734 /* landscape.dat in Resources */ = {isa = PBXBuildFile; fileRef = EB1994B23C1113BEF842C514 /* landscape.dat */; };
 		4B6D93F4FBEAD30A6A116F46 /* GameObjectDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4EDAB057950782165E6034E /* GameObjectDefinitions.swift */; };
+		4BA4C9BAFE1883C26CD39D5E /* minimap-tab.c in Sources */ = {isa = PBXBuildFile; fileRef = 5EF1432065878349DAE0C0F5 /* minimap-tab.c */; };
+		4C2BD1204AD74A42370DC16E /* client-opcodes204.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1EA81FA023C410A6100E741E /* client-opcodes204.h */; };
+		4E0B6E364990A4065589EAE3 /* server-opcodes.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2ED2D416644E085182B5B214 /* server-opcodes.h */; };
+		4E7ED2AABCF4CD89B5447024 /* welcome.c in Sources */ = {isa = PBXBuildFile; fileRef = 05ABBB0266E2425E0EF746F2 /* welcome.c */; };
 		4EDFD6C354CB77D0C3011728 /* RSCWorldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CBD0EBDD0DAD78E31727091 /* RSCWorldState.swift */; };
+		5183A515846879CA5DB62E62 /* game-model.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2EAFFD59DE796F810B4473AF /* game-model.h */; };
+		51EFC43753CB07C209A9EFEC /* libRSCEngine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A83F8CF16735D1E6B4A06EC /* libRSCEngine.a */; };
+		54EF80A0D8661D22ECC03DE9 /* rsa.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7C37173FCE48C9444D38543E /* rsa.h */; };
 		552BAD94C1418B5032196D70 /* BiometricLoginStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368DEB5A277F7F3412F785E4 /* BiometricLoginStore.swift */; };
+		55408BDB40700B3DE7373FAE /* ini.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 14746B6FC05879F209F7FFCE /* ini.h */; };
+		562670C307F7F5615EA6E5E1 /* worldlist.c in Sources */ = {isa = PBXBuildFile; fileRef = BBFC6CEE5E50D4C3563C9876 /* worldlist.c */; };
+		56FC521D94B14BCD8101E30E /* welcome.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 4B84D50776F9D9ED04D073B9 /* welcome.h */; };
+		58409F81BBB1C9745E8FD712 /* trade.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 6DACB0C365712E4F578F2C6A /* trade.h */; };
+		5909327B9E574508A3289342 /* option-menu.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = B2DB60AEEBA7F5C79A7D30F7 /* option-menu.h */; };
+		5A5A709CC1043BDE04FE3F45 /* clarify-herblaw-items.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 6A2302781B83D67DEECC803F /* clarify-herblaw-items.h */; };
+		5C384FD47BA1668C71A6A58F /* rsc_ios_prefix.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = BDBA701C1DB984B34B334D82 /* rsc_ios_prefix.h */; };
 		5D992464CE94A9E8AD9FE4FE /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA34960346994775CDF265C /* LoginView.swift */; };
+		5E32460EF647F68A4E4A462D /* offer-x.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1E00CA895FEB9227B580EBFC /* offer-x.h */; };
 		64AB02B55EB3EBA6BE73D300 /* Scanline.swift in Sources */ = {isa = PBXBuildFile; fileRef = D37E5A4EBD7022529B04B92A /* Scanline.swift */; };
 		6648F15278343C12D182D549 /* NPCNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5576569325B6C2223C6DEE7E /* NPCNames.swift */; };
+		673DA699FD81D591197FB223 /* message-tabs.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = C0A94174EF5448D747AC6D59 /* message-tabs.h */; };
 		6B141925187BB265598AE4E2 /* ISAACCipher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63B049FFEB87A145A0D3F9BC /* ISAACCipher.swift */; };
+		6D721CA6D772F3D7D31F3997 /* option-menu.c in Sources */ = {isa = PBXBuildFile; fileRef = 64E2AD4BCEF46C27F7B580D6 /* option-menu.c */; };
+		6E65598C3DBC3F8BCD50A4C5 /* duel.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 956B35397E0F17E216A3DD3D /* duel.h */; };
+		70C840D367325F625B7F5B59 /* bzip.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 8F419BD92B204EF30F068A25 /* bzip.h */; };
+		70F4DE796788632D14EBFDC1 /* ui-tabs.c in Sources */ = {isa = PBXBuildFile; fileRef = E8E55449F5F4054E89B74BB7 /* ui-tabs.c */; };
 		7234C13A3B9833C90E81C8CF /* Scene.swift in Sources */ = {isa = PBXBuildFile; fileRef = F01562B77A1FF9666EF960FB /* Scene.swift */; };
 		7255140007F553B7E76E835B /* WelcomePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4158CF99B998E5ACBE1150CE /* WelcomePanel.swift */; };
+		7255AA75122C5A6FBFCCBE96 /* shop.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = DE6BCCA7B11E4BFF7236833F /* shop.h */; };
+		73619C9829D0D6AAB44D15F5 /* server-opcodes177.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 5ED0223E9BFB2C75A82E0965 /* server-opcodes177.h */; };
+		76D47259A1F6A62DF86176B7 /* isaac.c in Sources */ = {isa = PBXBuildFile; fileRef = 1A15525676DCDD609A09E46C /* isaac.c */; };
+		7821C0D4616FCAD6B0C3A5EF /* game-data.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 52BF3A7279D0D4E492EB1766 /* game-data.h */; };
 		79FBC4B39E4291EA3889A584 /* FastMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79470D5C002A690DB639638F /* FastMath.swift */; };
+		7D94EA98A733CAB8547B2BC7 /* RSCEngineHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 818ADAA7413EE77CD4894746 /* RSCEngineHost.swift */; };
+		7DE50CF46359D6E010BF0E0A /* stats-tab.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1ABA3CFD925BE46A3B37D1F5 /* stats-tab.h */; };
 		7DEDBC075AAE1EA8F6D35A82 /* GameSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5F4767C4E2C9162C1DF5F3 /* GameSelectorView.swift */; };
 		7E6C152D0E1B360DA926B507 /* NpcDefs.json in Resources */ = {isa = PBXBuildFile; fileRef = FFEE1170686C181AC0F64F7F /* NpcDefs.json */; };
 		7FFB9D1CA4251DC6E52E18DC /* NPCDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D507B265366A49DD76F0BDAD /* NPCDefinitions.swift */; };
+		81BEFF566973A75A1E2C9A4E /* panel.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 8C765C51A0282C736E5C6E86 /* panel.h */; };
+		83257BDACF3DB78EBD170CA1 /* game-character.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = EF98B69A7810EB63096FC083 /* game-character.h */; };
 		843CD2F78B555661353B2FBA /* DuelPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C5DA77DFB8A641346DA3FD3 /* DuelPanel.swift */; };
+		84617B8507FB3E57E1F1718A /* NativeRSCView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CA919D63C2CC58438490E54 /* NativeRSCView.swift */; };
+		855054E4195AB8894FE30CF4 /* sleep.c in Sources */ = {isa = PBXBuildFile; fileRef = 8C3B15836A1EEBCD6AD99759 /* sleep.c */; };
+		856F8C44B64D193CFF8B23C9 /* login.c in Sources */ = {isa = PBXBuildFile; fileRef = BE0FB5B229741D3308E7FEA8 /* login.c */; };
+		85742CC1439D9F40BC87FFA1 /* additional-options.c in Sources */ = {isa = PBXBuildFile; fileRef = 6C0BA1ABDDDF60BE1F68DB63 /* additional-options.c */; };
+		85789C96C58471A0442B4265 /* world.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = AA31002E485E9C2F30C43698 /* world.h */; };
+		858E26F7208789E6D9EA0E07 /* game-character.c in Sources */ = {isa = PBXBuildFile; fileRef = ED5956B518CDDAD9D2FA7A0F /* game-character.c */; };
 		87B26B2F490394943F28B68D /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A609DE488849FEB3D6CB9E47 /* MetalRenderer.swift */; };
 		8816B8332CC031CA6433B1A2 /* Authentic_Sprites.orsc in Resources */ = {isa = PBXBuildFile; fileRef = 4C427C9F5B86C2E46A8D4C79 /* Authentic_Sprites.orsc */; };
+		8857F205641BB6BEA409A5E4 /* packet-stream.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = A763156381534B4761E5CE8C /* packet-stream.h */; };
+		8933C2F1B6ACCA371136901B /* colours.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = CA68EF6DEF50EE466FE600CC /* colours.h */; };
 		89A587E1B70A0CBC5632E006 /* RSCGameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24A98D60D91F8BC96E8BD27 /* RSCGameEngine.swift */; };
+		8B4EB65D0B78F4628E079EF9 /* options-tab.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 40C00BA58D77BA434FF14728 /* options-tab.h */; };
+		8CE17BB29CCBC96F01BD3505 /* utility.c in Sources */ = {isa = PBXBuildFile; fileRef = 5CF603EB91BC14884B53714C /* utility.c */; };
 		8D061CA1AC54B0CBBD451140 /* RSCOpcodes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A1905E095D026FE16EA83 /* RSCOpcodes.swift */; };
 		8FFAC6D6B26D024D29E86D7E /* Pathfinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D25BDF5D342303EE194991D5 /* Pathfinder.swift */; };
+		9027BED60FA73EFE21345CE7 /* rsa-tiny.c in Sources */ = {isa = PBXBuildFile; fileRef = 642BF7A9BD8EDBE506FECCE9 /* rsa-tiny.c */; };
+		921F9A54751277366314840F /* wilderness-warning.c in Sources */ = {isa = PBXBuildFile; fileRef = A770290E3A1A86D5649C7F43 /* wilderness-warning.c */; };
 		92372A0FC76D6BAA377EFE79 /* FriendToastStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569A8D0135576A42A7C18004 /* FriendToastStack.swift */; };
+		935117C010A199B857D4D19D /* confirm.c in Sources */ = {isa = PBXBuildFile; fileRef = 081C5C572B8A8A2F2C911106 /* confirm.c */; };
+		93D7D76277B8D59823348A3C /* mudclient-sdl.c in Sources */ = {isa = PBXBuildFile; fileRef = B2259E807692AC2E4AF6F656 /* mudclient-sdl.c */; };
+		94C3868722F14BFCB2A737D0 /* combat-style.c in Sources */ = {isa = PBXBuildFile; fileRef = 54A83324DCA4155F64A47C06 /* combat-style.c */; };
+		95B30C47D51125A3AB0A8769 /* toonscape.c in Sources */ = {isa = PBXBuildFile; fileRef = 962FD53B3D6B61F8F8FA7D4E /* toonscape.c */; };
+		97246518B97A055358353399 /* server-message.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 57EA0FFBA02BE5494D43EFE7 /* server-message.h */; };
+		9791B8701A4EE67E89887490 /* minimap-tab.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = A537A51F288FC548D04A48FF /* minimap-tab.h */; };
+		97C19019254798ACD29F5F8B /* transaction.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = C106539D115AF9332E613D23 /* transaction.h */; };
+		97F32C1841C7E7B05AF56FC4 /* offer-x.c in Sources */ = {isa = PBXBuildFile; fileRef = E7CAA4CFBB147378BE5D7B2D /* offer-x.c */; };
+		98B85AA46417AB294C008011 /* packet-handler.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = F89E0EF3BF04639208790445 /* packet-handler.h */; };
+		994FE272816EBAC1D1B83FB3 /* ini.c in Sources */ = {isa = PBXBuildFile; fileRef = DBFF024878A96F8A24A7EEB4 /* ini.c */; };
 		9A87124B06D31862E37C17BD /* InteractivePanelStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2F5EF8F7ACAB00446AD4B5 /* InteractivePanelStyles.swift */; };
+		9BF812E19062EA25EF98E920 /* packet-stream.c in Sources */ = {isa = PBXBuildFile; fileRef = 7E960FEFF1D6E73F2E78A696 /* packet-stream.c */; };
 		9BF9A498F47DACC733867A2D /* WebGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */; };
+		9D302BD0F524AC3827A077E0 /* appearance.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = BDEBA18940DD751AF80AE759 /* appearance.h */; };
+		9D7EAB9EDAAD1B6C874A6C2B /* item-highlight.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 274FBAEBB4619448BA4CCBAF /* item-highlight.h */; };
+		9F540CDC9EC63191A9BEB663 /* social-tab.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 5DFA21E934F7E1606D93DD9C /* social-tab.h */; };
 		A19DE57B3E32A6C6541C11D6 /* HUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00878BEFAD27286B1E048F3B /* HUDView.swift */; };
 		A2FEAD959F5162454E49F9CE /* RSCPacketHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A06C782469867C78107848F /* RSCPacketHandler.swift */; };
+		A31F79C4E56CC6A9F1B9C11F /* chat-message.c in Sources */ = {isa = PBXBuildFile; fileRef = 11E73A24C981CFC9211BD96D /* chat-message.c */; };
+		A4287B76CCABA1294B48D6CE /* scanline.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 390C7B778D437F69F9BCD644 /* scanline.h */; };
+		A61B96400D1A7FDC444C006E /* additional-options.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = B8FDB8A8F3B7791728C8ED38 /* additional-options.h */; };
 		A90CABFEADA63166A315C892 /* LocalHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BDDB02A754C67CF7D8CEC0D /* LocalHTTPServer.swift */; };
+		AE2DE795B955A9AE75B167A8 /* duel.c in Sources */ = {isa = PBXBuildFile; fileRef = EA4322998EFC5EE352F2709B /* duel.c */; };
 		AFB05CAF0757B4C1C741DCBF /* EntityDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABDC850EF4975AC38D6C8306 /* EntityDefinitions.swift */; };
 		AFB330532316E550054ECF33 /* PlayerPalettes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E7CB6F413D57AD45817C2D /* PlayerPalettes.swift */; };
+		B04BB5720FD9CD5271F3996C /* panel.c in Sources */ = {isa = PBXBuildFile; fileRef = 01791917DF951E89A294625F /* panel.c */; };
+		B05C68A68671DD888C261CBB /* options.c in Sources */ = {isa = PBXBuildFile; fileRef = 5A661D62806A0EC9111CCFC2 /* options.c */; };
+		B2D0DB034F49B2BDFF192FA7 /* magic-tab.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = E719908558C6312603929CE8 /* magic-tab.h */; };
 		B8725914B85D1E9DFE630D12 /* RSModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EAAA291551DD814CD0DA0F3 /* RSModel.swift */; };
+		BA0E68CC1EA2DF9E8AFEEA81 /* menu.c in Sources */ = {isa = PBXBuildFile; fileRef = 57CFF12659918D698C386B99 /* menu.c */; };
 		BAF91952B389E3B73067BCA0 /* DoorDef.xml in Resources */ = {isa = PBXBuildFile; fileRef = 00E48D2F06CB0A321FC87DA1 /* DoorDef.xml */; };
 		BB7A1B71A3C297D0770B6E89 /* SystemUpdateBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5242B6A5DCB117B084B12B9C /* SystemUpdateBanner.swift */; };
+		BDB34C211A6250A4B77E43D5 /* version.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 34CAECFD083598058A7128CC /* version.h */; };
 		C12585663E2FB82518F60F4E /* ItemDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D54F169977103F6BA3CE019 /* ItemDefinitions.swift */; };
 		C17AE88BA79A247836F1CFBB /* sprites.dat in Resources */ = {isa = PBXBuildFile; fileRef = A10B951D45EB676566FF7CB1 /* sprites.dat */; };
+		C1D61C5CA7DE3F6395B96913 /* clarify-herblaw-items.c in Sources */ = {isa = PBXBuildFile; fileRef = B7A678DA3ED9A8BDC9633D04 /* clarify-herblaw-items.c */; };
+		C234CBAA3555BE436F61BC1E /* surface.c in Sources */ = {isa = PBXBuildFile; fileRef = 13D85A23C4F03A58BD1F1A7D /* surface.c */; };
+		C593183F5D023254B01B6238 /* message-tabs.c in Sources */ = {isa = PBXBuildFile; fileRef = 5774BA4872E1404C050199B8 /* message-tabs.c */; };
+		C6ED0E9454E45B525A144E58 /* scene.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 3344CEC85618F2658AEC8941 /* scene.h */; };
+		C71CC97783FA2B172D5E9BE9 /* server-message.c in Sources */ = {isa = PBXBuildFile; fileRef = E6A571E1CDEA8EB48EC75FC4 /* server-message.c */; };
+		C72A4EB69955A9F8ECEF3718 /* experience-drops.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = C8E8598A2E28557FDD1FC3A3 /* experience-drops.h */; };
 		C739C5CCA2E18AD043A9238B /* TileDef.xml in Resources */ = {isa = PBXBuildFile; fileRef = 7C359171C0463D59CDF4F736 /* TileDef.xml */; };
+		C86A5726F15323EE91B8C136 /* logout.c in Sources */ = {isa = PBXBuildFile; fileRef = F8812B7BBA8EACF7C5FE36C5 /* logout.c */; };
+		C9614A6842D8C855E7D78AB0 /* locolour.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = CF189030F661FE2201F185D6 /* locolour.h */; };
 		CBF2C9E8D5FADE352A16BF9B /* Shader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 690046C4CF8B28809E819546 /* Shader.swift */; };
+		CC48AF8B64EF48C4F0BA17F9 /* mudclient.c in Sources */ = {isa = PBXBuildFile; fileRef = A6C1F31F042CA63AF2579B03 /* mudclient.c */; };
 		CC7E01957E9CC492C4A17597 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA10602CA01E71FF2E52EF /* AppState.swift */; };
+		CC9DF1F7908DDB91119571D7 /* bzip.c in Sources */ = {isa = PBXBuildFile; fileRef = 901ECB3F0661EB9F90F93DD8 /* bzip.c */; };
 		D10043D1E4A4315989E35C21 /* ItemDefs.json in Resources */ = {isa = PBXBuildFile; fileRef = CAC8D2CF9A6083B23FDBC4C8 /* ItemDefs.json */; };
+		D23C761B9E6E8351A0F9D993 /* social-tab.c in Sources */ = {isa = PBXBuildFile; fileRef = CCF464CFB07A523C101BCAEC /* social-tab.c */; };
+		D26A86F73DE7FEE6083D1508 /* item-highlight.c in Sources */ = {isa = PBXBuildFile; fileRef = 9C33568F09A1D351E0FF8B54 /* item-highlight.c */; };
+		D323A872BC305E1044A6F17F /* lost-connection.c in Sources */ = {isa = PBXBuildFile; fileRef = F76EDE21A978BDCBE8CEACC5 /* lost-connection.c */; };
+		D37A208A5A1EA610E8249E61 /* rsc-cache in Resources */ = {isa = PBXBuildFile; fileRef = 4CF475814EFB8B13BCD7A304 /* rsc-cache */; };
 		D52601860204DA30D7B28639 /* TCPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990619EF9FCF13064CD17511 /* TCPConnection.swift */; };
+		D560C042565477284B9F6143 /* inventory-tab.c in Sources */ = {isa = PBXBuildFile; fileRef = D2BF481CC187C31C839AD483 /* inventory-tab.c */; };
+		D7FB5A975C00488747BADEE2 /* client-opcodes177.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = AC9D7BB1FCFCF1C946EBD391 /* client-opcodes177.h */; };
+		DA730AE9B7C3661F3137EC79 /* menu.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 129BFF510FCC47831CB52E19 /* menu.h */; };
+		DAE47564E02FACA75B77326D /* options-tab.c in Sources */ = {isa = PBXBuildFile; fileRef = B94099D7AF9DBE5EB664E71C /* options-tab.c */; };
+		DAF0245C4251DB9FE6150C9E /* isaac.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = E545377A240F3833E7EBA427 /* isaac.h */; };
+		DB363FCA10C0B5CB3A6DC311 /* appearance.c in Sources */ = {isa = PBXBuildFile; fileRef = DB208EB7A085AA7C0BDA675D /* appearance.c */; };
+		DBBEF8A6B630C4018D072B0B /* packet-handler.c in Sources */ = {isa = PBXBuildFile; fileRef = E22D8C74E3B3E10A2F76BCD7 /* packet-handler.c */; };
+		DE9E854ED35499256DAC5D16 /* server-opcodes204.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 89E509F47C50418DA0A4FFAE /* server-opcodes204.h */; };
 		DEFC358256760CE8C2766569 /* AppearancePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5FBB918C12B58C6F35F9CA /* AppearancePanel.swift */; };
+		E12479027BFF7E0548C33DF0 /* ui-tabs.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 81F3F48687CDC43E5D252259 /* ui-tabs.h */; };
+		E2DB5F18C6051C86DA88D42E /* transaction.c in Sources */ = {isa = PBXBuildFile; fileRef = 43BE52E84FD8353A18F18624 /* transaction.c */; };
 		E2F931D857FB7A50A40F1316 /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A965968A944DB773A974098 /* SoundManager.swift */; };
+		E336E9310438A0100C7BF18F /* status-bars.c in Sources */ = {isa = PBXBuildFile; fileRef = C9AE92B116627D321069B506 /* status-bars.c */; };
 		E3F13C70A5D6B3E05C6615BE /* GameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C3A69581252F63EC5EAA1E /* GameView.swift */; };
+		E5219316CAAC2B4B74E24A05 /* worldlist.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = B234F289E64F213ECDEAD7BE /* worldlist.h */; };
 		E6742B1D452C43AB4926C8A9 /* World.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F001E360C5E37BAE24BD54 /* World.swift */; };
+		E6C61E606862F56DF72ADC82 /* game-data.c in Sources */ = {isa = PBXBuildFile; fileRef = 86BA473FDC4D7764B8D8E80A /* game-data.c */; };
 		E964A6AC245FC0015DFBC76F /* BankPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AA431B51F6327E8909C7691 /* BankPanel.swift */; };
+		E9B764901FCA7777FF3570E0 /* game-model.c in Sources */ = {isa = PBXBuildFile; fileRef = 024B853A1332860972651B0E /* game-model.c */; };
+		EAB17E37EAD7064AFD8D3983 /* sleep.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9F4865EA000387F1CAE9C20C /* sleep.h */; };
 		EB5AA1EDEB883B4B339EC1B2 /* GameProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7A50354B450F1785FDA303 /* GameProtocol.swift */; };
 		EBA8E4A55266291BCB60A316 /* ShopPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FC277CCD5343D460C70637 /* ShopPanel.swift */; };
 		EF9B796974E87C5ABA49F84A /* GameObjectDef.xml in Resources */ = {isa = PBXBuildFile; fileRef = B31B8BD08541F5B8861754B6 /* GameObjectDef.xml */; };
 		F03679ABB7ADFCC6B61737E9 /* sprites_v2.dat in Resources */ = {isa = PBXBuildFile; fileRef = DA44202D4E360DF84525A203 /* sprites_v2.dat */; };
+		F180FA3310009FC39245D93B /* inventory-tab.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 699446D7FF4409FF06001757 /* inventory-tab.h */; };
 		F36655D5F48D23FF885D8D57 /* WildernessWarningPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE52B9620D9B21EBFD147E58 /* WildernessWarningPanel.swift */; };
 		F434395EB6BF20DBAC76710C /* ServerBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C61DBD09EB20B0BF2CC077 /* ServerBrowserView.swift */; };
+		F6A6310C50ADEDEBEB33B2C5 /* toonscape.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 0D3F80DCA6028D183BAAD332 /* toonscape.h */; };
 		F793CE144665DBB9834FA194 /* SettingsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26571E96500DAB87E51F147 /* SettingsPanel.swift */; };
+		F8B27F31302BD05DFDEA0C92 /* combat-style.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = EDA7209B9D399560B9CE2F9E /* combat-style.h */; };
+		FABD95503404605506835D91 /* logout.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7483AE7A70AF61CCC5691FE2 /* logout.h */; };
 		FBB7C16E4E6EAC7BE21D3EE2 /* ItemNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E03CEC760DF829859E3CFBB /* ItemNames.swift */; };
+		FD99BAF4891984E286C8EFAF /* world.c in Sources */ = {isa = PBXBuildFile; fileRef = 66EA19C30077B873DE1F2E64 /* world.c */; };
+		FDDBDD6C2457FF7B71D3BC54 /* status-bars.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9A9EADB91EB695D071CB6E21 /* status-bars.h */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		811C42B7DDA147278E574C70 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EC9B59AFAC52230A8ED17EBE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EA3292358BCAAFEB2F673D20;
+			remoteInfo = RSCEngine;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7EFA2A6C3347ECC2AEF6B4E7 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "include/$(PRODUCT_NAME)";
+			dstSubfolderSpec = 16;
+			files = (
+				1673CD1080346B357BE8212F /* SDL.h in CopyFiles */,
+				A61B96400D1A7FDC444C006E /* additional-options.h in CopyFiles */,
+				9D302BD0F524AC3827A077E0 /* appearance.h in CopyFiles */,
+				0A9AC1B94236998881D7B059 /* bank.h in CopyFiles */,
+				176BDCF05D179AF60F8EBCAA /* bn.h in CopyFiles */,
+				70C840D367325F625B7F5B59 /* bzip.h in CopyFiles */,
+				35776F9D5A1556E7802B73AD /* chat-message.h in CopyFiles */,
+				5A5A709CC1043BDE04FE3F45 /* clarify-herblaw-items.h in CopyFiles */,
+				1BF4D03B50F5127D1EC928C1 /* client-opcodes.h in CopyFiles */,
+				D7FB5A975C00488747BADEE2 /* client-opcodes177.h in CopyFiles */,
+				4C2BD1204AD74A42370DC16E /* client-opcodes204.h in CopyFiles */,
+				8933C2F1B6ACCA371136901B /* colours.h in CopyFiles */,
+				F8B27F31302BD05DFDEA0C92 /* combat-style.h in CopyFiles */,
+				4251D181CC7A2CFFCA13551A /* confirm.h in CopyFiles */,
+				0F8F699EC82727BC69217CC3 /* diverse-npcs.h in CopyFiles */,
+				6E65598C3DBC3F8BCD50A4C5 /* duel.h in CopyFiles */,
+				C72A4EB69955A9F8ECEF3718 /* experience-drops.h in CopyFiles */,
+				83257BDACF3DB78EBD170CA1 /* game-character.h in CopyFiles */,
+				7821C0D4616FCAD6B0C3A5EF /* game-data.h in CopyFiles */,
+				5183A515846879CA5DB62E62 /* game-model.h in CopyFiles */,
+				55408BDB40700B3DE7373FAE /* ini.h in CopyFiles */,
+				F180FA3310009FC39245D93B /* inventory-tab.h in CopyFiles */,
+				DAF0245C4251DB9FE6150C9E /* isaac.h in CopyFiles */,
+				9D7EAB9EDAAD1B6C874A6C2B /* item-highlight.h in CopyFiles */,
+				C9614A6842D8C855E7D78AB0 /* locolour.h in CopyFiles */,
+				39612513261F3BCE70CFF7AF /* login.h in CopyFiles */,
+				FABD95503404605506835D91 /* logout.h in CopyFiles */,
+				1B4061034715A557694754B2 /* lost-connection.h in CopyFiles */,
+				B2D0DB034F49B2BDFF192FA7 /* magic-tab.h in CopyFiles */,
+				DA730AE9B7C3661F3137EC79 /* menu.h in CopyFiles */,
+				673DA699FD81D591197FB223 /* message-tabs.h in CopyFiles */,
+				9791B8701A4EE67E89887490 /* minimap-tab.h in CopyFiles */,
+				38D47E706BA4F92C67CC599A /* mudclient.h in CopyFiles */,
+				5E32460EF647F68A4E4A462D /* offer-x.h in CopyFiles */,
+				5909327B9E574508A3289342 /* option-menu.h in CopyFiles */,
+				8B4EB65D0B78F4628E079EF9 /* options-tab.h in CopyFiles */,
+				034CD96FC242FA2786D73464 /* options.h in CopyFiles */,
+				98B85AA46417AB294C008011 /* packet-handler.h in CopyFiles */,
+				8857F205641BB6BEA409A5E4 /* packet-stream.h in CopyFiles */,
+				81BEFF566973A75A1E2C9A4E /* panel.h in CopyFiles */,
+				2915048B17F0EB9683683A59 /* polygon.h in CopyFiles */,
+				54EF80A0D8661D22ECC03DE9 /* rsa.h in CopyFiles */,
+				5C384FD47BA1668C71A6A58F /* rsc_ios_prefix.h in CopyFiles */,
+				A4287B76CCABA1294B48D6CE /* scanline.h in CopyFiles */,
+				C6ED0E9454E45B525A144E58 /* scene.h in CopyFiles */,
+				97246518B97A055358353399 /* server-message.h in CopyFiles */,
+				4E0B6E364990A4065589EAE3 /* server-opcodes.h in CopyFiles */,
+				73619C9829D0D6AAB44D15F5 /* server-opcodes177.h in CopyFiles */,
+				DE9E854ED35499256DAC5D16 /* server-opcodes204.h in CopyFiles */,
+				7255AA75122C5A6FBFCCBE96 /* shop.h in CopyFiles */,
+				EAB17E37EAD7064AFD8D3983 /* sleep.h in CopyFiles */,
+				9F540CDC9EC63191A9BEB663 /* social-tab.h in CopyFiles */,
+				7DE50CF46359D6E010BF0E0A /* stats-tab.h in CopyFiles */,
+				FDDBDD6C2457FF7B71D3BC54 /* status-bars.h in CopyFiles */,
+				40C9E7CB1ADA152E65A0BD26 /* surface.h in CopyFiles */,
+				F6A6310C50ADEDEBEB33B2C5 /* toonscape.h in CopyFiles */,
+				58409F81BBB1C9745E8FD712 /* trade.h in CopyFiles */,
+				97C19019254798ACD29F5F8B /* transaction.h in CopyFiles */,
+				E12479027BFF7E0548C33DF0 /* ui-tabs.h in CopyFiles */,
+				0F0479F78947A6362FBB3AAA /* utility.h in CopyFiles */,
+				BDB34C211A6250A4B77E43D5 /* version.h in CopyFiles */,
+				56FC521D94B14BCD8101E30E /* welcome.h in CopyFiles */,
+				398B99843487BE910D66B513 /* wilderness-warning.h in CopyFiles */,
+				85789C96C58471A0442B4265 /* world.h in CopyFiles */,
+				E5219316CAAC2B4B74E24A05 /* worldlist.h in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		00878BEFAD27286B1E048F3B /* HUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDView.swift; sourceTree = "<group>"; };
 		00E48D2F06CB0A321FC87DA1 /* DoorDef.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = DoorDef.xml; sourceTree = "<group>"; };
+		01791917DF951E89A294625F /* panel.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = panel.c; sourceTree = "<group>"; };
+		024B853A1332860972651B0E /* game-model.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "game-model.c"; sourceTree = "<group>"; };
+		036EC4452F8C6237AF74571D /* locolour.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = locolour.c; sourceTree = "<group>"; };
+		0402B84A513AF91882B3C5E8 /* magic-tab.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "magic-tab.c"; sourceTree = "<group>"; };
+		05ABBB0266E2425E0EF746F2 /* welcome.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = welcome.c; sourceTree = "<group>"; };
+		06A85A977E16879F40D894EB /* experience-drops.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "experience-drops.c"; sourceTree = "<group>"; };
+		081C5C572B8A8A2F2C911106 /* confirm.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = confirm.c; sourceTree = "<group>"; };
+		09B6D6F273992CD793510E24 /* bn.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bn.h; sourceTree = "<group>"; };
 		0C5DA77DFB8A641346DA3FD3 /* DuelPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuelPanel.swift; sourceTree = "<group>"; };
+		0D3F80DCA6028D183BAAD332 /* toonscape.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = toonscape.h; sourceTree = "<group>"; };
+		11E73A24C981CFC9211BD96D /* chat-message.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "chat-message.c"; sourceTree = "<group>"; };
+		129BFF510FCC47831CB52E19 /* menu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = menu.h; sourceTree = "<group>"; };
+		13D85A23C4F03A58BD1F1A7D /* surface.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = surface.c; sourceTree = "<group>"; };
+		14746B6FC05879F209F7FFCE /* ini.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ini.h; sourceTree = "<group>"; };
+		1A15525676DCDD609A09E46C /* isaac.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = isaac.c; sourceTree = "<group>"; };
+		1A83F8CF16735D1E6B4A06EC /* libRSCEngine.a */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = archive.ar; path = libRSCEngine.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		1ABA3CFD925BE46A3B37D1F5 /* stats-tab.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "stats-tab.h"; sourceTree = "<group>"; };
+		1D8D09753C1766479BB4C212 /* rsc_sdl_shim.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = rsc_sdl_shim.c; sourceTree = "<group>"; };
+		1E00CA895FEB9227B580EBFC /* offer-x.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "offer-x.h"; sourceTree = "<group>"; };
 		1E03CEC760DF829859E3CFBB /* ItemNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemNames.swift; sourceTree = "<group>"; };
+		1EA81FA023C410A6100E741E /* client-opcodes204.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "client-opcodes204.h"; sourceTree = "<group>"; };
+		274FBAEBB4619448BA4CCBAF /* item-highlight.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "item-highlight.h"; sourceTree = "<group>"; };
 		29FBC620FEE34BCB304CCA49 /* AnimationDefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationDefs.swift; sourceTree = "<group>"; };
 		2A2C8E3EE280E9D4EC285120 /* MinimapPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinimapPanel.swift; sourceTree = "<group>"; };
 		2A965968A944DB773A974098 /* SoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
 		2BDDB02A754C67CF7D8CEC0D /* LocalHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHTTPServer.swift; sourceTree = "<group>"; };
+		2EAFFD59DE796F810B4473AF /* game-model.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "game-model.h"; sourceTree = "<group>"; };
+		2ED2D416644E085182B5B214 /* server-opcodes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "server-opcodes.h"; sourceTree = "<group>"; };
+		3344CEC85618F2658AEC8941 /* scene.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = scene.h; sourceTree = "<group>"; };
+		34CAECFD083598058A7128CC /* version.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = version.h; sourceTree = "<group>"; };
 		368DEB5A277F7F3412F785E4 /* BiometricLoginStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricLoginStore.swift; sourceTree = "<group>"; };
 		38223850597085ADCA3EE8A3 /* TouchTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchTranslator.swift; sourceTree = "<group>"; };
+		390C7B778D437F69F9BCD644 /* scanline.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = scanline.h; sourceTree = "<group>"; };
 		3E5FBB918C12B58C6F35F9CA /* AppearancePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePanel.swift; sourceTree = "<group>"; };
 		3ED06FB5405C413FFB721D92 /* ObjectNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectNames.swift; sourceTree = "<group>"; };
+		40C00BA58D77BA434FF14728 /* options-tab.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "options-tab.h"; sourceTree = "<group>"; };
 		4158CF99B998E5ACBE1150CE /* WelcomePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomePanel.swift; sourceTree = "<group>"; };
+		43BE52E84FD8353A18F18624 /* transaction.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = transaction.c; sourceTree = "<group>"; };
 		43C023BDFCCE3322E38787E6 /* GraphicsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphicsController.swift; sourceTree = "<group>"; };
 		47C3A69581252F63EC5EAA1E /* GameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameView.swift; sourceTree = "<group>"; };
+		4A50A713EA7A8595E3825DD8 /* lost-connection.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "lost-connection.h"; sourceTree = "<group>"; };
 		4AA431B51F6327E8909C7691 /* BankPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BankPanel.swift; sourceTree = "<group>"; };
+		4B84D50776F9D9ED04D073B9 /* welcome.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = welcome.h; sourceTree = "<group>"; };
 		4C427C9F5B86C2E46A8D4C79 /* Authentic_Sprites.orsc */ = {isa = PBXFileReference; path = Authentic_Sprites.orsc; sourceTree = "<group>"; };
+		4CF475814EFB8B13BCD7A304 /* rsc-cache */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "rsc-cache"; path = "RSCEngine/rsc-cache"; sourceTree = SOURCE_ROOT; };
 		4EAAA291551DD814CD0DA0F3 /* RSModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSModel.swift; sourceTree = "<group>"; };
+		4FAB0A49C2D370BDEDC17035 /* bank.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = bank.c; sourceTree = "<group>"; };
+		51D1AE61D2B44AD140F1C06E /* login.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = login.h; sourceTree = "<group>"; };
 		5242B6A5DCB117B084B12B9C /* SystemUpdateBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemUpdateBanner.swift; sourceTree = "<group>"; };
+		52BF3A7279D0D4E492EB1766 /* game-data.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "game-data.h"; sourceTree = "<group>"; };
+		54A83324DCA4155F64A47C06 /* combat-style.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "combat-style.c"; sourceTree = "<group>"; };
 		5576569325B6C2223C6DEE7E /* NPCNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPCNames.swift; sourceTree = "<group>"; };
 		569A8D0135576A42A7C18004 /* FriendToastStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendToastStack.swift; sourceTree = "<group>"; };
+		5774BA4872E1404C050199B8 /* message-tabs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "message-tabs.c"; sourceTree = "<group>"; };
+		57CFF12659918D698C386B99 /* menu.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = menu.c; sourceTree = "<group>"; };
+		57EA0FFBA02BE5494D43EFE7 /* server-message.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "server-message.h"; sourceTree = "<group>"; };
 		5969C636EE8BFAC20BDCE024 /* OpenRSCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenRSCApp.swift; sourceTree = "<group>"; };
 		5A2F5EF8F7ACAB00446AD4B5 /* InteractivePanelStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractivePanelStyles.swift; sourceTree = "<group>"; };
+		5A661D62806A0EC9111CCFC2 /* options.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = options.c; sourceTree = "<group>"; };
+		5CA919D63C2CC58438490E54 /* NativeRSCView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRSCView.swift; sourceTree = "<group>"; };
 		5CBD0EBDD0DAD78E31727091 /* RSCWorldState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCWorldState.swift; sourceTree = "<group>"; };
+		5CF603EB91BC14884B53714C /* utility.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = utility.c; sourceTree = "<group>"; };
 		5D5705B24E1415694C5BFC19 /* OpenRSC.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenRSC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5D6B9F41201F6AE4126D67AF /* LandscapeLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandscapeLoader.swift; sourceTree = "<group>"; };
+		5DFA21E934F7E1606D93DD9C /* social-tab.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "social-tab.h"; sourceTree = "<group>"; };
+		5ED0223E9BFB2C75A82E0965 /* server-opcodes177.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "server-opcodes177.h"; sourceTree = "<group>"; };
+		5EF1432065878349DAE0C0F5 /* minimap-tab.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "minimap-tab.c"; sourceTree = "<group>"; };
+		621E44A453AEAA9BD3BBDA2D /* client-opcodes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "client-opcodes.h"; sourceTree = "<group>"; };
 		62F92BCAA91ED7CB2C887F6F /* ByteBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ByteBuffer.swift; sourceTree = "<group>"; };
 		63B049FFEB87A145A0D3F9BC /* ISAACCipher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ISAACCipher.swift; sourceTree = "<group>"; };
+		642BF7A9BD8EDBE506FECCE9 /* rsa-tiny.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "rsa-tiny.c"; sourceTree = "<group>"; };
+		64E2AD4BCEF46C27F7B580D6 /* option-menu.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "option-menu.c"; sourceTree = "<group>"; };
+		65603A97DA510447ACDDACB4 /* SDL.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SDL.h; sourceTree = "<group>"; };
 		66DF674CB40A4F01E8EBEEC1 /* Authentic_Landscape.orsc */ = {isa = PBXFileReference; path = Authentic_Landscape.orsc; sourceTree = "<group>"; };
+		66EA19C30077B873DE1F2E64 /* world.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = world.c; sourceTree = "<group>"; };
 		690046C4CF8B28809E819546 /* Shader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shader.swift; sourceTree = "<group>"; };
+		699446D7FF4409FF06001757 /* inventory-tab.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "inventory-tab.h"; sourceTree = "<group>"; };
+		69C161AB89680BB56B3FD73A /* wilderness-warning.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "wilderness-warning.h"; sourceTree = "<group>"; };
+		6A2302781B83D67DEECC803F /* clarify-herblaw-items.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "clarify-herblaw-items.h"; sourceTree = "<group>"; };
+		6AE22CB9A5C6AFA56D0E66FD /* mudclient-sdl2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "mudclient-sdl2.c"; sourceTree = "<group>"; };
+		6C0BA1ABDDDF60BE1F68DB63 /* additional-options.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "additional-options.c"; sourceTree = "<group>"; };
 		6D54F169977103F6BA3CE019 /* ItemDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemDefinitions.swift; sourceTree = "<group>"; };
+		6DACB0C365712E4F578F2C6A /* trade.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = trade.h; sourceTree = "<group>"; };
 		6EA8AE1F76A6030168425450 /* CharacterBillboards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterBillboards.swift; sourceTree = "<group>"; };
+		6F0E61838465D517FA40DCE2 /* scene.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = scene.c; sourceTree = "<group>"; };
+		72962EB29E56F834727BECD5 /* trade.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = trade.c; sourceTree = "<group>"; };
+		7483AE7A70AF61CCC5691FE2 /* logout.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = logout.h; sourceTree = "<group>"; };
 		768F1EA39D6B57B64CD4E728 /* RSCStringCipher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCStringCipher.swift; sourceTree = "<group>"; };
 		77082BCCC301983216C93E70 /* TradePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradePanel.swift; sourceTree = "<group>"; };
 		79470D5C002A690DB639638F /* FastMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastMath.swift; sourceTree = "<group>"; };
 		7A06C782469867C78107848F /* RSCPacketHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCPacketHandler.swift; sourceTree = "<group>"; };
 		7B4A1905E095D026FE16EA83 /* RSCOpcodes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCOpcodes.swift; sourceTree = "<group>"; };
 		7C359171C0463D59CDF4F736 /* TileDef.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = TileDef.xml; sourceTree = "<group>"; };
+		7C37173FCE48C9444D38543E /* rsa.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = rsa.h; sourceTree = "<group>"; };
 		7D4A8C89190272EFC205D26A /* RSCLoginHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCLoginHandler.swift; sourceTree = "<group>"; };
+		7E960FEFF1D6E73F2E78A696 /* packet-stream.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "packet-stream.c"; sourceTree = "<group>"; };
+		818ADAA7413EE77CD4894746 /* RSCEngineHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCEngineHost.swift; sourceTree = "<group>"; };
+		81F3F48687CDC43E5D252259 /* ui-tabs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ui-tabs.h"; sourceTree = "<group>"; };
 		82C6EF63288E0ECBA6862BC3 /* ServerProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerProfile.swift; sourceTree = "<group>"; };
 		85989A2D185A0C6B9D712DC5 /* RegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterView.swift; sourceTree = "<group>"; };
+		8698D90603F5A9514C4DD654 /* module.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.modulemap; sourceTree = "<group>"; };
+		86BA473FDC4D7764B8D8E80A /* game-data.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "game-data.c"; sourceTree = "<group>"; };
 		86C61DBD09EB20B0BF2CC077 /* ServerBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerBrowserView.swift; sourceTree = "<group>"; };
 		87D9BF081F24BC3018C86C2F /* UserPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPreferences.swift; sourceTree = "<group>"; };
+		89E509F47C50418DA0A4FFAE /* server-opcodes204.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "server-opcodes204.h"; sourceTree = "<group>"; };
 		8B57ED468FC1209E7D5335BC /* Audio */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Audio; path = OpenRSC/Audio; sourceTree = SOURCE_ROOT; };
+		8C3B15836A1EEBCD6AD99759 /* sleep.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sleep.c; sourceTree = "<group>"; };
+		8C765C51A0282C736E5C6E86 /* panel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = panel.h; sourceTree = "<group>"; };
+		8D454E7CCCFF14CD8000F4C1 /* stats-tab.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "stats-tab.c"; sourceTree = "<group>"; };
 		8DBA10602CA01E71FF2E52EF /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		8F419BD92B204EF30F068A25 /* bzip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bzip.h; sourceTree = "<group>"; };
+		901ECB3F0661EB9F90F93DD8 /* bzip.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = bzip.c; sourceTree = "<group>"; };
 		9240C0E5469D30D0BECF2BF0 /* WebGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebGameView.swift; sourceTree = "<group>"; };
+		926C9E55150A54575F563C63 /* confirm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = confirm.h; sourceTree = "<group>"; };
+		956B35397E0F17E216A3DD3D /* duel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = duel.h; sourceTree = "<group>"; };
+		95F135063AA16D833109EE61 /* polygon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = polygon.h; sourceTree = "<group>"; };
+		962FD53B3D6B61F8F8FA7D4E /* toonscape.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = toonscape.c; sourceTree = "<group>"; };
 		990619EF9FCF13064CD17511 /* TCPConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCPConnection.swift; sourceTree = "<group>"; };
 		99F001E360C5E37BAE24BD54 /* World.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = World.swift; sourceTree = "<group>"; };
+		9A9EADB91EB695D071CB6E21 /* status-bars.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "status-bars.h"; sourceTree = "<group>"; };
+		9C33568F09A1D351E0FF8B54 /* item-highlight.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "item-highlight.c"; sourceTree = "<group>"; };
 		9D699C23A0F9C4835F522B84 /* SleepPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepPanel.swift; sourceTree = "<group>"; };
+		9F4865EA000387F1CAE9C20C /* sleep.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = sleep.h; sourceTree = "<group>"; };
 		9F7A50354B450F1785FDA303 /* GameProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameProtocol.swift; sourceTree = "<group>"; };
+		9FA84417F2E74F5329E1285A /* utility.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utility.h; sourceTree = "<group>"; };
 		A10B951D45EB676566FF7CB1 /* sprites.dat */ = {isa = PBXFileReference; path = sprites.dat; sourceTree = "<group>"; };
+		A2BC953C3BFB197B4BD1770C /* bn.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = bn.c; sourceTree = "<group>"; };
 		A4EDAB057950782165E6034E /* GameObjectDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameObjectDefinitions.swift; sourceTree = "<group>"; };
+		A537A51F288FC548D04A48FF /* minimap-tab.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "minimap-tab.h"; sourceTree = "<group>"; };
+		A5A695EF68F329A20BD6BB15 /* surface.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = surface.h; sourceTree = "<group>"; };
 		A609DE488849FEB3D6CB9E47 /* MetalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalRenderer.swift; sourceTree = "<group>"; };
+		A6C1F31F042CA63AF2579B03 /* mudclient.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = mudclient.c; sourceTree = "<group>"; };
+		A763156381534B4761E5CE8C /* packet-stream.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "packet-stream.h"; sourceTree = "<group>"; };
+		A770290E3A1A86D5649C7F43 /* wilderness-warning.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "wilderness-warning.c"; sourceTree = "<group>"; };
+		AA31002E485E9C2F30C43698 /* world.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = world.h; sourceTree = "<group>"; };
 		ABDC850EF4975AC38D6C8306 /* EntityDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntityDefinitions.swift; sourceTree = "<group>"; };
+		AC9D7BB1FCFCF1C946EBD391 /* client-opcodes177.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "client-opcodes177.h"; sourceTree = "<group>"; };
+		AE5013CED6E3B45B9F3488FE /* chat-message.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "chat-message.h"; sourceTree = "<group>"; };
 		AFA34960346994775CDF265C /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		B2259E807692AC2E4AF6F656 /* mudclient-sdl.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "mudclient-sdl.c"; sourceTree = "<group>"; };
+		B234F289E64F213ECDEAD7BE /* worldlist.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = worldlist.h; sourceTree = "<group>"; };
+		B2DB60AEEBA7F5C79A7D30F7 /* option-menu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "option-menu.h"; sourceTree = "<group>"; };
 		B31B8BD08541F5B8861754B6 /* GameObjectDef.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = GameObjectDef.xml; sourceTree = "<group>"; };
+		B7A678DA3ED9A8BDC9633D04 /* clarify-herblaw-items.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "clarify-herblaw-items.c"; sourceTree = "<group>"; };
+		B8FDB8A8F3B7791728C8ED38 /* additional-options.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "additional-options.h"; sourceTree = "<group>"; };
+		B94099D7AF9DBE5EB664E71C /* options-tab.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "options-tab.c"; sourceTree = "<group>"; };
+		BBFC6CEE5E50D4C3563C9876 /* worldlist.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = worldlist.c; sourceTree = "<group>"; };
+		BC63366914FBB9308EF74650 /* bank.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bank.h; sourceTree = "<group>"; };
+		BDBA701C1DB984B34B334D82 /* rsc_ios_prefix.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = rsc_ios_prefix.h; sourceTree = "<group>"; };
+		BDEBA18940DD751AF80AE759 /* appearance.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = appearance.h; sourceTree = "<group>"; };
+		BE0FB5B229741D3308E7FEA8 /* login.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = login.c; sourceTree = "<group>"; };
 		BF2188BC35B6FD7A3DFDBCA4 /* Polygon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polygon.swift; sourceTree = "<group>"; };
+		C0A94174EF5448D747AC6D59 /* message-tabs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "message-tabs.h"; sourceTree = "<group>"; };
+		C106539D115AF9332E613D23 /* transaction.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = transaction.h; sourceTree = "<group>"; };
 		C24A98D60D91F8BC96E8BD27 /* RSCGameEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCGameEngine.swift; sourceTree = "<group>"; };
+		C72668244F0389200C203448 /* diverse-npcs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "diverse-npcs.h"; sourceTree = "<group>"; };
 		C8E7CB6F413D57AD45817C2D /* PlayerPalettes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerPalettes.swift; sourceTree = "<group>"; };
+		C8E8598A2E28557FDD1FC3A3 /* experience-drops.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "experience-drops.h"; sourceTree = "<group>"; };
+		C9AE92B116627D321069B506 /* status-bars.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "status-bars.c"; sourceTree = "<group>"; };
+		CA68EF6DEF50EE466FE600CC /* colours.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = colours.h; sourceTree = "<group>"; };
 		CA9F6A909F89CE0F94742AF5 /* ModelArchiveLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelArchiveLoader.swift; sourceTree = "<group>"; };
 		CAC8D2CF9A6083B23FDBC4C8 /* ItemDefs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ItemDefs.json; sourceTree = "<group>"; };
+		CC0CDD0A8C5613191466BC64 /* diverse-npcs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "diverse-npcs.c"; sourceTree = "<group>"; };
+		CCF464CFB07A523C101BCAEC /* social-tab.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "social-tab.c"; sourceTree = "<group>"; };
 		CE52B9620D9B21EBFD147E58 /* WildernessWarningPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WildernessWarningPanel.swift; sourceTree = "<group>"; };
+		CF189030F661FE2201F185D6 /* locolour.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = locolour.h; sourceTree = "<group>"; };
 		D1FC277CCD5343D460C70637 /* ShopPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShopPanel.swift; sourceTree = "<group>"; };
 		D25BDF5D342303EE194991D5 /* Pathfinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pathfinder.swift; sourceTree = "<group>"; };
+		D2BF481CC187C31C839AD483 /* inventory-tab.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "inventory-tab.c"; sourceTree = "<group>"; };
 		D37E5A4EBD7022529B04B92A /* Scanline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scanline.swift; sourceTree = "<group>"; };
 		D507B265366A49DD76F0BDAD /* NPCDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NPCDefinitions.swift; sourceTree = "<group>"; };
 		D8ADEBB716923D01590135A4 /* SpriteLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteLoader.swift; sourceTree = "<group>"; };
 		DA44202D4E360DF84525A203 /* sprites_v2.dat */ = {isa = PBXFileReference; path = sprites_v2.dat; sourceTree = "<group>"; };
+		DB208EB7A085AA7C0BDA675D /* appearance.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = appearance.c; sourceTree = "<group>"; };
 		DB5F4767C4E2C9162C1DF5F3 /* GameSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSelectorView.swift; sourceTree = "<group>"; };
+		DBFF024878A96F8A24A7EEB4 /* ini.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ini.c; sourceTree = "<group>"; };
+		DE6BCCA7B11E4BFF7236833F /* shop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = shop.h; sourceTree = "<group>"; };
+		E054C4FFEE327FFC2F0A56A7 /* options.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = options.h; sourceTree = "<group>"; };
+		E22D8C74E3B3E10A2F76BCD7 /* packet-handler.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "packet-handler.c"; sourceTree = "<group>"; };
 		E26571E96500DAB87E51F147 /* SettingsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPanel.swift; sourceTree = "<group>"; };
+		E49BEB0F62E0906C06BA9449 /* mudclient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = mudclient.h; sourceTree = "<group>"; };
 		E51923D95FF7E811C424EE3D /* WebClient */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebClient; path = OpenRSC/Sources/WebClient; sourceTree = SOURCE_ROOT; };
+		E545377A240F3833E7EBA427 /* isaac.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = isaac.h; sourceTree = "<group>"; };
+		E6A571E1CDEA8EB48EC75FC4 /* server-message.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "server-message.c"; sourceTree = "<group>"; };
+		E719908558C6312603929CE8 /* magic-tab.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "magic-tab.h"; sourceTree = "<group>"; };
+		E7CAA4CFBB147378BE5D7B2D /* offer-x.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "offer-x.c"; sourceTree = "<group>"; };
+		E88B6C401087D577C3036EC5 /* rsa-openssl.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "rsa-openssl.c"; sourceTree = "<group>"; };
+		E8E55449F5F4054E89B74BB7 /* ui-tabs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "ui-tabs.c"; sourceTree = "<group>"; };
+		E9F793F44C6126322ABC637A /* rsc_host.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = rsc_host.h; sourceTree = "<group>"; };
+		EA4322998EFC5EE352F2709B /* duel.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = duel.c; sourceTree = "<group>"; };
 		EB1994B23C1113BEF842C514 /* landscape.dat */ = {isa = PBXFileReference; path = landscape.dat; sourceTree = "<group>"; };
+		ED5956B518CDDAD9D2FA7A0F /* game-character.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "game-character.c"; sourceTree = "<group>"; };
+		EDA7209B9D399560B9CE2F9E /* combat-style.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "combat-style.h"; sourceTree = "<group>"; };
+		EF98B69A7810EB63096FC083 /* game-character.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "game-character.h"; sourceTree = "<group>"; };
 		F01562B77A1FF9666EF960FB /* Scene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scene.swift; sourceTree = "<group>"; };
+		F1FE28F61B2CFC01AC56636B /* shop.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = shop.c; sourceTree = "<group>"; };
+		F76EDE21A978BDCBE8CEACC5 /* lost-connection.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "lost-connection.c"; sourceTree = "<group>"; };
+		F8812B7BBA8EACF7C5FE36C5 /* logout.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = logout.c; sourceTree = "<group>"; };
+		F89E0EF3BF04639208790445 /* packet-handler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "packet-handler.h"; sourceTree = "<group>"; };
 		F96FB7917C1BE2A428AA3513 /* models.orsc */ = {isa = PBXFileReference; path = models.orsc; sourceTree = "<group>"; };
 		FFEE1170686C181AC0F64F7F /* NpcDefs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = NpcDefs.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		C68CCB7EA1D87210779E4274 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				51EFC43753CB07C209A9EFEC /* libRSCEngine.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
+		007478350CEC488E02D99729 /* include */ = {
+			isa = PBXGroup;
+			children = (
+				8698D90603F5A9514C4DD654 /* module.modulemap */,
+				E9F793F44C6126322ABC637A /* rsc_host.h */,
+			);
+			path = include;
+			sourceTree = "<group>";
+		};
+		029E9141C7A9696253342440 /* RSCEngine */ = {
+			isa = PBXGroup;
+			children = (
+				4CF475814EFB8B13BCD7A304 /* rsc-cache */,
+				007478350CEC488E02D99729 /* include */,
+				8790D9AC5C3CD4FDE6CCB2AB /* rsc-c-src */,
+				5632AB84DB420895E53F108B /* shim */,
+			);
+			path = RSCEngine;
+			sourceTree = "<group>";
+		};
+		0668384F4D06DDDA555DC1B3 /* rsa */ = {
+			isa = PBXGroup;
+			children = (
+				E88B6C401087D577C3036EC5 /* rsa-openssl.c */,
+				642BF7A9BD8EDBE506FECCE9 /* rsa-tiny.c */,
+				7C37173FCE48C9444D38543E /* rsa.h */,
+			);
+			path = rsa;
+			sourceTree = "<group>";
+		};
+		0C090F13E611A7748C943A1B /* Native */ = {
+			isa = PBXGroup;
+			children = (
+				5CA919D63C2CC58438490E54 /* NativeRSCView.swift */,
+				818ADAA7413EE77CD4894746 /* RSCEngineHost.swift */,
+			);
+			path = Native;
+			sourceTree = "<group>";
+		};
+		0FDB2B474325AD51E5CF1D3B /* custom */ = {
+			isa = PBXGroup;
+			children = (
+				B7A678DA3ED9A8BDC9633D04 /* clarify-herblaw-items.c */,
+				6A2302781B83D67DEECC803F /* clarify-herblaw-items.h */,
+				CC0CDD0A8C5613191466BC64 /* diverse-npcs.c */,
+				C72668244F0389200C203448 /* diverse-npcs.h */,
+				9C33568F09A1D351E0FF8B54 /* item-highlight.c */,
+				274FBAEBB4619448BA4CCBAF /* item-highlight.h */,
+				962FD53B3D6B61F8F8FA7D4E /* toonscape.c */,
+				0D3F80DCA6028D183BAAD332 /* toonscape.h */,
+			);
+			path = custom;
+			sourceTree = "<group>";
+		};
 		14BFB150E52CE5887FD9D2C4 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				1A83F8CF16735D1E6B4A06EC /* libRSCEngine.a */,
 				5D5705B24E1415694C5BFC19 /* OpenRSC.app */,
 			);
 			name = Products;
@@ -201,6 +608,7 @@
 				26ABAB5919F1BD537A0A4B1E /* Game */,
 				E315A776BCB043D7824B75B4 /* GameSelector */,
 				530C8C7EB5A9EEB1675B5E3C /* Login */,
+				0C090F13E611A7748C943A1B /* Native */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -212,6 +620,16 @@
 				85989A2D185A0C6B9D712DC5 /* RegisterView.swift */,
 			);
 			path = Login;
+			sourceTree = "<group>";
+		};
+		5632AB84DB420895E53F108B /* shim */ = {
+			isa = PBXGroup;
+			children = (
+				BDBA701C1DB984B34B334D82 /* rsc_ios_prefix.h */,
+				1D8D09753C1766479BB4C212 /* rsc_sdl_shim.c */,
+				65603A97DA510447ACDDACB4 /* SDL.h */,
+			);
+			path = shim;
 			sourceTree = "<group>";
 		};
 		699C5C185BD323A5162E5836 /* Models */ = {
@@ -268,6 +686,56 @@
 			path = Audio;
 			sourceTree = "<group>";
 		};
+		8790D9AC5C3CD4FDE6CCB2AB /* rsc-c-src */ = {
+			isa = PBXGroup;
+			children = (
+				11E73A24C981CFC9211BD96D /* chat-message.c */,
+				AE5013CED6E3B45B9F3488FE /* chat-message.h */,
+				621E44A453AEAA9BD3BBDA2D /* client-opcodes.h */,
+				AC9D7BB1FCFCF1C946EBD391 /* client-opcodes177.h */,
+				1EA81FA023C410A6100E741E /* client-opcodes204.h */,
+				CA68EF6DEF50EE466FE600CC /* colours.h */,
+				ED5956B518CDDAD9D2FA7A0F /* game-character.c */,
+				EF98B69A7810EB63096FC083 /* game-character.h */,
+				86BA473FDC4D7764B8D8E80A /* game-data.c */,
+				52BF3A7279D0D4E492EB1766 /* game-data.h */,
+				024B853A1332860972651B0E /* game-model.c */,
+				2EAFFD59DE796F810B4473AF /* game-model.h */,
+				036EC4452F8C6237AF74571D /* locolour.c */,
+				CF189030F661FE2201F185D6 /* locolour.h */,
+				B2259E807692AC2E4AF6F656 /* mudclient-sdl.c */,
+				6AE22CB9A5C6AFA56D0E66FD /* mudclient-sdl2.c */,
+				A6C1F31F042CA63AF2579B03 /* mudclient.c */,
+				E49BEB0F62E0906C06BA9449 /* mudclient.h */,
+				5A661D62806A0EC9111CCFC2 /* options.c */,
+				E054C4FFEE327FFC2F0A56A7 /* options.h */,
+				E22D8C74E3B3E10A2F76BCD7 /* packet-handler.c */,
+				F89E0EF3BF04639208790445 /* packet-handler.h */,
+				7E960FEFF1D6E73F2E78A696 /* packet-stream.c */,
+				A763156381534B4761E5CE8C /* packet-stream.h */,
+				01791917DF951E89A294625F /* panel.c */,
+				8C765C51A0282C736E5C6E86 /* panel.h */,
+				95F135063AA16D833109EE61 /* polygon.h */,
+				390C7B778D437F69F9BCD644 /* scanline.h */,
+				6F0E61838465D517FA40DCE2 /* scene.c */,
+				3344CEC85618F2658AEC8941 /* scene.h */,
+				2ED2D416644E085182B5B214 /* server-opcodes.h */,
+				5ED0223E9BFB2C75A82E0965 /* server-opcodes177.h */,
+				89E509F47C50418DA0A4FFAE /* server-opcodes204.h */,
+				13D85A23C4F03A58BD1F1A7D /* surface.c */,
+				A5A695EF68F329A20BD6BB15 /* surface.h */,
+				5CF603EB91BC14884B53714C /* utility.c */,
+				9FA84417F2E74F5329E1285A /* utility.h */,
+				34CAECFD083598058A7128CC /* version.h */,
+				66EA19C30077B873DE1F2E64 /* world.c */,
+				AA31002E485E9C2F30C43698 /* world.h */,
+				0FDB2B474325AD51E5CF1D3B /* custom */,
+				ED9191B81CD6976EA0E00415 /* lib */,
+				B416916C0E922255F835D732 /* ui */,
+			);
+			path = "rsc-c-src";
+			sourceTree = "<group>";
+		};
 		9A075E32A6F0E4BD527998DA /* RSC */ = {
 			isa = PBXGroup;
 			children = (
@@ -285,8 +753,76 @@
 			isa = PBXGroup;
 			children = (
 				6CE1BB6E2A812FA0B34E7ED0 /* OpenRSC */,
+				029E9141C7A9696253342440 /* RSCEngine */,
 				14BFB150E52CE5887FD9D2C4 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		B416916C0E922255F835D732 /* ui */ = {
+			isa = PBXGroup;
+			children = (
+				6C0BA1ABDDDF60BE1F68DB63 /* additional-options.c */,
+				B8FDB8A8F3B7791728C8ED38 /* additional-options.h */,
+				DB208EB7A085AA7C0BDA675D /* appearance.c */,
+				BDEBA18940DD751AF80AE759 /* appearance.h */,
+				4FAB0A49C2D370BDEDC17035 /* bank.c */,
+				BC63366914FBB9308EF74650 /* bank.h */,
+				54A83324DCA4155F64A47C06 /* combat-style.c */,
+				EDA7209B9D399560B9CE2F9E /* combat-style.h */,
+				081C5C572B8A8A2F2C911106 /* confirm.c */,
+				926C9E55150A54575F563C63 /* confirm.h */,
+				EA4322998EFC5EE352F2709B /* duel.c */,
+				956B35397E0F17E216A3DD3D /* duel.h */,
+				06A85A977E16879F40D894EB /* experience-drops.c */,
+				C8E8598A2E28557FDD1FC3A3 /* experience-drops.h */,
+				D2BF481CC187C31C839AD483 /* inventory-tab.c */,
+				699446D7FF4409FF06001757 /* inventory-tab.h */,
+				BE0FB5B229741D3308E7FEA8 /* login.c */,
+				51D1AE61D2B44AD140F1C06E /* login.h */,
+				F8812B7BBA8EACF7C5FE36C5 /* logout.c */,
+				7483AE7A70AF61CCC5691FE2 /* logout.h */,
+				F76EDE21A978BDCBE8CEACC5 /* lost-connection.c */,
+				4A50A713EA7A8595E3825DD8 /* lost-connection.h */,
+				0402B84A513AF91882B3C5E8 /* magic-tab.c */,
+				E719908558C6312603929CE8 /* magic-tab.h */,
+				57CFF12659918D698C386B99 /* menu.c */,
+				129BFF510FCC47831CB52E19 /* menu.h */,
+				5774BA4872E1404C050199B8 /* message-tabs.c */,
+				C0A94174EF5448D747AC6D59 /* message-tabs.h */,
+				5EF1432065878349DAE0C0F5 /* minimap-tab.c */,
+				A537A51F288FC548D04A48FF /* minimap-tab.h */,
+				E7CAA4CFBB147378BE5D7B2D /* offer-x.c */,
+				1E00CA895FEB9227B580EBFC /* offer-x.h */,
+				64E2AD4BCEF46C27F7B580D6 /* option-menu.c */,
+				B2DB60AEEBA7F5C79A7D30F7 /* option-menu.h */,
+				B94099D7AF9DBE5EB664E71C /* options-tab.c */,
+				40C00BA58D77BA434FF14728 /* options-tab.h */,
+				E6A571E1CDEA8EB48EC75FC4 /* server-message.c */,
+				57EA0FFBA02BE5494D43EFE7 /* server-message.h */,
+				F1FE28F61B2CFC01AC56636B /* shop.c */,
+				DE6BCCA7B11E4BFF7236833F /* shop.h */,
+				8C3B15836A1EEBCD6AD99759 /* sleep.c */,
+				9F4865EA000387F1CAE9C20C /* sleep.h */,
+				CCF464CFB07A523C101BCAEC /* social-tab.c */,
+				5DFA21E934F7E1606D93DD9C /* social-tab.h */,
+				8D454E7CCCFF14CD8000F4C1 /* stats-tab.c */,
+				1ABA3CFD925BE46A3B37D1F5 /* stats-tab.h */,
+				C9AE92B116627D321069B506 /* status-bars.c */,
+				9A9EADB91EB695D071CB6E21 /* status-bars.h */,
+				72962EB29E56F834727BECD5 /* trade.c */,
+				6DACB0C365712E4F578F2C6A /* trade.h */,
+				43BE52E84FD8353A18F18624 /* transaction.c */,
+				C106539D115AF9332E613D23 /* transaction.h */,
+				E8E55449F5F4054E89B74BB7 /* ui-tabs.c */,
+				81F3F48687CDC43E5D252259 /* ui-tabs.h */,
+				05ABBB0266E2425E0EF746F2 /* welcome.c */,
+				4B84D50776F9D9ED04D073B9 /* welcome.h */,
+				A770290E3A1A86D5649C7F43 /* wilderness-warning.c */,
+				69C161AB89680BB56B3FD73A /* wilderness-warning.h */,
+				BBFC6CEE5E50D4C3563C9876 /* worldlist.c */,
+				B234F289E64F213ECDEAD7BE /* worldlist.h */,
+			);
+			path = ui;
 			sourceTree = "<group>";
 		};
 		BA24992C9D30600FD094A500 /* Network */ = {
@@ -355,6 +891,22 @@
 			path = GameSelector;
 			sourceTree = "<group>";
 		};
+		ED9191B81CD6976EA0E00415 /* lib */ = {
+			isa = PBXGroup;
+			children = (
+				A2BC953C3BFB197B4BD1770C /* bn.c */,
+				09B6D6F273992CD793510E24 /* bn.h */,
+				901ECB3F0661EB9F90F93DD8 /* bzip.c */,
+				8F419BD92B204EF30F068A25 /* bzip.h */,
+				DBFF024878A96F8A24A7EEB4 /* ini.c */,
+				14746B6FC05879F209F7FFCE /* ini.h */,
+				1A15525676DCDD609A09E46C /* isaac.c */,
+				E545377A240F3833E7EBA427 /* isaac.h */,
+				0668384F4D06DDDA555DC1B3 /* rsa */,
+			);
+			path = lib;
+			sourceTree = "<group>";
+		};
 		EEB3325A965B51B67539C863 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
@@ -380,10 +932,12 @@
 			buildPhases = (
 				27EBD023E308F40C21193944 /* Sources */,
 				C619CAAC18FDD0E65217EADB /* Resources */,
+				C68CCB7EA1D87210779E4274 /* Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				88A9774FDCC2DD7D9DAF6479 /* PBXTargetDependency */,
 			);
 			name = OpenRSC;
 			packageProductDependencies = (
@@ -391,6 +945,24 @@
 			productName = OpenRSC;
 			productReference = 5D5705B24E1415694C5BFC19 /* OpenRSC.app */;
 			productType = "com.apple.product-type.application";
+		};
+		EA3292358BCAAFEB2F673D20 /* RSCEngine */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 08376BDF7A151EBA2D311D7D /* Build configuration list for PBXNativeTarget "RSCEngine" */;
+			buildPhases = (
+				7EFA2A6C3347ECC2AEF6B4E7 /* CopyFiles */,
+				BB4995B19771686C8E65E295 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RSCEngine;
+			packageProductDependencies = (
+			);
+			productName = RSCEngine;
+			productReference = 1A83F8CF16735D1E6B4A06EC /* libRSCEngine.a */;
+			productType = "com.apple.product-type.library.static";
 		};
 /* End PBXNativeTarget section */
 
@@ -422,6 +994,7 @@
 			projectRoot = "";
 			targets = (
 				24C87ADC8A795C0A7A2949E7 /* OpenRSC */,
+				EA3292358BCAAFEB2F673D20 /* RSCEngine */,
 			);
 		};
 /* End PBXProject section */
@@ -442,6 +1015,7 @@
 				338FA91C1E0E26BAAEA38C25 /* WebClient in Resources */,
 				49BE2E9E20608DF7F8491734 /* landscape.dat in Resources */,
 				406DA2FFE25D7DA56EC24D73 /* models.orsc in Resources */,
+				D37A208A5A1EA610E8249E61 /* rsc-cache in Resources */,
 				C17AE88BA79A247836F1CFBB /* sprites.dat in Resources */,
 				F03679ABB7ADFCC6B61737E9 /* sprites_v2.dat in Resources */,
 			);
@@ -483,11 +1057,13 @@
 				48198E65F85056BF3CD2BCE6 /* ModelArchiveLoader.swift in Sources */,
 				7FFB9D1CA4251DC6E52E18DC /* NPCDefinitions.swift in Sources */,
 				6648F15278343C12D182D549 /* NPCNames.swift in Sources */,
+				84617B8507FB3E57E1F1718A /* NativeRSCView.swift in Sources */,
 				295E2A677F0E7DADBE03EC41 /* ObjectNames.swift in Sources */,
 				0950957DF00260DAA0754C38 /* OpenRSCApp.swift in Sources */,
 				8FFAC6D6B26D024D29E86D7E /* Pathfinder.swift in Sources */,
 				AFB330532316E550054ECF33 /* PlayerPalettes.swift in Sources */,
 				3D751413D47F84684101DEC1 /* Polygon.swift in Sources */,
+				7D94EA98A733CAB8547B2BC7 /* RSCEngineHost.swift in Sources */,
 				89A587E1B70A0CBC5632E006 /* RSCGameEngine.swift in Sources */,
 				056348FA1DEC564CF4D734D0 /* RSCLoginHandler.swift in Sources */,
 				8D061CA1AC54B0CBBD451140 /* RSCOpcodes.swift in Sources */,
@@ -518,7 +1094,79 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BB4995B19771686C8E65E295 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				85742CC1439D9F40BC87FFA1 /* additional-options.c in Sources */,
+				DB363FCA10C0B5CB3A6DC311 /* appearance.c in Sources */,
+				0577B9DF47C2AFB7DDDDD690 /* bank.c in Sources */,
+				24BD07F1AA4B6DFB2734D5BB /* bn.c in Sources */,
+				CC9DF1F7908DDB91119571D7 /* bzip.c in Sources */,
+				A31F79C4E56CC6A9F1B9C11F /* chat-message.c in Sources */,
+				C1D61C5CA7DE3F6395B96913 /* clarify-herblaw-items.c in Sources */,
+				94C3868722F14BFCB2A737D0 /* combat-style.c in Sources */,
+				935117C010A199B857D4D19D /* confirm.c in Sources */,
+				34B350F87148B0AF0E6351C6 /* diverse-npcs.c in Sources */,
+				AE2DE795B955A9AE75B167A8 /* duel.c in Sources */,
+				3B0FD55B8CF7C247F0D590AA /* experience-drops.c in Sources */,
+				858E26F7208789E6D9EA0E07 /* game-character.c in Sources */,
+				E6C61E606862F56DF72ADC82 /* game-data.c in Sources */,
+				E9B764901FCA7777FF3570E0 /* game-model.c in Sources */,
+				994FE272816EBAC1D1B83FB3 /* ini.c in Sources */,
+				D560C042565477284B9F6143 /* inventory-tab.c in Sources */,
+				76D47259A1F6A62DF86176B7 /* isaac.c in Sources */,
+				D26A86F73DE7FEE6083D1508 /* item-highlight.c in Sources */,
+				4996C36EC378E91390E7292F /* locolour.c in Sources */,
+				856F8C44B64D193CFF8B23C9 /* login.c in Sources */,
+				C86A5726F15323EE91B8C136 /* logout.c in Sources */,
+				D323A872BC305E1044A6F17F /* lost-connection.c in Sources */,
+				355CAC7AB93E23FFD93F3977 /* magic-tab.c in Sources */,
+				BA0E68CC1EA2DF9E8AFEEA81 /* menu.c in Sources */,
+				C593183F5D023254B01B6238 /* message-tabs.c in Sources */,
+				4BA4C9BAFE1883C26CD39D5E /* minimap-tab.c in Sources */,
+				93D7D76277B8D59823348A3C /* mudclient-sdl.c in Sources */,
+				28AF223226C071D779171CC6 /* mudclient-sdl2.c in Sources */,
+				CC48AF8B64EF48C4F0BA17F9 /* mudclient.c in Sources */,
+				97F32C1841C7E7B05AF56FC4 /* offer-x.c in Sources */,
+				6D721CA6D772F3D7D31F3997 /* option-menu.c in Sources */,
+				DAE47564E02FACA75B77326D /* options-tab.c in Sources */,
+				B05C68A68671DD888C261CBB /* options.c in Sources */,
+				DBBEF8A6B630C4018D072B0B /* packet-handler.c in Sources */,
+				9BF812E19062EA25EF98E920 /* packet-stream.c in Sources */,
+				B04BB5720FD9CD5271F3996C /* panel.c in Sources */,
+				3F210DDA4E78F8301BE11FB4 /* rsa-openssl.c in Sources */,
+				9027BED60FA73EFE21345CE7 /* rsa-tiny.c in Sources */,
+				324C87E86D8CC9202FCB55FB /* rsc_sdl_shim.c in Sources */,
+				25DB4A170CCB5C69FE2739EC /* scene.c in Sources */,
+				C71CC97783FA2B172D5E9BE9 /* server-message.c in Sources */,
+				2591B03818A86E95A86617E8 /* shop.c in Sources */,
+				855054E4195AB8894FE30CF4 /* sleep.c in Sources */,
+				D23C761B9E6E8351A0F9D993 /* social-tab.c in Sources */,
+				300E4D04B224AC93196C4EB0 /* stats-tab.c in Sources */,
+				E336E9310438A0100C7BF18F /* status-bars.c in Sources */,
+				C234CBAA3555BE436F61BC1E /* surface.c in Sources */,
+				95B30C47D51125A3AB0A8769 /* toonscape.c in Sources */,
+				03BCB97956F77C69099370C2 /* trade.c in Sources */,
+				E2DB5F18C6051C86DA88D42E /* transaction.c in Sources */,
+				70F4DE796788632D14EBFDC1 /* ui-tabs.c in Sources */,
+				8CE17BB29CCBC96F01BD3505 /* utility.c in Sources */,
+				4E7ED2AABCF4CD89B5447024 /* welcome.c in Sources */,
+				921F9A54751277366314840F /* wilderness-warning.c in Sources */,
+				FD99BAF4891984E286C8EFAF /* world.c in Sources */,
+				562670C307F7F5615EA6E5E1 /* worldlist.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		88A9774FDCC2DD7D9DAF6479 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EA3292358BCAAFEB2F673D20 /* RSCEngine */;
+			targetProxy = 811C42B7DDA147278E574C70 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		049B56CBD7E5DE9CC1007A5D /* Debug */ = {
@@ -536,11 +1184,39 @@
 					"@executable_path/Frameworks",
 				);
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.openrsc.client;
 				PRODUCT_NAME = OpenRSC;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) OPENRSC_APP";
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/RSCEngine/include";
 				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		2C3238AC962A4EFD17B61946 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_PREFIX_HEADER = "$(SRCROOT)/RSCEngine/shim/rsc_ios_prefix.h";
+				GCC_PREPROCESSOR_DEFINITIONS = "$(inherited) SDL2=1 RENDER_SW=1 ANDROID=1 main=rsc_c_main";
+				GCC_WARN_INHIBIT_ALL_WARNINGS = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/RSCEngine/shim $(SRCROOT)/RSCEngine/include";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_CFLAGS = "$(inherited) -fwrapv";
+				PRODUCT_BUNDLE_IDENTIFIER = com.openrsc.RSCEngine;
+				PRODUCT_NAME = RSCEngine;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -608,6 +1284,29 @@
 				SWIFT_VERSION = 5.9;
 			};
 			name = Debug;
+		};
+		7D715CBD4ADAF10DAF60F29B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_PREFIX_HEADER = "$(SRCROOT)/RSCEngine/shim/rsc_ios_prefix.h";
+				GCC_PREPROCESSOR_DEFINITIONS = "$(inherited) SDL2=1 RENDER_SW=1 ANDROID=1 main=rsc_c_main";
+				GCC_WARN_INHIBIT_ALL_WARNINGS = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/RSCEngine/shim $(SRCROOT)/RSCEngine/include";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_CFLAGS = "$(inherited) -fwrapv";
+				PRODUCT_BUNDLE_IDENTIFIER = com.openrsc.RSCEngine;
+				PRODUCT_NAME = RSCEngine;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
 		};
 		CE637B97BF584A09F5DAC67B /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -681,10 +1380,15 @@
 					"@executable_path/Frameworks",
 				);
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.openrsc.client;
 				PRODUCT_NAME = OpenRSC;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) OPENRSC_APP";
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/RSCEngine/include";
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -693,6 +1397,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		08376BDF7A151EBA2D311D7D /* Build configuration list for PBXNativeTarget "RSCEngine" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2C3238AC962A4EFD17B61946 /* Debug */,
+				7D715CBD4ADAF10DAF60F29B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		B8B47ADBC563D9AFEB8ED8B3 /* Build configuration list for PBXNativeTarget "OpenRSC" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -88,7 +88,12 @@ public class Crypto {
     public static byte[] decryptRSA(byte[] data, int offset, int length) {
         byte newData[] = new byte[length];
         System.arraycopy(data, offset, newData, 0, length);
-        return new BigInteger(newData).modPow(privateKey.getPrivateExponent(), privateKey.getModulus()).toByteArray();
+        // The ciphertext is an unsigned big-endian integer. Java clients send
+        // BigInteger.toByteArray(), which adds a leading 0x00 whenever the top
+        // bit is set, but fixed-width clients (rsc-c: the WebAssembly web
+        // client and the native iOS app) send exactly 64 bytes. Parsing those
+        // as signed turned ~40% of logins into "missing username terminator".
+        return new BigInteger(1, newData).modPow(privateKey.getPrivateExponent(), privateKey.getModulus()).toByteArray();
     }
 
     public static void generateRSAKeys() {

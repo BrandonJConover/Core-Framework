@@ -250,6 +250,7 @@ struct WebGameView: UIViewRepresentable {
                 || (scheme == "http" && host == "127.0.0.1")
                 || scheme == "ws" || scheme == "wss"
                 || host == "10.8.0.1"
+                || host == "192.168.0.30"
                 || host.hasSuffix(".openrsc.com") {
                 decisionHandler(.allow)
             } else {

@@ -1,0 +1,4 @@
+module RSCEngine {
+    header "rsc_host.h"
+    export *
+}

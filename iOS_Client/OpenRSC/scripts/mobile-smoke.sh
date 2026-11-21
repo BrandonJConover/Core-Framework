@@ -12,8 +12,10 @@ echo "[smoke] installed OpenRSC apps:"
 xcrun devicectl device info apps --device "$DEVICE_ID" \
   | grep -E 'OpenRSC|Bundle Identifier|Name' || true
 
-echo "[smoke] network probe: 10.8.0.1:43594"
-if nc -vz -G 5 10.8.0.1 43594 >/tmp/openrsc-mobile-smoke-nc.log 2>&1; then
+SERVER_HOST="${SERVER_HOST:-192.168.0.30}"
+SERVER_PORT="${SERVER_PORT:-43594}"
+echo "[smoke] network probe: ${SERVER_HOST}:${SERVER_PORT}"
+if nc -vz -G 5 "$SERVER_HOST" "$SERVER_PORT" >/tmp/openrsc-mobile-smoke-nc.log 2>&1; then
   cat /tmp/openrsc-mobile-smoke-nc.log
 else
   cat /tmp/openrsc-mobile-smoke-nc.log

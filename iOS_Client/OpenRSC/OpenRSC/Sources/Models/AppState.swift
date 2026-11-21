@@ -7,6 +7,8 @@ enum AppView {
     case login(ServerProfile)
     case webGame(ServerProfile, String?, String?)
     case game(ServerProfile, String, String)  // server, username, password
+    /// Native RSC client: the embedded rsc-c engine draws its own login screen.
+    case nativeGame(ServerProfile)
 }
 
 @MainActor
@@ -24,7 +26,19 @@ final class AppState: ObservableObject {
     }()
 
     private static func withDefaultServers(_ savedServers: [ServerProfile]) -> [ServerProfile] {
-        var servers = savedServers
+        // Migrate profiles created by the retired Hetzner/WireGuard deployment
+        // and the earlier LAN address to the Raspberry Pi on the home network.
+        var servers = savedServers.map { profile in
+            guard profile.gameType == .rsc || profile.gameType == .rscWeb else { return profile }
+            let oldHosts = ["10.8.0.1", "192.168.0.25", "127.0.0.1", "localhost"]
+            guard oldHosts.contains(profile.host) else { return profile }
+            var migrated = profile
+            migrated.host = "192.168.0.30"
+            migrated.port = 43594
+            migrated.wsPort = 43494
+            migrated.name = profile.gameType == .rsc ? "2001scape (Home)" : "2001scape Web (Home)"
+            return migrated
+        }
 
         if !servers.contains(where: { $0.gameType == .rsc }) {
             servers.append(.openRSCDefault)
@@ -37,6 +51,26 @@ final class AppState: ObservableObject {
         return servers
     }
 
+    /// Test hook: `-nativeHost <host> [-nativePort <port>] -nativeRSA <modulus>`
+    /// launch arguments (e.g. `xcrun simctl launch booted com.openrsc.client
+    /// -nativeHost 127.0.0.1 -nativeRSA <hex>`) open the native RSC client
+    /// straight away, without tapping through the menus.
+    func applyLaunchArguments() {
+        let defaults = UserDefaults.standard
+        guard let host = defaults.string(forKey: "nativeHost"), !host.isEmpty else { return }
+        let port = defaults.integer(forKey: "nativePort")
+        var profile = ServerProfile(
+            name: "Launch argument server",
+            host: host,
+            port: port > 0 ? port : 43594,
+            wsPort: 43494,
+            lastUsername: "",
+            gameType: .rsc
+        )
+        profile.rsaModulus = defaults.string(forKey: "nativeRSA") ?? ""
+        currentView = .nativeGame(profile)
+    }
+
     func saveServers() {
         if let encoded = try? JSONEncoder().encode(servers) {
             UserDefaults.standard.set(encoded, forKey: "savedServers")
@@ -45,6 +79,12 @@ final class AppState: ObservableObject {
 
     func addServer(_ profile: ServerProfile) {
         servers.append(profile)
+        saveServers()
+    }
+
+    func updateServer(_ profile: ServerProfile) {
+        guard let index = servers.firstIndex(where: { $0.id == profile.id }) else { return }
+        servers[index] = profile
         saveServers()
     }
 
