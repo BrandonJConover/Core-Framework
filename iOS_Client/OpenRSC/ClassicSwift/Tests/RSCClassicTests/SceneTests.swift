@@ -10,32 +10,10 @@ final class SceneTests: XCTestCase {
         let golden = String(decoding: try Data(contentsOf: TestPaths.golden.appendingPathComponent("scene.txt")),
                             as: UTF8.self).split(separator: "\n").map(String.init)
         var lines: [String] = []
-        let w = 512, h = 346
 
-        let s = Surface(width: w, height: h, limit: SpriteBase.limit)
         let gameData = try GameData(config: try JagArchive(contentsOf: TestPaths.cache.appendingPathComponent("config85.jag")),
                                     members: true, version: 85)
-        let media = try JagArchive(contentsOf: TestPaths.cache.appendingPathComponent("media59.jag"))
-        let index = try XCTUnwrap(try media.file("index.dat"))
-        var remaining = gameData.itemSpriteCount
-        var file = 1
-        while remaining > 0 {
-            let c = min(remaining, 30)
-            remaining -= 30
-            let data = try XCTUnwrap(try media.file("objects\(file).dat"))
-            s.parseSprite(id: SpriteBase.item + (file - 1) * 30, spriteData: data, indexData: index, frameCount: c)
-            file += 1
-        }
-        for i in 0..<gameData.itemSpriteCount { s.loadSprite(id: SpriteBase.item + i) }
-
-        let scene = Scene(surface: s, modelCount: 7500, polygonCount: 7500, maxSpriteCount: 1000)
-        scene.setBounds(width: w, height: h - 12)
-        scene.clipFar3d = 2400
-        scene.clipFar2d = 2400
-        scene.fogZDistance = 2300
-
-        try MediaLoader.loadTextures(try JagArchive(contentsOf: TestPaths.cache.appendingPathComponent("textures17.jag")),
-                                     into: s, scene: scene, gameData: gameData)
+        let (s, scene) = try makeTestScene(gameData: gameData)
         for i in 0..<scene.textureCount {
             let dim = Int(scene.textureDimension[i])
             // gcc evaluates the printf arguments right to left, so the fill lookup (which loads the texture) runs first.

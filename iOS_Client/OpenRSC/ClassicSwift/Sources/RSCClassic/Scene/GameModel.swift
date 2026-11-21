@@ -212,8 +212,14 @@ public final class GameModel {
     }
 
     public func vertexAt(x: Int, y: Int, z: Int) -> Int {
-        for i in 0..<vertexCount where Int(vertexX[i]) == x && Int(vertexY[i]) == y && Int(vertexZ[i]) == z {
-            return i
+        // Terrain assembly calls this ~10k times on an 18k-vertex model, so scan raw storage.
+        if vertexCount > 0, let sx = Int16(exactly: x), let sy = Int16(exactly: y), let sz = Int16(exactly: z) {
+            let px = vertexX.pointer, py = vertexY.pointer, pz = vertexZ.pointer
+            var i = 0
+            while i < vertexCount {
+                if px[i] == sx && py[i] == sy && pz[i] == sz { return i }
+                i += 1
+            }
         }
         return createVertex(x: x, y: y, z: z)
     }

@@ -13,14 +13,14 @@ CFLAGS += -std=gnu99 -fwrapv -O2 -I$(ENGINE)/shim -I$(ENGINE)/include \
 LDLIBS += -lm -lpthread
 CACHE := $(ENGINE)/rsc-cache
 GOLDEN := ../Tests/RSCClassicTests/Golden
-TOOLS := build/jagdump build/gamedata build/surfacedump build/netdump build/modeldump build/scenedump
+TOOLS := build/jagdump build/gamedata build/surfacedump build/netdump build/modeldump build/scenedump build/worlddump
 
 all: $(TOOLS)
 
 engine:
 	$(MAKE) -C $(ENGINE)/tools
 
-build/%: %.c engine | build
+build/%: %.c common.h engine | build
 	$(CC) $(CFLAGS) -o $@ $< $(ENGINE_OBJ) $(LDLIBS)
 
 build:
@@ -36,5 +36,6 @@ golden: $(TOOLS)
 	build/netdump > $(GOLDEN)/net.txt
 	build/modeldump $(CACHE) > $(GOLDEN)/models.txt
 	build/scenedump $(CACHE) > $(GOLDEN)/scene.txt
+	build/worlddump $(CACHE) > $(GOLDEN)/world.txt
 
 .PHONY: all engine golden

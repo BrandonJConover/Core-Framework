@@ -304,9 +304,8 @@ extension Scene {
                 break
             }
             if i == Scene.rampCount - 1 {
-                // rsc-c picks the slot with rand(); the slot only affects caching, not output.
-                gradientSeed = gradientSeed &* 1103515245 &+ 12345
-                let index = Int((gradientSeed >> 16) % UInt32(Scene.rampCount))
+                // rsc-c picks the slot with rand() (shared with terrain ambience); the slot only affects caching.
+                let index = min(Int(CRandom.shared.nextUnitFloat() * Float(Scene.rampCount)), Scene.rampCount - 1)
                 gradientBase[index] = fill
                 let f = -1 - fill
                 let r = ((f >> 10) & 0x1f) * 8, g = ((f >> 5) & 0x1f) * 8, b = (f & 0x1f) * 8

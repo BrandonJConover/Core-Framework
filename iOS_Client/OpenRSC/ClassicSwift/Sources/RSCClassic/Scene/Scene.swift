@@ -59,7 +59,6 @@ public final class Scene {
     var gradientBase = [Int](repeating: 0, count: Scene.rampCount)
     let gradientRamps = Buf<Int32>(Scene.rampCount * Int(Scene.rampSize))
     var gradientRamp = 0
-    var gradientSeed: UInt32 = 1
     public var textureCount = 0
     var textureColours: [[UInt8]?] = []
     var texturePalette: [[Int32]?] = []
