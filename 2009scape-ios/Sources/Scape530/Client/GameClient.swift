@@ -162,7 +162,10 @@ public final class GameClient {
 	/// and ground textures reach the world; changed build options rebuild the scene (`method2742`).
 	func applySceneOptions() {
 		let p = host.prefs
-		if neverRemoveRoofs { world.roofMode = .never }
+		// rt4 mode 0 (op 6021, `neverRemoveRoofs`) is set by the Tutorial Island scripts; drawing every level there
+		// leaves this port's camera under the upper level's floor, so until that is matched it keeps the selective
+		// mode (the behaviour players saw). Tracked in PARITY.md.
+		if neverRemoveRoofs && Self.honoursNeverRemoveRoofs { world.roofMode = .never }
 		else if p.allLevelsVisible { world.roofMode = p.removeRoofsSelectively ? .selective : .always }
 		else { world.roofMode = .always }
 		var o = WorldView.SceneOptions()
@@ -196,6 +199,8 @@ public final class GameClient {
 
 	/// Called after any Options-tab setting changed (rt4 `Preferences.write`): store `preferencesData`.
 	public var onPreferencesChanged: (() -> Void)?
+	/// Off until the all-levels camera matches rt4 (see `applySceneOptions`).
+	nonisolated(unsafe) static var honoursNeverRemoveRoofs = false
 	/// rt4 `ScriptRunner.neverRemoveRoofs` (op 6021): not persisted.
 	var neverRemoveRoofs: Bool { host.prefs.neverRemoveRoofs }
 

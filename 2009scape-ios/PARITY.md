@@ -23,7 +23,7 @@ playthrough tests (tutorial, combat, bank, shop, magic, woodcutting, fires, cook
 - [ ] Hardware keyboard (iPad/BT keyboards): arrow-key camera, F-keys, Esc, modifiers, Ctrl-run
 - [ ] Fixed 765x503 mode (interface 548)
 - [ ] Large-creature terrain tilt (PathingEntity.method2685) and BAS roll/pitch (method2687)
-- [ ] RoofHider mode 1, client-local ::commands
+- [ ] RoofHider mode 0 (op 6021 on Tutorial Island): drawing every level leaves the camera under the upper floor; held at selective until matched. Client-local ::commands
 - [ ] Account creation (ops 5603-5610), probably not needed for a private server
 - [ ] HD (GL) paths: lighting, shadows, water, overlay edge blend (Metal renderer roadmap)
 

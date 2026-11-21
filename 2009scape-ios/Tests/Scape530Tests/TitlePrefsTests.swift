@@ -208,7 +208,7 @@ final class TitlePrefsTests: XCTestCase {
 		set(6003, 1)
 		XCTAssertEqual(client.world.roofMode, .selective)
 		set(6021, 1)
-		XCTAssertEqual(client.world.roofMode, .never)
+		XCTAssertEqual(client.world.roofMode, GameClient.honoursNeverRemoveRoofs ? .never : .selective)
 		set(6021, 0)
 		saved = 0
 		set(6002, 0)
