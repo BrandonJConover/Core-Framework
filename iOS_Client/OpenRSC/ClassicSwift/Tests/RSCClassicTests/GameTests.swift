@@ -1,10 +1,10 @@
 import XCTest
 @testable import RSCClassic
 
-/// Replays the server packets recorded by tools/gamedump.c (a scripted session
+/// Replays the server packets and game ticks recorded by tools/gamedump.c (a scripted session
 /// in Lumbridge) through the Swift packet handler and compares the game state
 /// dumped after each one with the C client's.
-final class PacketTests: XCTestCase {
+final class GameTests: XCTestCase {
     private final class NullHost: MudclientHost {
         func present(_ mud: Mudclient) {}
         func triggerKeyboard(text: String, isPassword: Bool, x: Int, y: Int, width: Int, height: Int,
@@ -47,9 +47,24 @@ final class PacketTests: XCTestCase {
                 for (j, b) in bytes.enumerated() { mud.incomingPacket[j] = b }
                 mud.handlePacket(opcode: Int(bytes[0]), size: bytes.count)
                 dump()
-            } else if line == "poke death 0" {
-                mud.deathScreenTimeout = 0
+            } else if line.hasPrefix("poke ") {
+                let parts = line.split(separator: " ")
+                let v = Int(parts[2])!
+                switch parts[1] {
+                case "death": mud.deathScreenTimeout = v
+                case "rotation": mud.cameraRotation = v
+                case "zoom": mud.cameraZoom = v
+                case "roofs": mud.options.showRoofs = v
+                case "fog": mud.options.fogOfWar = v
+                case "appearance": mud.showAppearanceChange = v != 0
+                default: XCTFail("unknown poke \(line)")
+                }
                 lines.append(line)
+            } else if line.hasPrefix("tick ") {
+                lines.append(line)
+                for _ in 0..<Int(line.dropFirst(5))! { mud.handleInputs() }
+            } else if line.hasPrefix("frame ") {
+                frame(String(line.split(separator: " ")[1]), golden: line)
             }
         }
 
@@ -60,6 +75,20 @@ final class PacketTests: XCTestCase {
         }
         XCTAssertEqual(lines.count, golden.count, "line count")
         XCTAssertEqual(mismatches, 0, "\(mismatches) mismatched lines")
+    }
+
+    /// draw_scene in gamedump.c: the 3D view part of mudclient_draw_game.
+    private func frame(_ name: String, golden: String) {
+        mud.drawGameScene()
+        let bytes = mud.surface.pixelBuffer.withMemoryRebound(to: UInt8.self) { Array($0) }
+        let line = "frame \(name) \(fnv1a(bytes)) sprites \(mud.sceneSpriteCount) models \(mud.scene.modelCount) cam "
+            + "\(mud.cameraAutoRotatePlayerX) \(mud.cameraAutoRotatePlayerY) \(mud.cameraRotation) \(mud.cameraZoom)"
+        lines.append(line)
+        if line != golden {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rsc-swift-frames")
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try? Data(bytes).write(to: dir.appendingPathComponent("\(name).raw"))
+        }
     }
 
     private func adjacencyHash() -> UInt32 {

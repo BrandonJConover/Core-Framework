@@ -142,7 +142,8 @@ public final class Scene {
         }
     }
 
-    public func removeModel(_ model: GameModel) {
+    /// scene_remove_model. Passing nil removes nulled slots, like C's NULL pointer compare.
+    public func removeModel(_ model: GameModel?) {
         var i = 0
         while i < modelCount {
             if models[i] === model {

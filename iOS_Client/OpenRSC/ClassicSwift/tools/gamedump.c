@@ -9,10 +9,10 @@
  * socketpair and sends it a scripted series of server packets in Lumbridge.
  * Each packet is printed as hex ("packet <opcode> <hex>") before the client
  * reads it, followed by a dump of the game state, so
- * RSCClassicTests/PacketTests.swift can replay the same bytes.
+ * RSCClassicTests/GameTests.swift can replay the same bytes.
  *
  *   gamedump <cache_dir> <empty_config_dir> */
-static const char *config_dir;
+static const char *config_dir, *frame_dir;
 char *__wrap_SDL_GetPrefPath(const char *org, const char *app) {
   (void)org; (void)app; char *p = malloc(600); snprintf(p, 600, "%s/", config_dir); return p;
 }
@@ -98,6 +98,111 @@ static void dump(void){
     m->settings_block_chat, m->settings_block_private, m->settings_block_trade, m->settings_block_duel);
 }
 
+
+/* The first half of mudclient_draw_game (before draw_ui), copied verbatim so
+ * the 3D view can be compared before the in-game UI is ported. */
+static void draw_scene(const char *label){
+  mudclient *mud=M;
+  if (mud->death_screen_timeout != 0) {
+    surface_fade_to_black(mud->surface);
+    surface_draw_string_centre(mud->surface, "Oh dear! You are dead...", mud->surface->width / 2, (mud->surface->height - 12) / 2, FONT_BOLD_24, RED);
+    mudclient_draw_chat_message_tabs(mud);
+    goto out;
+  }
+  if (mud->show_appearance_change) { mudclient_draw_appearance_panel(mud); goto out; }
+  if (mud->is_sleeping) { goto out; }
+  if (!mud->world->player_alive) { goto out; }
+  for (int i = 0; i < TERRAIN_COUNT; i++) {
+    scene_remove_model(mud->scene, mud->world->roof_models[mud->last_plane_index][i]);
+    if (mud->last_plane_index == 0) {
+      scene_remove_model(mud->scene, mud->world->wall_models[1][i]);
+      scene_remove_model(mud->scene, mud->world->roof_models[1][i]);
+      scene_remove_model(mud->scene, mud->world->wall_models[2][i]);
+      scene_remove_model(mud->scene, mud->world->roof_models[2][i]);
+    }
+    if (mud->options->show_roofs) {
+      mud->fog_of_war = 1;
+      if (mud->last_plane_index == 0 && !world_is_under_roof(mud->world, mud->local_player->current_x, mud->local_player->current_y)) {
+        scene_add_model(mud->scene, mud->world->roof_models[mud->last_plane_index][i]);
+        scene_add_model(mud->scene, mud->world->wall_models[1][i]);
+        scene_add_model(mud->scene, mud->world->roof_models[1][i]);
+        scene_add_model(mud->scene, mud->world->wall_models[2][i]);
+        scene_add_model(mud->scene, mud->world->roof_models[2][i]);
+        mud->fog_of_war = 0;
+      }
+    }
+  }
+  if (!mud->options->lowmem) mudclient_animate_objects(mud);
+  mudclient_draw_entity_sprites(mud);
+  mud->surface->interlace = 0;
+  surface_black_screen(mud->surface);
+  mud->surface->interlace = mud->options->interlace;
+  if (mud->last_plane_index == 3 && mud->options->flicker) {
+    int ambience = 40 + ((float)rand() / (float)RAND_MAX) * 3;
+    int diffuse = 40 + ((float)rand() / (float)RAND_MAX) * 7;
+    scene_set_light(mud->scene, ambience, diffuse, -50, -10, -50);
+  }
+  mud->action_bubble_count = 0; mud->received_messages_count = 0; mud->health_bar_count = 0; mud->overworld_text_count = 0;
+  if (mud->settings_camera_auto && !mud->fog_of_war) mudclient_auto_rotate_camera(mud);
+  if (mud->options->zoom_camera) {
+    int clip_far = (int)((2400.0f / ZOOM_OUTDOORS) * (float)mud->camera_zoom);
+    mud->scene->clip_far_3d = clip_far; mud->scene->clip_far_2d = clip_far; mud->scene->fog_z_distance = clip_far - 100;
+  } else { mud->scene->clip_far_3d = 2400; mud->scene->clip_far_2d = 2400; mud->scene->fog_z_distance = 2300; }
+  if (mud->options->interlace) { mud->scene->clip_far_3d -= 200; mud->scene->clip_far_2d -= 200; mud->scene->fog_z_distance -= 200; }
+  if (mud->game_height > MUD_VANILLA_HEIGHT) {
+    int clip_far = mud->scene->clip_far_3d / (MUD_VANILLA_HEIGHT / (float)mud->game_height);
+    mud->scene->clip_far_3d = clip_far; mud->scene->clip_far_2d = clip_far; mud->scene->fog_z_distance = clip_far - 100;
+  }
+  if (!mud->options->fog_of_war) { mud->scene->clip_far_3d = 20000; mud->scene->clip_far_2d = 20000; mud->scene->fog_z_distance = 20000; }
+  int camera_x = mud->camera_auto_rotate_player_x + mud->camera_rotation_x;
+  int camera_z = mud->camera_auto_rotate_player_y + mud->camera_rotation_y;
+  int offset_y = 0; int is_touch = mudclient_is_touch(mud);
+  if (is_touch) offset_y = 100; else if (MUD_IS_COMPACT) offset_y = 75;
+  scene_set_camera(mud->scene, camera_x, -world_get_elevation(mud->world, camera_x, camera_z) - offset_y, camera_z, 912, (mud->camera_rotation * 4), 0, (mud->camera_zoom * 2));
+  surface_black_screen(mud->surface);
+  scene_render(mud->scene);
+  mudclient_draw_overhead(mud);
+  if (mud->mouse_click_x_step > 0) surface_draw_sprite(mud->surface, mud->mouse_click_x_x - 8, mud->mouse_click_x_y - 8, mud->sprite_media + 14 + ((24 - mud->mouse_click_x_step) / 6));
+  else if (mud->mouse_click_x_step < 0) surface_draw_sprite(mud->surface, mud->mouse_click_x_x - 8, mud->mouse_click_x_y - 8, mud->sprite_media + 18 + ((24 + mud->mouse_click_x_step) / 6));
+  if (mud->options->display_fps) {
+    int offset_x = mud->is_in_wilderness ? 70 : 0; char fps[17] = {0}; sprintf(fps, "Fps: %d", mud->fps);
+    surface_draw_string(mud->surface, fps, is_touch ? 9 + offset_x : mud->surface->width - 62 - offset_x, mud->surface->height - 22, FONT_BOLD_12, YELLOW);
+  }
+  if (mud->system_update != 0) {
+    int seconds = mud->system_update / 50; int minutes = seconds / 60; seconds %= 60;
+    char formatted_update[41] = {0}; sprintf(formatted_update, "System update in: %d:%02d", minutes, seconds);
+    surface_draw_string_centre(mud->surface, formatted_update, 256, mud->game_height - 19, FONT_BOLD_12, YELLOW);
+  }
+  if (!mud->loading_area) {
+    int wilderness_depth = mudclient_get_wilderness_depth(mud);
+    mud->is_in_wilderness = wilderness_depth > 0;
+    if (mud->is_in_wilderness) {
+      int x = is_touch ? 29 : mud->surface->width - 59;
+      surface_draw_sprite(mud->surface, x, mud->surface->height - 68, mud->sprite_media + 13);
+      surface_draw_string_centre(mud->surface, "Wilderness", x + 12, mud->surface->height - 32, FONT_BOLD_12, YELLOW);
+      int wilderness_level = 1 + (wilderness_depth / 6); char formatted_level[19] = {0}; sprintf(formatted_level, "Level: %d", wilderness_level);
+      surface_draw_string_centre(mud->surface, formatted_level, x + 12, mud->surface->height - 19, FONT_BOLD_12, YELLOW);
+      if (mud->show_wilderness_warning == 0) mud->show_wilderness_warning = 2;
+    }
+    if (mud->options->wilderness_warning && mud->show_wilderness_warning == 0 && wilderness_depth > -10 && wilderness_depth <= 0) mud->show_wilderness_warning = 1;
+  }
+out:;
+  Surface *S=mud->surface;
+  printf("frame %s %u sprites %d models %d cam %d %d %d %d\n", label, fnv(S->pixels,S->width*S->height*4), mud->scene_sprite_count,
+    mud->scene->model_count, mud->camera_auto_rotate_player_x, mud->camera_auto_rotate_player_y, mud->camera_rotation, mud->camera_zoom);
+  if(frame_dir){char p[600];snprintf(p,sizeof p,"%s/%s.raw",frame_dir,label);FILE*f=fopen(p,"wb");fwrite(S->pixels,4,S->width*S->height,f);fclose(f);}
+}
+static void ticks(int n){ printf("tick %d\n", n); for(int i=0;i<n;i++) mudclient_handle_inputs(M); }
+static void poke(const char *what, int v){
+  printf("poke %s %d\n", what, v);
+  if(!strcmp(what,"death")) M->death_screen_timeout=v;
+  else if(!strcmp(what,"rotation")) M->camera_rotation=v;
+  else if(!strcmp(what,"zoom")) M->camera_zoom=v;
+  else if(!strcmp(what,"roofs")) M->options->show_roofs=v;
+  else if(!strcmp(what,"fog")) M->options->fog_of_war=v;
+  else if(!strcmp(what,"appearance")) M->show_appearance_change=v;
+}
+
 /* ---- scripted session ---- */
 static void region_players(int x, int y, int sprite, int known, const int (*moves)[2], const int (*adds)[5], int nadds){
   begin(SERVER_REGION_PLAYERS); bits(x,11); bits(y,13); bits(sprite,4); bits(known,8);
@@ -111,7 +216,7 @@ static void appearance(int index, const char *who, int lvl, int skull){
   b8(2); b8(8); b8(14); b8(1); b8(lvl); b8(skull);
 }
 int main(int argc, char **argv){
-  const char *cache = argv[1]; config_dir = argv[2];
+  const char *cache = argv[1]; config_dir = argv[2]; frame_dir = argc > 3 ? argv[3] : NULL;
   if(chdir(cache)!=0){perror(cache);return 1;}
   srand(1234);
   init_utility_global(); init_surface_global(); init_world_global(); init_stats_tab_global();
@@ -172,6 +277,11 @@ int main(int argc, char **argv){
   int moves3[][2] = {{-1,0},{0,6}};
   int adds3[][5] = {{9,4,-4,0,0}};
   region_players(121, 649, 4, 2, moves3, adds3, 1);
+  ticks(1); draw_scene("lumbridge_1");
+  ticks(12); draw_scene("lumbridge_13");
+  poke("rotation", 64); poke("zoom", 550); ticks(1); draw_scene("rotated");
+  poke("roofs", 0); poke("fog", 0); ticks(40); draw_scene("no_roofs");
+  poke("rotation", 200); poke("zoom", 1200); poke("roofs", 1); poke("fog", 1); ticks(3); draw_scene("far");
 
   begin(SERVER_INVENTORY_ITEMS); b8(4); b16(10); bstack(1500); b16(1|32768); b16(546); b16(20); bstack(3); send_packet();
   begin(SERVER_INVENTORY_ITEM_UPDATE); b8(4); b16(87|32768); b8(1); send_packet();
@@ -219,12 +329,14 @@ int main(int argc, char **argv){
   begin(SERVER_PLAYER_DIED); send_packet();
   int moves4[][2] = {{-1,0},{-1,0},{-1,0}};
   region_players(121, 649, 4, 3, moves4, NULL, 0);
-  mud->death_screen_timeout = 0; printf("poke death 0\n");
+  draw_scene("dead");
+  poke("death", 0);
 
   begin(SERVER_REGION_ENTITY_UPDATE); b16(0); b16(0); send_packet();
   /* walk far enough east to load the next region, shifting everything */
   int moves5[][2] = {{-1,0},{-1,0},{-1,0}};
   region_players(200, 649, 2, 3, moves5, NULL, 0);
+  poke("appearance", 0); ticks(30); draw_scene("east");
   begin(SERVER_REGION_OBJECTS); b8(255); b8(-24); b8(0); send_packet();
   begin(SERVER_REGION_WALL_OBJECTS); b16(65535); b8(-25); b8(-2); b8(0); b8(255); b8(-30); b8(4); send_packet();
   begin(SERVER_PLAYER_STAT_FATIGUE_ASLEEP); b16(321); send_packet();

@@ -882,6 +882,7 @@ public enum SocialTab {
     public static let width = 196, height = 182, tabHeight = 24
     public static let dialogAddWidth = 300, dialogHeight = 70, cancelSize = 40
     public static let friendOnline = 255
+    public static let addFriend = 1, messageFriend = 2, addIgnore = 3
 }
 
 extension Mudclient: PanelHost {
