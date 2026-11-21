@@ -160,9 +160,9 @@ public final class InterfaceScriptHost: ScriptHost {
 	public func apply(_ m: ServerMessage) {
 		switch m {
 		case .ifOpenTop(let id, _):
+			// rt4 IF_OPENTOP only swaps the top-level interface: sub-interfaces stay in `openInterfaces`, so going
+			// back from the world map (755) to the game screen (746) brings back its chatbox and side panel.
 			game.interfaces.top = id
-			game.interfaces.open = [:]
-			openTypes = [:]
 			runOnLoad(interface: id)
 		case let .ifOpenSub(parent, component, type):
 			game.interfaces.open[Int(parent)] = component
@@ -300,6 +300,11 @@ public final class InterfaceScriptHost: ScriptHost {
 
 	/// Folds a session event (messages go through `apply(_: ServerMessage)`).
 	public func apply(_ e: GameSession.Event) {
+		if case .loggedIn = e {
+			// A new login starts with no interfaces open (rt4 clears `openInterfaces` on logout).
+			game.interfaces.open = [:]
+			openTypes = [:]
+		}
 		if case .message(let m) = e { apply(m) } else { game.apply(e) }
 	}
 

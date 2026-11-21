@@ -349,7 +349,8 @@ public final class GameClient {
 		if !inGame { drawFaceIDLink(into: &r) }
 		if !showInterface { ui.worldMap.isShown = false }
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
-		if inGame { plugins.drawOverlays(.hud, into: &r) } // Plugins/
+		// Plugin panels would cover the full-screen world map (755).
+		if inGame, top != 755 { plugins.drawOverlays(.hud, into: &r) } // Plugins/
 		if inGame { try drawInteraction(into: &r); try drawTargetHint(into: &r) }
 		if inGame, showDebugInfo, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
 			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 32, color: 0xFFFF00, shadow: 0, into: &r)

@@ -289,5 +289,23 @@ final class WorldMapTests: XCTestCase {
 		XCTAssertEqual(host(client).errors.count, 0)
 	}
 
+	/// Closing the map reopens the game screen as the top-level interface; its chatbox and tabs come back because
+	/// rt4's IF_OPENTOP keeps the sub-interfaces open (Brandon: the chatbox was gone after closing the map).
+	func testClosingMapKeepsSubInterfaces() throws {
+		let s = try store()
+		let client = try GameClient(store: s, server: .init(host: "127.0.0.1", port: 1))
+		client.handle(.loggedIn(Login.Success(staffModLevel: 0, blackmarks: 0, underage: false, parentalChatConsent: false, parentalAdvertConsent: false, mapQuickChat: false, mouseRecorder: false, selfId: 2047, member: false, mapMembers: false, firstOpcode: 0, firstLength: 0)))
+		client.handle(.message(.ifOpenTop(id: 746, reset: 0)))
+		client.handle(.message(.ifOpenSub(parent: 746 << 16 | 75, component: 752, type: 1)))
+		client.handle(.message(.ifOpenTop(id: 755, reset: 0)))
+		_ = try client.frame(width: 852, height: 393)
+		client.handle(.message(.ifOpenTop(id: 746, reset: 2)))
+		XCTAssertEqual(client.state.interfaces.top, 746)
+		XCTAssertEqual(client.state.interfaces.open[746 << 16 | 75], 752, "chatbox still open")
+		// A fresh login starts clean.
+		client.handle(.loggedIn(Login.Success(staffModLevel: 0, blackmarks: 0, underage: false, parentalChatConsent: false, parentalAdvertConsent: false, mapQuickChat: false, mouseRecorder: false, selfId: 2047, member: false, mapMembers: false, firstOpcode: 0, firstLength: 0)))
+		XCTAssertTrue(client.state.interfaces.open.isEmpty)
+	}
+
 	func host(_ c: GameClient) -> InterfaceScriptHost { c.host }
 }

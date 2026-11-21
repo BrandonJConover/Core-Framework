@@ -62,7 +62,7 @@ public struct InterfaceState {
 	@discardableResult
 	public mutating func apply(_ m: ServerMessage) -> Bool {
 		switch m {
-		case .ifOpenTop(let id, _): top = id; open = [:]; resetAnimations(of: id)
+		case .ifOpenTop(let id, _): top = id; resetAnimations(of: id) // sub-interfaces stay open (rt4)
 		case .ifOpenSub(let parent, let component, _): open[Int(parent)] = component; resetAnimations(of: component)
 		case .ifCloseSub(let parent): open[Int(parent)] = nil
 		case .ifSetHide(let c, let h): hidden[Int(c)] = h
@@ -175,7 +175,9 @@ public final class InterfaceRenderer {
 		var best: (d: Int, x: Int, y: Int)?
 		for d in drawn {
 			let c = d.component
-			guard d.w > 0, d.h > 0, d.w * d.h <= 160 * 60, c.type != 2, c.clientCode != 1337 else { continue }
+			// Only small buttons (tabs, chat filters, dialogue options) get the slop: a near miss on a big panel is more
+			// likely a tap on the world beside it.
+			guard d.w > 0, d.h > 0, d.w <= 64, d.h <= 40, c.type != 2, c.clientCode != 1337 else { continue }
 			guard c.hooks["onOptionClick"] != nil || c.hooks["onClickRepeat"] != nil || !c.ops.isEmpty || c.buttonType != 0
 				|| c.option != nil || (c.events >> 11) & 0x7F != 0 || c.events & 1 != 0 else { continue }
 			let dx = max(d.x - x, 0, x - (d.x + d.w - 1)), dy = max(d.y - y, 0, y - (d.y + d.h - 1))
