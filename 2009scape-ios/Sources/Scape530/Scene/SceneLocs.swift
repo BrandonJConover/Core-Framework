@@ -200,6 +200,8 @@ public final class LocPlacer {
 	public let env: LocEnvironment
 	/// Called after each loc is placed (collision flagging hooks in here).
 	public var onPlaced: ((LocPlacement) -> Void)?
+	/// rt4 `Preferences.showGroundDecorations`: false skips decorative ground locs (type 22) that block nothing.
+	public var showGroundDecorations = true
 
 	static let wallRotation = [1, 2, 4, 8]
 	static let cornerRotation = [16, 32, 64, 128]
@@ -262,7 +264,7 @@ public final class LocPlacer {
 		defer { onPlaced?(placement) }
 
 		if locType == 22 {
-			if loc.interactable != 0 || loc.blockWalk == 1 || loc.forceDecor {
+			if showGroundDecorations || loc.interactable != 0 || loc.blockWalk == 1 || loc.forceDecor {
 				let e = try entity(22, orientation)
 				scene.setGroundDecor(level: plane, x: x, z: z, y: averageY, entity: e, key: bitset, flag: loc.flags90and98.0)
 			}

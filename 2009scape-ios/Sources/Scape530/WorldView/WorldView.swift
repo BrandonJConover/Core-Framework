@@ -22,7 +22,21 @@ public final class WorldView {
 		didSet { if brightness != oldValue { raster3D = nil } }
 	}
 	/// rt4 `Preferences.removeRoofsSelectively` (false = `neverRemoveRoofs`, roofs always drawn).
-	public var removeRoofs = true
+	public var removeRoofs: Bool {
+		get { roofMode != .never }
+		set { roofMode = newValue ? .selective : .never }
+	}
+	/// rt4 `ScriptRunner.method4047`: 0 never removes roofs, 1 always removes them, 2 removes them selectively.
+	public var roofMode: RoofHider.Mode = .selective
+	/// Scene-build options (rt4 `Preferences.allLevelsVisible` / `showGroundDecorations` / `manyGroundTextures`).
+	/// Changing them with `applySceneOptions` rebuilds the scene as rt4's `method2742` (game state 25) does.
+	public private(set) var sceneOptions = SceneOptions()
+	public struct SceneOptions: Equatable, Sendable {
+		public var allLevelsVisible = true
+		public var showGroundDecorations = true
+		public var manyGroundTextures = true
+		public init() {}
+	}
 	var roofs = RoofHider()
 	/// rt4's one-actor-per-tile rule (`ScriptRunner.method964` / `method3240`): of several size-1 actors standing
 	/// exactly on a tile centre only one is drawn; `MenuBuilder.addStacked` lists the hidden ones in the menu.
@@ -165,6 +179,18 @@ public final class WorldView {
 		default:
 			break
 		}
+	}
+
+	/// rt4 `Preferences.setAllVisibleLevels` / ground-decoration / ground-texture changes: stores the options
+	/// and, when the built scene depends on them, rebuilds the scene around the current zone.
+	public func applySceneOptions(_ o: SceneOptions) {
+		let old = sceneOptions
+		sceneOptions = o
+		liveScene?.manyGroundTextures = o.manyGroundTextures
+		guard o.allLevelsVisible != old.allLevelsVisible || o.showGroundDecorations != old.showGroundDecorations,
+		      rebuild != nil else { return }
+		rebuildStamp += 1
+		needsBuild = true
 	}
 
 	func reset() {
@@ -358,7 +384,7 @@ public final class WorldView {
 		var buildStore = store
 		var async = false
 		if asyncBuild, let iso = store.isolatedCopy() { buildStore = iso; async = true }
-		let input = BuildInput(rebuild: r, plane: plane, store: buildStore, textures: textures, env: env, stamp: rebuildStamp, minimap: async)
+		let input = BuildInput(rebuild: r, plane: plane, store: buildStore, textures: textures, env: env, stamp: rebuildStamp, minimap: async, options: sceneOptions)
 		if !async {
 			adopt(Self.performBuild(input))
 			return
@@ -420,6 +446,7 @@ public final class WorldView {
 		var stamp: Int
 		/// Also render the minimap image (background builds; the frame thread builds it lazily otherwise).
 		var minimap: Bool
+		var options = SceneOptions()
 	}
 
 	/// Runs one scene build without touching any `WorldView` state, so it can run on any thread.
@@ -434,9 +461,11 @@ public final class WorldView {
 			let builder = LocModelBuilder(store: store) { id in id >= 0 && id < defined.count && defined[id] }
 			let s = Scene(store: store, textures: ts, width: 104, length: 104)
 			// rt4 defaults `Preferences.allLevelsVisible` to true: every level is built so roofs exist to be hidden.
-			s.allLevelsVisible = true
+			s.allLevelsVisible = input.options.allLevelsVisible
+			s.manyGroundTextures = input.options.manyGroundTextures
 			let baseX = (r.zoneX - 6) * 8, baseZ = (r.zoneZ - 6) * 8
 			let placer = LocPlacer(scene: s, store: store, builder: builder, env: input.env)
+			placer.showGroundDecorations = input.options.showGroundDecorations
 			var placed: [LocPlacement] = []
 			var failures = 0
 			if let table = r.chunks {
@@ -572,12 +601,13 @@ public final class WorldView {
 		                              centerX: Int(r3.centerX), centerY: Int(r3.centerY))
 		let playerTile = (x: me.xFine >> 7, z: me.zFine >> 7)
 		// rt4 `ScriptRunner.method4302`: roofs above the player (or where the camera ray enters a building) are hidden.
+		roofs.mode = roofMode
 		roofs.update(scene: scene, plane: level, playerTile: playerTile, cameraX: eye.x, cameraZ: eye.z, pitch: eye.pitch)
 		let tDraw = PerfStats.now()
 		defer { PerfStats.add(.sceneDraw, since: tDraw) }
 		scene.draw(into: r3, cameraX: eye.x, cameraY: eye.y, cameraZ: eye.z, pitch: eye.pitch, yaw: eye.yaw, plane: 3,
 		           playerTile: (playerTile.x, playerTile.z),
-		           hideMask: removeRoofs ? roofs.mask : nil, hideFromLevel: level + 1, hideValue: roofs.hideValue, roofBoxes: roofs.boxes)
+		           hideMask: roofMode != .never ? roofs.mask : nil, hideFromLevel: level + 1, hideValue: roofs.hideValue, roofBoxes: roofs.boxes)
 		return r3
 	}
 

@@ -147,14 +147,14 @@ extension GameClient {
 		if lastSize.w < left + w { left = lastSize.w - w }
 		left = max(left, 0)
 		top = max(top, 0)
-		interaction.popup = WorldInteraction.Popup(menu: menu, x: left, y: top, width: w, height: menu.count * 15 + 22)
+		interaction.popup = WorldInteraction.Popup(menu: menu, x: left, y: top, width: w, height: menu.count * 15 + (host.menuStyle != nil ? 26 : 22))
 	}
 
 	/// rt4 `Protocol` click handling while the menu is open: the entry under the click runs, then the menu closes.
 	func selectMenuEntry(_ p: WorldInteraction.Popup, x: Int, y: Int) {
 		interaction.popup = nil
 		for i in 0..<p.menu.count {
-			let rowY = (p.menu.count - i - 1) * 15 + p.y + 31
+			let rowY = (p.menu.count - i - 1) * 15 + p.y + (host.menuStyle != nil ? 35 : 31)
 			if x > p.x && p.x + p.width > x && rowY - 13 < y && rowY + 3 > y {
 				doAction(p.menu, i, clickX: x, clickY: y)
 				return
@@ -173,6 +173,7 @@ extension GameClient {
 			font.drawLeft(text, x: 4, y: 15, color: 0xFFFFFF, shadow: 0, into: &r)
 		}
 		guard drawsClassicMenu, let p = interaction.popup, let font = try store.font(named: "b12_full") else { return }
+		if let style = host.menuStyle { drawStyledMenu(p, style, font: font, into: &r); return }
 		r.fillRect(p.x, p.y, p.width, p.height, 0x5D5447)
 		r.fillRect(p.x + 1, p.y + 1, p.width - 2, 16, 0)
 		r.drawRect(p.x + 1, p.y + 18, p.width - 2, p.height - 19, 0)
@@ -183,6 +184,40 @@ extension GameClient {
 			var color: UInt32 = 0xFFFFFF
 			if p.x < mouse.x && mouse.x < p.x + p.width && rowY - 13 < mouse.y && mouse.y < rowY + 3 { color = 0xFFFF00 }
 			font.drawLeft(p.menu.text(i), x: p.x + 3, y: rowY, color: color, shadow: 0, into: &r)
+		}
+	}
+
+	/// rt4 `MiniMenu.drawB`: the menu skinned by cs2 op 5424 (translucent body, sprite borders, hover bar).
+	func drawStyledMenu(_ p: WorldInteraction.Popup, _ s: MenuStyle, font: BitmapFont, into r: inout Raster) {
+		func frame(_ id: Int) -> SpriteFrame? { id < 0 ? nil : ((try? store.sprite(id)) ?? nil)?.frames.first }
+		let x = p.x, y = p.y, w = p.width, h = p.height
+		if let bar = frame(s.topBar), let corner = frame(s.topCorner) {
+			for i in 0..<(w / max(bar.width, 1)) { r.draw(bar, x: i * bar.width + x, y: y) }
+			r.draw(corner, x: x, y: y)
+			r.draw(corner, x: x + w - corner.width, y: y, hFlip: true)
+		} else {
+			r.fillRect(x, y, w, 20, UInt32(truncatingIfNeeded: s.bodyColour) & 0xFFFFFF, opacity: 256 - s.bodyAlpha)
+		}
+		font.drawLeft("Choose Option", x: x + 3, y: y + 14, color: UInt32(truncatingIfNeeded: s.textColour) & 0xFFFFFF, shadow: -1, into: &r)
+		r.fillRect(x, y + 20, w, h - 20, UInt32(truncatingIfNeeded: s.bodyColour) & 0xFFFFFF, opacity: 256 - s.bodyAlpha)
+		let mouse = interaction.pointer
+		func rowY(_ i: Int) -> Int { (p.menu.count - i - 1) * 15 + y + 35 }
+		func hovered(_ i: Int) -> Bool { x < mouse.x && mouse.x < x + w && rowY(i) - 13 < mouse.y && mouse.y < rowY(i) + 3 }
+		for i in 0..<p.menu.count where hovered(i) {
+			r.fillRect(x, rowY(i) - 13, w, 16, UInt32(truncatingIfNeeded: s.hoverColour) & 0xFFFFFF, opacity: 256 - s.hoverAlpha)
+		}
+		if let bottom = frame(s.bottomBar), let side = frame(s.side), let corner = frame(s.bottomCorner) {
+			for i in 0..<(w / max(bottom.width, 1)) { r.draw(bottom, x: x + bottom.width * i, y: h + y - bottom.height) }
+			for i in 0..<((h - 20) / max(side.height, 1)) {
+				r.draw(side, x: x, y: y + i * side.height + 20)
+				r.draw(side, x: x + w - side.width, y: y + 20 + i * side.height, hFlip: true)
+			}
+			r.draw(corner, x: x, y: h + y - corner.height)
+			r.draw(corner, x: x + w - corner.width, y: y + h - corner.height, hFlip: true)
+		}
+		for i in 0..<p.menu.count {
+			let c = hovered(i) ? s.hoverTextColour : s.textColour
+			font.drawLeft(p.menu.text(i), x: x + 3, y: rowY(i), color: UInt32(truncatingIfNeeded: c) & 0xFFFFFF, shadow: 0, into: &r)
 		}
 	}
 

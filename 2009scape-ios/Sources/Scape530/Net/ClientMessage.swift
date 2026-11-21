@@ -63,6 +63,8 @@ public enum ClientMessage {
 	case resumeString(String)
 	/// rt4 SOUND_SONGEND: the song that finished, so the server can pick the next one.
 	case songEnd(Int)
+	/// Opcode 98 (rt4 `Protocol`, `p1isaac(98)` + `p4(Preferences.toInt())`): the changed client settings.
+	case preferences(Int32)
 
 	// MARK: targeting (rt4 `MiniMenu.doAction`, "Use" and spell target modes)
 
@@ -169,6 +171,9 @@ public enum ClientMessage {
 			body.p4(crc)
 			p.p1(body.written.count)
 			p.pdata(body.written)
+		case .preferences(let bits):
+			op(ClientProt.preferences)
+			p.p4(bits)
 		case .songEnd(let id):
 			op(ClientProt.soundSongend)
 			p.p4(Int32(truncatingIfNeeded: id))

@@ -108,6 +108,11 @@ final class AppModel: ObservableObject {
 				Keychain.setPassword(pass, for: user)
 			}
 			client.log = { ClientLogFile.shared.write($0) }
+			// Options-tab settings persist between launches in rt4's Preferences file format.
+			if let saved = UserDefaults.standard.data(forKey: "client.preferences") { client.preferencesData = saved }
+			client.onPreferencesChanged = { [weak client] in
+				if let data = client?.preferencesData { UserDefaults.standard.set(data, forKey: "client.preferences") }
+			}
 			// Plugins: settings in UserDefaults, notifications (idle, low hitpoints) to the system.
 			client.plugins.useSettingsStore(UserDefaultsPluginSettingsStore())
 			client.plugins.onNotification = { PluginNotifier.shared.handle($0) }

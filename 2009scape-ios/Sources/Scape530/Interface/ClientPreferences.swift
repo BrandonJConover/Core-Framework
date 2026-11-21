@@ -31,7 +31,117 @@ public struct ClientPreferences: Equatable {
 	public var particles = 2
 	public var cursorsEnabled = true
 
+	// Fields rt4 `Preferences` persists but the Options tab does not edit; kept so a decode/encode round trip is exact.
+	/// rt4 `Preferences.windowMode` (also stored as the anti-aliasing mode on decode).
+	public var windowMode = 0
+	public var fullScreenWidth = 0
+	public var fullScreenHeight = 0
+	public var lastWorldId = 0
+	public var favoriteWorlds = 0
+	public var safeMode = false
+	/// rt4 `Preferences.aBoolean63` (unnamed in rt4).
+	public var unknownFlag = false
+	public var buildArea = 0
+	public var hdr = false
+	/// rt4 `Preferences.sentToServer`: false after a setter op until `Protocol` sent packet 98 (not persisted).
+	public var sentToServer = true
+
 	public init() {}
+
+	// MARK: rt4 `Preferences.encode` / `decode` / `toInt`
+
+	/// rt4 `Preferences.encode`: the 33-byte version 11 record written to the "runescape" preferences file.
+	public func encode() -> [UInt8] {
+		var p = Packet(capacity: 34)
+		func b(_ v: Bool) -> Int { v ? 1 : 0 }
+		p.p1(11)
+		p.p1(brightness)
+		p.p1(b(allLevelsVisible))
+		p.p1(b(removeRoofsSelectively))
+		p.p1(b(showGroundDecorations))
+		p.p1(b(highDetailTextures))
+		p.p1(b(manyIdleAnimations))
+		p.p1(b(flickeringEffects))
+		p.p1(b(manyGroundTextures))
+		p.p1(b(characterShadows))
+		p.p1(sceneryShadows)
+		p.p1(b(highDetailLighting))
+		p.p1(b(highWaterDetail))
+		p.p1(b(fogEnabled))
+		p.p1(windowMode)
+		p.p1(b(stereo))
+		p.p1(soundEffectVolume)
+		p.p1(musicVolume)
+		p.p1(ambientSoundsVolume)
+		p.p2(fullScreenWidth)
+		p.p2(fullScreenHeight)
+		p.p1(particles)
+		p.p4(Int32(truncatingIfNeeded: lastWorldId))
+		p.p1(favoriteWorlds)
+		p.p1(b(safeMode))
+		p.p1(b(unknownFlag))
+		p.p1(buildArea)
+		p.p1(b(hdr))
+		p.p1(b(cursorsEnabled))
+		return p.written
+	}
+
+	/// rt4 `Preferences.decode`: reads any record version 0...11 over `self` (fields a short or unknown record
+	/// does not carry keep their value). Too-short or out-of-range records change nothing.
+	public mutating func decode(_ data: [UInt8]) {
+		guard let version = data.first, version <= 11 else { return }
+		let lengths = [19, 23, 22, 23, 24, 28, 28, 29, 30, 31, 32, 33]
+		guard data.count - 1 >= lengths[Int(version)] else { return }
+		var i = 1
+		func g1() -> Int { defer { i += 1 }; return Int(data[i]) }
+		func g2() -> Int { let v = g1() << 8; return v | g1() }
+		func g4() -> Int { let v = g2() << 16; return Int(Int32(truncatingIfNeeded: v | g2())) }
+		brightness = min(max(g1(), 1), 4)
+		allLevelsVisible = g1() == 1
+		removeRoofsSelectively = g1() == 1
+		showGroundDecorations = g1() == 1
+		highDetailTextures = g1() == 1
+		manyIdleAnimations = g1() == 1
+		flickeringEffects = g1() == 1
+		manyGroundTextures = g1() == 1
+		characterShadows = g1() == 1
+		sceneryShadows = min(g1(), 2)
+		if version < 2 {
+			highDetailLighting = g1() == 1
+			_ = g1()
+		} else {
+			highDetailLighting = g1() == 1
+		}
+		highWaterDetail = g1() == 1
+		fogEnabled = g1() == 1
+		windowMode = min(g1(), 2)
+		antiAliasing = windowMode
+		stereo = g1() == 1
+		soundEffectVolume = min(g1(), 127)
+		musicVolume = g1()
+		ambientSoundsVolume = min(g1(), 127)
+		if version >= 1 { fullScreenWidth = g2(); fullScreenHeight = g2() }
+		if version >= 3 && version < 6 { _ = g1() }
+		if version >= 4 { particles = g1() }
+		if version >= 5 { lastWorldId = g4() }
+		if version >= 6 { favoriteWorlds = g1() }
+		if version >= 7 { safeMode = g1() == 1 }
+		if version >= 8 { unknownFlag = g1() == 1 }
+		if version >= 9 { buildArea = g1() }
+		if version >= 10 { hdr = g1() != 0 }
+		if version >= 11 { cursorsEnabled = g1() != 0 }
+	}
+
+	/// rt4 `Preferences.toInt`: the bit set sent to the server in the login block and as packet 98.
+	public func toInt() -> Int32 {
+		func b(_ v: Bool, _ shift: Int) -> Int { (v ? 1 : 0) << shift }
+		let v = b(stereo, 19) + b(fogEnabled, 16) + b(highWaterDetail, 15) + b(highDetailLighting, 13)
+			+ b(characterShadows, 10) + b(manyGroundTextures, 9) + b(manyIdleAnimations, 7) + b(highDetailTextures, 6)
+			+ b(showGroundDecorations, 5) + b(allLevelsVisible, 3) + (brightness & 7) + b(removeRoofsSelectively, 4)
+			+ b(flickeringEffects, 8) + ((sceneryShadows & 3) << 11) + b(soundEffectVolume != 0, 20)
+			+ b(musicVolume != 0, 21) + b(ambientSoundsVolume != 0, 22) + (particles << 23)
+		return Int32(truncatingIfNeeded: v)
+	}
 
 	/// rt4 `Rasteriser.setBrightness` argument for a `brightness` preference (nil when out of range).
 	public static func gamma(forBrightness b: Int) -> Float? {
@@ -51,8 +161,11 @@ public struct ClientPreferences: Equatable {
 		case musicVolume(old: Int, new: Int)
 		case soundEffectVolume(Int)
 		case ambientVolume(Int)
-		/// Anything else that changes what the scene shows (roofs, decorations, levels, shadows...).
+		/// Anything else that changes what the scene shows (roofs, decorations, levels, ground textures...).
 		case scene
+		/// A setting changed that needs no reaction beyond being stored (idle animations, flickering, shadows,
+		/// stereo, texture detail...): stored in `prefs`, persisted and sent to the server.
+		case stored
 	}
 }
 
@@ -60,6 +173,16 @@ extension InterfaceScriptHost {
 	/// rt4 `ScriptRunner` 6001-6028 (set) and 6101-6128 (get): the Options tab's controls. Returns nil for
 	/// any other op. Setters clamp as rt4 does and report to `onPreferenceChange`.
 	func performPreference(_ op: HostOpSpec, ints a: [Int32]) -> HostResult? {
+		let result = performPreferenceOp(op, ints: a)
+		// rt4 `Preferences.write` + `sentToServer = false` follow every setter except 6021 (`neverRemoveRoofs`).
+		if result != nil, (6001...6028).contains(op.opcode), op.opcode != 6021 {
+			prefs.sentToServer = false
+			onPreferencesWritten()
+		}
+		return result
+	}
+
+	private func performPreferenceOp(_ op: HostOpSpec, ints a: [Int32]) -> HostResult? {
 		let v = a.first.map { Int($0) } ?? 0
 		let flag = v == 1
 		func ret(_ x: Int) -> HostResult { HostResult(ints: [Int32(truncatingIfNeeded: x)]) }
@@ -71,19 +194,19 @@ extension InterfaceScriptHost {
 		case 6002: prefs.allLevelsVisible = flag; onPreferenceChange(.scene)
 		case 6003: prefs.removeRoofsSelectively = flag; onPreferenceChange(.scene)
 		case 6005: prefs.showGroundDecorations = flag; onPreferenceChange(.scene)
-		case 6006: prefs.highDetailTextures = flag
-		case 6007: prefs.manyIdleAnimations = flag
-		case 6008: prefs.flickeringEffects = flag
-		case 6009: prefs.manyGroundTextures = flag
-		case 6010: prefs.characterShadows = flag
-		case 6011: prefs.sceneryShadows = v < 0 || v > 2 ? 0 : v
+		case 6006: prefs.highDetailTextures = flag; onPreferenceChange(.stored)
+		case 6007: prefs.manyIdleAnimations = flag; onPreferenceChange(.stored)
+		case 6008: prefs.flickeringEffects = flag; onPreferenceChange(.stored)
+		case 6009: prefs.manyGroundTextures = flag; onPreferenceChange(.scene)
+		case 6010: prefs.characterShadows = flag; onPreferenceChange(.stored)
+		case 6011: prefs.sceneryShadows = v < 0 || v > 2 ? 0 : v; onPreferenceChange(.stored)
 		case 6012:
 			prefs.highDetailLighting = flag
 			if let g = ClientPreferences.gamma(forBrightness: prefs.brightness) { onPreferenceChange(.brightness(gamma: g)) }
-		case 6014: prefs.highWaterDetail = flag
-		case 6015: prefs.fogEnabled = flag
-		case 6016: prefs.antiAliasing = v < 0 || v > 2 ? 0 : v
-		case 6017: prefs.stereo = flag
+		case 6014: prefs.highWaterDetail = flag; onPreferenceChange(.stored)
+		case 6015: prefs.fogEnabled = flag; onPreferenceChange(.stored)
+		case 6016: prefs.antiAliasing = v < 0 || v > 2 ? 0 : v; onPreferenceChange(.stored)
+		case 6017: prefs.stereo = flag; onPreferenceChange(.stored)
 		case 6018:
 			prefs.soundEffectVolume = min(max(v, 0), 127)
 			onPreferenceChange(.soundEffectVolume(prefs.soundEffectVolume))

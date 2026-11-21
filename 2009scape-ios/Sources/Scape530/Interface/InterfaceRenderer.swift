@@ -119,6 +119,8 @@ public final class InterfaceRenderer {
 	public private(set) lazy var models = ComponentModels(store: store, icons: icons)
 	/// The world map the interface-755 components with client codes 1400 / 1401 draw (`WorldMap/`).
 	public private(set) lazy var worldMap = WorldMap(store: store)
+	/// rt4 `Flames`: the login fire, nil until a component with client code 1402 is drawn.
+	public internal(set) var flames: Flames?
 
 	public init(store: ConfigStore) {
 		self.store = store
@@ -280,6 +282,16 @@ public final class InterfaceRenderer {
 		}
 	}
 
+	/// rt4 `Cs1ScriptRunner` client code 1402: the login screen's fire (`Flames.render`), created on first use from
+	/// sprite group "runes".
+	func drawFlames(into r: inout Raster, x: Int, y: Int) {
+		if flames == nil {
+			guard let runes = (try? store.sprite(named: "runes")) ?? nil else { return }
+			flames = Flames(runes: runes.frames)
+		}
+		flames?.render(into: &r, x: x, y: y)
+	}
+
 	func draw(_ c: Component, x: Int, y: Int, w: Int, h: Int, state: InterfaceState, into r: inout Raster) throws {
 		let opacity = 256 - (c.alpha & 0xFF)
 		let isStatic = c.childIndex == -1
@@ -288,6 +300,7 @@ public final class InterfaceRenderer {
 			if c.clientCode == 1400 { worldMap.drawMain(into: &r, x: x, y: y, w: w, h: h) }
 			else if c.clientCode == 1401 { worldMap.drawOverview(into: &r, x: x, y: y, w: w, h: h) }
 		}
+		if c.clientCode == 1402 { drawFlames(into: &r, x: x, y: y); return }
 		switch c.type {
 		case 3:
 			let rgb = UInt32(bitPattern: (isStatic ? state.color[c.id] : nil) ?? c.color) & 0xFFFFFF

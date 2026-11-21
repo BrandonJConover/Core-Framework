@@ -99,6 +99,7 @@ public final class GameClient {
 		host.onDirectLogin = { [weak self] user, pass in self?.beginLogin(username: user, password: pass) }
 		host.log = { [weak self] in self?.log($0) }
 		host.onPreferenceChange = { [weak self] in self?.applyPreference($0) }
+		host.onPreferencesWritten = { [weak self] in self?.onPreferencesChanged?() }
 		host.onVarpClientCode = { [weak self] code, value in
 			if code == VarpClientCode.chatEffects { self?.world.chatEffectsDisabled = value != 0 }
 		}
@@ -127,9 +128,51 @@ public final class GameClient {
 			}
 		case .soundEffectVolume(let v): audio.effects.effectVolume = v
 		case .ambientVolume(let v): audio.effects.ambientVolume = v
-		case .scene: break
+		case .scene: applySceneOptions()
+		case .stored: break
 		}
 	}
+
+	/// rt4 `ScriptRunner` 6002 / 6003 / 6005 / 6009 / 6021: roof mode (`method4047`), all-levels, ground decorations
+	/// and ground textures reach the world; changed build options rebuild the scene (`method2742`).
+	func applySceneOptions() {
+		let p = host.prefs
+		if neverRemoveRoofs { world.roofMode = .never }
+		else if p.allLevelsVisible { world.roofMode = p.removeRoofsSelectively ? .selective : .always }
+		else { world.roofMode = .always }
+		var o = WorldView.SceneOptions()
+		o.allLevelsVisible = p.allLevelsVisible
+		o.showGroundDecorations = p.showGroundDecorations
+		o.manyGroundTextures = p.manyGroundTextures
+		world.applySceneOptions(o)
+	}
+
+	/// Pushes every stored preference to the systems it drives (after `preferencesData` was set or a new login).
+	func applyAllPreferences() {
+		let p = host.prefs
+		if let g = ClientPreferences.gamma(forBrightness: p.brightness) { applyPreference(.brightness(gamma: g)) }
+		audio.music.volume = p.musicVolume
+		audio.effects.effectVolume = p.soundEffectVolume
+		audio.effects.ambientVolume = p.ambientSoundsVolume
+		applySceneOptions()
+	}
+
+	/// rt4 `Preferences.encode` / `decode` as the persisted "runescape" preferences record. The shell stores it
+	/// (e.g. in UserDefaults) and sets it on launch; reading gives the current settings.
+	public var preferencesData: Data {
+		get { Data(host.prefs.encode()) }
+		set {
+			var p = host.prefs
+			p.decode([UInt8](newValue))
+			host.prefs = p
+			applyAllPreferences()
+		}
+	}
+
+	/// Called after any Options-tab setting changed (rt4 `Preferences.write`): store `preferencesData`.
+	public var onPreferencesChanged: (() -> Void)?
+	/// rt4 `ScriptRunner.neverRemoveRoofs` (op 6021): not persisted.
+	var neverRemoveRoofs: Bool { host.prefs.neverRemoveRoofs }
 
 	/// Gives the interface model renderer (chat heads, player models) its view of the world.
 	private func bindModels() {
@@ -325,9 +368,11 @@ public final class GameClient {
 		world.renderAlpha = lastCycleAt.map { min(max(now.timeIntervalSince($0) / 0.02, 0), 1) } ?? 1
 		for _ in 0..<cycles {
 			host.cycle()
+			if let f = ui.flames { f.loop = host.loop; f.update() } // Title/Flames
 			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI() }
 		}
-		if inGame { updateAudio(); plugins.update(cycles: cycles) } // Plugins/
+		updateTitleMusic()
+		if inGame { sendPreferencesIfNeeded(); updateAudio(); plugins.update(cycles: cycles) } // Plugins/
 		// GPU mode: the 2D layer is opaque black like software mode; `drawGPU` makes only the viewport transparent
 		// so the Metal scene shows through there.
 		let transparent = false
@@ -339,6 +384,8 @@ public final class GameClient {
 		for pass in 0..<2 {
 			let drawnViewport = inGame && drawWorld(into: &r, width: width, height: height)
 			if drawnViewport { plugins.drawOverlays(.scene, into: &r) } // Plugins/
+			// rt4 `TitleScreen.load`: the title backdrop stays on the canvas behind the login interface.
+			if !inGame, top == loginInterface { TitleScreen.draw(store: store, into: &r) }
 			if showInterface { try ui.render(top, state: host.game.interfaces, into: &r) }
 			let found = showInterface ? ui.drawn.first(where: { $0.component.clientCode == 1337 }).map { (x: $0.x, y: $0.y, w: $0.w, h: $0.h) } : nil
 			let changed = found.map { f in viewport.map { $0 != f } ?? true } ?? false
@@ -580,6 +627,11 @@ public final class GameClient {
 		req.windowMode = 2
 		req.canvasWidth = max(lastSize.w, 765)
 		req.canvasHeight = max(lastSize.h, 503)
+		// rt4 `LoginManager`: the login block carries the anti-aliasing mode and `Preferences.toInt()`, which also
+		// marks the preferences as sent.
+		req.antiAliasingMode = host.prefs.antiAliasing
+		req.preferences = host.prefs.toInt()
+		host.prefs.sentToServer = true
 		connectError = nil
 		lastRequest = req
 		let s = GameSession(host: server.host, port: server.port, request: req)
@@ -620,13 +672,16 @@ public final class GameClient {
 		session = nil
 		inGame = false
 		let (u, p) = (username, password)
+		let savedPrefs = host.prefs
 		host = InterfaceScriptHost(store: store)
+		host.prefs = savedPrefs
 		world = WorldView(store: store)
 		keyboardRequested = false
 		viewport = nil
 		interaction.reset()
 		host.canvas = (lastSize.w > 0 ? lastSize.w : 765, lastSize.h > 0 ? lastSize.h : 503)
 		bindHost()
+		applyAllPreferences()
 		openLoginScreen()
 		username = u
 		password = p
@@ -666,6 +721,38 @@ public final class GameClient {
 			lastAreaLoop = loop
 		}
 		if let ended = audio.music.takeSongEnded(), ended >= 0 { send(.songEnd(ended)) }
+	}
+
+	/// Plays the title song while at the login screens (rt4 `client.setGameState` ~383-396, game states 5 / 10 / 28)
+	/// and fades it out once a login starts. Off with `playsTitleMusic = false`.
+	public var playsTitleMusic = true
+	private var titleMusicActive = false
+
+	/// rt4 `MusicPlayer.titleSong`: group "scape main" of archive 6.
+	var titleSongId: Int? { try? store.index(6).group(named: "scape main") }
+
+	private func updateTitleMusic() {
+		guard playsTitleMusic else { return }
+		let want = !inGame && session == nil
+		guard want != titleMusicActive else { return }
+		titleMusicActive = want
+		let music = audio.music
+		if want {
+			guard let song = titleSongId else { return }
+			music.volume = host.prefs.musicVolume
+			if audioSharesStore { music.play(songId: song) } else { audioLoader.async { music.play(songId: song) } }
+		} else if audioSharesStore {
+			music.stop()
+		} else {
+			audioLoader.async { music.stop() }
+		}
+	}
+
+	/// rt4 `Protocol` (~2526): a changed preference set goes to the server once as packet 98.
+	private func sendPreferencesIfNeeded() {
+		guard !host.prefs.sentToServer else { return }
+		send(.preferences(host.prefs.toInt()))
+		host.prefs.sentToServer = true
 	}
 
 	/// Private messages (rt4 `Protocol` MESSAGE_PRIVATE / MESSAGE_PRIVATE_ECHO): huffman-decoded into the chat history.
