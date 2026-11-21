@@ -133,7 +133,8 @@ public struct BasType: ConfigType, Equatable {
 	public var yaw = (acceleration: 0, maxSpeed: 0)
 	public var roll = (acceleration: 0, maxSpeed: 0, target: 0)
 	public var pitch = (acceleration: 0, maxSpeed: 0, target: 0)
-	public var movementAcceleration = 0
+	/// rt4 default -1 (no acceleration: the plain 4/8/16-per-cycle steps). 0 would pin the speed at 1 fine unit a cycle.
+	public var movementAcceleration = -1
 
 	public init(id: Int) { self.id = id }
 
