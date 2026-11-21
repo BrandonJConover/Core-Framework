@@ -29,6 +29,18 @@ object BotPacketTap {
     @JvmStatic
     fun lines(player: Player, interfaceId: Int): Map<Int, String> = strings[player]?.get(interfaceId) ?: emptyMap()
 
+    private val chatListeners = ArrayList<(Player, String) -> Unit>()
+
+    /** Called for every public chat message a real player sends, so bots can answer requests. */
+    fun onPublicChat(listener: (Player, String) -> Unit) { chatListeners += listener }
+
+    @JvmStatic
+    fun heard(player: Player, message: String) {
+        for (listener in chatListeners) {
+            try { listener(player, message) } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
+
     @JvmStatic
     fun forget(player: Player) {
         strings.remove(player)

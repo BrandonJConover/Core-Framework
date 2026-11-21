@@ -27,4 +27,16 @@ else
         rm -f "$REPO_FILE.bak"
     }
 fi
+PROC_FILE="$TARGET/Server/src/main/core/net/packet/PacketProcessor.kt"
+if grep -q "BotPacketTap.heard" "$PROC_FILE"; then
+    echo "PacketProcessor chat hook already present."
+else
+    echo "Hooking public chat so companions can hear their owner's requests ..."
+    (cd "$TARGET" && git apply --whitespace=nowarn "$HERE/bot-chat-hook.patch") || {
+        echo "git apply failed; adding the line with sed instead." >&2
+        sed -i.bak 's#^\( *\)pkt.player.updateMasks.register(EntityFlag.Chat, ctx)$#&\n\1core.game.bots.BotPacketTap.heard(pkt.player, pkt.message)#' "$PROC_FILE"
+        grep -q "BotPacketTap.heard" "$PROC_FILE" || { echo "Could not hook PacketProcessor.kt" >&2; exit 1; }
+        rm -f "$PROC_FILE.bak"
+    }
+fi
 echo "Done. Rebuild the server, make sure enable_bots = true in worldprops, then type ::companion in game."

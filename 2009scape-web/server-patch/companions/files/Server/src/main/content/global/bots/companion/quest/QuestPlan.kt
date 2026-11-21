@@ -14,17 +14,30 @@ class QuestPlan(
     val quest: Quests,
     val aliases: List<String>,
     private val rules: List<Rule>,
+    /** For a gather plan: done when it holds the items, not when the quest is finished. */
+    private val done: ((Player) -> Boolean)? = null,
+    private val title: String? = null,
+    /** Runs on the companion when the plan finishes (a gather plan offers the items for sale). */
+    val onFinished: ((content.global.bots.companion.CompanionBot) -> Unit)? = null,
 ) {
     class Rule(val condition: (Player) -> Boolean, val step: QuestStep)
 
-    fun isComplete(player: Player): Boolean = player.questRepository.getStage(quest) >= 100
+    fun isComplete(player: Player): Boolean = done?.invoke(player) ?: (player.questRepository.getStage(quest) >= 100)
 
     fun currentStep(player: Player): QuestStep? {
         if (isComplete(player)) return null
         return rules.firstOrNull { it.condition(player) }?.step
     }
 
-    val displayName: String get() = quest.questName
+    val displayName: String get() = title ?: quest.questName
+    val isGather: Boolean get() = done != null
+
+    val startMessage: String get() =
+        if (isGather) "I'll go get $displayName. Back soon!" else "Let's do $displayName! Follow me."
+    val alreadyDoneMessage: String get() =
+        if (isGather) "I already have $displayName." else "I've already done $displayName."
+    val doneMessage: String get() =
+        if (isGather) "Got $displayName!" else "We did it! $displayName is complete."
 }
 
 /** What to act on: an NPC, scenery or ground item, matched by name and/or id. */
@@ -60,18 +73,30 @@ class QuestPlanBuilder(private val quest: Quests, private val aliases: List<Stri
     private val rules = ArrayList<QuestPlan.Rule>()
     fun step(condition: (Player) -> Boolean, step: QuestStep) { rules += QuestPlan.Rule(condition, step) }
     fun build() = QuestPlan(quest, aliases, rules)
+    fun buildGather(title: String, done: (Player) -> Boolean, onFinished: (content.global.bots.companion.CompanionBot) -> Unit) =
+        QuestPlan(quest, aliases, rules, done, title, onFinished)
 }
 
 fun questPlan(quest: Quests, vararg aliases: String, block: QuestPlanBuilder.() -> Unit): QuestPlan =
     QuestPlanBuilder(quest, aliases.toList()).apply(block).build()
 
+/** A plan that collects a quest's items without doing the quest, so the owner can buy them. */
+fun gatherPlan(quest: Quests, title: String, aliases: List<String>, done: (Player) -> Boolean,
+               onFinished: (content.global.bots.companion.CompanionBot) -> Unit, block: QuestPlanBuilder.() -> Unit): QuestPlan =
+    QuestPlanBuilder(quest, aliases).apply(block).buildGather(title, done, onFinished)
+
 object QuestPlans {
     val all: List<QuestPlan> by lazy { listOf(CooksAssistantPlan.plan) }
+    val gather: List<QuestPlan> by lazy { listOf(CooksAssistantPlan.gather) }
 
-    fun find(query: String): QuestPlan? {
-        val q = query.trim().lowercase().replace("'", "")
-        return all.firstOrNull { plan ->
-            plan.displayName.lowercase().replace("'", "") == q || plan.aliases.any { it == q }
-        } ?: all.firstOrNull { it.displayName.lowercase().replace("'", "").contains(q) }
+    fun find(query: String): QuestPlan? = find(query, all)
+    fun findGather(query: String): QuestPlan? = find(query, gather)
+
+    private fun find(query: String, plans: List<QuestPlan>): QuestPlan? {
+        val q = query.trim().lowercase().replace("'", "").removePrefix("the ").removeSuffix(" quest").trim()
+        if (q.isEmpty()) return null
+        return plans.firstOrNull { plan ->
+            plan.quest.questName.lowercase().replace("'", "") == q || plan.aliases.any { it == q }
+        } ?: plans.firstOrNull { it.quest.questName.lowercase().replace("'", "").contains(q) }
     }
 }

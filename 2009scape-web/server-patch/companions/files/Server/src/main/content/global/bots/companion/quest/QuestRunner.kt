@@ -84,7 +84,7 @@ class QuestRunner(
         if (plan.isComplete(bot)) {
             state = State.DONE
             status = "Finished ${plan.displayName}"
-            say("We did it! ${plan.displayName} is complete.")
+            say(plan.doneMessage)
             return
         }
         val step = plan.currentStep(bot)

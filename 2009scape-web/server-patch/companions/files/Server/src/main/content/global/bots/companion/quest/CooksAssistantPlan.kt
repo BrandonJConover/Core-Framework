@@ -5,6 +5,7 @@ import core.game.node.entity.player.Player
 import core.game.world.map.Location
 import org.rs09.consts.Items
 import org.rs09.consts.Scenery
+import content.global.bots.companion.CompanionSale
 
 /**
  * Cook's Assistant, following the same steps as Quest Helper's CooksAssistant helper
@@ -41,6 +42,19 @@ object CooksAssistantPlan {
             QuestStep.TalkTo(named("Cook"), KITCHEN, COOK_OPTIONS, "Let's talk to the Cook in Lumbridge Castle's kitchen."))
         step({ milkDone(it) && flourDone(it) && eggDone(it) },
             QuestStep.TalkTo(named("Cook"), KITCHEN, COOK_OPTIONS, "We have everything. Back to the Cook!"))
+        collect(::milkDone, ::flourDone, ::eggDone)
+    }
+
+    /** Fetch an egg, a bucket of milk and a pot of flour for the owner to buy, without doing the quest. */
+    val gather = gatherPlan(Quests.COOKS_ASSISTANT, "the Cook's Assistant items", listOf("cook", "cooks", "cooks assistant", "ca"),
+        done = { has(it, MILK) && has(it, FLOUR) && has(it, EGG) },
+        onFinished = { c -> CompanionSale.offerBundle(c, listOf(EGG to 1, MILK to 1, FLOUR to 1)) },
+    ) {
+        collect({ has(it, MILK) }, { has(it, FLOUR) }, { has(it, EGG) })
+    }
+
+    /** The item-collecting half of the quest, shared by the quest plan and the gather plan. */
+    private fun QuestPlanBuilder.collect(milkDone: (Player) -> Boolean, flourDone: (Player) -> Boolean, eggDone: (Player) -> Boolean) {
         step({ !flourDone(it) && !has(it, POT) },
             QuestStep.TakeGroundItem(POT, Location(3209, 3214, 0), "I'll grab the pot on the kitchen table."))
         step({ !milkDone(it) && !has(it, BUCKET) },
