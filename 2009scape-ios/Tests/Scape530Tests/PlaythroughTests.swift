@@ -643,6 +643,38 @@ final class PlaythroughTests: XCTestCase {
 		l.client.logout()
 	}
 
+	/// Tap a tree with an axe: the player walks there, chops, and logs land in the backpack (Brandon: the tree fell but
+	/// the character never moved and no logs arrived).
+	func testChopTree() throws {
+		let l = try live("ptchop")
+		finishTutorial(l)
+		l.pump(2)
+		l.say("::empty")
+		l.say("::item 1351")
+		teleport(l, 3190, 3240)
+		let start = l.client.state.selfWorld
+		guard let tree = l.scanWorld(step: 8, { $0.op == "Chop down" }) else {
+			l.shot("chop-notree")
+			XCTFail("a tree on screen"); return
+		}
+		print("CHOP tap \(tree.entry.base) at \(tree.x),\(tree.y) from \(String(describing: start))")
+		_ = l.takeSent()
+		l.client.tap(x: tree.x, y: tree.y)
+		for i in 0..<60 {
+			l.pump(0.5)
+			let me = l.client.world.ctx.players[l.client.world.selfIndex]
+			print("CHOP t=\(Double(i) * 0.5) server \(String(describing: l.client.state.selfWorld)) render \(String(describing: me.map { ($0.xFine, $0.zFine, $0.queueSize) })) anim \(String(describing: me?.seqId)) logs \(count(l, item: 1511))")
+			if count(l, item: 1511) > 0 { break }
+		}
+		print("CHOP sent: \(l.takeSent().prefix(6)) chat \(l.client.state.chatLog.lines.prefix(4).map(\.message))")
+		l.shot("chop")
+		l.report()
+		XCTAssertNotEqual(l.client.state.selfWorld.map { [$0.x, $0.z] }, start.map { [$0.x, $0.z] }, "walked to the tree")
+		XCTAssertGreaterThan(count(l, item: 1511), 0, "logs in the backpack")
+		XCTAssertTrue(l.client.diagnostics.decodeFailures.isEmpty, "\(l.client.diagnostics.decodeFailures)")
+		l.client.logout()
+	}
+
 	/// Lumbridge general store (shop interface, buy) and Wind Strike on a chicken (spell target mode).
 	func testShopAndMagic() throws {
 		let l = try live("ptshop")
