@@ -1,0 +1,12 @@
+diff --git a/Server/src/main/core/net/packet/PacketProcessor.kt b/Server/src/main/core/net/packet/PacketProcessor.kt
+index a0e2c86..55ca936 100644
+--- a/Server/src/main/core/net/packet/PacketProcessor.kt
++++ b/Server/src/main/core/net/packet/PacketProcessor.kt
+@@ -248,6 +248,7 @@ object PacketProcessor {
+                     PlayerMonitor.logChat(pkt.player, "public", pkt.message)
+                     val ctx = ChatMessage(pkt.player, pkt.message, pkt.effects, pkt.message.length)
+                     pkt.player.updateMasks.register(EntityFlag.Chat, ctx)
++                    core.game.bots.BotPacketTap.heard(pkt.player, pkt.message)
+                 }
+             }
+             is Packet.ChatSetting -> {
