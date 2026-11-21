@@ -117,6 +117,9 @@ public final class InterfaceScriptHost: ScriptHost {
 		self.store = store
 		renderer = InterfaceRenderer(store: store)
 		runner = ScriptRunner(store: store, host: self)
+		// WorldMap/: multi-locs read the live varps and the map opens on the local player.
+		renderer.worldMap.varps = { [unowned self] in game.varps }
+		renderer.worldMap.playerTile = { [unowned self] in game.selfWorld.map { (x: $0.x, z: $0.z) } }
 	}
 
 	public func takeErrors() -> [String] {

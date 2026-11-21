@@ -113,6 +113,8 @@ public final class InterfaceRenderer {
 	public private(set) lazy var icons = ItemIcons(store: store)
 	/// Models of type-6 components (chat heads, items, npcs). `GameClient` wires the player and npc lookups.
 	public private(set) lazy var models = ComponentModels(store: store, icons: icons)
+	/// The world map the interface-755 components with client codes 1400 / 1401 draw (`WorldMap/`).
+	public private(set) lazy var worldMap = WorldMap(store: store)
 
 	public init(store: ConfigStore) {
 		self.store = store
@@ -144,6 +146,7 @@ public final class InterfaceRenderer {
 		drawn.removeAll(keepingCapacity: true)
 		origins.removeAll(keepingCapacity: true)
 		deferredDrag.removeAll()
+		worldMap.isShown = false
 		try renderInterface(interface, x: 0, y: 0, w: r.width, h: r.height, state: state, into: &r)
 		r.resetClip()
 		for paint in deferredDrag { try paint(&r) }
@@ -241,6 +244,11 @@ public final class InterfaceRenderer {
 	func draw(_ c: Component, x: Int, y: Int, w: Int, h: Int, state: InterfaceState, into r: inout Raster) throws {
 		let opacity = 256 - (c.alpha & 0xFF)
 		let isStatic = c.childIndex == -1
+		// rt4 `Cs1ScriptRunner`: layers with client code 1400 / 1401 are the world map and its overview.
+		if c.type == 0 {
+			if c.clientCode == 1400 { worldMap.drawMain(into: &r, x: x, y: y, w: w, h: h) }
+			else if c.clientCode == 1401 { worldMap.drawOverview(into: &r, x: x, y: y, w: w, h: h) }
+		}
 		switch c.type {
 		case 3:
 			let rgb = UInt32(bitPattern: (isStatic ? state.color[c.id] : nil) ?? c.color) & 0xFFFFFF

@@ -54,6 +54,7 @@ extension InterfaceScriptHost {
 		func b(_ v: Bool) -> HostResult { r(v ? 1 : 0) }
 		if let result = performPreference(op, ints: a) { return result }
 		if let result = performQuickChat(op, ints: a, strings: s) { return result }
+		if let result = performWorldMap(op, ints: a, strings: s) { return result } // WorldMap/
 		switch op.name {
 		// MARK: client actions
 		case "chatMessage":
