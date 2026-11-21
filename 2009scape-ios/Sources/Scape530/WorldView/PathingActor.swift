@@ -14,6 +14,10 @@ final class WorldContext {
 	var players: [Int: PathingActor] = [:]
 	/// The local player's index (rt4 `PlayerList.selfId`), so sound cues of its own actions are full volume.
 	var selfIndex = -1
+	/// rt4 `Preferences.characterShadowsOn`.
+	var characterShadows = true
+	/// rt4 `ShadowModelList.SHADOWS`.
+	let shadows = ShadowModelList()
 	/// rt4 `SoundPlayer.playSeqSound(zFine, seq, xFine, self, index)`: an animation reached cue `index`
 	/// at an actor's fine position. See `WorldView.onSeqFrameSound`.
 	var onSeqSound: ((_ seq: SeqType, _ index: Int, _ xFine: Int, _ zFine: Int, _ isSelf: Bool) -> Void)?
@@ -30,8 +34,9 @@ final class WorldContext {
 /// rt4 name is in the doc comment.
 ///
 /// Forced movement (`lerpToForceMove*`) and layered animations (`aClass147Array3`) are ported
-/// (see `applyForceMove`, `applyLayeredAnims`). Not ported: the terrain tilt of large creatures
-/// (`method2685`) and BAS roll/pitch.
+/// (see `applyForceMove`, `applyLayeredAnims`). Render-time effects: the character shadow
+/// (`ShadowModelList`), BAS roll and pitch (`method2687`, `AxisSpring`) and the terrain tilt of
+/// large creatures (`method2685`, `FootprintTilt`).
 final class PathingActor: SceneEntity {
 	enum Kind {
 		case player
@@ -139,6 +144,10 @@ final class PathingActor: SceneEntity {
 	var groundY = 0
 	/// rt4 `minY`.
 	var minY = -32768
+	/// rt4 `anInt3419/3383/3355/3398/aBoolean170` (roll) and `anInt3367/3427/3423/3357/aBoolean169` (pitch).
+	var roll = AxisSpring(), pitch = AxisSpring()
+	/// `ctx.loop` of the last roll/pitch step: rt4 steps them once per drawn frame, one per client cycle.
+	private var rollPitchLoop = -1
 
 	private var bas = BasType(id: -1)
 	private var basId = -2
@@ -884,10 +893,217 @@ final class PathingActor: SceneEntity {
 
 	var isVisible: Bool { kind == .player ? look != nil : npcType != nil }
 
+	/// rt4 `PathingEntity.method2687` state update: where the roll and pitch angles head while the actor
+	/// turns (`aBoolean167 && anInt3414 != 0`). Called once per client cycle from `render`.
+	func stepRollPitch(_ b: BasType) {
+		var rollTarget = 0, pitchTarget = 0
+		if yawBraking && yawVelocity != 0 {
+			pitchTarget = b.pitch.target
+			rollTarget = yawVelocity >= 0 ? b.roll.target : -b.roll.target
+		}
+		roll.step(target: rollTarget, acceleration: b.roll.acceleration, maxSpeed: b.roll.maxSpeed)
+		pitch.step(target: pitchTarget, acceleration: b.pitch.acceleration, maxSpeed: b.pitch.maxSpeed)
+	}
+
+	/// rt4 `PathingEntity.method2687` model part: lean the model about its middle height.
+	static func applyRollPitch(_ m: SoftwareModel, roll: Int, pitch: Int) {
+		if roll != 0 {
+			let half = m.getMinY() / 2
+			m.translate(0, -half, 0)
+			m.rotateZ((roll >> 5) & 0x7FF)
+			m.translate(0, half, 0)
+		}
+		if pitch != 0 {
+			let half = m.getMinY() / 2
+			m.translate(0, -half, 0)
+			m.rotateX((pitch >> 5) & 0x7FF)
+			m.translate(0, half, 0)
+		}
+	}
+
+	/// The tilt rt4 `method2685` would apply here (zero without a footprint or a scene).
+	func footprintTilt(orientation: Int) -> FootprintTilt {
+		guard let scene = ctx.scene else { return FootprintTilt() }
+		let level = scene.centralPlane
+		return FootprintTilt.compute(width: currentBas.opcode26.0, length: currentBas.opcode26.1, orientation: orientation,
+		                             xFine: xFine, zFine: zFine, groundY: groundY) { scene.tileHeight(level: level, xFine: $0, zFine: $1) }
+	}
+
+	var hasShadow: Bool {
+		switch kind {
+		case .player: return look.map { $0.npcId == -1 || ((try? ctx.store.npc($0.npcId)) ?? nil)?.hasShadow ?? true } ?? false
+		case .npc: return npcType?.hasShadow ?? false
+		}
+	}
+
+	/// rt4 `Npc.render` / `Player.render` shadow call (`ShadowModelList.method1043`).
+	private func shadowModel(for body: SoftwareModel, orientation: Int) -> SoftwareModel? {
+		guard ctx.characterShadows, hasShadow, let scene = ctx.scene else { return nil }
+		let level = scene.centralPlane
+		let action: SeqType? = (seqId != -1 && seqDelay == 0) ? ((try? ctx.store.seq(seqId)) ?? nil) : nil
+		let b = currentBas
+		var movement: SeqType?
+		if moveSeqId != -1 && !(moveSeqId == b.idle && action != nil) {
+			movement = (try? ctx.store.seq(moveSeqId)) ?? nil
+		}
+		let seq = movement ?? action
+		let frame = movement == nil ? seqFrame : moveFrame
+		let height = { (x: Int, z: Int) in scene.tileHeight(level: level, xFine: x, zFine: z) }
+		switch kind {
+		case .player:
+			return ctx.shadows.shadow(store: ctx.store, modifier1: 160, stretches: stretches, seq: seq, xFine: xFine, colour2: 0, zFine: zFine,
+			                          colour1: 0, size: 1, body: body, orientation: orientation, frame: frame, groundY: groundY, modifier2: 240, height: height)
+		case .npc:
+			guard let t = npcType else { return nil }
+			return ctx.shadows.shadow(store: ctx.store, modifier1: t.shadowModifiers[0], stretches: stretches, seq: seq, xFine: xFine,
+			                          colour2: t.shadowColours[1], zFine: zFine, colour1: t.shadowColours[0], size: t.size, body: body,
+			                          orientation: orientation, frame: frame, groundY: groundY, modifier2: t.shadowModifiers[1], height: height)
+		}
+	}
+
 	func render(_ r: Rasteriser3D, yaw orientation: Int, sinPitch: Int, cosPitch: Int, sinYaw: Int, cosYaw: Int, x: Int, y: Int, z: Int, key: Int64) {
-		guard let m = buildModel() else { return }
+		guard var m = buildModel() else { return }
 		minY = m.getMinY()
+		if let shadow = shadowModel(for: m, orientation: orientation) {
+			// rt4 draws it with yaw 0 (already turned), no key, before the body.
+			shadow.render(r, yaw: 0, sinPitch: sinPitch, cosPitch: cosPitch, sinYaw: sinYaw, cosYaw: cosYaw, x: x, y: y, z: z, key: -1)
+		}
+		let b = currentBas
+		let leans = b.roll.target != 0 || b.pitch.target != 0
+		let tilt = footprintTilt(orientation: orientation)
+		if leans || !tilt.isIdentity {
+			// The cached pose is shared between frames: lean a copy.
+			m = m.copy()
+			if leans {
+				if rollPitchLoop != ctx.loop { rollPitchLoop = ctx.loop; stepRollPitch(b) }
+				Self.applyRollPitch(m, roll: roll.position, pitch: pitch.position)
+			}
+			tilt.apply(to: m)
+		}
 		m.pickable = true // rt4 `Player.render` / `Npc.render`
 		m.render(r, yaw: orientation, sinPitch: sinPitch, cosPitch: cosPitch, sinYaw: sinYaw, cosYaw: cosYaw, x: x, y: y, z: z, key: key)
+	}
+}
+
+/// Port of the roll or pitch half of rt4 `PathingEntity.method2687`: a position that eases towards
+/// `target` with a constant acceleration, a speed limit and a braking point (`intermediate`) chosen so
+/// it stops on the target. Units are 1/32 of a model angle.
+struct AxisSpring: Equatable {
+	/// `anInt3383` / `anInt3427`
+	var position = 0
+	/// `anInt3355` / `anInt3423`
+	var velocity = 0
+	/// `anInt3398` / `anInt3357`: where acceleration turns to braking.
+	var intermediate = 0
+	/// `aBoolean170` / `aBoolean169`: still accelerating.
+	var accelerating = false
+	/// `anInt3419` / `anInt3367`: the target of the previous step.
+	var lastTarget = 0
+
+	mutating func step(target: Int, acceleration: Int, maxSpeed: Int) {
+		guard acceleration > 0 else { return }
+		let brake = maxSpeed * maxSpeed / (acceleration * 2)
+		if lastTarget != target {
+			lastTarget = target
+			if velocity > 0 && position < target {
+				let stop = velocity * velocity / (acceleration * 2)
+				if stop <= target - position {
+					accelerating = true
+					intermediate = (target + position - stop) / 2
+					intermediate = max(intermediate, target - brake)
+				} else {
+					accelerating = false
+				}
+			} else if velocity < 0 && position > target {
+				let stop = velocity * velocity / (acceleration * 2)
+				if target - position >= stop {
+					accelerating = true
+					intermediate = (position + stop + target) / 2
+					intermediate = min(intermediate, brake + target)
+				} else {
+					accelerating = false
+				}
+			} else {
+				accelerating = false
+			}
+		}
+		if velocity == 0 {
+			let d = lastTarget - position
+			if -acceleration < d && acceleration > d {
+				position = lastTarget
+			} else {
+				accelerating = true
+				intermediate = (lastTarget + position) / 2
+				if d >= 0 {
+					velocity = acceleration
+					intermediate = max(intermediate, lastTarget - brake)
+				} else {
+					velocity = -acceleration
+					intermediate = min(intermediate, brake + lastTarget)
+				}
+			}
+		} else if velocity > 0 {
+			if position >= intermediate { accelerating = false }
+			if !accelerating {
+				velocity -= acceleration
+				if velocity < 0 { velocity = 0 }
+			} else if maxSpeed > velocity {
+				velocity += acceleration
+			}
+		} else {
+			if intermediate >= position { accelerating = false }
+			if !accelerating {
+				velocity += acceleration
+				if velocity > 0 { velocity = 0 }
+			} else if velocity > -maxSpeed {
+				velocity -= acceleration
+			}
+		}
+		position += velocity
+	}
+}
+
+/// Port of rt4 `PathingEntity.method2685`: a creature with a BAS footprint (`BasType.anInt1059` x
+/// `anInt1050`, opcode 26, in fine units) lies on the slope under its four corners.
+struct FootprintTilt: Equatable {
+	/// `anInt2640`: `rotateX` angle.
+	var rotateX = 0
+	/// `anInt2680`: `rotateZ` angle.
+	var rotateZ = 0
+	/// `anInt1938`: vertical shift.
+	var translateY = 0
+
+	var isIdentity: Bool { rotateX == 0 && rotateZ == 0 && translateY == 0 }
+
+	/// `height(xFine, zFine)` is `SceneGraph.getTileHeight(Player.plane, ...)`; `groundY` is `anInt3424`.
+	static func compute(width: Int, length: Int, orientation: Int, xFine: Int, zFine: Int, groundY: Int, height: (Int, Int) -> Int) -> FootprintTilt {
+		guard width != 0 && length != 0 else { return FootprintTilt() }
+		let sin = MathTables.sin[orientation & 2047], cos = MathTables.cos[orientation & 2047]
+		let hw = width / 2, hl = length / 2
+		// Corner (-w/2, -l/2), (w/2, -l/2), (-w/2, l/2), (w/2, l/2), each turned by the orientation.
+		func corner(_ cx: Int, _ cz: Int) -> Int {
+			let dz = (cz * cos - cx * sin) >> 16
+			let dx = (sin * cz + cos * cx) >> 16
+			return height(xFine + dx, zFine + dz)
+		}
+		let h00 = corner(-width / 2, -length / 2)
+		let h10 = corner(hw, -length / 2)
+		let h01 = corner(-width / 2, hl)
+		let h11 = corner(hw, hl)
+		let aX = min(h00, h10) - min(h11, h01)
+		let aZ = min(h01, h00) - min(h11, h10)
+		var t = FootprintTilt()
+		t.rotateX = Int(atan2(Double(aX), Double(length)) * 325.95) & 0x7FF
+		t.rotateZ = Int(atan2(Double(aZ), Double(width)) * 325.95) & 0x7FF
+		var y = h11 + h00
+		if h01 + h10 < y { y = h01 + h10 }
+		t.translateY = (y >> 1) - groundY
+		return t
+	}
+
+	func apply(to m: SoftwareModel) {
+		if rotateX != 0 { m.rotateX(rotateX) }
+		if rotateZ != 0 { m.rotateZ(rotateZ) }
+		if translateY != 0 { m.translate(0, translateY, 0) }
 	}
 }

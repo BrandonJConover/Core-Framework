@@ -420,6 +420,22 @@ extension SoftwareModel {
 		}
 	}
 
+	/// rt4 `Model.method4555`: apply one frame to a shadow model, using only the transforms whose
+	/// `AnimBase.shadow` flag is set (the bones that move the feet), never tweened.
+	public func animateShadow(_ set: AnimFrameset, frame: Int) {
+		guard frame != -1, let f = set.frameSafe(frame) else { return }
+		withAnimation { p in
+			for i in 0..<f.length {
+				let t = f.indices[i]
+				guard f.base.shadow[t] else { continue }
+				if f.prevOriginIndices[i] != -1 {
+					applyTransform(f.base, f.prevOriginIndices[i], type: 0, x: 0, y: 0, z: 0, layerMask: Self.allParts, matrix: nil, pivot: &p)
+				}
+				applyTransform(f.base, t, type: f.base.types[t], x: f.x[i], y: f.y[i], z: f.z[i], layerMask: Self.allParts, matrix: nil, pivot: &p)
+			}
+		}
+	}
+
 	/// rt4 `Model.method4565`: apply one frame of a layered animation, limited to
 	/// the model parts selected by `layerMask` (bit `1 << layer`), using the
 	/// optional bone pose matrix.

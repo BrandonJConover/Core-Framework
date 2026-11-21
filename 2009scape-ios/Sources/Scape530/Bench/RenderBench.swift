@@ -31,6 +31,7 @@ public enum RenderBench {
 		if ProcessInfo.processInfo.environment["SCAPE530_NO_MODEL_CACHE"] != nil { PathingActor.cacheModels = false }
 		let store = ConfigStore(disk: try DiskCache(directory: URL(fileURLWithPath: cache)))
 		let client = try GameClient(store: store, server: .init(host: "127.0.0.1", port: 1))
+		if ProcessInfo.processInfo.environment["SCAPE530_NO_SHADOWS"] != nil { client.host.prefs.characterShadows = false }
 		let me = 2047
 		client.handle(.loggedIn(Login.Success(staffModLevel: 0, blackmarks: 0, underage: false, parentalChatConsent: false, parentalAdvertConsent: false, mapQuickChat: false, mouseRecorder: false, selfId: me, member: false, mapMembers: false, firstOpcode: 0, firstLength: 0)))
 		var players = PlayerInfoDecoder(selfIndex: me, localX: 52, localZ: 52)
