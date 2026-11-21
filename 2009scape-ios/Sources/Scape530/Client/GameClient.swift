@@ -64,6 +64,8 @@ public final class GameClient {
 	private var lastRequest: Login.Request?
 	/// Mobile UI: tapping an inventory item runs its "Drop" option (like shift-drop).
 	public var tapToDrop = false
+	/// Draws the player's tile and the server tick in the top-left corner (developer aid).
+	public var showDebugInfo = false
 	/// False when the shell draws the world menu itself (`popupRows` / `chooseMenuEntry`).
 	public var drawsClassicMenu = true
 	/// Toggleable plugins (overlays, menu swaps, trackers); see `Plugins/`.
@@ -284,7 +286,7 @@ public final class GameClient {
 		if inGame && showInterface { world.drawMinimap(drawn: ui.drawn, into: &r) } // Minimap/
 		if inGame { plugins.drawOverlays(.hud, into: &r) } // Plugins/
 		if inGame { try drawInteraction(into: &r); try drawTargetHint(into: &r) }
-		if inGame, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
+		if inGame, showDebugInfo, let p12 = try store.font(named: "p12_full"), let w = host.game.selfWorld {
 			p12.drawLeft("\(w.x), \(w.z)  tick \(host.game.ticks)", x: 6, y: 32, color: 0xFFFF00, shadow: 0, into: &r)
 		}
 		frameBuffer = r

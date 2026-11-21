@@ -27,6 +27,14 @@ public final class CacheUpdater {
 	public func run(archives: [Int]? = nil, progress: (Progress) -> Void = { _ in }) throws -> Int {
 		let client = try Js5Client(host: host, port: port)
 		let master = try client.masterIndex()
+		// A previous full run against this exact master index already checked every group: skip the
+		// per-group CRC pass (it reads and hashes the whole cache, ~30 s on a phone at every launch).
+		let stamp = Self.stamp(master)
+		let stampURL = directory.appendingPathComponent("js5-verified.txt")
+		if archives == nil, let old = try? String(contentsOf: stampURL, encoding: .utf8), old == stamp,
+		   FileManager.default.fileExists(atPath: directory.appendingPathComponent("main_file_cache.dat2").path) {
+			return 0
+		}
 		let writer = try DiskCacheWriter(directory: directory)
 		var local = try? DiskCache(directory: directory)
 		var fetched = 0
@@ -84,6 +92,12 @@ public final class CacheUpdater {
 			}
 		}
 		try writer.synchronize()
+		if archives == nil { try? stamp.write(to: stampURL, atomically: true, encoding: .utf8) }
 		return fetched
+	}
+
+	/// Identifies a master index (every archive's CRC and version).
+	static func stamp(_ master: [(crc: Int32, version: Int32)]) -> String {
+		master.map { "\($0.crc):\($0.version)" }.joined(separator: ",")
 	}
 }
