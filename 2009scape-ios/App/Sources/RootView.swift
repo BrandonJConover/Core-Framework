@@ -29,25 +29,17 @@ struct RootView: View {
 				.padding()
 				.frame(maxWidth: .infinity, maxHeight: .infinity)
 			}
-			HStack(spacing: 0) {
-				Button {
-					showingSettings = true
-				} label: {
-					Image(systemName: "slider.horizontal.3")
-						.foregroundColor(.white.opacity(0.6))
-						.frame(width: 44, height: 44)
-				}
-				// Server configuration belongs to setup and error states; on the game screen it would cover
-				// gameplay and catch stray taps.
-				if !model.isReady {
-					Button {
-						showingServer = true
-					} label: {
-						Image(systemName: "server.rack")
-							.foregroundColor(.white.opacity(0.6))
-							.frame(width: 44, height: 44)
-					}
-				}
+			// The shell's own buttons live in the screen margin outside the game (the safe-area strip beside the
+			// Dynamic Island / home indicator in landscape), so they never cover game UI such as the world map's
+			// close button. Without such a margin (iPad) they sit at the top right, half transparent.
+			GeometryReader { g in
+				let margin = max(g.safeAreaInsets.trailing, g.safeAreaInsets.leading)
+				let inMargin = margin >= 36
+				let side = g.safeAreaInsets.trailing >= g.safeAreaInsets.leading
+				VStack(spacing: 6) { shellButtons }
+					.frame(width: inMargin ? margin : 44)
+					.position(x: inMargin ? (side ? g.size.width + margin / 2 : -margin / 2) : g.size.width - 22,
+					          y: inMargin ? g.size.height / 2 : 46)
 			}
 		}
 		.onChange(of: scenePhase) { model.scenePhaseChanged($0) }
@@ -59,6 +51,38 @@ struct RootView: View {
 		.sheet(isPresented: $showingServer) {
 			ServerSettingsView(host: model.host, port: String(model.port)) { host, port in
 				model.applyServer(host: host, port: port)
+			}
+		}
+	}
+}
+
+extension RootView {
+	@ViewBuilder var shellButtons: some View {
+		if model.isReady {
+			// Shows or hides the iOS keyboard for typing in the chatbox (GameCanvasView listens).
+			Button {
+				NotificationCenter.default.post(name: .toggleGameKeyboard, object: nil)
+			} label: {
+				Image(systemName: "keyboard")
+					.foregroundColor(.white.opacity(0.6))
+					.frame(width: 44, height: 44)
+			}
+		}
+		Button {
+			showingSettings = true
+		} label: {
+			Image(systemName: "slider.horizontal.3")
+				.foregroundColor(.white.opacity(0.6))
+				.frame(width: 44, height: 44)
+		}
+		// Server configuration belongs to setup and error states; on the game screen it would catch stray taps.
+		if !model.isReady {
+			Button {
+				showingServer = true
+			} label: {
+				Image(systemName: "server.rack")
+					.foregroundColor(.white.opacity(0.6))
+					.frame(width: 44, height: 44)
 			}
 		}
 	}
@@ -181,4 +205,8 @@ struct TouchSettingsView: View {
 			.toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
 		}
 	}
+}
+
+extension Notification.Name {
+	static let toggleGameKeyboard = Notification.Name("scape530.toggleGameKeyboard")
 }

@@ -105,6 +105,7 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		let nc = NotificationCenter.default
 		nc.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
 		nc.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+		nc.addObserver(self, selector: #selector(keyboardButtonTapped), name: .toggleGameKeyboard, object: nil)
 		nc.addObserver(self, selector: #selector(setPaused), name: UIApplication.willResignActiveNotification, object: nil)
 		nc.addObserver(self, selector: #selector(setPaused), name: UIApplication.didBecomeActiveNotification, object: nil)
 		nc.addObserver(self, selector: #selector(updateFrameRate), name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
@@ -219,7 +220,7 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 			_ = resignFirstResponder()
 		}
 		lastKeyboardWanted = s.wantsKeyboard
-		keyboardButton.isHidden = s.screen != .game
+		keyboardButton.isHidden = true // the shell's keyboard button lives in the screen margin (RootView)
 
 		if s.reconnectAttempt > 0 && s.screen == .game {
 			banner.text = "Connection lost. Reconnecting (\(s.reconnectAttempt)/\(s.maxReconnectAttempts))..."
