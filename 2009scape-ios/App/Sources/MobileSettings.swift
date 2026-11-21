@@ -10,6 +10,7 @@ enum MobileSettings {
 	static let smoothMotionKey = "ui.smoothMotion"
 	static let opaqueSidePanelKey = "ui.opaqueSidePanel"
 	static let frameStatsKey = "ui.frameStats"
+	static let fixedScreenKey = "ui.fixedScreen"
 	static let interfaceSizeKey = "ui.interfaceSize"
 	static let gpuRendererKey = "gfx.gpuRenderer"
 	static let gpuDrawDistanceKey = "gfx.drawDistance"
@@ -31,6 +32,8 @@ enum MobileSettings {
 	static var smoothMotion: Bool { bool(smoothMotionKey, true) }
 	/// Draw the resizable side panel background opaque (rt4 draws it 60% opaque, so the world shows through).
 	static var opaqueSidePanel: Bool { bool(opaqueSidePanelKey, true) }
+	/// rt4 fixed window mode: the 765x503 game screen (interface 548), centred and scaled, instead of the resizable one (746).
+	static var fixedScreen: Bool { bool(fixedScreenKey, false) }
 	/// Small fps / ms-per-frame / cycles-per-second readout in the corner.
 	static var frameStats: Bool { bool(frameStatsKey, false) }
 	/// 0 normal (rt4 765x503 minimum canvas), 1 large, 2 larger.

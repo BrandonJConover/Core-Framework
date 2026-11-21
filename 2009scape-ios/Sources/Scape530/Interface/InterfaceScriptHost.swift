@@ -33,6 +33,10 @@ public final class InterfaceScriptHost: ScriptHost {
 	public var game = GameState()
 	/// Canvas size in game pixels (rt4 `GameShell.canvasWidth/Height`).
 	public var canvas = (w: 765, h: 503)
+	/// rt4 `DisplayMode.getWindowMode` (CS2 5306): 0 fixed, 2 resizable.
+	public var windowModeValue: () -> Int = { 2 }
+	/// CS2 5307 `setWindowMode` (rt4 `DisplayMode.setWindowMode`).
+	public var onSetWindowMode: (Int) -> Void = { _ in }
 	/// rt4 `client.loop`: client cycles (20 ms each) since start.
 	public internal(set) var loop = 0
 	/// rt4 `InterfaceList.transmitTimer`.

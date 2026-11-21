@@ -113,6 +113,10 @@ extension GameClient {
 	/// The finger moved after a long press on a draggable slot: past 5 pixels (rt4) the menu closes and the
 	/// item follows the finger at half opacity.
 	public func dragMove(x: Int, y: Int) {
+		mapInput(x, y) { x, y in dragMoveGame(x: x, y: y) }
+	}
+
+	private func dragMoveGame(x: Int, y: Int) {
 		guard let cand = interaction.dragCandidate else { return }
 		var dx = x - cand.x, dy = y - cand.y
 		if host.game.interfaces.inventoryUI.dragging == nil {
@@ -127,6 +131,10 @@ extension GameClient {
 	/// The finger lifted: over another slot of the same inventory the item moves there (swapped locally, then
 	/// MOVE_ITEM is sent); anywhere else the drag is dropped.
 	public func dragEnd(x: Int, y: Int) {
+		mapInput(x, y) { x, y in dragEndGame(x: x, y: y) }
+	}
+
+	private func dragEndGame(x: Int, y: Int) {
 		defer {
 			interaction.dragCandidate = nil
 			host.game.interfaces.inventoryUI.dragging = nil

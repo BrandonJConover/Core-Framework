@@ -106,6 +106,10 @@ extension GameClient {
 	/// Returns false when the point is not over the world.
 	@discardableResult
 	public func longPress(x: Int, y: Int) -> Bool {
+		mapInput(x, y) { x, y in longPressGame(x: x, y: y) }
+	}
+
+	private func longPressGame(x: Int, y: Int) -> Bool {
 		if interaction.popup != nil { interaction.popup = nil }
 		if screen == .game, openInventoryMenu(x: x, y: y) { return true }
 		if screen == .game, openComponentMenu(x: x, y: y) { return true }
@@ -117,6 +121,10 @@ extension GameClient {
 	/// Touch (or hover) at (x, y) in game pixels: shows, at the top left, the action a tap there would run,
 	/// like rt4 does for the hovered entry ("Walk here", "Talk-to Hans / 2 more options"). Costs one picking pass.
 	public func previewTap(x: Int, y: Int) {
+		mapInput(x, y) { x, y in previewTapGame(x: x, y: y) }
+	}
+
+	private func previewTapGame(x: Int, y: Int) {
 		interaction.preview = nil
 		guard screen == .game, interaction.popup == nil, isOverWorld(x: x, y: y), let (menu, _) = buildMenu(x: x, y: y) else { return }
 		interaction.preview = menu.hoverText

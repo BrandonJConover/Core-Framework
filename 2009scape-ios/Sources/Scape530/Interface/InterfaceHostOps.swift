@@ -176,9 +176,10 @@ extension InterfaceScriptHost {
 		case "isHoldingCtrl": return b(keyboard.isPressed(KeyCode.ctrl))
 		case "isHoldingShift": return b(keyboard.isPressed(KeyCode.shift))
 
-		// MARK: display (we are a resizable window the size of the canvas)
-		case "windowMode": return r(2)
-		case "setWindowMode", "leaveFullscreen": break
+		// MARK: display (a window the size of the canvas: resizable, or fixed 765x503)
+		case "windowMode": return r(windowModeValue())
+		case "setWindowMode": onSetWindowMode(min(max(i(0), 0), 2)) // rt4: out of range -> 0
+		case "leaveFullscreen": break
 		case "setWindowSize": return r(0)
 		case "displayModeCount": return r(1)
 		case "displayModeSize": return HostResult(ints: [Int32(canvas.w), Int32(canvas.h)])

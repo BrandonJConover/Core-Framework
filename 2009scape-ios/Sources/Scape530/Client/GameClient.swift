@@ -43,7 +43,16 @@ public final class GameClient {
 	private let audioLoader = DispatchQueue(label: "scape530.audio-loader")
 	/// The 3D viewport component's rectangle from the last frame (rt4 `Component.clientCode == 1337`).
 	public private(set) var viewport: (x: Int, y: Int, w: Int, h: Int)?
+	/// The size of the canvas the game is laid out in: the shell's canvas in resizable mode, 765x503 in fixed mode.
 	public private(set) var lastSize = (w: 0, h: 0)
+	/// rt4 window mode (`DisplayMode`): `.fixed` is interface 548 on a 765x503 canvas, `.resizable` is interface 746.
+	/// Set before login (the login request carries it) or in game (the server then swaps the pane, as for rt4's
+	/// CS2 op 5307). See `FixedScreen.swift`.
+	public var windowMode = WindowMode.resizable
+	/// The canvas the shell passed to `frame` last (differs from `lastSize` in fixed mode).
+	var outerSize = (w: 0, h: 0)
+	var outerBuffer: Raster?
+	var mapDepth = 0
 	/// Touch interaction with the world: open menu, click cross, player options.
 	public let interaction = WorldInteraction()
 	private var inGame = false
@@ -70,6 +79,7 @@ public final class GameClient {
 	private var sentCamera: (pitch: Int, yaw: Int)?
 	private var cameraCooldown = 0
 	private var sentWindow: (w: Int, h: Int)?
+	private var sentMode = WindowMode.resizable
 	private var lastRequest: Login.Request?
 	/// rt4 `Protocol.verifyId` of the session that just ended, re-sent by the reconnect login.
 	private var lastVerifyId = 0
@@ -331,7 +341,8 @@ public final class GameClient {
 		}
 		if let l = faceIDLink, keyboard { minX = min(minX, l.x); maxX = max(maxX, l.x + l.w) }
 		guard minX < maxX, minY < maxY else { return nil }
-		return (minX, minY, maxX - minX, maxY - minY)
+		let a = toCanvas(x: minX, y: minY), b = toCanvas(x: maxX, y: maxY)
+		return (a.x, a.y, b.x - a.x, b.y - a.y)
 	}
 
 	/// Draws the "Use Face ID" link to the right of the form's Log In (same font and colour as Log In).
@@ -387,6 +398,15 @@ public final class GameClient {
 	/// `frame(width:height:)` with the display timestamp supplied by the shell (e.g. `CADisplayLink.targetTimestamp`
 	/// converted to a `Date`), so cycles and interpolation follow the time the frame will be shown.
 	public func frame(width: Int, height: Int, at now: Date) throws -> Raster {
+		outerSize = (width, height)
+		guard windowMode == .fixed else { return try renderFrame(width: width, height: height, at: now) }
+		// rt4 fixed mode: the canvas is 765x503 whatever the window size; the frame is laid out in the shell's canvas.
+		world.gpuSettings = nil // the Metal path composites by raster size; fixed mode is software only
+		let inner = try renderFrame(width: Self.fixedSize.w, height: Self.fixedSize.h, at: now)
+		return compose(inner, width: width, height: height)
+	}
+
+	private func renderFrame(width: Int, height: Int, at now: Date) throws -> Raster {
 		lastSize = (width, height)
 		if !worldListSettled { worldListSettled = worldList.fetch() != -1 }
 		host.resize(width: width, height: height)
@@ -472,7 +492,7 @@ public final class GameClient {
 	/// One-finger drag over the world, in game pixels: horizontal turns the camera, vertical tilts it.
 	/// While the world map is open the drag pans the map instead (see `worldMapDrag`).
 	public func cameraDrag(dx: Double, dy: Double) {
-		if worldMapIsOpen { worldMapDrag(dx: dx, dy: dy) } else { world.camera.drag(dx: dx, dy: dy) }
+		if worldMapIsOpen { worldMapDrag(dx: dx, dy: dy) } else { world.camera.drag(dx: dx / fixedScale, dy: dy / fixedScale) }
 	}
 
 	/// Pinch gesture: `scale` > 1 zooms in, < 1 out (use the change since the last callback).
@@ -491,9 +511,11 @@ public final class GameClient {
 	/// True when a drag starting at (x, y) belongs to the camera: inside the world viewport and not
 	/// on an interactive interface component.
 	public func isOverWorld(x: Int, y: Int) -> Bool {
-		if inGame, worldMapIsOpen { return isOverWorldMap(x: x, y: y) }
-		guard inGame, !interaction.isMenuOpen, let v = viewport else { return false }
-		return x >= v.x && y >= v.y && x < v.x + v.w && y < v.y + v.h && ui.hitTest(x: x, y: y) == nil
+		mapInput(x, y) { x, y in
+			if inGame, worldMapIsOpen { return isOverWorldMap(x: x, y: y) }
+			guard inGame, !interaction.isMenuOpen, let v = viewport else { return false }
+			return x >= v.x && y >= v.y && x < v.x + v.w && y < v.y + v.h && ui.hitTest(x: x, y: y) == nil
+		}
 	}
 
 	// MARK: scrolling (rt4 InterfaceList wheel handling)
@@ -507,7 +529,7 @@ public final class GameClient {
 	@discardableResult
 	public func scrollInterface(x: Int, y: Int, delta: Int) -> Bool {
 		guard canScrollInterfaces else { return false }
-		return host.scrollWheel(x: x, y: y, delta: delta)
+		return mapInput(x, y) { host.scrollWheel(x: $0, y: $1, delta: delta) }
 	}
 
 	/// Touch pan: the finger moved `dy` game pixels (positive: down) since the last call, with the gesture started at
@@ -516,18 +538,22 @@ public final class GameClient {
 	@discardableResult
 	public func dragScroll(x: Int, y: Int, dy: Int) -> Bool {
 		guard canScrollInterfaces else { return false }
-		return host.scrollDrag(x: x, y: y, dy: dy)
+		return mapInput(x, y) { host.scrollDrag(x: $0, y: $1, dy: Int((Double(dy) / fixedScale).rounded())) }
 	}
 
 	/// True when a vertical pan starting at (x, y) belongs to a scrollable interface layer rather than the camera.
 	public func isOverScrollable(x: Int, y: Int) -> Bool {
-		canScrollInterfaces && host.isOverScrollable(x: x, y: y)
+		canScrollInterfaces && mapInput(x, y) { host.isOverScrollable(x: $0, y: $1) }
 	}
 
 	// MARK: input
 
 	/// A tap in game pixels: press and release of the primary button.
 	public func tap(x: Int, y: Int) {
+		mapInput(x, y) { x, y in tapGame(x: x, y: y) }
+	}
+
+	private func tapGame(x: Int, y: Int) {
 		var (x, y) = (x, y)
 		if canScrollInterfaces, host.pressScrollbar(x: x, y: y) { return } // IF1 scrollbar arrows and track
 		if inGame, interaction.popup == nil, mobileToggles(x: x, y: y) { return }
@@ -647,9 +673,11 @@ public final class GameClient {
 
 	/// Pointer hover (mouse or Apple Pencil hover); drives onMouseOver/Leave.
 	public func hover(x: Int, y: Int) {
-		interaction.pointer = (x, y)
-		if interaction.popup == nil { previewTap(x: x, y: y) }
-		host.pointerMoved(x: x, y: y)
+		mapInput(x, y) { x, y in
+			interaction.pointer = (x, y)
+			if interaction.popup == nil { previewTap(x: x, y: y) }
+			host.pointerMoved(x: x, y: y)
+		}
 	}
 
 	/// Typed characters, one client cycle each so the scripts see them in
@@ -741,9 +769,9 @@ public final class GameClient {
 		guard session == nil else { return }
 		host.loginReply = -3
 		var req = Login.Request(username: username, password: password)
-		// Resizable mode: the server opens interface 746, which lays itself
-		// out for whatever size we draw at.
-		req.windowMode = 2
+		// Resizable (2): the server opens interface 746, which lays itself out for whatever size we draw at.
+		// Fixed (0): interface 548, 765x503 (`ClientInfo.isResizable` is `windowMode == 2`).
+		req.windowMode = windowMode.rawValue
 		req.canvasWidth = max(lastSize.w, 765)
 		req.canvasHeight = max(lastSize.h, 503)
 		// rt4 `LoginManager`: the login block carries the anti-aliasing mode and `Preferences.toInt()`, which also
@@ -768,6 +796,7 @@ public final class GameClient {
 		req.reconnecting = true
 		req.verifyId = lastVerifyId
 		req.resumeAccount = host.game.account
+		req.windowMode = windowMode.rawValue
 		req.canvasWidth = max(lastSize.w, 765)
 		req.canvasHeight = max(lastSize.h, 503)
 		let s = GameSession(host: server.host, port: server.port, request: req)
@@ -814,6 +843,8 @@ public final class GameClient {
 
 	/// Connects the CS2 client actions that need the world, audio or the platform (`InterfaceClientOps.swift`).
 	private func bindClientOps() {
+		host.windowModeValue = { [weak self] in self?.windowMode.rawValue ?? 2 }
+		host.onSetWindowMode = { [weak self] in self?.windowMode = $0 == 2 || $0 == 3 ? .resizable : .fixed }
 		host.onAppearanceEdit = { [weak self] in self?.world.editSelfLook($0) }
 		host.selfFemale = { [weak self] in self?.world.selfLook?.female ?? false }
 		host.onAnimateSelf = { [weak self] seq, delay in self?.world.selfActor?.animate(delay: delay, seq: seq) }
@@ -1052,15 +1083,15 @@ extension GameClient {
 	/// be dragged, or it reacts to `onDrag` / `onHold`), so the caller leaves the camera alone.
 	public func beginComponentDrag(x: Int, y: Int) -> Bool {
 		guard inGame, interaction.popup == nil, interaction.target == nil else { return false }
-		return host.beginDragGesture(x: x, y: y)
+		return mapInput(x, y) { host.beginDragGesture(x: $0, y: $1) }
 	}
 
-	public func moveComponentDrag(x: Int, y: Int) { host.moveDragGesture(x: x, y: y) }
+	public func moveComponentDrag(x: Int, y: Int) { mapInput(x, y) { host.moveDragGesture(x: $0, y: $1) } }
 
 	/// The finger lifted: a finished drag ran its release hook and sent IF_DRAG; a press that never left the dead
 	/// zone is the tap it started as.
 	public func endComponentDrag(x: Int, y: Int) {
-		let r = host.endDragGesture(x: x, y: y)
+		let r = mapInput(x, y) { host.endDragGesture(x: $0, y: $1) }
 		if !r.dragged { performTap(x: r.start.x, y: r.start.y, hooks: false) }
 	}
 }
@@ -1081,17 +1112,19 @@ extension GameClient {
 
 	/// Is (x, y) on the map picture (not on a button or panel above it)? Use it to start a map pan or pinch.
 	public func isOverWorldMap(x: Int, y: Int) -> Bool {
-		guard let r = worldMapRect, x >= r.x, y >= r.y, x < r.x + r.w, y < r.y + r.h else { return false }
-		// Controls drawn over the map (zoom buttons, search box) keep their own taps.
-		for d in ui.drawn.reversed() where x >= d.x && y >= d.y && x < d.x + d.w && y < d.y + d.h {
-			if d.component.clientCode == 1400 { return true }
-			if d.component.hooks["onOptionClick"] != nil || d.component.hooks["onClickRepeat"] != nil { return false }
+		mapInput(x, y) { x, y in
+			guard let r = worldMapRect, x >= r.x, y >= r.y, x < r.x + r.w, y < r.y + r.h else { return false }
+			// Controls drawn over the map (zoom buttons, search box) keep their own taps.
+			for d in ui.drawn.reversed() where x >= d.x && y >= d.y && x < d.x + d.w && y < d.y + d.h {
+				if d.component.clientCode == 1400 { return true }
+				if d.component.hooks["onOptionClick"] != nil || d.component.hooks["onClickRepeat"] != nil { return false }
+			}
+			return true
 		}
-		return true
 	}
 
 	/// One-finger pan inside the map: `dx` / `dy` are the finger's travel in game pixels since the last call.
-	public func worldMapDrag(dx: Double, dy: Double) { ui.worldMap.drag(dx: dx, dy: dy) }
+	public func worldMapDrag(dx: Double, dy: Double) { ui.worldMap.drag(dx: dx / fixedScale, dy: dy / fixedScale) }
 
 	/// Pinch inside the map: `scale` is the change since the last callback (> 1 zooms in). Call `worldMapZoomEnded()`
 	/// when the pinch ends to settle on the nearest zoom level.
@@ -1102,10 +1135,12 @@ extension GameClient {
 	/// A tap or drag on the overview (client code 1401) at (x, y): centres the main map there. True when it hit.
 	@discardableResult
 	public func worldMapOverviewTouch(x: Int, y: Int) -> Bool {
-		guard worldMapIsOpen, let d = ui.drawn.last(where: { $0.component.clientCode == 1401 }),
-		      x >= d.x, y >= d.y, x < d.x + d.w, y < d.y + d.h else { return false }
-		ui.worldMap.centre(overviewX: x - d.x, y: y - d.y, w: d.w, h: d.h)
-		return true
+		mapInput(x, y) { x, y in
+			guard worldMapIsOpen, let d = ui.drawn.last(where: { $0.component.clientCode == 1401 }),
+			      x >= d.x, y >= d.y, x < d.x + d.w, y < d.y + d.h else { return false }
+			ui.worldMap.centre(overviewX: x - d.x, y: y - d.y, w: d.w, h: d.h)
+			return true
+		}
 	}
 }
 
@@ -1142,6 +1177,7 @@ extension GameClient {
 	/// Canvas size and mode as the login packet reports them (resizable window, never below 765x503).
 	private var reportedCanvas: (w: Int, h: Int) { (max(lastSize.w, 765), max(lastSize.h, 503)) }
 
+
 	/// rt4 `LoginManager` after a login: `Protocol.prevFocus = true`, the camera flag set, then `sendWindowDetails`.
 	func beginHousekeeping() {
 		sentFocus = true
@@ -1154,13 +1190,14 @@ extension GameClient {
 	private func sendWindowStatus() {
 		let c = reportedCanvas
 		sentWindow = c
-		send(.windowStatus(mode: 2, width: c.w, height: c.h, antiAliasing: host.prefs.antiAliasing))
+		sentMode = windowMode
+		send(.windowStatus(mode: windowMode.rawValue, width: c.w, height: c.h, antiAliasing: host.prefs.antiAliasing))
 	}
 
 	/// One client cycle of the checks rt4 makes before each flush: a changed canvas (`DisplayMode`), the camera
 	/// (EVENT_CAMERA_POSITION, at most once per 20 cycles) and the focus.
 	func housekeepingCycle() {
-		if let w = sentWindow, w != reportedCanvas { sendWindowStatus() }
+		if let w = sentWindow, w != reportedCanvas || sentMode != windowMode { sendWindowStatus() }
 		if cameraCooldown > 0 { cameraCooldown -= 1 }
 		let cam = (pitch: Int(world.camera.pitchTarget), yaw: Int(world.camera.yawTarget) & 0x7FF)
 		if cameraCooldown <= 0, sentCamera.map({ $0 != cam }) ?? true {

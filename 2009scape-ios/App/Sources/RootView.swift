@@ -159,6 +159,7 @@ struct TouchSettingsView: View {
 	@AppStorage(MobileSettings.smoothMotionKey) private var smoothMotion = true
 	@AppStorage(MobileSettings.opaqueSidePanelKey) private var opaqueSidePanel = true
 	@AppStorage(MobileSettings.frameStatsKey) private var frameStats = false
+	@AppStorage(MobileSettings.fixedScreenKey) private var fixedScreen = false
 	@AppStorage(MobileSettings.interfaceSizeKey) private var interfaceSize = 0
 	@AppStorage(MobileSettings.gpuRendererKey) private var gpuRenderer = false
 	@AppStorage(MobileSettings.gpuDrawDistanceKey) private var drawDistance = 56.0
@@ -177,6 +178,7 @@ struct TouchSettingsView: View {
 					Toggle("Smooth scaling", isOn: $smoothScaling)
 					Toggle("Smooth motion (60/120 Hz)", isOn: $smoothMotion)
 					Toggle("Solid side panel", isOn: $opaqueSidePanel)
+					Toggle("Fixed screen (765x503)", isOn: $fixedScreen)
 					Toggle("Show frame rate", isOn: $frameStats)
 					Picker("Interface size", selection: $interfaceSize) {
 						Text("Normal").tag(0)

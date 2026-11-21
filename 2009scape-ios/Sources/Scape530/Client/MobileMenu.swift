@@ -21,7 +21,7 @@ extension GameClient {
 	public func chooseMenuEntry(_ index: Int, clickX: Int, clickY: Int) {
 		guard let p = interaction.popup else { return }
 		interaction.popup = nil
-		doAction(p.menu, index, clickX: clickX, clickY: clickY)
+		mapInput(clickX, clickY) { doAction(p.menu, index, clickX: $0, clickY: $1) }
 	}
 
 	/// Tap-to-drop: runs the "Drop" option of the inventory item under (x, y). False if there is none.

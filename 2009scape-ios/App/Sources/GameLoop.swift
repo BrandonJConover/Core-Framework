@@ -24,6 +24,7 @@ final class GameLoop: @unchecked Sendable {
 	}
 	private var faceIDUser = ""
 	private var faceIDCheckedAt = Date.distantPast
+	private var lastFixedSetting: Bool?
 
 	// Frame statistics (game queue only).
 	private var statFrames = 0
@@ -76,10 +77,15 @@ final class GameLoop: @unchecked Sendable {
 			}
 			controller.poll(client)
 			client.smoothMotion = smoothMotion
+			// Applied when the setting changes, so the game options' Fixed/Resizable buttons (CS2 5307) keep working.
+			if lastFixedSetting != MobileSettings.fixedScreen {
+				lastFixedSetting = MobileSettings.fixedScreen
+				client.windowMode = lastFixedSetting == true ? .fixed : .resizable
+			}
 			do {
 				// Software mode draws the whole frame into the raster; GPU mode leaves the 3D viewport transparent
 				// and draws the scene in Metal under the raster (see `WorldView.gpuFrame`).
-				let gpu = MobileSettings.gpuRenderer && scenePresenter != nil
+				let gpu = MobileSettings.gpuRenderer && scenePresenter != nil && client.windowMode == .resizable // fixed mode is software only
 				client.world.gpuSettings = gpu ? MobileSettings.gpuSettings : nil
 				client.ui.opaqueSprites = MobileSettings.opaqueSidePanel ? [1131] : []
 				let raster = try client.frame(width: width, height: height)
