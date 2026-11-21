@@ -505,6 +505,8 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 	}
 
 	@objc private func pinched(_ g: UIPinchGestureRecognizer) {
+		// The world map snaps its zoom to rt4's steps (37/50/75/100/200%) when the pinch ends.
+		if g.state == .ended || g.state == .cancelled { loop.async { $0.worldMapZoomEnded() }; return }
 		guard g.state == .changed else { return }
 		let s = Double(g.scale)
 		loop.async { $0.cameraPinch(scale: s) }
