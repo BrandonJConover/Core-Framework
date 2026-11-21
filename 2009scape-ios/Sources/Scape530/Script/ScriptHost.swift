@@ -234,7 +234,7 @@ enum HostOps {
 		// display
 		h(5300, "setWindowSize", i: 2, oi: 1); h(5301, "leaveFullscreen"); h(5302, "displayModeCount", oi: 1)
 		h(5303, "displayModeSize", i: 1, oi: 2); h(5305, "currentDisplayModeIndex", oi: 1); h(5306, "windowMode", oi: 1)
-		h(5307, "setWindowMode", i: 1); h(5308, "favouriteWorlds", oi: 1); h(5309, "setFavouriteWorlds", i: 1)
+		h(5307, "setWindowMode", i: 1); h(5308, "favoriteWorlds", oi: 1); h(5309, "setFavouriteWorlds", i: 1)
 		// misc
 		h(5400, "sendTwoStrings", i: 1, s: 2); h(5401, "setObjRecolour", i: 2); h(5405, "cameraSplineAlloc", i: 2)
 		h(5406, "cameraSplinePoint", i: 7); h(5407, "cameraSplineLength", i: 1, oi: 1); h(5411, "quit")

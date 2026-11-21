@@ -221,10 +221,10 @@ extension InterfaceScriptHost {
 		case "setLastWorld": prefs.lastWorldId = i(0)
 		case "worldSort":
 			worldList.sort(primaryKey: i(0), primaryReverse: i(1) == 1, secondaryKey: i(2), secondaryReverse: i(3) == 1)
-		case "setFavouriteWorlds": prefs.favouriteWorlds = (0...2).contains(i(0)) ? i(0) : 0
-		case "favouriteWorlds": return r(prefs.favouriteWorlds)
-		case "setPref6600": prefs.pref6600 = i(0) == 1
-		case "pref6601": return b(prefs.pref6600)
+		case "setFavouriteWorlds": prefs.favoriteWorlds = (0...2).contains(i(0)) ? i(0) : 0
+		case "favoriteWorlds": return r(prefs.favoriteWorlds)
+		case "setPref6600": prefs.unknownFlag = i(0) == 1
+		case "pref6601": return b(prefs.unknownFlag)
 
 		case "cameraMoveTo", "cameraPointAt", "cameraUnlock", "cameraSetAngles", "cameraPitch", "cameraYaw":
 			if let v = cameraOp(op.name, a.map(Int.init)), op.name == "cameraPitch" || op.name == "cameraYaw" { return r(v) }

@@ -30,22 +30,18 @@ public struct ClientPreferences: Equatable {
 	/// 0...2 (rt4 `Preferences.setParticles`)
 	public var particles = 2
 	public var cursorsEnabled = true
-	/// rt4 `Preferences.favoriteWorlds` (CS2 5308 / 5309): 0...2.
-	public var favouriteWorlds = 0
-	/// rt4 `Preferences.lastWorldId` (CS2 6504 / 6505).
-	public var lastWorldId = 0
-	/// rt4 `Preferences.aBoolean63` (CS2 6600 / 6601).
-	public var pref6600 = false
 
 	// Fields rt4 `Preferences` persists but the Options tab does not edit; kept so a decode/encode round trip is exact.
 	/// rt4 `Preferences.windowMode` (also stored as the anti-aliasing mode on decode).
 	public var windowMode = 0
 	public var fullScreenWidth = 0
 	public var fullScreenHeight = 0
+	/// rt4 `Preferences.lastWorldId` (CS2 6504 / 6505).
 	public var lastWorldId = 0
+	/// rt4 `Preferences.favoriteWorlds` (CS2 5308 / 5309): 0...2.
 	public var favoriteWorlds = 0
 	public var safeMode = false
-	/// rt4 `Preferences.aBoolean63` (unnamed in rt4).
+	/// rt4 `Preferences.aBoolean63` (unnamed in rt4; CS2 6600 / 6601).
 	public var unknownFlag = false
 	public var buildArea = 0
 	public var hdr = false

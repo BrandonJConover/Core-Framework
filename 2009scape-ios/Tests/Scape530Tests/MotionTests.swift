@@ -169,6 +169,24 @@ final class MotionTests: XCTestCase {
 		XCTAssertEqual(me.zFine, (z0 + 6) * 128 + 64)
 	}
 
+	/// rt4 walks 4 fine units a cycle (a tile in 32 cycles, about one 600 ms server tick) and runs 8. A BAS without
+	/// opcode 37 has no movement acceleration (-1); defaulting it to 0 made everyone creep 1 unit a cycle.
+	func testWalkAndRunSpeeds() throws {
+		let s = try store()
+		XCTAssertEqual(BasType(id: 0).movementAcceleration, -1)
+		let ctx = WorldContext(store: s, models: ActorModels(store: s))
+		for (speed, cycles) in [(1, 32), (2, 16)] {
+			let a = PathingActor(kind: .player, index: 3, ctx: ctx)
+			a.setPosition(x: 20, z: 20, jump: true)
+			a.yaw = 1536; a.targetYaw = 1536 // already facing east: no slow turning step
+			a.move(speed: speed, direction: 4)
+			var n = 0
+			while a.queueSize > 0 && n < 200 { ctx.loop += 1; a.cycle(isSelf: false); n += 1 }
+			XCTAssertEqual(a.xFine, 21 * 128 + 64)
+			XCTAssertEqual(n, cycles, "speed \(speed): one tile in \(cycles) cycles")
+		}
+	}
+
 	// MARK: forced movement
 
 	func testForcedMovementInterpolates() throws {
