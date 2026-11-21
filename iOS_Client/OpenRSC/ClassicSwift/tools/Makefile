@@ -13,7 +13,7 @@ CFLAGS += -std=gnu99 -fwrapv -O2 -I$(ENGINE)/shim -I$(ENGINE)/include \
 LDLIBS += -lm -lpthread
 CACHE := $(ENGINE)/rsc-cache
 GOLDEN := ../Tests/RSCClassicTests/Golden
-TOOLS := build/jagdump build/gamedata
+TOOLS := build/jagdump build/gamedata build/surfacedump
 
 all: $(TOOLS)
 
@@ -32,5 +32,6 @@ golden: $(TOOLS)
 		build/jagdump $$f > $(GOLDEN)/jag/`basename $$f`.txt; done
 	build/gamedata $(CACHE)/config85.jag 1 85 > $(GOLDEN)/gamedata-members.txt
 	build/gamedata $(CACHE)/config85.jag 0 85 > $(GOLDEN)/gamedata-free.txt
+	build/surfacedump $(CACHE) > $(GOLDEN)/surface.txt
 
 .PHONY: all engine golden
