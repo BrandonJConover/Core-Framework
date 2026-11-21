@@ -94,6 +94,35 @@ final class SurfaceTests: XCTestCase {
         s.fadeToBlack(); step("fade")
         s.applyLoginFilter(backgroundHeight: 200); step("login_filter")
 
+        s.blackScreen()
+        Panel.baseSpriteStart = SpriteBase.util
+        let p = Panel(surface: s, max: 50)
+        p.addButtonBackground(x: 256, y: 60, width: 200, height: 40)
+        p.addTextCentre(x: 256, y: 52, text: "Existing User", font: .bold14, alternativeColour: false)
+        let b = p.addButton(x: 256, y: 60, width: 200, height: 40)
+        p.addBoxRounded(x: 256, y: 160, width: 300, height: 100)
+        p.addText(x: 120, y: 130, text: "Username:", font: .bold14, alternativeColour: true)
+        let u = p.addTextInput(x: 256, y: 150, width: 200, height: 40, font: .bold14, maxLength: 12, isPassword: false, alternativeColour: false)
+        let pw = p.addTextInput(x: 256, y: 180, width: 200, height: 40, font: .bold14, maxLength: 20, isPassword: true, alternativeColour: true)
+        let cb = p.addCheckbox(x: 420, y: 140, width: 14, height: 14)
+        let cb2 = p.addCheckbox(x: 440, y: 140, width: 14, height: 14)
+        p.addSprite(x: 60, y: 300, spriteId: m + 24)
+        let list = p.addTextList(x: 20, y: 220, width: 200, height: 100, font: .bold12, maxEntries: 40, alternativeColour: true)
+        for i in 0..<20 { p.addListEntryWrapped(list, text: "@yel@Line \(i) of the chat", flash: true) }
+        let il = p.addTextListInteractive(x: 280, y: 220, width: 200, height: 100, font: .bold12, maxLength: 30, alternativeColour: false)
+        for i in 0..<12 { p.addListEntry(il, index: i, text: "Quest number \(i)") }
+        p.updateText(u, "Zezima"); p.updateText(pw, "hunter2")
+        p.focusControlIndex = u
+        p.toggleCheckbox(cb2, activated: true)
+        p.handleMouse(x: 300, y: 245, lastButton: 1, isDown: 1, scrollDelta: 0)
+        p.handleMouse(x: 427, y: 147, lastButton: 1, isDown: 0, scrollDelta: 0)
+        p.handleMouse(x: 256, y: 60, lastButton: 1, isDown: 0, scrollDelta: 0)
+        p.drawPanel(); step("panel")
+        func flag(_ v: Bool) -> Int { v ? 1 : 0 }
+        lines.append("panel \(flag(p.isClicked(b))) \(flag(p.isActivated(cb))) \(flag(p.isActivated(cb2))) \(p.controlListPosition[list]) \(p.controlListEntryMouseOver[il]) \(p.controlActivated[il])")
+        for key in [Int(UInt8(ascii: "x")), 8, 8, Int(UInt8(ascii: "!")), 9] { p.keyPress(key) }
+        lines.append("panel_keys \(p.text(u)) \(p.focusControlIndex)")
+
         // The C dump prints sprites in id order before the steps, then the two extra ones inline.
         XCTAssertEqual(lines.count, golden.count)
         var failures = 0

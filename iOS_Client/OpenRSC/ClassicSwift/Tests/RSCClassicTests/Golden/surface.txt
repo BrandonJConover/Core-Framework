@@ -519,3 +519,6 @@ step reversed 3926390418
 step logo 1173943809
 step fade 2860393207
 step login_filter 2631392843
+step panel 896240517
+panel 1 1 1 15 -1 -1
+panel_keys Zezim! 6

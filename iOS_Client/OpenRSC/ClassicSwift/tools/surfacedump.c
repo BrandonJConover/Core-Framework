@@ -5,6 +5,7 @@
 #include "surface.h"
 #include "game-data.h"
 #include "utility.h"
+#include "panel.h"
 /* Runs a fixed list of rsc-c surface draw calls on a 512x346 frame and prints
  * an FNV-1a hash of the frame after each step, plus every loaded sprite's
  * metadata. RSCClassicTests/SurfaceTests.swift replays the same steps. */
@@ -115,5 +116,34 @@ int main(int argc, char **argv){
   surface_draw_sprite(S,0,0,SPRITE_LIMIT-1); step("logo");
   surface_fade_to_black(S); step("fade");
   surface_apply_login_filter(S,200); step("login_filter");
+
+  /* panel.c controls */
+  surface_black_screen(S); panel_base_sprite_start = 2100;
+  Panel *p = calloc(1, sizeof(Panel)); panel_new(p, S, 50);
+  panel_add_button_background(p, 256, 60, 200, 40);
+  panel_add_text_centre(p, 256, 52, "Existing User", 4, 0);
+  int b = panel_add_button(p, 256, 60, 200, 40);
+  panel_add_box_rounded(p, 256, 160, 300, 100);
+  panel_add_text(p, 120, 130, "Username:", 4, 1);
+  int u = panel_add_text_input(p, 256, 150, 200, 40, 4, 12, 0, 0);
+  int pw = panel_add_text_input(p, 256, 180, 200, 40, 4, 20, 1, 1);
+  int cb = panel_add_checkbox(p, 420, 140, 14, 14);
+  int cb2 = panel_add_checkbox(p, 440, 140, 14, 14);
+  panel_add_sprite(p, 60, 300, 2000 + 24);
+  int list = panel_add_text_list(p, 20, 220, 200, 100, 1, 40, 1);
+  for (int i = 0; i < 20; i++) { char line[40]; sprintf(line, "@yel@Line %d of the chat", i); panel_add_list_entry_wrapped(p, list, strdup(line), 1); }
+  int il = panel_add_text_list_interactive(p, 280, 220, 200, 100, 1, 30, 0);
+  for (int i = 0; i < 12; i++) { char line[40]; sprintf(line, "Quest number %d", i); panel_add_list_entry(p, il, i, line); }
+  panel_update_text(p, u, "Zezima"); panel_update_text(p, pw, "hunter2");
+  p->focus_control_index = u;
+  panel_toggle_checkbox(p, cb2, 1);
+  panel_handle_mouse(p, 300, 245, 1, 1, 0);
+  panel_handle_mouse(p, 427, 147, 1, 0, 0);
+  panel_handle_mouse(p, 256, 60, 1, 0, 0);
+  panel_draw_panel(p); step("panel");
+  printf("panel %d %d %d %d %d %d\n", panel_is_clicked(p, b), panel_is_activated(p, cb), panel_is_activated(p, cb2),
+    p->control_list_position[list], p->control_list_entry_mouse_over[il], p->control_activated[il]);
+  panel_key_press(p, 'x'); panel_key_press(p, 8); panel_key_press(p, 8); panel_key_press(p, '!'); panel_key_press(p, 9);
+  printf("panel_keys %s %d\n", panel_get_text(p, u), p->focus_control_index);
   return 0;
 }
