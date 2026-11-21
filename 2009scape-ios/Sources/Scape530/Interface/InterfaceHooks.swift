@@ -90,7 +90,9 @@ extension InterfaceScriptHost {
 		renderer.advanceModelAnimations(&game.interfaces)
 		renderer.worldMap.cycle() // WorldMap/: zoom easing, gliding and the flash timer
 		var high: [Pending] = [], medium: [Pending] = [], low: [Pending] = []
+		var remapped: [(c: Component, op: Int)] = []
 		walk { c in
+			if c.if3, !c.keyRemapCodes.isEmpty { for op in keyRemapOptions(c) { remapped.append((c, op)) } }
 			guard !c.hooks.isEmpty else { return }
 			let ref = c.ref
 			func queue(_ hook: String, into list: inout [Pending], key: Int = 0, char: Int = 0) {
@@ -120,10 +122,37 @@ extension InterfaceScriptHost {
 			}
 		}
 		keyQueue.removeAll()
+		// rt4 `ClientProt.method4512(EMPTY, -1, op, component.id)`: the component is looked up by id with child -1.
+		for r in remapped { if let target = component(ComponentRef(id: r.c.id)) { clickOption(target, op: r.op) } }
 		collectPointerHooks(medium: &medium, low: &low)
 		collectHeldHooks(medium: &medium, low: &low)
 		for p in high + medium + low where component(p.source) != nil { run(p.request) }
 		if drag != nil { _ = stepDrag() }
+	}
+
+	// MARK: key remaps
+
+	/// rt4 `InterfaceList.method1320` (if3 branch): the option slots (1...10) of `c` whose remapped key is held this cycle,
+	/// honouring the modifier mask and the repeat delay, and updating the per-slot next-fire cycle.
+	func keyRemapOptions(_ c: Component) -> [Int] {
+		let ref = c.ref
+		var next = keyRemapNext[ref]
+		var fire: [Int] = []
+		for i in 0..<c.keyRemapCodes.count {
+			if keyboard.isPressed(c.keyRemapCodes[i]) {
+				guard next == nil || loop >= next![i] else { continue }
+				let m = c.keyRemapMods[i]
+				guard m == 0 || ((m & 2) == 0 || keyboard.isPressed(KeyCode.alt)) && ((m & 1) == 0 || keyboard.isPressed(KeyCode.ctrl)) && ((m & 4) == 0 || keyboard.isPressed(KeyCode.shift)) else { continue }
+				fire.append(i + 1)
+				if next == nil { next = [Int](repeating: 0, count: c.keyRemapCodes.count) }
+				let k = c.keyRemapRepeat[i]
+				next![i] = k == 0 ? Int.max : loop + k
+			} else if next != nil {
+				next![i] = 0
+			}
+		}
+		keyRemapNext[ref] = next
+		return fire
 	}
 
 	// MARK: pointer

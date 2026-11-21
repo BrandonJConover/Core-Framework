@@ -48,6 +48,8 @@ public final class GameClient {
 	public let interaction = WorldInteraction()
 	private var inGame = false
 	private var lastCycleAt: Date?
+	/// Time of the previous `frame`, for the per-frame arrow-key camera (rt4 `GameShell.renderDelta`).
+	private var lastInputFrameAt: Date?
 	/// Called when a tap lands on something the client cannot handle yet.
 	public var log: (String) -> Void = { _ in }
 	/// Called once the server accepts the login (e.g. to save credentials).
@@ -105,6 +107,7 @@ public final class GameClient {
 		world = WorldView(store: store)
 		worldList.endpoint = { [weak self] in self.map { ($0.server.host, $0.server.port) } ?? ("127.0.0.1", 43595) }
 		bindHost()
+		interaction.isCtrlHeld = { [weak self] in self?.host.keyboard.isPressed(KeyCode.ctrl) ?? false }
 		openLoginScreen()
 		plugins.attach(self) // Plugins/
 		_ = worldList.fetch() // rt4 loads the world list during start-up (`mainLoadState` 135)
@@ -399,10 +402,13 @@ public final class GameClient {
 		cyclesThisSecond += cycles
 		world.renderAlpha = lastCycleAt.map { min(max(now.timeIntervalSince($0) / 0.02, 0), 1) } ?? 1
 		for _ in 0..<cycles {
+			deliverKeys()
 			host.cycle()
 			if let f = ui.flames { f.loop = host.loop; f.update() } // Title/Flames
 			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI(); housekeepingCycle() }
+			host.keyboard.loop() // rt4 `Keyboard.loop`, at the end of each client cycle
 		}
+		arrowKeyCamera(at: now)
 		updateTitleMusic()
 		if inGame { sendPreferencesIfNeeded(); updateAudio(); plugins.update(cycles: cycles) } // Plugins/
 		// GPU mode: the 2D layer is opaque black like software mode; `drawGPU` makes only the viewport transparent
@@ -655,6 +661,52 @@ public final class GameClient {
 			}
 			host.cycle()
 		}
+	}
+
+	// MARK: hardware keyboard (rt4 `Keyboard`)
+
+	/// A key went down. `code` is a Java AWT key code (`KeyEvent.VK_*`, see `KeyCode.VK`; `KeyCode.javaCode(hidUsage:)` maps
+	/// UIKit's HID usages) and `char` the character it types (-1 for none). Like rt4 `Keyboard.keyPressed` + `keyTyped` this
+	/// queues a code event and, for characters rt4 can type (1...255, euro as 128), a separate char event, and marks the key
+	/// held for arrow-key camera, remapped options and the CS2 modifier ops. Shells that already forward the soft keyboard
+	/// through `type(_:)` must send each key through only one of the two paths.
+	public func keyDown(code: Int, char: Int = -1) {
+		if code >= 0 { host.keyboard.keyPressed(javaCode: code) }
+		if char >= 0 { host.keyboard.keyTyped(char: char) }
+	}
+
+	/// A key went up (rt4 `Keyboard.keyReleased`), `code` a Java AWT key code.
+	public func keyUp(code: Int) { host.keyboard.keyReleased(javaCode: code) }
+
+	/// Sets the shift / ctrl / alt state outright (for a shell that only learns modifiers from flags); read by CS2 5100-5102
+	/// and by the ctrl-run flag of the walk packets.
+	public func setModifiers(shift: Bool, ctrl: Bool, alt: Bool) {
+		host.keyboard.setPressed(KeyCode.shift, shift)
+		host.keyboard.setPressed(KeyCode.ctrl, ctrl)
+		host.keyboard.setPressed(KeyCode.alt, alt)
+	}
+
+	/// Releases every held key (a cancelled press sequence, the window losing key focus).
+	public func releaseAllKeys() { host.keyboard.releaseAll() }
+
+	/// Moves the keys the keyboard made readable into the CS2 key queue for this cycle (rt4 `client.mainUpdate`), and applies
+	/// the legacy key-queue camera when `Preferences.aBoolean63` is set.
+	func deliverKeys() {
+		while let k = host.keyboard.nextKey() {
+			host.key(code: k.code, char: k.char)
+			if inGame, host.prefs.unknownFlag, k.code >= 0 {
+				world.camera.applyLegacyArrowKey(rt4Code: k.code)
+			}
+		}
+	}
+
+	/// rt4 `GameShell.mainInputLoop`: held arrow keys steer the camera once per frame.
+	func arrowKeyCamera(at now: Date) {
+		let dt = lastInputFrameAt.map { min(max(now.timeIntervalSince($0), 0), 0.1) } ?? 0
+		lastInputFrameAt = now
+		guard inGame, !worldMapIsOpen else { return }
+		let k = host.keyboard
+		world.camera.applyArrowKeys(up: k.isPressed(KeyCode.up), down: k.isPressed(KeyCode.down), left: k.isPressed(KeyCode.left), right: k.isPressed(KeyCode.right), seconds: dt)
 	}
 
 	public func backspace() {
@@ -1076,7 +1128,10 @@ extension GameClient {
 extension GameClient {
 	/// The app moved to the foreground (true) or background (false). rt4 sends EVENT_APPLET_FOCUS when its window's
 	/// focus changes; on a touch device this is the app becoming active / inactive.
-	public func setApplicationFocus(_ focused: Bool) { hasFocus = focused }
+	public func setApplicationFocus(_ focused: Bool) {
+		hasFocus = focused
+		if !focused { host.keyboard.focusLost() } // rt4 `Keyboard.focusLost`
+	}
 
 	/// Canvas size and mode as the login packet reports them (resizable window, never below 765x503).
 	private var reportedCanvas: (w: Int, h: Int) { (max(lastSize.w, 765), max(lastSize.h, 503)) }

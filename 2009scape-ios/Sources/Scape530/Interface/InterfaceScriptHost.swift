@@ -129,6 +129,10 @@ public final class InterfaceScriptHost: ScriptHost {
 	var readers: [ComponentRef: Readers] = [:]
 	var openTypes: [Int: Int] = [:]
 	var keyQueue: [(code: Int, char: Int)] = []
+	/// rt4 `Keyboard`: held keys and the key queues a hardware keyboard feeds (see `GameClient.keyDown`).
+	public internal(set) var keyboard = Keyboard()
+	/// rt4 `Component.anIntArray49`: the cycle at which each key-remapped option may fire again, per component.
+	var keyRemapNext: [ComponentRef: [Int]] = [:]
 	/// rt4 `Chat.transmitAt` and friends: the transmit timer value of the last change.
 	var chatAt = 0, friendAt = 0, clanAt = 0, miscAt = 0
 	/// rt4 `StockMarketManager.transmitAt`: when a GRAND_EXCHANGE_OFFERS packet last arrived (wakes `onStockTransmit`).

@@ -35,6 +35,12 @@ public struct Component {
 	/// Item shown by `cc_setobject` (rt4 `objId`/`objCount`).
 	public var objId = -1, objCount = 0, objDrawText = true
 
+	/// Key remaps (rt4 `anIntArray46`, `aByteArray8`, `aByteArray7`), ten slots, or empty when the component has none:
+	/// repeat delay in cycles (0 = once per press, -1 = every cycle), rt4 key code, and modifier mask (1 ctrl, 2 alt, 4 shift).
+	public var keyRemapRepeat: [Int] = []
+	public var keyRemapCodes: [Int] = []
+	public var keyRemapMods: [Int] = []
+
 	// Sprite
 	public var spriteId = -1, activeSpriteId = -1
 	public var angle2d = 0
@@ -134,6 +140,30 @@ public struct Component {
 		}
 	}
 
+	/// The key remap block of `decodeIf3` (rt4 `Component.anIntArray46` / `aByteArray8` / `aByteArray7`).
+	mutating func decodeKeyRemaps(_ p: inout Packet) throws {
+		var key = try p.g1()
+		if key != 0 {
+			keyRemapRepeat = [Int](repeating: 0, count: 10)
+			keyRemapCodes = [Int](repeating: 0, count: 10)
+			keyRemapMods = [Int](repeating: 0, count: 10)
+		}
+		while key != 0 {
+			// Key remaps (rt4 `Component.anIntArray46` / `aByteArray8` / `aByteArray7`): slot (key >> 4) - 1 fires option
+			// slot + 1 while rt4 key `keyRemapCodes[slot]` is held, repeating every `keyRemapRepeat[slot]` cycles.
+			let slot = (key >> 4) - 1
+			key = ((try p.g1()) | key << 8) & 0xFFF
+			let code = try p.g1b()
+			let mods = try p.g1b()
+			if slot >= 0, slot < 10 {
+				keyRemapRepeat[slot] = key == 4095 ? -1 : key
+				keyRemapCodes[slot] = code
+				keyRemapMods[slot] = mods
+			}
+			key = try p.g1()
+		}
+	}
+
 	func parentId(_ raw: Int) -> Int { raw == 65535 ? -1 : (id & ~0xFFFF) + raw }
 
 	mutating func decodeIf3(_ p: inout Packet) throws {
@@ -208,14 +238,7 @@ public struct Component {
 			lineMirrored = try p.g1() == 1
 		}
 		var eventMask = try p.g3()
-		var key = try p.g1()
-		while key != 0 {
-			// Key remaps (rt4 anIntArray46/aByteArray8/7); not used on touch.
-			key = (try p.g1()) | key << 8
-			_ = try p.g1b()
-			_ = try p.g1b()
-			key = try p.g1()
-		}
+		try decodeKeyRemaps(&p)
 		optionBase = try p.gjstr()
 		let opFlags = try p.g1()
 		for _ in 0..<(opFlags & 0xF) { ops.append(try p.gjstr()) }

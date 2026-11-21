@@ -196,6 +196,31 @@ public struct WorldCamera {
 		yawTarget = ((yawTarget.truncatingRemainder(dividingBy: 2047)) + 2047).truncatingRemainder(dividingBy: 2047)
 	}
 
+	/// rt4 `GameShell.mainInputLoop`: held arrow keys steer the camera once per rendered frame. `calcRenderDelta(v)` is
+	/// `v * v * seconds since the last frame`, so up/down tilt by 18^2 and left/right turn by 24^2 units per second
+	/// (up wins over down, left over right, as in rt4's `else if`).
+	public mutating func applyArrowKeys(up: Bool, down: Bool, left: Bool, right: Bool, seconds: Double) {
+		guard up || down || left || right else { return }
+		let vertical = 18.0 * 18.0 * seconds
+		if up { pitchTarget += vertical } else if down { pitchTarget -= vertical }
+		let horizontal = 24.0 * 24.0 * seconds
+		if left { yawTarget -= horizontal } else if right { yawTarget += horizontal }
+		clampAngles()
+	}
+
+	/// rt4 `Camera.method4273` with `Preferences.aBoolean63` set: each arrow key event of the cycle nudges the target by a
+	/// fixed step (up +47, down -17, left -65, right +191; the asymmetry is rt4's).
+	public mutating func applyLegacyArrowKey(rt4Code code: Int) {
+		switch code {
+		case KeyCode.up: pitchTarget += 47
+		case KeyCode.down: pitchTarget -= 17
+		case KeyCode.left: yawTarget -= 65
+		case KeyCode.right: yawTarget += 191
+		default: return
+		}
+		clampAngles()
+	}
+
 	/// One-finger drag in game pixels: horizontal turns, vertical tilts.
 	public mutating func drag(dx: Double, dy: Double) {
 		yawTarget += dx * 2.0

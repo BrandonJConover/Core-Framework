@@ -171,7 +171,10 @@ extension InterfaceScriptHost {
 			return HostResult(strings: [varcstr(32)])
 
 		// MARK: keyboard modifiers
-		case "isHoldingAlt", "isHoldingCtrl", "isHoldingShift": return r(0)
+		// rt4 ScriptRunner 5100-5102: `Keyboard.pressedKeys[KEY_ALT / KEY_CTRL / KEY_SHIFT]`.
+		case "isHoldingAlt": return b(keyboard.isPressed(KeyCode.alt))
+		case "isHoldingCtrl": return b(keyboard.isPressed(KeyCode.ctrl))
+		case "isHoldingShift": return b(keyboard.isPressed(KeyCode.shift))
 
 		// MARK: display (we are a resizable window the size of the canvas)
 		case "windowMode": return r(2)
