@@ -117,6 +117,7 @@ public final class InterfaceScriptHost: ScriptHost {
 		self.store = store
 		renderer = InterfaceRenderer(store: store)
 		runner = ScriptRunner(store: store, host: self)
+		renderer.cs1 = self // IF1 scripts read the live game state
 		// WorldMap/: multi-locs read the live varps and the map opens on the local player.
 		renderer.worldMap.varps = { [unowned self] in game.varps }
 		renderer.worldMap.playerTile = { [unowned self] in game.selfWorld.map { (x: $0.x, z: $0.z) } }
@@ -193,7 +194,9 @@ public final class InterfaceScriptHost: ScriptHost {
 		case .ifSetPosition(let c, let x, let y):
 			// rt4 `Protocol` delayed change 11: an absolute position (both layout modes reset to 0).
 			mutate(ComponentRef(id: Int(c))) { $0.baseX = x; $0.baseY = y; $0.horizontalMode = 0; $0.verticalMode = 0 }
-		case .ifSetScrollPos(let c, let pos): mutate(ComponentRef(id: Int(c))) { $0.scrollY = max(pos, 0) }
+		case .ifSetScrollPos(let c, let pos):
+			game.interfaces.scroll[Int(c)] = nil
+			mutate(ComponentRef(id: Int(c))) { $0.scrollY = max(pos, 0) }
 		case let .ifSetEvents(c, start, end, mask):
 			// rt4 SET_INTERFACE_SETTINGS: one entry per index in start...end; index -1 is the component itself.
 			if start <= end {

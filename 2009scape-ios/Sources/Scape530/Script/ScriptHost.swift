@@ -74,6 +74,8 @@ public protocol ScriptHost: AnyObject {
 
 	// MARK: component tree
 	func componentExists(_ id: Int) -> Bool
+	/// rt4 `Cs1ScriptRunner.method1015` (CS2 3108 / 3109): arms the drag of a component grabbed at (offsetX, offsetY).
+	func armDrag(_ ref: ComponentRef, offsetX: Int, offsetY: Int)
 	func createChild(of parent: Int, type: Int, index: Int) throws -> ComponentRef
 	func deleteChild(_ ref: ComponentRef) throws
 	func deleteChildren(of parent: Int)
@@ -117,6 +119,7 @@ extension ScriptHost {
 	public func varcstr(_ id: Int) -> String { "" }
 	public func setVarcstr(_ id: Int, _ value: String) {}
 	public func componentExists(_ id: Int) -> Bool { false }
+	public func armDrag(_ ref: ComponentRef, offsetX: Int, offsetY: Int) {}
 	public func createChild(of parent: Int, type: Int, index: Int) throws -> ComponentRef { ComponentRef(id: parent, child: index) }
 	public func deleteChild(_ ref: ComponentRef) throws {}
 	public func deleteChildren(of parent: Int) {}
