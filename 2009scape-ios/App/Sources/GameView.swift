@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import QuartzCore
+import GameController
 import Scape530
 
 /// Hosts the software-rendered game: a display link asks the `GameLoop` (background queue) for frames,
@@ -244,9 +245,11 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 	/// Runs on the main queue after each frame.
 	private func apply(_ s: GameLoop.Snapshot) {
 		// Keyboard follows the client's focus (login fields, chat input, the HUD button).
-		if s.wantsKeyboard && !isFirstResponder {
+		// A hardware keyboard needs the first responder for pressesBegan; it raises no on-screen keyboard.
+		let wantsResponder = s.wantsKeyboard || GCKeyboard.coalesced != nil
+		if wantsResponder && !isFirstResponder {
 			becomeFirstResponder()
-		} else if !s.wantsKeyboard && isFirstResponder {
+		} else if !wantsResponder && isFirstResponder {
 			_ = resignFirstResponder()
 		}
 		lastKeyboardWanted = s.wantsKeyboard
@@ -574,6 +577,48 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 	var spellCheckingType: UITextSpellCheckingType { get { .no } set {} }
 	var keyboardType: UIKeyboardType { get { .asciiCapable } set {} }
 	var returnKeyType: UIReturnKeyType { get { .go } set {} }
+
+	// MARK: hardware keyboard (rt4 `Keyboard`)
+
+	/// Maps a UIKey to the library's (Java key code, typed char) pair; nil when rt4 has neither for it, or for Command shortcuts.
+	private func clientKey(_ key: UIKey) -> (code: Int, char: Int)? {
+		let flags = key.modifierFlags
+		if flags.contains(.command) { return nil }
+		let code = KeyCode.javaCode(hidUsage: key.keyCode.rawValue)
+		var char = -1
+		let scalars = key.characters.unicodeScalars
+		if !flags.contains(.control), scalars.count == 1, let v = scalars.first?.value {
+			char = KeyCode.typedChar(v == 13 ? 10 : Int(v))
+		}
+		return code < 0 && char < 0 ? nil : (code, char)
+	}
+
+	// Handled presses are not passed to super, so UIKeyInput.insertText / deleteBackward do not also fire for them (their
+	// characters are sent as rt4 typed-char events here instead); the soft keyboard keeps using insertText.
+	override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+		var rest = presses
+		for p in presses {
+			guard let key = p.key, let k = clientKey(key) else { continue }
+			rest.remove(p)
+			loop.async { $0.keyDown(code: k.code, char: k.char) }
+		}
+		if !rest.isEmpty { super.pressesBegan(rest, with: event) }
+	}
+
+	override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+		var rest = presses
+		for p in presses {
+			guard let key = p.key, let k = clientKey(key) else { continue }
+			rest.remove(p)
+			if k.code >= 0 { loop.async { $0.keyUp(code: k.code) } }
+		}
+		if !rest.isEmpty { super.pressesEnded(rest, with: event) }
+	}
+
+	override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+		loop.async { $0.releaseAllKeys() }
+		super.pressesCancelled(presses, with: event)
+	}
 
 	/// A keyboard the system dismissed itself (iPad dismiss key) must not be re-raised by the client's chat flag.
 	override func resignFirstResponder() -> Bool {

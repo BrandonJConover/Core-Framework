@@ -20,7 +20,7 @@ playthrough tests (tutorial, combat, bank, shop, magic, woodcutting, fires, cook
 ## To do
 - Done: world list (`Net/WorldList.swift`, fetched with `[255][checksum]` on the game port) and hopping, login replies 1/15/21/23/29 with the cache script's texts, TRANSMITVAR_VERIFYID / EVENT_APPLET_FOCUS / EVENT_CAMERA_POSITION / WINDOW_STATUS. Not done on purpose: the EVENT_MOUSE_* recorder (the 2009scape server never sets the login flag and the packets are a touch-device no-op).
 - [ ] Full interface sweep (all 483) clean
-- [ ] Hardware keyboard (iPad/BT keyboards): arrow-key camera, F-keys, Esc, modifiers, Ctrl-run
+- [x] Hardware keyboard (iPad/BT keyboards): `Input/Keyboard.swift`, `GameClient.keyDown/keyUp/setModifiers`: arrow-key camera, F-key tab remaps, CS2 onKey, modifiers (5100-5102), Ctrl-run. Shift-click (`Cheat.shiftClick`) is a debug toggle, not ported.
 - [ ] Fixed 765x503 mode (interface 548)
 - [x] Large-creature terrain tilt (PathingEntity.method2685), BAS roll/pitch (method2687) and SD character shadows (ShadowModelList; scenery shadows in SD are the baked `shadowmap`, the sprite shadows are GL-only)
 - [ ] RoofHider mode 0 (op 6021 on Tutorial Island): drawing every level leaves the camera under the upper floor; held at selective until matched. Client-local ::commands

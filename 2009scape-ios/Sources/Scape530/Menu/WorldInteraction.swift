@@ -36,6 +36,8 @@ public final class WorldInteraction {
 	public internal(set) var preview: String?
 	/// Every message the interaction sent, for tests and debugging.
 	public var onSend: ((ClientMessage) -> Void)?
+	/// rt4 `Keyboard.pressedKeys[KEY_CTRL]`, read when a walk packet is built (ClientProt ~130: the ctrl-run flag).
+	public var isCtrlHeld: () -> Bool = { false }
 
 	public init() {}
 
@@ -304,7 +306,7 @@ extension GameClient {
 		let finder = PathFinder(collision: world.collision[plane])
 		guard let route = finder.findPath(srcX: me.x, srcZ: me.z, size: me.size, target: .tile(x: tileX - o.x, z: tileZ - o.z), allowFallback: true),
 			let last = route.waypoints.last else { return true }
-		let message = PathFinder.walkMessage(route: route, originX: o.x, originZ: o.z, running: false, minimap: true)
+		let message = PathFinder.walkMessage(route: route, originX: o.x, originZ: o.z, running: interaction.isCtrlHeld(), minimap: true)
 		world.destinationFlag = last
 		interaction.onSend?(message)
 		send(message)
@@ -331,8 +333,8 @@ extension GameClient {
 		let o = world.origin
 		let pts = route.waypoints.map { (x: o.x + $0.x, z: o.z + $0.z) }
 		let message: ClientMessage = type == .interact
-			? .walkInteract(destX: pts[pts.count - 1].x, destZ: pts[pts.count - 1].z, path: Array(pts.dropLast()), ctrlRun: false)
-			: PathFinder.walkMessage(route: route, originX: o.x, originZ: o.z, running: false, minimap: false)
+			? .walkInteract(destX: pts[pts.count - 1].x, destZ: pts[pts.count - 1].z, path: Array(pts.dropLast()), ctrlRun: interaction.isCtrlHeld())
+			: PathFinder.walkMessage(route: route, originX: o.x, originZ: o.z, running: interaction.isCtrlHeld(), minimap: false)
 		world.destinationFlag = last
 		interaction.onSend?(message)
 		send(message)
