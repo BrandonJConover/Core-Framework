@@ -28,6 +28,18 @@ public struct Raster {
 		clipLeft = 0; clipTop = 0; clipRight = width; clipBottom = height
 	}
 
+	/// Fills a rectangle (clamped to the raster, ignoring the clip) with opaque black or full transparency.
+	public mutating func clearRect(x: Int, y: Int, w: Int, h: Int, transparent: Bool) {
+		let x0 = max(0, x), x1 = min(width, x + w), y0 = max(0, y), y1 = min(height, y + h)
+		guard x0 < x1, y0 < y1 else { return }
+		let c: UInt32 = transparent ? 0 : 0xFF00_0000
+		let stride = width
+		pixels.withUnsafeMutableBufferPointer { buf in
+			let base = buf.baseAddress!
+			for yy in y0..<y1 { (base + yy * stride + x0).update(repeating: c, count: x1 - x0) }
+		}
+	}
+
 	public mutating func setClip(_ x0: Int, _ y0: Int, _ x1: Int, _ y1: Int) {
 		clipLeft = max(0, x0)
 		clipTop = max(0, y0)

@@ -56,6 +56,9 @@ extension WorldView {
 	func drawGPU(into raster: inout Raster, rect: (x: Int, y: Int, w: Int, h: Int), settings: GPURenderSettings) -> Bool {
 		updateBuild()
 		guard let scene = scene, let me = selfActor, rect.w > 0, rect.h > 0 else { gpu.frame = nil; return false }
+		// Only the viewport lets the Metal scene through; the rest of the 2D layer stays opaque black as in
+		// software mode, so the fog colour never shows around a smaller interface.
+		raster.clearRect(x: rect.x, y: rect.y, w: rect.w, h: rect.h, transparent: true)
 
 		// Palette and baked scene follow the scene and the brightness setting.
 		if gpu.palette == nil || gpu.palette!.brightness != brightness {

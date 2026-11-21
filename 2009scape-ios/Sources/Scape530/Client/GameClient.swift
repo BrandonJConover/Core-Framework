@@ -263,8 +263,9 @@ public final class GameClient {
 			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI() }
 		}
 		if inGame { updateAudio(); plugins.update(cycles: cycles) } // Plugins/
-		// GPU mode: the 2D layer starts transparent so the Metal scene shows through the viewport.
-		let transparent = inGame && world.gpuSettings != nil
+		// GPU mode: the 2D layer is opaque black like software mode; `drawGPU` makes only the viewport transparent
+		// so the Metal scene shows through there.
+		let transparent = false
 		var r = takeFrameBuffer(width: width, height: height, transparent: transparent)
 		let top = host.game.interfaces.top
 		let showInterface = top != -1 && !(inGame && top == loginInterface)
