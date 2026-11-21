@@ -1,0 +1,65 @@
+texture 0 dim 1 alpha 0 px 1721319239 fill 1579036
+texture 1 dim 0 alpha 0 px 3992451317 fill 4227324
+texture 2 dim 1 alpha 0 px 3426858711 fill 1579036
+texture 3 dim 0 alpha 0 px 252306715 fill 13131780
+texture 4 dim 1 alpha 1 px 3024988489 fill 1579036
+texture 5 dim 1 alpha 0 px 392752957 fill 1579036
+texture 6 dim 1 alpha 0 px 1097265965 fill 7350292
+texture 7 dim 1 alpha 0 px 2950958825 fill 1579036
+texture 8 dim 1 alpha 1 px 83020109 fill 0
+texture 9 dim 0 alpha 1 px 4216449121 fill 0
+texture 10 dim 0 alpha 1 px 1899159205 fill 11034660
+texture 11 dim 0 alpha 0 px 2420096291 fill 5797972
+texture 12 dim 1 alpha 1 px 550709823 fill 0
+texture 13 dim 0 alpha 0 px 1780932877 fill 3160132
+texture 14 dim 0 alpha 0 px 4225727405 fill 1
+texture 15 dim 0 alpha 0 px 1739692233 fill 16316668
+texture 16 dim 1 alpha 1 px 2955751881 fill 0
+texture 17 dim 0 alpha 1 px 1843757301 fill 0
+texture 18 dim 1 alpha 0 px 1021924665 fill 1579036
+texture 19 dim 1 alpha 1 px 1049582241 fill 0
+texture 20 dim 1 alpha 0 px 933547317 fill 2052
+texture 21 dim 1 alpha 0 px 3632771409 fill 10500100
+texture 22 dim 1 alpha 0 px 2046880477 fill 10500100
+texture 23 dim 1 alpha 0 px 3506838831 fill 3162164
+texture 24 dim 0 alpha 1 px 334611061 fill 0
+texture 25 dim 0 alpha 0 px 2292920863 fill 4218996
+texture 26 dim 0 alpha 1 px 345854389 fill 0
+texture 27 dim 1 alpha 0 px 718483677 fill 1579036
+texture 28 dim 1 alpha 1 px 369536603 fill 1579036
+texture 29 dim 0 alpha 0 px 2253898743 fill 5777436
+texture 30 dim 0 alpha 0 px 619356517 fill 6303780
+texture 31 dim 0 alpha 0 px 1235071839 fill 14704644
+texture 32 dim 1 alpha 0 px 3324152817 fill 8421508
+texture 33 dim 1 alpha 1 px 3848838567 fill 0
+texture 34 dim 1 alpha 1 px 3658658285 fill 0
+texture 35 dim 0 alpha 1 px 1697914309 fill 8421508
+texture 36 dim 1 alpha 1 px 3924584597 fill 0
+texture 37 dim 0 alpha 0 px 2753625877 fill 6316132
+texture 38 dim 0 alpha 0 px 3770982451 fill 14211276
+texture 39 dim 1 alpha 0 px 49612517 fill 1579020
+texture 40 dim 1 alpha 1 px 4121494337 fill 0
+texture 41 dim 1 alpha 1 px 3197985361 fill 0
+texture 42 dim 1 alpha 1 px 841850473 fill 542740
+texture 43 dim 1 alpha 1 px 1897148917 fill 0
+texture 44 dim 1 alpha 0 px 2194886659 fill 3162164
+texture 45 dim 0 alpha 0 px 778989927 fill 13131780
+texture 46 dim 0 alpha 0 px 1112323225 fill 13131780
+texture 47 dim 1 alpha 1 px 4276981829 fill 5783604
+texture 48 dim 0 alpha 0 px 3054153157 fill 9455636
+texture 49 dim 1 alpha 0 px 2606850485 fill 11044972
+texture 50 dim 1 alpha 1 px 3836180229 fill 0
+texture 51 dim 1 alpha 1 px 2364257403 fill 1579036
+texture 52 dim 0 alpha 0 px 2253898743 fill 5777436
+texture 53 dim 0 alpha 0 px 619356517 fill 6303780
+texture 54 dim 0 alpha 1 px 1677035669 fill 14704644
+fill 2132128 0 -25991
+frame overview 888066628 polys 1291 order 3426185955 picks 0
+frame rotated_pick 3224160853 polys 1178 order 1305012273 picks 8 20:18 40:83 -1:3 18:94 18:105 18:98 19:1 18:201
+frame south_pick 204276415 polys 694 order 2928954093 picks 4 26:22 35:110 35:76 35:73
+frame interlace 3391632523 polys 1330 order 2650454061 picks 4 26:22 35:110 35:76 35:73
+frame closeup_roll 1215428470 polys 701 order 3860371151 picks 4 26:22 35:110 35:76 35:73
+frame near_clip 933399277 polys 40 order 2498292299 picks 1 40:34
+frame scrolled_relit 2457107737 polys 1291 order 3426185955 picks 1 40:34
+frame removed 3797982427 polys 1342 order 2232981905 picks 2 40:84 -1:3
+frame cleared 2198379577 polys 1262 order 4122729693 picks 2 40:84 -1:3
