@@ -203,6 +203,32 @@ static void poke(const char *what, int v){
   else if(!strcmp(what,"appearance")) M->show_appearance_change=v;
 }
 
+
+/* ---- full frames (mudclient_draw_game, with the in-game UI) ---- */
+static void mouse(int x, int y, int click){
+  printf("mouse %d %d %d\n", x, y, click);
+  M->mouse_x=x; M->mouse_y=y; M->mouse_button_click=0; M->mouse_button_down=0; M->last_mouse_button_down=click;
+  mudclient_finger_1_x=x; mudclient_finger_1_y=y; mudclient_finger_1_down=0;
+  mudclient_handle_inputs(M); /* one game tick: turns the press into a click and sets the scene's pick point */
+}
+static void ui(const char *label){
+  PacketStream *ps=M->packet_stream; ps->packet_start=0; ps->packet_end=3;
+  mudclient_draw_game(M);
+  Surface *S=M->surface; mudclient *m=M;
+  printf("ui %s %u tab %d sub %d %d %d spell %d item %d rc %d menu %d %d %d %d wiki %d social %d pw %d cam %d %d opts %d %d %d %d %d\n", label,
+    fnv(S->pixels,S->width*S->height*4), m->show_ui_tab, m->ui_tab_stats_sub_tab, m->ui_tab_magic_sub_tab, m->ui_tab_social_sub_tab,
+    m->selected_spell, m->selected_item_inventory_index, m->show_right_click_menu, m->menu_x, m->menu_y, m->menu_width, m->menu_height,
+    m->selected_wiki, m->show_dialog_social_input, m->show_change_password_step, m->camera_rotation, m->settings_camera_auto,
+    m->settings_mouse_button_one, m->settings_block_chat, m->settings_block_private, m->settings_block_trade, m->settings_block_duel);
+  printf("menu %d", m->menu_items_count);
+  for(int i=0;i<m->menu_items_count;i++){ struct MenuEntry *e=&m->menu_items[m->menu_indices[i]]; printf(" [%d|%s|%s]", e->type, e->action_text, e->target_text); }
+  printf("\nsent "); for(int i=0;i<ps->packet_start;i++) printf("%02x", (uint8_t)ps->packet_data[i]); printf("\n");
+  ps->packet_start=0; ps->packet_end=3;
+  if(frame_dir){char p[600];snprintf(p,sizeof p,"%s/%s.raw",frame_dir,label);FILE*f=fopen(p,"wb");fwrite(S->pixels,4,S->width*S->height,f);fclose(f);}
+}
+/* a point on right-click menu entry i (menu.c's hit box) */
+static void menu_entry(int i, int click){ mouse(M->menu_x + 10, M->menu_y + 19 + 12 + i * 19 - 4, click); }
+
 /* ---- scripted session ---- */
 static void region_players(int x, int y, int sprite, int known, const int (*moves)[2], const int (*adds)[5], int nadds){
   begin(SERVER_REGION_PLAYERS); bits(x,11); bits(y,13); bits(sprite,4); bits(known,8);
@@ -298,6 +324,54 @@ int main(int argc, char **argv){
   begin(SERVER_FRIEND_STATUS_CHANGE); b64(name("newpal")); b8(0); send_packet();
   begin(SERVER_FRIEND_MESSAGE); b64(name("friend two")); b32(77); { int n=chat_message_encode("are you there?"); for(int i=0;i<n;i++) b8(chat_message_encoded[i]); } send_packet();
   begin(SERVER_IGNORE_LIST); b8(2); b64(name("spammer")); b64(name("Bob")); send_packet();
+
+  /* in-game UI: tabs, menus and clicks (touch layout: tab buttons on the
+   * right; 196 wide tabs span x 269..465, y 116..314) */
+  { int tx = 480, ty = 117 + 16;
+  mouse(200, 200, 0); ui("game_ui");
+  mouse(tx, ty, 1); ui("inv_open");
+  mouse(240, 130, 0); ui("inv_hover");
+  mouse(240, 130, 2); ui("inv_menu");
+  menu_entry(2, 0); ui("inv_menu_hover");
+  menu_entry(2, 1); ui("inv_examine");
+  mouse(tx, ty, 1); ui("inv_open2");
+  mouse(290, 130, 2); ui("inv_menu2");
+  menu_entry(0, 1); ui("inv_menu2_click");
+  mouse(tx, ty + 33, 1); ui("map");
+  mouse(407, 231, 1); ui("map_walk");
+  mouse(319, 155, 2); ui("map_compass");
+  menu_entry(1, 1); ui("map_look");
+  mouse(tx, ty + 66, 1); ui("stats");
+  mouse(290, 150, 0); ui("stats_skill");
+  mouse(420, 128, 1); ui("stats_quests");
+  mouse(300, 200, 0); ui("stats_quest_hover");
+  mouse(360, 128, 1); ui("stats_gear");
+  mouse(tx, ty + 99, 1); ui("magic");
+  mouse(300, 150, 0); ui("magic_hover");
+  mouse(300, 150, 1); ui("magic_select");
+  mouse(420, 128, 1); ui("prayers");
+  mouse(300, 150, 1); ui("prayer_on");
+  mouse(tx, ty + 132, 1); ui("social");
+  mouse(300, 150, 0); ui("social_hover");
+  mouse(420, 128, 1); ui("ignore");
+  mouse(320, 128, 1); ui("friends");
+  mouse(300, 306, 1); ui("add_friend");
+  mouse(10, 10, 1); ui("add_friend_close");
+  mouse(tx, ty + 165, 1); ui("options");
+  mouse(300, 137, 1); ui("options_camera");
+  mouse(300, 235, 1); ui("options_privacy");
+  mouse(tx, ty + 165, 1); ui("closed");
+  mouse(217, 225, 0); ui("hover_player");
+  mouse(217, 225, 2); ui("player_menu");
+  menu_entry(1, 0); ui("player_menu_hover");
+  menu_entry(1, 1); ui("player_menu_click");
+  mouse(310, 195, 2); ui("menu2");
+  menu_entry(0, 1); ui("menu2_click");
+  mouse(270, 160, 2); ui("menu3");
+  menu_entry(0, 1); ui("menu3_click");
+  mouse(150, 250, 1); ui("world_click");
+  ticks(5); mouse(150, 250, 0); ui("after_walk");
+  }
   begin(SERVER_REGION_PLAYER_UPDATE); b16(1); b16(5); b8(1); bchat("you cannot hear me"); send_packet();
   begin(SERVER_MESSAGE); bstr("@gre@Welcome to the game"); send_packet();
   begin(SERVER_OPTION_LIST); b8(3); b8(3); bstr("Yes"); b8(2); bstr("No"); b8(10); bstr("Maybe later"); send_packet();

@@ -65,6 +65,15 @@ final class GameTests: XCTestCase {
                 for _ in 0..<Int(line.dropFirst(5))! { mud.handleInputs() }
             } else if line.hasPrefix("frame ") {
                 frame(String(line.split(separator: " ")[1]), golden: line)
+            } else if line.hasPrefix("mouse ") {
+                let v = line.split(separator: " ").dropFirst().map { Int($0)! }
+                lines.append(line)
+                mud.mouseX = v[0]; mud.mouseY = v[1]
+                mud.mouseButtonClick = 0; mud.mouseButtonDown = 0; mud.lastMouseButtonDown = v[2]
+                Mudclient.finger1X = v[0]; Mudclient.finger1Y = v[1]; Mudclient.finger1Down = 0
+                mud.handleInputs()
+            } else if line.hasPrefix("ui ") {
+                ui(String(line.split(separator: " ")[1]))
             }
         }
 
@@ -89,6 +98,38 @@ final class GameTests: XCTestCase {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             try? Data(bytes).write(to: dir.appendingPathComponent("\(name).raw"))
         }
+    }
+
+    private final class CaptureTransport: PacketTransport {
+        func receive(into buffer: UnsafeMutableRawBufferPointer) -> Int { -1 }
+        func send(_ buffer: UnsafeRawBufferPointer) -> Int { buffer.count }
+        func close() {}
+    }
+
+    /// ui in gamedump.c: a full mudclient_draw_game frame, the menu it built and the packets it sent.
+    private func ui(_ name: String) {
+        let ps = PacketStream(transport: CaptureTransport(), rsa: RSA(exponentHex: "010001", modulusHex: "01")!)
+        mud.packetStream = ps
+        mud.drawGame()
+        mud.packetStream = nil
+        let m = mud!
+        let bytes = m.surface.pixelBuffer.withMemoryRebound(to: UInt8.self) { Array($0) }
+        lines.append("ui \(name) \(fnv1a(bytes)) tab \(m.showUITab) sub \(m.uiTabStatsSubTab) \(m.uiTabMagicSubTab) "
+            + "\(m.uiTabSocialSubTab) spell \(m.selectedSpell) item \(m.selectedItemInventoryIndex) "
+            + "rc \(m.showRightClickMenu ? 1 : 0) menu \(m.menuX) \(m.menuY) \(m.menuWidth) \(m.menuHeight) "
+            + "wiki \(m.selectedWiki ? 1 : 0) social \(m.showDialogSocialInput) pw \(m.showChangePasswordStep) "
+            + "cam \(m.cameraRotation) \(m.settingsCameraAuto) opts \(m.settingsMouseButtonOne) \(m.settingsBlockChat) "
+            + "\(m.settingsBlockPrivate) \(m.settingsBlockTrade) \(m.settingsBlockDuel)")
+        var menu = "menu \(m.menuItemsCount)"
+        for i in 0..<m.menuItemsCount {
+            let e = m.menuItems[m.menuIndices[i]]
+            menu += " [\(e.type)|\(e.actionText)|\(e.targetText)]"
+        }
+        lines.append(menu)
+        lines.append("sent " + ps.packetData[0..<ps.packetStart].map { String(format: "%02x", $0) }.joined())
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rsc-swift-frames")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? Data(bytes).write(to: dir.appendingPathComponent("\(name).raw"))
     }
 
     private func adjacencyHash() -> UInt32 {

@@ -5,9 +5,6 @@ extension Mudclient {
     func handleSleepInput() {}            // ui/sleep.c
     func drawSleep() {}                   // ui/sleep.c
     func drawStatusBars() {}              // ui/status-bars.c
-    func drawUITabs() {}                  // ui/ui-tabs.c
-    func setActiveUITab(noMenus: Bool) {} // ui/ui-tabs.c
-    func drawActiveUITab(noMenus: Bool) {} // ui/ui-tabs.c
     func drawExperienceDrops() {}         // ui/experience-drops.c
     func drawWelcome() {}                 // ui/welcome.c
     func drawServerMessage() {}           // ui/server-message.c
@@ -18,12 +15,9 @@ extension Mudclient {
     func drawTrade() {}                   // ui/trade.c
     func drawDuelConfirm() {}             // ui/duel.c
     func drawDuel() {}                    // ui/duel.c
-    func drawChangePassword() {}          // ui/options-tab.c
-    func drawSocialInput() {}             // ui/social-tab.c
     func drawOptionMenu() {}              // ui/option-menu.c
     func drawCombatStyle() {}             // ui/combat-style.c
-    func createRightClickMenu() {}        // ui/menu.c
-    func drawRightClickMenu() {}          // ui/menu.c
-    func createTopMouseMenu() {}          // ui/menu.c
-    func drawHoverTooltip() {}            // ui/menu.c
+    func bankTransaction(itemId: Int, amount: Int, opcode: Int) {}          // ui/bank.c
+    func offerTransactionItem(opcode: Int, itemId: Int, amount: Int) {}     // ui/transaction.c
+    func removeTransactionItem(opcode: Int, itemId: Int, amount: Int) {}    // ui/transaction.c
 }

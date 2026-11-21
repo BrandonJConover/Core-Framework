@@ -49,6 +49,12 @@ public protocol MudclientHost: AnyObject {
     func triggerKeyboard(text: String, isPassword: Bool, x: Int, y: Int, width: Int, height: Int,
                          font: FontStyle, isCentred: Bool)
     func playSound(_ pcm: [Int16])
+    /// Open a web page (wiki lookups).
+    func openURL(_ url: String)
+}
+
+public extension MudclientHost {
+    func openURL(_ url: String) {}
 }
 
 public final class Mudclient {
