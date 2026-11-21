@@ -657,6 +657,8 @@ extension Scene {
 		defer { PerfStats.add(.ground, since: t0) }
 		let cxs = Int(r.centerX), cys = Int(r.centerY), w = Int(r.width)
 		let h = tileHeights[level]
+		r.flatTextures = !manyGroundTextures
+		defer { r.flatTextures = false }
 		let x0 = (x << 7) - cameraX, z0 = (z << 7) - cameraZ
 		let x1 = x0 + 128, z1 = z0 + 128
 		let y00 = h[x][z] - cameraY, y10 = h[x + 1][z] - cameraY
@@ -717,6 +719,8 @@ extension Scene {
 	func drawShapedTile(_ r: Rasteriser3D, _ tile: ShapedTile, x tileX: Int, z tileZ: Int, drawPixels: Bool = true) {
 		let t0 = PerfStats.now()
 		defer { PerfStats.add(.ground, since: t0) }
+		r.flatTextures = !manyGroundTextures
+		defer { r.flatTextures = false }
 		let cxs = Int(r.centerX), cys = Int(r.centerY), w = Int(r.width)
 		let n = tile.vertexX.count
 		var sx = [Int](repeating: 0, count: n), sy = sx, vx = sx, vy = sx, vz = sx

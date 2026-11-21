@@ -19,6 +19,8 @@ public enum ClientProt {
 	public static let friendSetrank = 188
 	public static let ignorelistAdd = 34
 	public static let ignorelistDel = 213
+	/// rt4 `Protocol` (`p1isaac(98)`): `Preferences.toInt()` after a setting changed.
+	public static let preferences = 98
 	public static let windowStatus = 243 // assumed
 	public static let transmitvarVerifyid = 177
 	public static let eventMouseMove = 123

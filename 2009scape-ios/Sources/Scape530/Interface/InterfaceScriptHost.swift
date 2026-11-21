@@ -9,6 +9,23 @@ import Foundation
 /// queues: timer first, then release/leave, then the rest), `ClientProt.method4512`
 /// (option clicks), `Protocol` (var/inventory/stat transmit bookkeeping) and
 /// `ScriptRunner` (what each opcode does to a `Component`).
+/// The 11 arguments of cs2 op 5424 (rt4 `LoginManager.anInt1275`, `anInt2910`, `anInt5457`, `anInt5208`, `anInt1736`,
+/// `anInt4073`, `anInt2261`, `anInt3324`, `anInt5556`, `anInt4581`, `anInt5752`).
+public struct MenuStyle: Equatable {
+	public var bodyColour = 0, bodyAlpha = 0
+	public var hoverColour = 0, hoverAlpha = 0
+	/// Sprite groups: top bar (tiled), top corner, bottom bar (tiled), side (tiled), bottom corner.
+	public var topBar = -1, topCorner = -1, bottomBar = -1, side = -1, bottomCorner = -1
+	public var textColour = 0, hoverTextColour = 0
+
+	public init(_ a: [Int]) {
+		func v(_ i: Int) -> Int { i < a.count ? a[i] : 0 }
+		bodyColour = v(0); bodyAlpha = v(1); hoverColour = v(2); hoverAlpha = v(3)
+		topBar = v(4); topCorner = v(5); bottomBar = v(6); side = v(7); bottomCorner = v(8)
+		textColour = v(9); hoverTextColour = v(10)
+	}
+}
+
 public final class InterfaceScriptHost: ScriptHost {
 	public let store: ConfigStore
 	public let renderer: InterfaceRenderer
@@ -81,6 +98,13 @@ public final class InterfaceScriptHost: ScriptHost {
 	public var prefs = ClientPreferences()
 	/// Told after a setting changes so the platform can apply it (volumes to audio, brightness to the rasteriser).
 	public var onPreferenceChange: (ClientPreferences.Change) -> Void = { _ in }
+	/// rt4 `LoginManager.anInt1275...anInt5752` set by op 5424 and cleared by 5425: the styled context menu
+	/// (`MiniMenu.drawB`), with `InterfaceList.aBoolean298` true while set.
+	public var menuStyle: MenuStyle?
+	/// rt4 `ScriptRunner.anInt5794` (op 5426): the cursor sprite used when nothing else asks for one.
+	public var defaultCursor = -1
+	/// rt4 `Preferences.write`: told after any setter op so the platform can persist `prefs.encode()`.
+	public var onPreferencesWritten: () -> Void = {}
 	/// State derived from varps with a `clientCode` (rt4 `VarpDomain.refreshMagicVarp`).
 	public internal(set) var varpClient = VarpClientState()
 	/// Called after a varp with a non-zero `clientCode` changed, with that code and the new value.

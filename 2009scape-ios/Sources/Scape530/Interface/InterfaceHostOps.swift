@@ -57,6 +57,11 @@ extension InterfaceScriptHost {
 		if let result = performQuickChat(op, ints: a, strings: s) { return result }
 		if let result = performWorldMap(op, ints: a, strings: s) { return result } // WorldMap/
 		switch op.name {
+		// MARK: styled context menu (rt4 `ScriptRunner` 5424-5426)
+		case "loginBackgroundSetup": menuStyle = MenuStyle(a.map { Int($0) })
+		case "loginBackgroundClear": menuStyle = nil
+		case "setClientOpt5426": defaultCursor = i(0)
+
 		// MARK: client actions
 		case "chatMessage":
 			game.chatLog.add(type: 0, name: "", message: s.first ?? "")

@@ -56,6 +56,8 @@ public final class Scene {
 	public var centralPlane = 0
 	/// rt4 `Preferences.allLevelsVisible`.
 	public var allLevelsVisible = false
+	/// rt4 `Preferences.manyGroundTextures`: false draws terrain textures as their average colour.
+	public var manyGroundTextures = true
 	/// rt4 `firstVisibleLevel`.
 	public internal(set) var firstVisibleLevel = 99
 	/// rt4 `anInt5276`: lowest level that is drawn.

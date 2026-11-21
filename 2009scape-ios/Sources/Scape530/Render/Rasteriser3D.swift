@@ -48,6 +48,8 @@ public final class Rasteriser3D {
 	/// rt4 `Rasteriser.offsets`: row start index for each viewport row.
 	var offsets = [Int32](repeating: 0, count: 1024)
 	/// rt4 `Rasteriser.textureProvider`.
+	/// rt4 `!Preferences.manyGroundTextures`: textured triangles (terrain tiles) fill with the texture's average colour.
+	public var flatTextures = false
 	public var textureProvider: TextureSource? { didSet { texelCache = [[Int32]?](repeating: nil, count: 2048) } }
 
 	public var centerX: Int32 = 0
@@ -267,7 +269,7 @@ public final class Rasteriser3D {
 		var viewZC = viewZC
 		var textureId = textureId
 		guard let tp = textureProvider else { return }
-		let texelsOpt = cachedTexels(tp, textureId)
+		let texelsOpt = flatTextures ? nil : cachedTexels(tp, textureId)
 		if texelsOpt == nil {
 		let averageColor = Int32(truncatingIfNeeded: tp.averageColor(Int(textureId)))
 		fillGouraudTriangle(yA, yB, yC, xA, xB, xC, multiplyLightness(averageColor, colorA), multiplyLightness(averageColor, colorB), multiplyLightness(averageColor, colorC))

@@ -96,6 +96,7 @@ extension WorldView {
 		overlayCamera = OverlayCamera(x: eye.x, y: eye.y, z: eye.z, pitch: eye.pitch, yaw: eye.yaw, level: level,
 		                              centerX: rect.w / 2, centerY: rect.h / 2)
 		let playerTile = (x: me.xFine >> 7, z: me.zFine >> 7)
+		roofs.mode = roofMode
 		roofs.update(scene: scene, plane: level, playerTile: playerTile, cameraX: eye.x, cameraZ: eye.z, pitch: eye.pitch)
 
 		let tiles = settings.clampedDrawDistance
@@ -104,7 +105,7 @@ extension WorldView {
 		cam.far = Float(tiles * 128) + 768
 
 		let pending = mesh.update(scene: scene, focus: playerTile, timeBudget: fresh ? 0.05 : 0.006, minChunks: fresh ? 12 : 4)
-		let mask = removeRoofs ? roofs.mask : nil
+		let mask = roofMode != .never ? roofs.mask : nil
 		let hideValue = roofs.hideValue
 		let list = mesh.makeDrawList(camera: cam, drawDistanceTiles: tiles, minLevel: scene.minLevel, maxLevel: 3,
 		                             hideFromLevel: level + 1, hidden: mask.map { m in { l, x, z in m[l][x][z] == hideValue } })

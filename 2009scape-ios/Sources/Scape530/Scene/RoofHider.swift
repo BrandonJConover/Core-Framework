@@ -18,9 +18,17 @@ public struct RoofBox {
 /// player's whose stamp equals `hideValue`. Ported from `ScriptRunner.method4302` (per-frame driver),
 /// `ScriptRunner.method4348` (the flood fill) and `SceneGraph.method2251` (wall side codes).
 ///
-/// Not ported: mode 1 ("always remove", only reachable with `allLevelsVisible` off) and the free camera
+/// Mode 1 ("always remove", `Preferences.removeRoofsSelectively` off) floods every roof once. Not ported: the free camera
 /// branch of `method4302`; this client only has rt4's player-following camera (`cameraType == 1`).
-final class RoofHider {
+public final class RoofHider {
+	/// rt4 `ScriptRunner.method4047`: 0 `never`, 1 `always` (every roof above the player's level is hidden,
+	/// rt4 `method2608` with the fixed stamp 1), 2 `selective` (`method4302`).
+	public enum Mode: Int, Sendable { case never = 0, always = 1, selective = 2 }
+	var mode: Mode = .selective {
+		didSet { if mode != oldValue { resetMask(); alwaysKey = nil } }
+	}
+	/// The scene and plane `always` mode last stamped.
+	private var alwaysKey: (scene: ObjectIdentifier, plane: Int)?
 	/// rt4 `ScriptRunner.aByteArrayArrayArray15`: per tile the frame stamp that marked it.
 	private(set) var mask = [[[UInt8]]](repeating: [[UInt8]](repeating: [UInt8](repeating: 0, count: 104), count: 104), count: 4)
 	/// rt4 `ScriptRunner.anInt3325`: draw counter.
@@ -30,12 +38,30 @@ final class RoofHider {
 	private var queue = [(x: Int, z: Int, a: Int, b: Int, c: Int)](repeating: (0, 0, 0, 0, 0), count: 4096)
 
 	/// The stamp `Scene.draw` compares against (rt4 `local387`).
-	var hideValue: UInt8 { UInt8(truncatingIfNeeded: frame) }
+	var hideValue: UInt8 { mode == .always ? 1 : UInt8(truncatingIfNeeded: frame) }
 
 	/// rt4 `ScriptRunner.method960` for mode 2: all tiles start as "stamped four frames ago".
-	init() {
-		let v = UInt8(truncatingIfNeeded: frame - 4)
+	init() { resetMask() }
+
+	/// rt4 `ScriptRunner.method960(value)`: `always` clears to 0, `selective` to "four frames ago".
+	private func resetMask() {
+		let v = mode == .always ? 0 : UInt8(truncatingIfNeeded: frame - 4)
 		for l in 0..<4 { for x in 0..<104 { for z in 0..<104 { mask[l][x][z] = v } } }
+		boxes = [RoofBox(), RoofBox()]
+	}
+
+	/// rt4 `ScriptRunner.method2608`: flood every roof tile on the player's level once (up to 512 regions).
+	private func stampAll(scene: Scene, plane: Int) {
+		resetMask()
+		boxes = []
+		guard plane < 3 else { return }
+		for x in 0..<104 {
+			for z in 0..<104 {
+				boxes.append(RoofBox())
+				if !flood(scene, plane, x, z, region: boxes.count - 1) { boxes.removeLast() }
+				if boxes.count >= 512 { return }
+			}
+		}
 	}
 
 	/// rt4 `SceneGraph.method2251`: the wall side mask for a roof edge shape code (shape 18 or 19/21 plus rotation).
@@ -51,6 +77,20 @@ final class RoofHider {
 	///   - playerTile / cameraFine: scene tile of the player and the camera eye in fine units.
 	///   - pitch: camera pitch (rt4 `Camera.cameraPitch`).
 	func update(scene: Scene, plane: Int, playerTile: (x: Int, z: Int), cameraX: Int, cameraZ: Int, pitch: Int) {
+		switch mode {
+		case .never:
+			boxes = []
+			return
+		case .always:
+			let key = (ObjectIdentifier(scene), plane)
+			if alwaysKey?.scene != key.0 || alwaysKey?.plane != key.1 {
+				stampAll(scene: scene, plane: plane)
+				alwaysKey = key
+			}
+			return
+		case .selective:
+			break
+		}
 		frame += 1
 		let clear = UInt8(truncatingIfNeeded: frame - 4)
 		let row = frame % 104
