@@ -35,8 +35,9 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
       reference tables with matching CRCs, login returns code 2, REBUILD_NORMAL
       decodes (Tutorial Island, 3094,3107), the server's XTEA keys open all 9
       `l*_*` groups, and ~450 packets in 5 s frame cleanly.
-- [ ] Do the same from the Mac/iPhone against a reachable server (the Mac
-      cannot reach the WireGuard address).
+- [x] Do the same from the Mac/iPhone against a reachable server
+      (2026-11-21: the iOS app in the simulator on the MacBook Air loaded the
+      cache over JS5 from 192.168.0.223:43595 and logged in to Tutorial Island).
 - [x] Keepalive / idle packets so the session survives (rt4 `client.mainLoop` outbound cadence).
 - [x] Decode server packets into typed `ServerMessage`s (VARPs, interfaces,
       chat, inventories, stats, RUN_CS2, zone updates) plus PLAYER_INFO/NPC_INFO
@@ -59,11 +60,12 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 - [x] `GameSession` network thread (login, framing, PLAYER/NPC_INFO, keepalive)
       feeding `GameState` on the UI thread; resizable game frame (746) renders
       after login. A test drives the full flow against a live server.
-- [ ] First run on a device via the MacBook Air. **All App-layer code below is written but un-compiled** (no Xcode/iOS SDK where it was written); expect a round of compile fixes on the Mac.
-- [x] Frame upload via Metal (`App/Sources/MetalFramePresenter.swift`: texture ring, aspect-fit quad, nearest/bilinear), game thread (`GameLoop.swift`) off the main thread. Un-compiled.
-- [x] Non-blocking transport on `Network.framework` (`Net/NWTransport.swift` behind `ByteTransport`; `BlockingSocket` stays the Linux/test path), connect timeout and clear "Can't reach host:port (reason)" errors. Library part builds on Linux; NWTransport un-compiled.
-- [x] Lifecycle: display link and audio pause in background, audio interruption/route handling, reconnect (login opcode 18, up to 4 tries) with banner. Un-compiled.
-- [x] Mobile UI: tap = default action, 350 ms long press + haptic opens a big-row options menu (`MobileMenuView.swift`, toggle in the controls sheet), tap-to-drop, two-finger tilt, pinch, trackpad/mouse (right click, hover, scroll zoom), GameController, ProMotion/thermal/low-power frame rate. Un-compiled.
+- [x] First compile and run on the MacBook Air (2026-11-21, Xcode, iOS 26.5 simulator): the App layer below compiled with no errors for simulator and device (signed, team MJAYYU2WWD); JS5 cache download, login, the software renderer and the Metal GPU renderer (toggled live, shaders compile) all work in the simulator. `swift test` on macOS: 320 tests, 0 failures.
+- [ ] Install and play on the iPhone 15 Pro (device build is ready; the install needs the phone unlocked).
+- [x] Frame upload via Metal (`App/Sources/MetalFramePresenter.swift`: texture ring, aspect-fit quad, nearest/bilinear), game thread (`GameLoop.swift`) off the main thread.
+- [x] Non-blocking transport on `Network.framework` (`Net/NWTransport.swift` behind `ByteTransport`; `BlockingSocket` stays the Linux/test path), connect timeout and clear "Can't reach host:port (reason)" errors. Library part builds on Linux.
+- [x] Lifecycle: display link and audio pause in background, audio interruption/route handling, reconnect (login opcode 18, up to 4 tries) with banner.
+- [x] Mobile UI: tap = default action, 350 ms long press + haptic opens a big-row options menu (`MobileMenuView.swift`, toggle in the controls sheet), tap-to-drop, two-finger tilt, pinch, trackpad/mouse (right click, hover, scroll zoom), GameController, ProMotion/thermal/low-power frame rate.
 - [ ] Fixed 765x503 mode (needs the interface layer to support rt4 interface 548), compact native HUD, menu entry swapper, haptics for level-ups/hitsplats, larger-font classic menu.
 
 ## M3: See the world
