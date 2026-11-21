@@ -61,7 +61,21 @@ public final class GameClient {
 	/// Non-zero while a dropped game connection is being re-established (rt4 reconnect login, opcode 18).
 	public private(set) var reconnectAttempt = 0
 	public var maxReconnectAttempts = 4
+	/// Whether the app is in the foreground (rt4 `GameShell.focus`). The shell sets it from the scene phase through
+	/// `setApplicationFocus(_:)`; the change reaches the server as EVENT_APPLET_FOCUS.
+	public private(set) var hasFocus = true
+	private var sentFocus = true
+	private var sentCamera: (pitch: Int, yaw: Int)?
+	private var cameraCooldown = 0
+	private var sentWindow: (w: Int, h: Int)?
 	private var lastRequest: Login.Request?
+	/// rt4 `Protocol.verifyId` of the session that just ended, re-sent by the reconnect login.
+	private var lastVerifyId = 0
+	/// rt4 `Player.worldId`: the world the next login goes to. Survives a logout (the host is rebuilt).
+	public private(set) var currentWorldId: Int32 = 1
+	/// The lobby's world list (CS2 6500-6507), fetched from the game server; see `Net/WorldList.swift`.
+	public let worldList = WorldList()
+	private var worldListSettled = false
 	/// Mobile UI: tapping an inventory item runs its "Drop" option (like shift-drop).
 	public var tapToDrop = false
 	/// Draws the player's tile and the server tick in the top-left corner (developer aid).
@@ -89,12 +103,22 @@ public final class GameClient {
 		loginInterface = try probe.interfaceId(named: "loginscreen") ?? 744
 		host = InterfaceScriptHost(store: store)
 		world = WorldView(store: store)
+		worldList.endpoint = { [weak self] in self.map { ($0.server.host, $0.server.port) } ?? ("127.0.0.1", 43595) }
 		bindHost()
 		openLoginScreen()
 		plugins.attach(self) // Plugins/
+		_ = worldList.fetch() // rt4 loads the world list during start-up (`mainLoadState` 135)
 	}
 
 	private func bindHost() {
+		host.worldId = currentWorldId
+		// rt4 starts with `lastWorldId` 0 and the login screen then asks for a world first; this client has the
+		// world of its server configuration, so the login screen goes straight to the form.
+		if host.prefs.lastWorldId == 0 { host.prefs.lastWorldId = Int(currentWorldId) }
+		host.worldList = worldList
+		worldList.fallbackWorldId = Int(currentWorldId)
+		host.onWorldHop = { [weak self] w in self?.hopWorld(w) ?? false }
+		host.onSkipLoginStage = { [weak self] in self?.session?.skipLoginStage() }
 		host.send = { [weak self] in self?.send($0) }
 		host.onDirectLogin = { [weak self] user, pass in self?.beginLogin(username: user, password: pass) }
 		host.log = { [weak self] in self?.log($0) }
@@ -212,7 +236,13 @@ public final class GameClient {
 	/// The login error the interface is showing, as text.
 	public var status: (title: String, body: String) {
 		let r = Int(host.loginReply)
-		return r > 2 || r == -5 ? ("", r == -5 ? "Error connecting to server." : Login.message(for: r)) : ("", "")
+		switch r {
+		case 21: return ("", Login.message(forHopDelay: Int(host.worldSwitchTimer)))
+		case 29: return ("", Login.message(forDisallow: Int(host.loginDisallowResult)))
+		case 3...: return ("", Login.message(for: r))
+		case -1, -4, -5: return ("", Login.message(for: r))
+		default: return ("", "")
+		}
 	}
 
 	public var state: GameState { host.game }
@@ -306,6 +336,7 @@ public final class GameClient {
 	/// converted to a `Date`), so cycles and interpolation follow the time the frame will be shown.
 	public func frame(width: Int, height: Int, at now: Date) throws -> Raster {
 		lastSize = (width, height)
+		if !worldListSettled { worldListSettled = worldList.fetch() != -1 }
 		host.resize(width: width, height: height)
 		world.publicFilter = host.game.chatFilters.public
 		if let s = session {
@@ -325,7 +356,7 @@ public final class GameClient {
 		world.renderAlpha = lastCycleAt.map { min(max(now.timeIntervalSince($0) / 0.02, 0), 1) } ?? 1
 		for _ in 0..<cycles {
 			host.cycle()
-			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI() }
+			if inGame { world.cycle(varps: host.game.varps); interaction.cycle(); cycleInventoryUI(); housekeepingCycle() }
 		}
 		if inGame { updateAudio(); plugins.update(cycles: cycles) } // Plugins/
 		// GPU mode: the 2D layer is opaque black like software mode; `drawGPU` makes only the viewport transparent
@@ -609,6 +640,9 @@ public final class GameClient {
 		req.windowMode = 2
 		req.canvasWidth = max(lastSize.w, 765)
 		req.canvasHeight = max(lastSize.h, 503)
+		req.worldSelector = host.loginWorldSelector
+		req.antiAliasingMode = host.prefs.antiAliasing
+		lastVerifyId = 0
 		connectError = nil
 		lastRequest = req
 		let s = GameSession(host: server.host, port: server.port, request: req)
@@ -622,6 +656,8 @@ public final class GameClient {
 		guard inGame, var req = lastRequest, reconnectAttempt < maxReconnectAttempts else { return false }
 		reconnectAttempt += 1
 		req.reconnecting = true
+		req.verifyId = lastVerifyId
+		req.resumeAccount = host.game.account
 		req.canvasWidth = max(lastSize.w, 765)
 		req.canvasHeight = max(lastSize.h, 503)
 		let s = GameSession(host: server.host, port: server.port, request: req)
@@ -649,7 +685,9 @@ public final class GameClient {
 		session = nil
 		inGame = false
 		let (u, p) = (username, password)
+		let kept = host.prefs
 		host = InterfaceScriptHost(store: store)
+		host.prefs = kept // rt4 `Preferences` outlive the session
 		world = WorldView(store: store)
 		keyboardRequested = false
 		viewport = nil
@@ -779,15 +817,19 @@ public final class GameClient {
 		default: break
 		}
 		switch e {
+		case .loginQueued:
+			host.loginReply = 1
 		case .loggedIn:
 			host.apply(e)
 			host.loginReply = 2
 			inGame = true
+			beginHousekeeping()
 			plugins.loggedIn() // Plugins/
 			reconnectAttempt = 0
 			log("logged in to \(server.host):\(server.port)")
 			onLoggedIn(username, password)
 		case .loginFailed(let reply):
+			if let v = session?.verifyId { lastVerifyId = v }
 			session = nil
 			if inGame {
 				if !reconnect() { connectionLost("Could not rejoin the game.") }
@@ -795,11 +837,14 @@ public final class GameClient {
 			}
 			switch reply {
 			case .failure(let code): host.loginReply = Int32(code)
-			case .hopDelay: host.loginReply = 21
+			case .hopDelay(let ticks): host.loginReply = 21; host.worldSwitchTimer = Int32(ticks)
 			case .disallowed(let r): host.loginReply = 29; host.loginDisallowResult = Int32(r)
-			case .retry, .success: host.loginReply = -5
+			// rt4: a login held at reply 1 that never resumed times out (-5); a refused reconnect is an unknown reply.
+			case .retry: host.loginReply = -5
+			case .success, .reconnected: host.loginReply = 15
 			}
 		case .disconnected(let reason):
+			if let v = session?.verifyId { lastVerifyId = v }
 			session = nil
 			if inGame {
 				log("disconnected: \(reason ?? "closed")")
@@ -807,7 +852,8 @@ public final class GameClient {
 				if reason != nil, !host.game.loggedOut, reconnect() { return }
 				connectionLost(reason)
 			} else {
-				host.loginReply = -5
+				// rt4 `LoginManager.loop`: an IOException that survives the retry is reply -4 ("Error connecting to server").
+				host.loginReply = -4
 				connectError = reason
 			}
 		case .decodeFailed(let op, let err):
@@ -879,5 +925,68 @@ extension GameClient {
 		      x >= d.x, y >= d.y, x < d.x + d.w, y < d.y + d.h else { return false }
 		ui.worldMap.centre(overviewX: x - d.x, y: y - d.y, w: d.w, h: d.h)
 		return true
+	}
+}
+
+// MARK: world hop (rt4 `WorldList.hopWorld`)
+
+extension GameClient {
+	/// CS2 6503 `setWorldHost`: aim the next login at `w`. rt4 (`modeWhere != 0`) sets the host to the world's
+	/// hostname and the port to `worldId + 43594`; here the player then logs in as usual (a hop from inside the game
+	/// is a logout first, as in rt4, where the op only works on the login screen). A list that names a loopback
+	/// address for itself keeps the host we already use, and the world we are already on keeps its port.
+	func hopWorld(_ w: WorldEntry) -> Bool {
+		guard !inGame, session == nil else { return false }
+		let loopback: Set<String> = ["", "127.0.0.1", "localhost", "::1"]
+		let hostname = loopback.contains(w.hostname) ? server.host : w.hostname
+		let port = w.id == Int(currentWorldId) ? server.port : 43594 + w.id
+		server = Server(host: hostname, port: port)
+		currentWorldId = Int32(w.id)
+		host.worldId = currentWorldId
+		worldList.fallbackWorldId = w.id
+		return true
+	}
+}
+
+// MARK: housekeeping packets (rt4 `Protocol` outbound flush, `ClientProt.sendWindowDetails`)
+
+extension GameClient {
+	/// The app moved to the foreground (true) or background (false). rt4 sends EVENT_APPLET_FOCUS when its window's
+	/// focus changes; on a touch device this is the app becoming active / inactive.
+	public func setApplicationFocus(_ focused: Bool) { hasFocus = focused }
+
+	/// Canvas size and mode as the login packet reports them (resizable window, never below 765x503).
+	private var reportedCanvas: (w: Int, h: Int) { (max(lastSize.w, 765), max(lastSize.h, 503)) }
+
+	/// rt4 `LoginManager` after a login: `Protocol.prevFocus = true`, the camera flag set, then `sendWindowDetails`.
+	func beginHousekeeping() {
+		sentFocus = true
+		sentCamera = nil
+		cameraCooldown = 0
+		sendWindowStatus()
+	}
+
+	/// rt4 `ClientProt.sendWindowDetails`: WINDOW_STATUS with the window mode, canvas size and anti-aliasing mode.
+	private func sendWindowStatus() {
+		let c = reportedCanvas
+		sentWindow = c
+		send(.windowStatus(mode: 2, width: c.w, height: c.h, antiAliasing: host.prefs.antiAliasing))
+	}
+
+	/// One client cycle of the checks rt4 makes before each flush: a changed canvas (`DisplayMode`), the camera
+	/// (EVENT_CAMERA_POSITION, at most once per 20 cycles) and the focus.
+	func housekeepingCycle() {
+		if let w = sentWindow, w != reportedCanvas { sendWindowStatus() }
+		if cameraCooldown > 0 { cameraCooldown -= 1 }
+		let cam = (pitch: Int(world.camera.pitchTarget), yaw: Int(world.camera.yawTarget) & 0x7FF)
+		if cameraCooldown <= 0, sentCamera.map({ $0 != cam }) ?? true {
+			cameraCooldown = 20
+			sentCamera = cam
+			send(.cameraPosition(pitch: cam.pitch, yaw: cam.yaw))
+		}
+		if hasFocus != sentFocus {
+			sentFocus = hasFocus
+			send(.appletFocus(hasFocus))
+		}
 	}
 }

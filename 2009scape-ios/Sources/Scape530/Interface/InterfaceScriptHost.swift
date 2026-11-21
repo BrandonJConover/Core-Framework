@@ -47,6 +47,16 @@ public final class InterfaceScriptHost: ScriptHost {
 	public var loginDisallowResult: Int32 = -1
 	/// rt4 `Player.worldId` shown on the login screen.
 	public var worldId: Int32 = 1
+	/// rt4 `LoginManager.hopTime` (reply 21): the ticks (20 ms) left before the profile has moved worlds.
+	public var worldSwitchTimer: Int32 = 0
+	/// The int `directlogin` (CS2 5600) passes: rt4 `LoginManager.anInt39`, the world-selector byte of the login packet.
+	public var loginWorldSelector = -1
+	/// The lobby's world list (CS2 6500-6507). The client owns it so it outlives a logout.
+	public var worldList = WorldList()
+	/// CS2 6503 `setWorldHost`: select `world` for the next login; true when the client accepted it.
+	public var onWorldHop: (WorldEntry) -> Bool = { _ in false }
+	/// CS2 5601 `skipLoginStage10`.
+	public var onSkipLoginStage: () -> Void = {}
 
 	// MARK: client settings
 

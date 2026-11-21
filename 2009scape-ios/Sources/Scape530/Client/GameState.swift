@@ -54,7 +54,7 @@ public struct GameState {
 		case .players(_, let p): players = p; ticks += 1
 		case .npcs(_, let n): npcs = n
 		case .message(let m): apply(m)
-		case .decodeFailed, .disconnected, .loginFailed: break
+		case .decodeFailed, .disconnected, .loginFailed, .loginQueued: break
 		}
 	}
 

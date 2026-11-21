@@ -15,6 +15,8 @@ public final class GameSession {
 		/// The server refused the login (reply code, hop delay, ...).
 		case loginFailed(Login.Reply)
 		case disconnected(String?)
+		/// Login reply 1: the server holds the login (rt4 `LoginManager` step 5) until `skipLoginStage()`.
+		case loginQueued
 	}
 
 	public let host: String
@@ -27,11 +29,21 @@ public final class GameSession {
 	private var thread: Thread?
 	/// Seconds to wait before connecting (reconnect back-off).
 	public var startDelay: TimeInterval = 0
+	private var skipRequested = false
+	private var verifyIdValue: Int
+	/// rt4 `Protocol.verifyId` as of the last packet the network thread decoded; a reconnect login sends it again.
+	public var verifyId: Int { lock.lock(); defer { lock.unlock() }; return verifyIdValue }
 
 	public init(host: String, port: Int, request: Login.Request) {
 		self.host = host
 		self.port = port
 		self.request = request
+		self.verifyIdValue = request.verifyId
+	}
+
+	/// CS2 5601 `skipLoginStage10`: release a login held at reply 1.
+	public func skipLoginStage() {
+		lock.lock(); skipRequested = true; lock.unlock()
 	}
 
 	public func start() {
@@ -67,7 +79,19 @@ public final class GameSession {
 		if cancelled { post(.disconnected(nil)); return }
 		let session: GameConnection.Session
 		do {
-			session = try GameConnection.login(host: host, port: port, request: request)
+			var hooks = GameConnection.Hooks()
+			hooks.queued = { [weak self] in self?.post(.loginQueued) }
+			hooks.proceed = { [weak self] in
+				guard let self else { return true }
+				self.lock.lock(); defer { self.lock.unlock() }
+				return self.skipRequested
+			}
+			hooks.cancelled = { [weak self] in
+				guard let self else { return true }
+				self.lock.lock(); defer { self.lock.unlock() }
+				return self.stopping
+			}
+			session = try GameConnection.login(host: host, port: port, request: request, hooks: hooks)
 		} catch let failure as GameConnection.Failure {
 			post(.loginFailed(failure.reply))
 			return
@@ -78,13 +102,13 @@ public final class GameSession {
 		post(.loggedIn(session.account))
 		var framer = GamePacketFramer(cipher: session.inCipher)
 		var out = session.outCipher
-		var pipeline = Pipeline(selfId: session.account.selfId)
+		var pipeline = Pipeline(selfId: session.account.selfId, verifyId: request.verifyId)
 
 		func handle(_ pkt: GamePacket) {
 			for e in pipeline.handle(pkt) { post(e) }
 		}
 
-		handle(GamePacket(opcode: session.account.firstOpcode, payload: session.firstPacket))
+		if !session.resumed { handle(GamePacket(opcode: session.account.firstOpcode, payload: session.firstPacket)) }
 		session.socket.setReadTimeout(milliseconds: 50)
 		var lastSend = Date()
 		while true {
@@ -96,6 +120,11 @@ public final class GameSession {
 			if stop { break }
 			do {
 				for m in pending { try session.socket.write(m.encode(&out)); lastSend = Date() }
+				// rt4 `Protocol` flush: TRANSMITVAR_VERIFYID follows the other packets when `setVerifyId` ran since.
+				if let v = pipeline.takeVerifyId() {
+					lock.lock(); verifyIdValue = v; lock.unlock()
+					try session.socket.write(ClientMessage.verifyId(v).encode(&out)); lastSend = Date()
+				}
 				// rt4 sends NO_TIMEOUT when nothing else went out for ~1 s.
 				if Date().timeIntervalSince(lastSend) >= 1 {
 					try session.socket.write(ClientMessage.keepAlive.encode(&out))
@@ -129,10 +158,27 @@ public final class GameSession {
 		public private(set) var npcs = NpcInfoDecoder()
 		private var zone: (x: Int, z: Int)?
 		private let selfId: Int
+		/// rt4 `Protocol.verifyId`: the last tracknum + 1 (16 bits), re-sent to the server through `takeVerifyId`.
+		public private(set) var verifyId: Int
+		private var verifyIdChanged = false
 
-		public init(selfId: Int) {
+		public init(selfId: Int, verifyId: Int = 0) {
 			self.selfId = selfId
+			self.verifyId = verifyId
 			players = PlayerInfoDecoder(selfIndex: selfId, localX: 52, localZ: 52)
+		}
+
+		/// rt4 `Protocol.setVerifyId`.
+		mutating func setVerifyId(_ tracknum: Int) {
+			verifyId = (tracknum + 1) & 0xFFFF
+			verifyIdChanged = true
+		}
+
+		/// The verify id to transmit when it changed since the last call (rt4 `verifyIdChanged` / `transmitVerifyId`).
+		public mutating func takeVerifyId() -> Int? {
+			guard verifyIdChanged else { return nil }
+			verifyIdChanged = false
+			return verifyId
 		}
 
 		/// Decodes one packet into the events the UI thread should see.
@@ -147,7 +193,8 @@ public final class GameSession {
 					let r = try npcs.decode(pkt.payload, selfX: me.x, selfZ: me.z)
 					return [.npcs(r, npcs)]
 				default:
-					let m = try ServerMessage.decode(pkt)
+					let (m, track) = try ServerMessage.decodeTracked(pkt)
+					if let t = track { setVerifyId(t) }
 					switch m {
 					case .rebuildNormal(let r), .rebuildRegion(let r):
 						if let z = zone {

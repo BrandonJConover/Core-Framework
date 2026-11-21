@@ -26,7 +26,10 @@ public enum Login {
 		public var settings = ""
 		public var affiliate: Int32 = 0
 		public var preferences: Int32 = 0
+		/// rt4 `Protocol.verifyId`: the last verify id (`setVerifyId`), re-sent on a reconnect so the server keeps counting.
 		public var verifyId = 0
+		/// The account block of the session being resumed, used when a reconnect is answered with code 15.
+		public var resumeAccount: Success?
 		/// CRCs of archives 0...27 from the master index (rt4 sends 28, plus a fake 0 for idx28).
 		public var archiveChecksums = [Int32](repeating: 0, count: 28)
 		public var rsa = RsaKey.scape2009
@@ -89,6 +92,8 @@ public enum Login {
 		case disallowed(Int)
 		/// Code 1: retry (server loading); rt4 sends opcode 17 and waits again.
 		case retry
+		/// Code 15 on a reconnect login (opcode 18): the server resumed the old session, no account block follows.
+		case reconnected
 		case failure(Int)
 	}
 
@@ -108,29 +113,67 @@ public enum Login {
 		public var firstLength: Int
 	}
 
-	/// Human readable text for a reply code (rt4 login screen strings, abridged).
+	/// The text the cache's login screen script (clientscript 711, which rev 530 uses in place of any
+	/// `LocalizedText` entry) shows for a `LoginManager.reply` code, with its link markup reduced to the
+	/// plain words. Negative codes are the client's own states: -2 idle, -3 connecting is not an error,
+	/// -4 / -5 / -1 are the connect failures `LoginManager.loop` raises. Code 21 is `message(forHopDelay:)`
+	/// and code 29 is `message(forDisallow:)`; unknown codes read as the script's default branch.
 	public static func message(for code: Int) -> String {
 		switch code {
-		case 3: return "Invalid username or password."
-		case 4: return "Your account has been disabled."
-		case 5: return "Your account is already logged in."
-		case 6: return "The game has been updated. Please reload."
-		case 7: return "This world is full."
+		case -2: return "Enter your username and password."
+		case -5: return "Connection timed out. Please try using a different world."
+		case -4: return "Error connecting to server."
+		case -1: return "No response from server. Please try using a different world."
+		case 3: return "Invalid username or password. If you have forgotten your password, click here."
+		case 4: return "Your account has been disabled. Please click here to check your Message Centre for details."
+		case 5: return "Your account has not logged out from its last session. Try again in a few minutes."
+		case 6: return "RuneScape has been updated! Please reload this page."
+		case 7: return "This world is full. Please use a different world."
 		case 8: return "Unable to connect: login server offline."
 		case 9: return "Login limit exceeded: too many connections from your address."
-		case 10: return "Unable to connect: bad session id."
-		case 12: return "You need a members account to log in to this world."
-		case 13: return "Could not complete login. Please try again."
-		case 14: return "The server is being updated. Please wait."
-		case 16: return "Too many login attempts. Please wait a few minutes."
-		case 17: return "You are standing in a members-only area."
-		case 18: return "Account locked as we suspect it has been stolen."
-		case 20: return "Invalid loginserver requested."
-		case 22: return "Malformed login packet."
-		case 23: return "No reply from loginserver."
-		case 24: return "Error loading your profile."
-		case 26: return "This computer's address has been blocked."
-		default: return "Unexpected server response (\(code))."
+		case 10: return "Unable to connect: bad session ID."
+		case 11: return "Your password is an extremely common choice, and is very weak. You must change it before you can login. Click here"
+		case 12: return "You need a members' account to log in to this world. Please subscribe or use a different world. "
+		case 13: return "Could not complete login. Please try using a different world."
+		case 14: return "The server is being updated. Please wait a few minutes and try again."
+		case 16: return "Too many incorrect logins from your address. Please wait 5 minutes before trying again."
+		case 17: return "You are standing in a members-only area. To play on this world, move to a free area first."
+		case 18: return "Your account has been locked as we suspect it has been stolen. Click here to recover your account."
+		case 19: return "Fullscreen is currently a members-only feature. To log in, either return to the main menu and exit fullscreen or use a members' account."
+		case 20: return "Invalid loginserver requested. Please try using a different world."
+		case 22: return "Malformed login packet. Please try again."
+		case 23: return "No reply from login server. Please wait a minute and try again."
+		case 24: return "Error loading your profile. Please contact Customer Support."
+		case 25: return "Unexpected loginserver response. Please try using a different world."
+		case 26: return "This computer's address has been blocked as it was used to break our rules."
+		case 27: return "Service unavailable."
+		case 30: return "This is not a member's account; please choose the 'Free Users' option from the website to play on this account."
+		default: return "Unexpected server response. Please try using a different world."
+		}
+	}
+
+	/// Reply 21 (`LoginManager.hopTime` = `(byte + 3) * 60` ticks of 20 ms): the script divides by 50 for seconds.
+	public static func message(forHopDelay ticks: Int) -> String {
+		"You have only just left another world. Your profile will be transferred in \(ticks / 50) seconds."
+	}
+
+	/// Reply 29 with its detail byte (`LoginManager.disallowResult`, clientscript 1894).
+	public static func message(forDisallow reason: Int) -> String {
+		switch reason {
+		case 0: return "You must have a Combat Level of at least 20 (without Summoning) to enter a PvP world."
+		case 1: return "You are currently carrying lent items and cannot enter a PvP world."
+		default: return "Unexpected server response. Please try using a different world."
+		}
+	}
+
+	/// The line for a whole reply as `GameConnection` reports it.
+	public static func message(for reply: Reply) -> String {
+		switch reply {
+		case .success, .reconnected: return ""
+		case .hopDelay(let t): return message(forHopDelay: t)
+		case .disallowed(let r): return message(forDisallow: r)
+		case .retry: return "Please wait while your login is processed."
+		case .failure(let c): return message(for: c)
 		}
 	}
 

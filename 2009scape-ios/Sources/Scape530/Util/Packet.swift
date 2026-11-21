@@ -17,6 +17,8 @@ public struct PacketUnderflow: Error, CustomStringConvertible {
 public struct Packet {
 	public var data: [UInt8]
 	public var offset: Int
+	/// rt4 "tracknum": set by `ServerMessage` decoders for packets that carry the verify-id sequence number.
+	public var track: Int?
 
 	public init(_ data: [UInt8], offset: Int = 0) {
 		self.data = data

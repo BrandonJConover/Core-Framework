@@ -30,6 +30,12 @@ public struct ClientPreferences: Equatable {
 	/// 0...2 (rt4 `Preferences.setParticles`)
 	public var particles = 2
 	public var cursorsEnabled = true
+	/// rt4 `Preferences.favoriteWorlds` (CS2 5308 / 5309): 0...2.
+	public var favouriteWorlds = 0
+	/// rt4 `Preferences.lastWorldId` (CS2 6504 / 6505).
+	public var lastWorldId = 0
+	/// rt4 `Preferences.aBoolean63` (CS2 6600 / 6601).
+	public var pref6600 = false
 
 	public init() {}
 

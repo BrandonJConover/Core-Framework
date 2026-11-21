@@ -125,6 +125,8 @@ final class AppModel: ObservableObject {
 	/// Backgrounding pauses audio (rendering pauses in the game view); coming back resumes it. A connection
 	/// that died meanwhile is noticed by the session thread and rejoined by the client's reconnect logic.
 	func scenePhaseChanged(_ phase: ScenePhase) {
+		// rt4 EVENT_APPLET_FOCUS: the server learns when the app loses or regains focus.
+		if case .ready(let client) = self.phase { client.setApplicationFocus(phase == .active) }
 		switch phase {
 		case .background: audioOutput?.pause()
 		case .active: audioOutput?.resume()
