@@ -425,4 +425,21 @@ final class ClientGapsTests: XCTestCase {
 		let w = WorldView(store: ConfigStore(source: { _, _ in nil }))
 		XCTAssertTrue(w.oneActorPerTile)
 	}
+
+	/// rt4 clientCode 328 (character design body preview): the local player's full model, pitched 150 and swinging.
+	func testClientCode328ShowsTheLocalPlayer() {
+		let ui = InterfaceRenderer(store: ConfigStore(source: { _, _ in nil }))
+		var c = Component(parentId: 771 << 16 | 339, type: 6, index: -1)
+		c.clientCode = 328
+		ui.drawn = [(component: c, x: 0, y: 0, w: 65, h: 179)]
+		var state = InterfaceState()
+		ui.advanceModelAnimations(&state)
+		let m = state.overrides[c.id]
+		XCTAssertEqual(m?.modelType, 5)
+		XCTAssertEqual(m?.modelId, 2047)
+		XCTAssertEqual(m?.modelXAngle, 150)
+		XCTAssertEqual(m?.modelSeqId, -1)
+		for _ in 0..<20 { ui.advanceModelAnimations(&state) }
+		XCTAssertEqual(state.overrides[c.id]?.modelYAngle, Int(sin(21.0 / 40) * 256) & 0x7FF)
+	}
 }

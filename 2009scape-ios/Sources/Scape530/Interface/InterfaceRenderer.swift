@@ -1,3 +1,5 @@
+import Foundation
+
 /// Live interface state the server changes with IF_* packets (and, later,
 /// CS2 scripts): which sub-interfaces are open where, and per-component
 /// overrides. The renderer reads it every frame.
@@ -35,6 +37,8 @@ public struct InterfaceState {
 	public var inventoryUI = InventoryUI()
 	/// The if3 component being dragged, once the pointer left its dead zone (rt4 `Cs1ScriptRunner.aBoolean172`).
 	public var componentDrag: ComponentDrag?
+	/// Client cycles counted by `advanceModelAnimations` (rt4 `client.loop`), for the turning player models.
+	public var clientLoop = 0
 
 	public init() {}
 
@@ -340,9 +344,27 @@ public final class InterfaceRenderer {
 
 	/// rt4 `InterfaceList` per-cycle animation step for type-6 components with a sequence: `cycles` client cycles
 	/// elapse, frames advance by the sequence's delays, wrapping with `replayOffset`.
+	/// rt4 clientCode 327 (character design) and 328 (own player, e.g. the equipment screen): the local player's
+	/// full model in its standing pose, pitched 150 and swinging its yaw by `sin(loop / 40) * 256`.
+	func turnPlayerModel(_ c: Component, _ state: inout InterfaceState) {
+		var m = state.overrides[c.id] ?? c
+		m.modelXAngle = 150
+		m.modelYAngle = Int(Foundation.sin(Double(state.clientLoop) / 40) * 256) & 0x7FF
+		m.modelType = 5
+		m.modelId = 2047
+		let idle = models.selfLook().flatMap { look in look.basId == -1 ? nil : (try? store.bas(look.basId))??.idle } ?? -1
+		if m.modelSeqId != idle {
+			m.modelSeqId = idle
+			state.modelAnim[c.ref] = nil
+		}
+		state.overrides[c.id] = m
+	}
+
 	public func advanceModelAnimations(_ state: inout InterfaceState, cycles: Int = 1) {
+		state.clientLoop += cycles
 		for d in drawn where d.component.type == 6 {
 			let c = d.component
+			if c.clientCode == 327 || c.clientCode == 328, c.childIndex == -1 { turnPlayerModel(c, &state) }
 			// rt4 turns if1 models by `modelRotationSpeed` (pitch step in the high half, yaw step in the low half) per cycle.
 			if c.modelRotationSpeed != 0 && !c.if3 {
 				// `drawn` is the last frame's snapshot; the angles accumulate on the live copy between frames.
