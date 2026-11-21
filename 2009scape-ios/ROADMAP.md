@@ -66,12 +66,13 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 - [x] Non-blocking transport on `Network.framework` (`Net/NWTransport.swift` behind `ByteTransport`; `BlockingSocket` stays the Linux/test path), connect timeout and clear "Can't reach host:port (reason)" errors. Library part builds on Linux.
 - [x] Lifecycle: display link and audio pause in background, audio interruption/route handling, reconnect (login opcode 18, up to 4 tries) with banner.
 - [x] Mobile UI: tap = default action, 350 ms long press + haptic opens a big-row options menu (`MobileMenuView.swift`, toggle in the controls sheet), tap-to-drop, two-finger tilt, pinch, trackpad/mouse (right click, hover, scroll zoom), GameController, ProMotion/thermal/low-power frame rate.
-- [ ] Fixed 765x503 mode (needs the interface layer to support rt4 interface 548), compact native HUD, menu entry swapper, haptics for level-ups/hitsplats, larger-font classic menu.
+- [x] Menu entry swapper (plugin).
+- [ ] Fixed 765x503 mode (needs the interface layer to support rt4 interface 548), compact native HUD, haptics for level-ups/hitsplats, larger-font classic menu.
 
 ## M3: See the world
 
 - [x] Config decoders: ObjType, NpcType, LocType, SeqType, SpotAnimType, VarbitType, EnumType, FloType, FluType, IdkType, BasType. Every entry in the cache decodes (about 88,000).
-- [ ] Remaining small configs: ParamType, StructType, InvType, VarpType, LightType.
+- [x] Remaining small configs: ParamType, StructType, InvType, VarpType, LightType.
 - [x] Map squares from archive 5: `m{x}_{z}` terrain and `l{x}_{z}` locations (XTEA keys from REBUILD_NORMAL).
 - [x] Terrain (rt4 SceneGraph port: blending, PlainTile/ShapedTile, occluders) and loc placement (`Scene/`).
 - [x] `RawModel` decoder (all 45,472 models) and lighting; textures (all 680) via `TextureStore`.
@@ -84,7 +85,7 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 - [x] Animation: frame bases + framesets, SeqType playback with tweening, BAS idle/walk/run/turn.
 - [x] Tap-to-walk: CollisionMap + PathFinder + MOVE_GAMECLICK/MINIMAPCLICK; minimap with walls, icons, dots, compass, flag.
 - [x] Zone updates: LOC_ADD/DEL, OBJ_ADD/DEL/COUNT/REVEAL, SOUND_AREA.
-- [ ] Projectiles, forced movement, layered (action + movement) animations (in progress).
+- [x] Projectiles, forced movement, layered (action + movement) animations.
 
 ## M5: Interfaces
 
@@ -92,13 +93,13 @@ Pure Swift package `Scape530`, tested on Linux in Docker and on macOS.
 - [x] Interface components (archive 3, if1 + if3, all 31,622 decode) with rt4 layout and drawing for layers, rectangles, text, sprites and lines.
 - [x] CS2 interpreter (all 2,063 scripts decode) and `InterfaceScriptHost`: hooks, transmits, timers; the login screen and HUD run on the game's own scripts.
 - [x] Inventory/item icons (type 2 and IF_SETOBJECT, noted/lent), ground item piles, IF_BUTTON packets.
-- [ ] Model components (type 6) including NPC/player chat heads; use-item-on and spell targeting; inventory drag (in progress).
+- [x] Model components (type 6) including NPC/player chat heads; use-item-on and spell targeting; inventory drag.
 - [x] Right-click menus mapped to long-press (picking, MiniMenu, OPNPC/OPLOC/OPOBJ/OPPLAYER); public/private chat with Huffman, overhead text, hitsplats, health bars.
 
 ## M6: Polish
 
 - [x] Sound effects (synth archive 4, Vorbis archive 14) and MIDI music (archive 6 + instruments 15) through AVAudioEngine.
-- [ ] Resizable layout for iPhone vs iPad, safe areas, controller support.
+- [x] Resizable layout for iPhone vs iPad, safe areas, controller support (verify on devices).
 - [ ] TestFlight build via the MacBook Air.
 
 ## M7: Offline play (server on device)
