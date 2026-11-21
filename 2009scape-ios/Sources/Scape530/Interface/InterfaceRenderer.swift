@@ -107,6 +107,10 @@ public final class InterfaceRenderer {
 	public internal(set) var origins: [ComponentRef: (x: Int, y: Int)] = [:]
 	/// The dragged component's drawing, run after everything else (rt4 draws it in a last pass).
 	var deferredDrag: [(inout Raster) throws -> Void] = []
+	/// Sprites drawn fully opaque even though their alpha plane is translucent. The phone shell puts the resizable
+	/// side panel background (sprite 1131, 60% opaque in rt4) here so the world does not show through the tabs.
+	public var opaqueSprites: Set<Int> = []
+	private var opaqueFrames: [Int: SpriteFrame] = [:]
 	/// Drawn in place of a type-6 model or a 3D viewport component, if set.
 	public var drawModel: ((Component, Int, Int, Int, Int, inout Raster) -> Void)?
 	/// Item icons for inventory components and if3 sprites with an item set.
@@ -226,10 +230,13 @@ public final class InterfaceRenderer {
 	func paint(_ comps: [Component?], _ c: Component, interface: Int, isStatic: Bool, x: Int, y: Int, w: Int, h: Int, clip: (Int, Int, Int, Int), state: InterfaceState, into r: inout Raster) throws {
 		let saved = (r.clipLeft, r.clipTop, r.clipRight, r.clipBottom)
 		defer { r.setClip(saved.0, saved.1, saved.2, saved.3) }
-		let extra = c.type == 9 ? 1 : 0
-		r.setClip(max(clip.0, x), max(clip.1, y), min(clip.2, x + w + extra), min(clip.3, y + h + extra))
+		// rt4 `Cs1ScriptRunner.renderComponent` draws a component clipped only to its parent's rectangle (text,
+		// sprites and models may overhang their own box, e.g. centred dialogue lines and chat heads); only a layer's
+		// children are clipped to the layer.
+		r.setClip(clip.0, clip.1, clip.2, clip.3)
 		try draw(c, x: x, y: y, w: w, h: h, state: state, into: &r)
 		if c.type == 0 {
+			r.setClip(max(clip.0, x), max(clip.1, y), min(clip.2, x + w), min(clip.3, y + h))
 			let sy = (c.childIndex == -1 ? state.scroll[c.id] : nil) ?? c.scrollY
 			try renderLayer(comps, interface: interface, parent: c.id, ox: x - c.scrollX, oy: y - sy, pw: w, ph: h, state: state, into: &r)
 			if c.childIndex == -1, let sub = state.open[c.id] {
@@ -265,7 +272,14 @@ public final class InterfaceRenderer {
 			}
 		case 5:
 			let id = (isStatic ? state.sprite[c.id] : nil) ?? c.spriteId
-			guard id != -1, let sheet = try store.sprite(id), let f = sheet.frames.first else { return }
+			guard id != -1, let sheet = try store.sprite(id), var f = sheet.frames.first else { return }
+			if opaqueSprites.contains(id), f.alpha != nil {
+				if let o = opaqueFrames[id] { f = o } else {
+					f = SpriteFrame(width: f.width, height: f.height, xOffset: f.xOffset, yOffset: f.yOffset, innerWidth: f.innerWidth,
+					                innerHeight: f.innerHeight, indices: f.indices, alpha: nil, palette: f.palette)
+					opaqueFrames[id] = f
+				}
+			}
 			if !c.if3 {
 				r.draw(f, x: x, y: y)
 			} else if c.spriteTiling {

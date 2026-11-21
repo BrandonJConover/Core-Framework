@@ -187,7 +187,9 @@ public final class InterfaceScriptHost: ScriptHost {
 			// IF_SETCOLOUR carries RGB555.
 			let r = (col >> 10 & 0x1F) << 3, g = (col >> 5 & 0x1F) << 3, b = (col & 0x1F) << 3
 			mutate(ComponentRef(id: Int(c))) { $0.color = Int32(r << 16 | g << 8 | b) }
-		case .ifSetPosition(let c, let x, let y): mutate(ComponentRef(id: Int(c))) { $0.baseX = x; $0.baseY = y }
+		case .ifSetPosition(let c, let x, let y):
+			// rt4 `Protocol` delayed change 11: an absolute position (both layout modes reset to 0).
+			mutate(ComponentRef(id: Int(c))) { $0.baseX = x; $0.baseY = y; $0.horizontalMode = 0; $0.verticalMode = 0 }
 		case .ifSetScrollPos(let c, let pos): mutate(ComponentRef(id: Int(c))) { $0.scrollY = max(pos, 0) }
 		case let .ifSetEvents(c, start, end, mask):
 			// rt4 SET_INTERFACE_SETTINGS: one entry per index in start...end; index -1 is the component itself.

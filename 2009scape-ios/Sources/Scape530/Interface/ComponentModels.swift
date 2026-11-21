@@ -203,21 +203,26 @@ public final class ComponentModels {
 	/// centre shifted by its aspect-scaled offsets, places the model with the component's rotation and zoom
 	/// (orthographically for `modelOrtho` in if3), and blits what was drawn onto `raster`.
 	public func draw(_ c: Component, anim: ModelAnim, x: Int, y: Int, w: Int, h: Int, into target: inout Raster) {
-		guard w > 0, h > 0, w <= 2048, h <= 2048 else { return }
+		guard w > 0, h > 0 else { return }
+		// rt4 renders the model into the whole screen clipped to the parent's rectangle, centred on the component
+		// (a chat head overhangs its box). Render into a buffer covering the current clip instead of the box.
+		let rx = target.clipLeft, ry = target.clipTop
+		let rw = target.clipRight - rx, rh = target.clipBottom - ry
+		guard rw > 0, rh > 0, rw <= 4096, rh <= 4096 else { return }
 		guard let model = try? model(for: c, anim: anim) else { return }
 		let xScale = c.aspectWidth > 0 ? (w << 8) / c.aspectWidth : 256
 		let yScale = c.aspectHeight > 0 ? (h << 8) / c.aspectHeight : 256
-		let r = raster(width: w, height: h)
-		r.setClip(0, 0, w, h)
+		let r = raster(width: rw, height: rh)
+		r.setClip(0, 0, rw, rh)
 		r.prepare()
-		// rt4 `Rasteriser.setBounds(centerX, centerY)` in component-local pixels.
-		r.centerX = Int32(w / 2 + ((xScale * c.screenShiftX) >> 8))
-		r.centerY = Int32(h / 2 + ((yScale * c.screenShiftY) >> 8))
+		// rt4 `Rasteriser.setBounds(centerX, centerY)`, here relative to the buffer's origin (rx, ry).
+		r.centerX = Int32(x - rx + w / 2 + ((xScale * c.screenShiftX) >> 8))
+		r.centerY = Int32(y - ry + h / 2 + ((yScale * c.screenShiftY) >> 8))
 		r.screenLowerX = -r.centerX
-		r.screenUpperX = Int32(w) - r.centerX
+		r.screenUpperX = Int32(rw) - r.centerX
 		r.screenLowerY = -r.centerY
-		r.screenUpperY = Int32(h) - r.centerY
-		for row in 0..<h { (r.px + row * Int(r.stride)).update(repeating: 0, count: w) }
+		r.screenUpperY = Int32(rh) - r.centerY
+		for row in 0..<rh { (r.px + row * Int(r.stride)).update(repeating: 0, count: rw) }
 
 		model.ensureBounds()
 		let memory = c.objId != -1 ? -model.minY / 2 : 0
@@ -232,11 +237,10 @@ public final class ComponentModels {
 		}
 
 		let stride = Int(r.stride)
-		let y0 = max(y, target.clipTop), y1 = min(y + h, target.clipBottom)
-		let x0 = max(x, target.clipLeft), x1 = min(x + w, target.clipRight)
-		guard x0 < x1, y0 < y1 else { return }
+		let y0 = ry, y1 = ry + rh
+		let x0 = rx, x1 = rx + rw
 		for dy in y0..<y1 {
-			let src = r.px + (dy - y) * stride - x
+			let src = r.px + (dy - ry) * stride - rx
 			let row = dy * target.width
 			for dx in x0..<x1 {
 				let p = src[dx]
