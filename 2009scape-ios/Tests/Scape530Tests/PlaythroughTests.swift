@@ -272,8 +272,19 @@ final class PlaythroughTests: XCTestCase {
 
 		// Walk: tap a ground point inside the viewport (canvas coordinates).
 		let before = try XCTUnwrap(l.client.state.selfWorld)
-		let target = try XCTUnwrap(l.scanWorld(radius: 100) { $0.op == "Walk here" }, "a walkable ground point in the viewport")
-		let c = l.client.toCanvas(x: target.x, y: target.y)
+		// A walkable tile a few steps away (in game pixels: the menu and pick work on the 765x503 frame).
+		let me = try XCTUnwrap(l.client.world.selfSceneTile)
+		var target: (x: Int, y: Int)?
+		search: for py in stride(from: v.y + 20, to: v.y + v.h - 20, by: 10) {
+			for px in stride(from: v.x + 20, to: v.x + v.w - 20, by: 12) {
+				guard let (m, pick) = l.client.buildMenu(x: px, y: py), let t = pick.tile,
+					  m.entries[m.top].action == Menu.Action.walkHere else { continue }
+				let dist = abs(t.x - me.x) + abs(t.z - me.z)
+				if dist >= 3, dist <= 8, l.client.world.collision[l.client.world.plane].isWalkableForTest(t.x, t.z) { target = (px, py); break search }
+			}
+		}
+		let tgt = try XCTUnwrap(target, "a walkable ground point in the viewport")
+		let c = l.client.toCanvas(x: tgt.x, y: tgt.y)
 		XCTAssertTrue(l.client.isOverWorld(x: c.x, y: c.y))
 		l.client.tap(x: c.x, y: c.y)
 		XCTAssertTrue(l.pump(until: { l.client.state.selfWorld.map { $0.x != before.x || $0.z != before.z } ?? false }, timeout: 8), "the character walked")
