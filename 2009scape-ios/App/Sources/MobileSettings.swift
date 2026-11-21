@@ -10,6 +10,7 @@ enum MobileSettings {
 	static let smoothMotionKey = "ui.smoothMotion"
 	static let opaqueSidePanelKey = "ui.opaqueSidePanel"
 	static let frameStatsKey = "ui.frameStats"
+	static let interfaceSizeKey = "ui.interfaceSize"
 	static let gpuRendererKey = "gfx.gpuRenderer"
 	static let gpuDrawDistanceKey = "gfx.drawDistance"
 	static let gpuFogKey = "gfx.fog"
@@ -32,6 +33,8 @@ enum MobileSettings {
 	static var opaqueSidePanel: Bool { bool(opaqueSidePanelKey, true) }
 	/// Small fps / ms-per-frame / cycles-per-second readout in the corner.
 	static var frameStats: Bool { bool(frameStatsKey, false) }
+	/// 0 normal (rt4 765x503 minimum canvas), 1 large, 2 larger.
+	static var interfaceSize: Int { UserDefaults.standard.object(forKey: interfaceSizeKey) as? Int ?? 0 }
 
 	/// Draw the 3D scene on the GPU (Metal) instead of with the faithful software rasteriser.
 	static var gpuRenderer: Bool { bool(gpuRendererKey, false) }

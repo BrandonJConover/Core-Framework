@@ -210,7 +210,12 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 	private func computeGameSize() -> (Int, Int) {
 		let pts = bounds.size
 		guard pts.width > 0, pts.height > 0 else { return (0, 0) }
-		scale = max(1, 503 / pts.height, 765 / pts.width)
+		// "Interface size" (Controls > Display): a smaller game canvas makes every RuneScape interface bigger on
+		// screen. rt4's resizable layout is designed for 765x503 and up; Large/Larger go below that.
+		// The login screens keep rt4's size (their logo and scroll need the full 503 rows).
+		let size = lastScreen == .game ? min(max(MobileSettings.interfaceSize, 0), 2) : 0
+		let (minW, minH): (CGFloat, CGFloat) = [(765, 503), (680, 445), (620, 405)][size]
+		scale = max(1, minH / pts.height, minW / pts.width)
 		return (Int((pts.width * scale).rounded(.up)), Int((pts.height * scale).rounded(.up)))
 	}
 
@@ -243,6 +248,7 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 		}
 		lastKeyboardWanted = s.wantsKeyboard
 		keyboardButton.isHidden = true // the shell's keyboard button lives in the screen margin (RootView)
+		lastScreen = s.screen
 		if s.loginFocus != loginFocus || s.loginFocusKeyboard != loginFocusKeyboard {
 			loginFocus = s.loginFocus
 			loginFocusKeyboard = s.loginFocusKeyboard
@@ -337,6 +343,7 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 
 	/// How much of the view (untransformed, points) the keyboard covers from the bottom.
 	private var keyboardOverlap: CGFloat = 0
+	private var lastScreen: GameClient.Screen = .title
 	private var loginFocus: CGRect?
 	private var loginFocusKeyboard: CGRect?
 

@@ -159,6 +159,7 @@ struct TouchSettingsView: View {
 	@AppStorage(MobileSettings.smoothMotionKey) private var smoothMotion = true
 	@AppStorage(MobileSettings.opaqueSidePanelKey) private var opaqueSidePanel = true
 	@AppStorage(MobileSettings.frameStatsKey) private var frameStats = false
+	@AppStorage(MobileSettings.interfaceSizeKey) private var interfaceSize = 0
 	@AppStorage(MobileSettings.gpuRendererKey) private var gpuRenderer = false
 	@AppStorage(MobileSettings.gpuDrawDistanceKey) private var drawDistance = 56.0
 	@AppStorage(MobileSettings.gpuFogKey) private var gpuFog = true
@@ -177,6 +178,15 @@ struct TouchSettingsView: View {
 					Toggle("Smooth motion (60/120 Hz)", isOn: $smoothMotion)
 					Toggle("Solid side panel", isOn: $opaqueSidePanel)
 					Toggle("Show frame rate", isOn: $frameStats)
+					Picker("Interface size", selection: $interfaceSize) {
+						Text("Normal").tag(0)
+						Text("Large").tag(1)
+						Text("Larger").tag(2)
+					}
+					if interfaceSize > 0 {
+						Text("Large sizes draw the game on a smaller canvas than rt4's 765x503 minimum: everything is bigger, but on a phone the side panel overlaps the minimap and the tabs wrap to two rows.")
+							.font(.footnote).foregroundColor(.secondary)
+					}
 				}
 				Section("3D renderer") {
 					Toggle("GPU renderer (Metal)", isOn: $gpuRenderer)
