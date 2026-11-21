@@ -88,11 +88,15 @@ final class AppModel: ObservableObject {
 			} catch {
 				updateError = error
 			}
-			await self.openCache(updateError: updateError)
+			// The saved password is protected by Face ID / Touch ID: unlock it here, off the main thread and before
+			// the client starts, so it is never released without the owner.
+			let user = UserDefaults.standard.string(forKey: "account.username") ?? ""
+			let savedPassword = user.isEmpty ? nil : Keychain.unlockedPassword(for: user, prompt: "Unlock your 2009scape account")
+			await self.openCache(updateError: updateError, savedPassword: savedPassword)
 		}
 	}
 
-	private func openCache(updateError: Error?) {
+	private func openCache(updateError: Error?, savedPassword: String? = nil) {
 		guard hasLocalCache else {
 			phase = .failed(updateError.map { "\($0)" } ?? "Could not download the game from \(host):\(port).")
 			return
@@ -101,7 +105,7 @@ final class AppModel: ObservableObject {
 			let store = ConfigStore(disk: try DiskCache(directory: cacheDirectory))
 			let client = try GameClient(store: store, server: .init(host: host, port: port))
 			client.username = UserDefaults.standard.string(forKey: "account.username") ?? ""
-			if !client.username.isEmpty { client.password = Keychain.password(for: client.username) ?? "" }
+			if !client.username.isEmpty, let savedPassword { client.password = savedPassword }
 			client.onLoggedIn = { [weak client] user, pass in
 				// Quest helper flags are saved per account.
 				client?.plugins.plugin(ofType: QuestHelperPlugin.self)?.accountKey = user.lowercased()

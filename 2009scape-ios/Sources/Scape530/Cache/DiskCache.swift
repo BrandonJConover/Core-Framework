@@ -29,7 +29,8 @@ public final class DiskCache {
 
 	/// The raw stored bytes for a group (container + version trailer), or nil.
 	public func read(archive: Int, group: Int) -> [UInt8]? {
-		guard let idx = index(archive), idx.count >= group * 6 + 6 else { return nil }
+		guard archive >= 0, group >= 0, let idx = index(archive), idx.count >= 6,
+			group <= (idx.count - 6) / 6 else { return nil }
 		let e = idx.startIndex + group * 6
 		let size = Int(idx[e]) << 16 | Int(idx[e + 1]) << 8 | Int(idx[e + 2])
 		var sector = Int(idx[e + 3]) << 16 | Int(idx[e + 4]) << 8 | Int(idx[e + 5])
@@ -46,6 +47,7 @@ public final class DiskCache {
 			guard sector > 0, sector <= sectors else { return nil }
 			let base = dat.startIndex + sector * DiskCache.sectorSize
 			let n = min(size - out.count, payload)
+			guard base <= dat.endIndex, header + n <= dat.endIndex - base else { return nil }
 			var h = base
 			let g: Int
 			if extended {

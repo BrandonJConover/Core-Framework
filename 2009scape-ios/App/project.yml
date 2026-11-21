@@ -43,6 +43,7 @@ targets:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown
         NSLocalNetworkUsageDescription: "Connects to a 2009scape server on your local network."
+        NSFaceIDUsageDescription: "Unlocks the 2009scape password saved on this device."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.brandonconover.scape530

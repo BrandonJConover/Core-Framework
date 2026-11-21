@@ -4,6 +4,21 @@ import XCTest
 /// Runs against a real 2009scape cache when SCAPE530_CACHE points at a
 /// directory holding main_file_cache.dat2 + idx files (see 2009scape-ios/README.md).
 final class CacheTests: XCTestCase {
+	func testTruncatedCacheSectorsFailSafely() throws {
+		let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+		try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+		defer { try? FileManager.default.removeItem(at: dir) }
+		let dataFile = dir.appendingPathComponent("main_file_cache.dat2")
+		let indexFile = dir.appendingPathComponent("main_file_cache.idx0")
+		try Data([0, 0, 2, 0, 0, 1]).write(to: indexFile)
+		for count in [520, 525, 529] {
+			try Data(repeating: 0, count: count).write(to: dataFile)
+			let disk = try DiskCache(directory: dir)
+			XCTAssertNil(disk.read(archive: 0, group: 0), "truncated sector at \(count) bytes")
+			XCTAssertNil(disk.read(archive: 0, group: -1))
+			XCTAssertNil(disk.read(archive: 0, group: Int.max))
+		}
+	}
 	func cache() throws -> DiskCache {
 		guard let dir = ProcessInfo.processInfo.environment["SCAPE530_CACHE"] else {
 			throw XCTSkip("SCAPE530_CACHE not set")
