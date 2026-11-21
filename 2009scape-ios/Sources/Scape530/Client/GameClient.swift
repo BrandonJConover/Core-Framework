@@ -409,6 +409,7 @@ public final class GameClient {
 	/// A tap in game pixels: press and release of the primary button.
 	public func tap(x: Int, y: Int) {
 		var (x, y) = (x, y)
+		if inGame, interaction.popup == nil, mobileToggles(x: x, y: y) { return }
 		if inGame, interaction.popup == nil {
 			// Touch forgiveness (OSRS mobile style, not in rt4): a tap anywhere on a dialogue with "Click here to
 			// continue" continues it, and a tap just beside a small button presses the nearest one.
@@ -421,6 +422,51 @@ public final class GameClient {
 			}
 		}
 		performTap(x: x, y: y, hooks: true)
+	}
+
+
+	// MARK: mobile toggles (OSRS mobile style, not in rt4)
+
+	/// The side-panel tab or chat filter pressed by the previous tap, for "tap again to close".
+	private var lastToggleTap: Int?
+	/// The side panel (746:73) is hidden by tapping its open tab again.
+	public private(set) var sidePanelCollapsed = false
+	/// The chatbox is collapsed (its resizable-mode container 746:70 hidden) by tapping the selected filter again.
+	public private(set) var chatCollapsed = false
+
+	/// Tapping the open side-panel tab again hides the panel (any tab shows it again); tapping the chat's "All"
+	/// filter twice collapses or restores the chatbox. True if handled.
+	func mobileToggles(x: Int, y: Int) -> Bool {
+		guard let hit = ui.hitTest(x: x, y: y) else { lastToggleTap = nil; return false }
+		let top = host.game.interfaces.top
+		let id = hit.id
+		let previous = lastToggleTap
+		lastToggleTap = id
+		// Side-panel tab stones (both rows of interface 746's tab bar).
+		let isTab = top == 746 && id >> 16 == 746 && (41...54).contains(id & 0xFFFF)
+		if isTab {
+			if sidePanelCollapsed {
+				// Any tab brings the panel back (and opens that tab as usual).
+				sidePanelCollapsed = false
+				host.game.interfaces.hidden[746 << 16 | 73] = nil
+			} else if previous == id {
+				sidePanelCollapsed = true
+				host.game.interfaces.hidden[746 << 16 | 73] = true
+				lastToggleTap = nil
+				return true
+			}
+		}
+		// The "All" chat filter button: a component with an "All" label drawn inside it.
+		if top == 746, let box = ui.drawn.last(where: { $0.component.id == id }),
+		   ui.drawn.contains(where: { $0.component.type == 4 && $0.component.text == "All" && $0.x >= box.x - 2 && $0.y >= box.y - 2 && $0.x + $0.w <= box.x + box.w + 2 && $0.y + $0.h <= box.y + box.h + 2 }) {
+			if previous == id || chatCollapsed {
+				chatCollapsed.toggle()
+				host.game.interfaces.hidden[746 << 16 | 70] = chatCollapsed ? true : nil
+				lastToggleTap = nil
+				return true
+			}
+		}
+		return false
 	}
 
 	/// Game pixels a tap may miss a small button by and still press it (set by the shell from its points scale).
