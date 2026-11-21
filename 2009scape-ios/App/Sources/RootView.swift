@@ -132,6 +132,7 @@ struct TouchSettingsView: View {
 	@AppStorage(MobileSettings.smoothScalingKey) private var smoothScaling = true
 	@AppStorage(MobileSettings.hapticsKey) private var haptics = true
 	@AppStorage(MobileSettings.smoothMotionKey) private var smoothMotion = true
+	@AppStorage(MobileSettings.opaqueSidePanelKey) private var opaqueSidePanel = true
 	@AppStorage(MobileSettings.gpuRendererKey) private var gpuRenderer = false
 	@AppStorage(MobileSettings.gpuDrawDistanceKey) private var drawDistance = 56.0
 	@AppStorage(MobileSettings.gpuFogKey) private var gpuFog = true
@@ -148,6 +149,7 @@ struct TouchSettingsView: View {
 				Section("Display") {
 					Toggle("Smooth scaling", isOn: $smoothScaling)
 					Toggle("Smooth motion (60/120 Hz)", isOn: $smoothMotion)
+					Toggle("Solid side panel", isOn: $opaqueSidePanel)
 				}
 				Section("3D renderer") {
 					Toggle("GPU renderer (Metal)", isOn: $gpuRenderer)

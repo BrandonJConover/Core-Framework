@@ -61,6 +61,7 @@ final class GameLoop: @unchecked Sendable {
 				// and draws the scene in Metal under the raster (see `WorldView.gpuFrame`).
 				let gpu = MobileSettings.gpuRenderer && scenePresenter != nil
 				client.world.gpuSettings = gpu ? MobileSettings.gpuSettings : nil
+				client.ui.opaqueSprites = MobileSettings.opaqueSidePanel ? [1131] : []
 				let raster = try client.frame(width: width, height: height)
 				presenter?.smoothScaling = smooth
 				if let layer {

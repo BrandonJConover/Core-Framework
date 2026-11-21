@@ -8,6 +8,7 @@ enum MobileSettings {
 	static let smoothScalingKey = "ui.smoothScaling"
 	static let hapticsKey = "ui.haptics"
 	static let smoothMotionKey = "ui.smoothMotion"
+	static let opaqueSidePanelKey = "ui.opaqueSidePanel"
 	static let gpuRendererKey = "gfx.gpuRenderer"
 	static let gpuDrawDistanceKey = "gfx.drawDistance"
 	static let gpuFogKey = "gfx.fog"
@@ -26,6 +27,8 @@ enum MobileSettings {
 	static var haptics: Bool { bool(hapticsKey, true) }
 	/// Draw actors and the camera between rt4's 50 Hz client cycles (smooth at 60/120 Hz) instead of stepping at 50 Hz.
 	static var smoothMotion: Bool { bool(smoothMotionKey, true) }
+	/// Draw the resizable side panel background opaque (rt4 draws it 60% opaque, so the world shows through).
+	static var opaqueSidePanel: Bool { bool(opaqueSidePanelKey, true) }
 
 	/// Draw the 3D scene on the GPU (Metal) instead of with the faithful software rasteriser.
 	static var gpuRenderer: Bool { bool(gpuRendererKey, false) }
