@@ -30,6 +30,8 @@ public enum ClientProt {
 	public static let resumePStringdialog = 65
 	public static let setChatfiltersettings = 157
 	public static let bugReport = 99
+	/// Two jstrings and a byte (rt4 `ScriptRunner` op 5400; the opcode is unnamed in rt4).
+	public static let twoStrings = 117
 	public static let soundSongend = 137
 	public static let moveGameclick = 215
 	public static let moveMinimapclick = 39

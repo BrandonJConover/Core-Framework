@@ -61,6 +61,12 @@ public enum ClientMessage {
 	case resumeCount(Int32)
 	case resumeName(String)
 	case resumeString(String)
+	/// SET_CHATFILTERSETTINGS (rt4 `ScriptRunner` 5001): public, private and trade chat filters.
+	case chatFilterSettings(public: Int, private: Int, trade: Int)
+	/// BUG_REPORT (rt4 `ScriptRunner` 5002): the reporter's description base-37 encoded, the category (sent minus one) and a flag.
+	case bugReport(name37: Int64, category: Int, flag: Int)
+	/// rt4 `ScriptRunner` 5400 (opcode 117): two strings and a byte.
+	case twoStrings(String, String, Int)
 	/// rt4 SOUND_SONGEND: the song that finished, so the server can pick the next one.
 	case songEnd(Int)
 
@@ -169,6 +175,21 @@ public enum ClientMessage {
 			body.p4(crc)
 			p.p1(body.written.count)
 			p.pdata(body.written)
+		case let .chatFilterSettings(pub, priv, trade):
+			op(ClientProt.setChatfiltersettings)
+			p.p1(pub); p.p1(priv); p.p1(trade)
+		case let .bugReport(name37, category, flag):
+			op(ClientProt.bugReport)
+			p.p8(name37)
+			p.p1(category - 1)
+			p.p1(flag)
+		case let .twoStrings(a, b, v):
+			op(ClientProt.twoStrings)
+			// rt4 `Buffer.gjstrlen` counts the terminator of each string.
+			p.p1(Cp1252.encode(a).count + 1 + Cp1252.encode(b).count + 1 + 1)
+			p.pjstr(a)
+			p.pjstr(b)
+			p.p1(v)
 		case .songEnd(let id):
 			op(ClientProt.soundSongend)
 			p.p4(Int32(truncatingIfNeeded: id))

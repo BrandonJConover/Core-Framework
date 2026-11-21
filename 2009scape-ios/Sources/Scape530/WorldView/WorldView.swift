@@ -130,6 +130,17 @@ public final class WorldView {
 	public var isBuilding: Bool { inFlightStamp != nil }
 
 	var selfActor: PathingActor? { ctx.players[selfIndex] }
+
+	/// The local player's look, including edits the character designer made since the last appearance block.
+	var selfLook: PlayerLook? { selfActor?.look ?? selfActor?.appearance.map(PlayerLook.init) }
+
+	/// CS2 setBaseIdkit / setBaseColour / setFemale: rt4 edits `PlayerList.self.appearance`; the next appearance
+	/// block from the server replaces the edit, as in rt4.
+	func editSelfLook(_ edit: AppearanceEdit) {
+		guard let a = selfActor, var look = selfLook else { return }
+		look.apply(edit, store: store)
+		a.look = look
+	}
 	/// The local player's scene-local fine position (rt4 `PlayerList.self.xFine/zFine`), for the sound listener.
 	public var selfActorFine: (x: Int, z: Int)? { selfActor.map { ($0.xFine, $0.zFine) } }
 
@@ -272,7 +283,7 @@ public final class WorldView {
 			let isNew = ctx.players[id] == nil
 			let a = ctx.players[id] ?? PathingActor(kind: .player, index: id, ctx: ctx)
 			if isNew { ctx.players[id] = a }
-			if let ap = e.appearance, ap != a.appearance {
+			if let ap = e.appearance, ap != a.appearance || a.look != PlayerLook(ap) {
 				a.appearance = ap
 				a.look = PlayerLook(ap)
 				a.size = ap.size

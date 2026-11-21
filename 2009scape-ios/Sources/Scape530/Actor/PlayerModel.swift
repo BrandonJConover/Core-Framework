@@ -44,6 +44,49 @@ public struct PlayerLook: Hashable {
 	}
 }
 
+/// One edit of the local player's look from the character designer (CS2 ops 403, 404, 410).
+public enum AppearanceEdit: Equatable {
+	/// setBaseIdkit: the kit `kit` for the body feature (kit body part) `feature`.
+	case identikit(feature: Int, kit: Int)
+	/// setBaseColour: colour slot `slot` takes palette index `colour`.
+	case colour(slot: Int, colour: Int)
+	/// setFemale.
+	case gender(female: Bool)
+}
+
+extension PlayerLook {
+	/// rt4 `ScriptRunner` op 403 with `PlayerAppearance.setIdentikit`: finds which of the eight feature
+	/// slots `feature` is (male table first, then female) and, if that body part is worn (non-zero) and the
+	/// kit exists, replaces it. `kitExists` stands in for `IdkTypeList.get(kit) != null`.
+	public mutating func setIdentikit(feature: Int, kit: Int, kitExists: (Int) -> Bool) {
+		var index = Self.maleFeatures.firstIndex(of: feature)
+		if index == nil { index = Self.femaleFeatures.firstIndex(of: feature) }
+		guard let index else { return }
+		let part = Self.basePartMap[index]
+		guard slots[part] != 0, kitExists(kit) else { return }
+		slots[part] = kit | Int(Int32.min)
+	}
+
+	/// rt4 `PlayerAppearance.setColor`.
+	public mutating func setColour(slot: Int, colour: Int) {
+		guard slot >= 0, slot < colours.count else { return }
+		colours[slot] = colour
+	}
+
+	/// rt4 `PlayerAppearance.setGender`.
+	public mutating func setGender(female: Bool) { self.female = female }
+
+	/// Applies one designer edit against the identity-kit table.
+	public mutating func apply(_ edit: AppearanceEdit, store: ConfigStore) {
+		switch edit {
+		case let .identikit(feature, kit):
+			setIdentikit(feature: feature, kit: kit) { ((try? store.idk($0)) ?? nil) != nil }
+		case let .colour(slot, colour): setColour(slot: slot, colour: colour)
+		case let .gender(female): setGender(female: female)
+		}
+	}
+}
+
 extension ConfigStore {
 	/// rt4 `IdkType.getBodyModel`: the kit's models merged and recoloured; nil when it has none.
 	func idkBodyModel(_ kit: IdkType) throws -> RawModel? {

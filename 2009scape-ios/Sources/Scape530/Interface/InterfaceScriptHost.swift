@@ -40,6 +40,33 @@ public final class InterfaceScriptHost: ScriptHost {
 	public var cameraOp: (String, [Int]) -> Int? = { _, _ in nil }
 	public private(set) var unportedOpcodes: [Int: Int] = [:]
 
+	// MARK: platform hooks for the CS2 client actions (see `InterfaceClientOps.swift`)
+
+	/// CS2 setBaseIdkit / setBaseColour / setFemale (403, 404, 410): edits the local player's look (rt4 `PlayerAppearance`).
+	public var onAppearanceEdit: (AppearanceEdit) -> Void = { _ in }
+	/// rt4 `PlayerList.self.appearance.gender` (opcode 3327).
+	public var selfFemale: () -> Bool = { false }
+	/// CS2 playSoundEffect (3200): rt4 `SoundPlayer.play(loops, id, delay)`.
+	public var onPlaySoundEffect: (_ id: Int, _ loops: Int, _ delay: Int) -> Void = { _, _, _ in }
+	/// CS2 playSong (3201): rt4 `MusicPlayer.playSong(id)`.
+	public var onPlaySong: (_ id: Int) -> Void = { _ in }
+	/// CS2 playJingle (3202): rt4 `MusicPlayer.playJingle(volume, id)`.
+	public var onPlayJingle: (_ id: Int, _ volume: Int) -> Void = { _, _ in }
+	/// CS2 animateSelf (3101): rt4 `Player.animate(delay, seq, PlayerList.self)`.
+	public var onAnimateSelf: (_ seq: Int, _ delay: Int) -> Void = { _, _ in }
+	/// CS2 clickPlayerOption (3107): rt4 `ClientProt.clickPlayerOption(option, name)`.
+	public var onClickPlayerOption: (_ option: Int, _ name: String) -> Void = { _, _ in }
+	/// CS2 setObjRecolour (5401) changed the shared colour palette: drop every cached item model and icon.
+	public var onObjRecolour: () -> Void = {}
+	/// CS2 openUrl (5421): the site-relative address and whether it asked for a new tab.
+	public var onOpenUrl: (_ path: String, _ newTab: Bool) -> Void = { _, _ in }
+	/// CS2 quit (5411).
+	public var onQuit: () -> Void = {}
+	/// rt4 `ScriptRunner.aShort*` set by ops 6200-6202.
+	public var viewportLimits = ViewportLimits()
+	/// rt4 `MiniMap.anInt4075` / `anInt5073` set by op 5427: the "Use" and "Examine" menu cursors.
+	public var menuCursors = (use: -1, examine: -1)
+
 	// MARK: login state read by CS2 (rt4 `LoginManager`)
 
 	/// rt4 `LoginManager.reply`: -2 idle, -3 connecting, 2 ok, 3 bad credentials, ...

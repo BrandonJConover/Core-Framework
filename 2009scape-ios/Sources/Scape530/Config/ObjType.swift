@@ -22,6 +22,8 @@ public struct ObjType: ConfigType, Equatable {
 	public var recolours: [Int: Int] = [:]
 	public var retextures: [Int: Int] = [:]
 	public var recolourPalette: [Int] = []
+	/// rt4 `recol_s` in cache order, which `recolourPalette` (`recol_p`) indexes.
+	public var recolourSources: [Int] = []
 	public var stockMarket = false
 	public var dummyItem = 0
 	public var certlink = -1, certtemplate = -1
@@ -57,7 +59,10 @@ public struct ObjType: ConfigType, Equatable {
 		case 26: womanwear2 = try p.g2()
 		case 30...34: ops[op - 30] = menuOption(try p.gjstr())
 		case 35...39: iops[op - 35] = try p.gjstr()
-		case 40: for (s, d) in try decodePairs(&p) { recolours[s] = d }
+		case 40:
+			let pairs = try decodePairs(&p)
+			recolourSources = pairs.map { $0.from }
+			for (s, d) in pairs { recolours[s] = d }
 		case 41: for (s, d) in try decodePairs(&p) { retextures[s] = d }
 		case 42:
 			let n = try p.g1()

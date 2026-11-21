@@ -99,6 +99,7 @@ public final class GameClient {
 		host.onDirectLogin = { [weak self] user, pass in self?.beginLogin(username: user, password: pass) }
 		host.log = { [weak self] in self?.log($0) }
 		host.onPreferenceChange = { [weak self] in self?.applyPreference($0) }
+		bindClientOps()
 		host.onVarpClientCode = { [weak self] code, value in
 			if code == VarpClientCode.chatEffects { self?.world.chatEffectsDisabled = value != 0 }
 		}
@@ -134,7 +135,7 @@ public final class GameClient {
 	/// Gives the interface model renderer (chat heads, player models) its view of the world.
 	private func bindModels() {
 		host.cameraOp = { [weak self] name, args in self?.world.cameraScript(name, args) }
-		ui.models.selfLook = { [weak self] in self?.world.selfActor?.appearance.map(PlayerLook.init) }
+		ui.models.selfLook = { [weak self] in self?.world.selfLook }
 		ui.models.playerLook = { [weak self] i in self?.world.ctx.players[i]?.appearance.map(PlayerLook.init) }
 		ui.models.resolveNpc = { [weak self] t in
 			guard let self, let list = t.multiNpcs, !list.isEmpty else { return t }
@@ -633,6 +634,44 @@ public final class GameClient {
 	}
 
 	public func send(_ m: ClientMessage) { session?.send(m) }
+
+	/// Connects the CS2 client actions that need the world, audio or the platform (`InterfaceClientOps.swift`).
+	private func bindClientOps() {
+		host.onAppearanceEdit = { [weak self] in self?.world.editSelfLook($0) }
+		host.selfFemale = { [weak self] in self?.world.selfLook?.female ?? false }
+		host.onAnimateSelf = { [weak self] seq, delay in self?.world.selfActor?.animate(delay: delay, seq: seq) }
+		// The server-sent sounds and music take the same paths as these script ops (rt4 `Protocol` and `ScriptRunner`).
+		host.onPlaySoundEffect = { [weak self] id, loops, delay in self?.playAudio(.synthSound(id: id, loops: loops, delay: delay)) }
+		host.onPlaySong = { [weak self] id in self?.playAudio(.midiSong(id)) }
+		host.onPlayJingle = { [weak self] id, volume in self?.playAudio(.midiJingle(id: id, volume: volume)) }
+		host.onClickPlayerOption = { [weak self] option, name in self?.clickPlayerOption(option, name: name) }
+		host.onObjRecolour = { [weak self] in
+			guard let self else { return }
+			self.ui.icons.clear()
+			self.ui.models.clearCache()
+			self.world.groundModels = nil
+		}
+	}
+
+	/// rt4 `ClientProt.clickPlayerOption`: walks up to the named player in view and sends the option
+	/// (1 follow-style 30, 4 trade 29, 5 action 10, 6 action 44, 7 action 37); "Unable to find" when no such player is near.
+	func clickPlayerOption(_ option: Int, name: String) {
+		func norm(_ s: String) -> String { s.lowercased().replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "\u{A0}", with: " ") }
+		let wanted = norm(name)
+		let found = world.ctx.players.values.sorted { $0.index < $1.index }.first {
+			guard let n = $0.appearance?.name37, n != 0 else { return false }
+			return norm(WordPack.displayName(n)) == wanted
+		}
+		guard let target = found else {
+			host.game.chatLog.add(type: 0, name: "", message: "Unable to find " + WordPack.titleCase(name))
+			host.chatAt = host.transmitTimer
+			return
+		}
+		guard let tile = world.playerTile(target.index) else { return }
+		approach(.entity(x: tile.x, z: tile.z), clickX: 0, clickY: 0)
+		let actions = [1: 30, 4: 29, 5: 10, 6: 44, 7: 37]
+		if let action = actions[option] { sendOp(.opPlayer(action: action, index: target.index)) }
+	}
 
 	/// rt4 `Protocol` MIDI_SONG / MIDI_JINGLE / SYNTH_SOUND.
 	private func playAudio(_ m: ServerMessage) {

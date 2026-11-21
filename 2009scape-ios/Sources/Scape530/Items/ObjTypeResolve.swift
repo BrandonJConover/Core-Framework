@@ -14,6 +14,7 @@ extension ConfigStore {
 			o.zoom2d = template.zoom2d
 			o.recolours = template.recolours
 			o.recolourPalette = template.recolourPalette
+			o.recolourSources = template.recolourSources
 			o.retextures = template.retextures
 			o.xAngle2D = template.xAngle2D
 			o.yAngle2D = template.yAngle2D
@@ -27,6 +28,7 @@ extension ConfigStore {
 		}
 		if o.lentTemplate != -1, let link = try objResolved(o.lentLink), let template = try objResolved(o.lentTemplate) {
 			o.recolourPalette = link.recolourPalette
+			o.recolourSources = link.recolourSources
 			o.recolours = link.recolours
 			o.retextures = link.retextures
 			o.model = template.model
@@ -67,12 +69,31 @@ extension ConfigStore {
 	func objModel(_ o: ObjType, textureAvailable: (Int) -> Bool) throws -> SoftwareModel? {
 		guard let base = try rawModel(o.model) else { return nil }
 		let raw = base.copy()
-		for (src, dst) in o.recolours.sorted(by: { $0.key < $1.key }) { raw.recolor(src, dst) }
+		if o.recolourPalette.isEmpty {
+			for (src, dst) in o.recolours.sorted(by: { $0.key < $1.key }) { raw.recolor(src, dst) }
+		} else {
+			// rt4 `ObjType.getModel`: entry i with a palette byte takes its colour from the client palette (CS2 op 5401).
+			for (i, src) in o.recolourSources.enumerated() {
+				if i < o.recolourPalette.count {
+					raw.recolor(src, recolourPalette(o.recolourPalette[i] & 0xFF))
+				} else if let dst = o.recolours[src] {
+					raw.recolor(src, dst)
+				}
+			}
+		}
 		for (src, dst) in o.retextures.sorted(by: { $0.key < $1.key }) { raw.retexture(src, dst) }
 		let m = raw.createModel(ambient: o.ambient + 64, contrast: o.contrast + 768, x: -50, y: -10, z: -50, textureAvailable: textureAvailable)
 		if o.resize[0] != 128 || o.resize[1] != 128 || o.resize[2] != 128 {
 			m.resize(o.resize[0], o.resize[1], o.resize[2])
 		}
 		return m
+	}
+
+	/// rt4 `client.aShortArray87[index]`: the HSL colour CS2 stored for a palette index (0 until set).
+	func recolourPalette(_ index: Int) -> Int { palette[index & 0xFF] }
+
+	/// rt4 `ScriptRunner` op 5401: `client.aShortArray88[index] = rgbToHsl(rgb)`.
+	public func setRecolourPalette(index: Int, hsl: Int) {
+		palette[index & 0xFF] = hsl
 	}
 }
