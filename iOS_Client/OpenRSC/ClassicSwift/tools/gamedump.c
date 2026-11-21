@@ -1,0 +1,235 @@
+#include "common.h"
+#include "packet-handler.h"
+#include "chat-message.h"
+#include "ui/stats-tab.h"
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+/* Starts the client like clientdump, logs it in to a fake server over a
+ * socketpair and sends it a scripted series of server packets in Lumbridge.
+ * Each packet is printed as hex ("packet <opcode> <hex>") before the client
+ * reads it, followed by a dump of the game state, so
+ * RSCClassicTests/PacketTests.swift can replay the same bytes.
+ *
+ *   gamedump <cache_dir> <empty_config_dir> */
+static const char *config_dir;
+char *__wrap_SDL_GetPrefPath(const char *org, const char *app) {
+  (void)org; (void)app; char *p = malloc(600); snprintf(p, 600, "%s/", config_dir); return p;
+}
+static mudclient *M; static int peer;
+
+/* ---- packet building ---- */
+static uint8_t pk[5000]; static int pn, bitpos;
+static void begin(int op){ memset(pk,0,sizeof pk); pk[0]=op; pn=1; bitpos=8; }
+static void b8(int v){ pk[pn++]=v; }
+static void b16(int v){ b8(v>>8); b8(v); }
+static void b32(int v){ b16(v>>16); b16(v); }
+static void b64(int64_t v){ b32((int)(v>>32)); b32((int)v); }
+static void bstack(int v){ if(v<128) b8(v); else b32(v+0x80000000); }
+static void bstr(const char *s){ while(*s) b8(*s++); }
+static void bits(int v, int n){ for(int i=n-1;i>=0;i--){ if((v>>i)&1) pk[bitpos>>3] |= 0x80>>(bitpos&7); bitpos++; } pn=(bitpos+7)>>3; }
+static void bchat(const char *s){ int n=chat_message_encode((char*)s); b8(n); for(int i=0;i<n;i++) b8(chat_message_encoded[i]); }
+static int64_t name(const char *s){ return encode_username((char*)s); }
+
+static void dump(void);
+static void send_packet(void){
+  printf("packet %d ", pk[0]); for(int i=0;i<pn;i++) printf("%02x", pk[i]); printf("\n");
+  uint8_t frame[5010]; int n=0;
+  if(pn>=160){ frame[n++]=160+pn/256; frame[n++]=pn&0xff; memcpy(frame+n,pk,pn); n+=pn; }
+  else { frame[n++]=pn; if(pn>1){ frame[n++]=pk[pn-1]; memcpy(frame+n,pk,pn-1); n+=pn-1; } else frame[n++]=pk[0]; }
+  write(peer, frame, n);
+  mudclient_packet_tick(M);
+  { uint8_t junk[5000]; while(read(peer, junk, sizeof junk) > 0) {} }
+  dump();
+}
+
+/* ---- state dump ---- */
+static void dchar(const char *tag, int i, GameCharacter *c){
+  if(!c){ printf("%s %d null\n", tag, i); return; }
+  int w=c->waypoint_current;
+  printf("%s %d si %d id %d npc %d at %d %d step %d wc %d wp %d %d anim %d %d name '%s' lvl %d col %d %d %d %d skull %d eq",
+    tag, i, c->server_index, c->server_id, c->npc_id, c->current_x, c->current_y, c->moving_step, w, c->waypoints_x[w], c->waypoints_y[w],
+    c->current_animation, c->next_animation, c->name, c->level, c->hair_colour, c->top_colour, c->bottom_colour, c->skin_colour, c->skull_visible);
+  for(int j=0;j<ANIMATION_COUNT;j++) printf(" %d", c->animations[j]);
+  printf(" msg %d '%s' hit %d %d %d %d bubble %d %d proj %d %d %d %d\n", c->message_timeout, c->message, c->damage_taken, c->current_hits,
+    c->max_hits, c->combat_timer, c->bubble_timeout, c->bubble_item, c->incoming_projectile_sprite, c->projectile_range,
+    c->attacking_player_server_index, c->attacking_npc_server_index);
+}
+static void dmodel(GameModel *m){
+  if(!m){ printf(" nomodel"); return; }
+  printf(" key %d base %d %d %d rot %d %d %d", m->key, m->base_x, m->base_y, m->base_z, m->orientation_yaw, m->orientation_pitch, m->orientation_roll);
+}
+static void dump(void){
+  mudclient *m=M;
+  printf("region %d %d local %d %d plane %d %d %d %d last %d bounds %d %d %d %d alive %d loading %d models %d adj %u\n",
+    m->region_x, m->region_y, m->local_region_x, m->local_region_y, m->plane_width, m->plane_height, m->plane_index, m->plane_multiplier,
+    m->last_plane_index, m->local_lower_x, m->local_lower_y, m->local_upper_x, m->local_upper_y, m->world->player_alive,
+    m->loading_area, m->scene->model_count, fnv(m->world->object_adjacency, sizeof m->world->object_adjacency));
+  printf("players %d known %d local %d\n", m->player_count, m->known_player_count, m->local_player ? m->local_player->server_index : -1);
+  for(int i=0;i<m->player_count;i++) dchar("player", i, m->players[i]);
+  printf("npcs %d known %d\n", m->npc_count, m->known_npc_count);
+  for(int i=0;i<m->npc_count;i++) dchar("npc", i, m->npcs[i]);
+  for(int i=0;i<m->object_count;i++){ printf("object %d %d %d %d %d", i, m->objects[i].x, m->objects[i].y, m->objects[i].id, m->objects[i].direction); dmodel(m->objects[i].model); printf("\n"); }
+  for(int i=0;i<m->wall_object_count;i++){ printf("wall %d %d %d %d %d", i, m->wall_objects[i].x, m->wall_objects[i].y, m->wall_objects[i].id, m->wall_objects[i].direction); dmodel(m->wall_objects[i].model);
+    GameModel *g=m->wall_objects[i].model; if(g) printf(" v %u %u %u ff %d %d", fnv(g->vertex_x,g->vertex_count*2), fnv(g->vertex_y,g->vertex_count*2), fnv(g->vertex_z,g->vertex_count*2), g->face_fill_front[0], g->face_fill_back[0]); printf("\n"); }
+  for(int i=0;i<m->ground_item_count;i++) printf("item %d %d %d %d %d\n", i, m->ground_items[i].x, m->ground_items[i].y, m->ground_items[i].id, m->ground_items[i].z);
+  printf("inv %d", m->inventory_items_count); for(int i=0;i<m->inventory_items_count;i++) printf(" %d:%d:%d", m->inventory_item_id[i], m->inventory_item_stack_count[i], m->inventory_equipped[i]); printf("\n");
+  printf("skills"); for(int i=0;i<PLAYER_SKILL_COUNT;i++) printf(" %d/%d/%d", m->player_skill_current[i], m->player_skill_base[i], m->player_experience[i]);
+  printf(" qp %d fatigue %d %d eq", m->player_quest_points, m->stat_fatigue, m->fatigue_sleeping); for(int i=0;i<PLAYER_STAT_EQUIPMENT_COUNT;i++) printf(" %d", m->player_stat_equipment[i]);
+  printf(" quests"); for(int i=0;i<quests_length;i++) printf("%d", m->quest_complete[i]); printf("\n");
+  printf("friends %d", m->friend_list_count); for(int i=0;i<m->friend_list_count;i++) printf(" %lld:%d", (long long)m->friend_list[i], m->friend_list_online[i]);
+  printf(" ignore %d", m->ignore_list_count); for(int i=0;i<m->ignore_list_count;i++) printf(" %lld", (long long)m->ignore_list[i]); printf("\n");
+  printf("messages"); for(int i=0;i<MESSAGE_HISTORY_LENGTH;i++) printf(" [%s|%d]", m->message_history[i], m->message_history_timeout[i]); printf("\n");
+  printf("dialogs opt %d %d", m->show_option_menu, m->option_menu_count); for(int i=0;i<m->option_menu_count&&i<5;i++) printf(" [%s]", m->option_menu_entry[i]);
+  printf(" welcome %d %d %d %d %d server %d %d [%s] appearance %d sleep %d death %d logout %d sysupd %d\n", m->show_dialog_welcome, m->welcome_last_ip,
+    m->welcome_days_ago, m->welcome_recovery_set_days, m->welcome_unread_messages, m->show_dialog_server_message, m->server_message_box_top,
+    m->server_message, m->show_appearance_change, m->is_sleeping, m->death_screen_timeout, m->logout_timeout, m->system_update);
+  printf("bank %d %d max %d", m->show_dialog_bank, m->bank_item_count, m->bank_items_max); for(int i=0;i<m->bank_item_count;i++) printf(" %d:%d", m->bank_items[i], m->bank_items_count[i]);
+  printf(" shop %d %d %d", m->show_dialog_shop, m->shop_sell_price_mod, m->shop_buy_price_mod); for(int i=0;i<40;i++) if(m->shop_items[i]!=-1) printf(" %d=%d:%d:%d", i, m->shop_items[i], m->shop_items_count[i], m->shop_items_price[i]); printf("\n");
+  printf("trade %d %d duel %d %d offerx %d name '%s' acc %d %d items", m->show_dialog_trade, m->show_dialog_trade_confirm, m->show_dialog_duel, m->show_dialog_duel_confirm,
+    m->show_dialog_offer_x, m->transaction_recipient_name, m->transaction_recipient_accepted, m->transaction_accepted);
+  for(int i=0;i<m->transaction_recipient_item_count;i++) printf(" %d:%d", m->transaction_recipient_items[i], m->transaction_recipient_items_count[i]);
+  printf(" confirm %lld", (long long)m->transaction_recipient_confirm_name); for(int i=0;i<m->transaction_recipient_confirm_item_count;i++) printf(" %d:%d", m->transaction_recipient_confirm_items[i], m->transaction_recipient_confirm_items_count[i]);
+  printf(" /"); for(int i=0;i<m->transaction_confirm_item_count;i++) printf(" %d:%d", m->transaction_confirm_items[i], m->transaction_confirm_items_count[i]);
+  printf(" duelopt %d %d %d %d\n", m->duel_option_retreat, m->duel_option_magic, m->duel_option_prayer, m->duel_option_weapons);
+  printf("misc prayers"); for(int i=0;i<PRAYER_COUNT;i++) printf("%d", m->prayer_on[i]); printf(" bubbles %d", m->magic_bubble_count);
+  for(int i=0;i<m->magic_bubble_count;i++) printf(" %d:%d:%d:%d", m->magic_bubbles[i].x, m->magic_bubbles[i].y, m->magic_bubbles[i].type, m->magic_bubbles[i].time);
+  printf(" settings %d %d %d %d %d %d %d\n", m->settings_camera_auto, m->settings_mouse_button_one, m->settings_sound_disabled,
+    m->settings_block_chat, m->settings_block_private, m->settings_block_trade, m->settings_block_duel);
+}
+
+/* ---- scripted session ---- */
+static void region_players(int x, int y, int sprite, int known, const int (*moves)[2], const int (*adds)[5], int nadds){
+  begin(SERVER_REGION_PLAYERS); bits(x,11); bits(y,13); bits(sprite,4); bits(known,8);
+  for(int i=0;i<known;i++){ int t=moves[i][0], v=moves[i][1];
+    if(t<0){ bits(0,1); } else { bits(1,1); bits(t,1); if(t==0) bits(v,3); else { bits(v,4); } } }
+  for(int i=0;i<nadds;i++){ bits(adds[i][0],11); bits(adds[i][1]&31,5); bits(adds[i][2]&31,5); bits(adds[i][3],4); bits(adds[i][4],1); }
+  send_packet();
+}
+static void appearance(int index, const char *who, int lvl, int skull){
+  b16(index); b8(5); b16(index*3); b64(name(who)); b8(5); b8(1); b8(2); b8(3); b8(index); b8(0);
+  b8(2); b8(8); b8(14); b8(1); b8(lvl); b8(skull);
+}
+int main(int argc, char **argv){
+  const char *cache = argv[1]; config_dir = argv[2];
+  if(chdir(cache)!=0){perror(cache);return 1;}
+  srand(1234);
+  init_utility_global(); init_surface_global(); init_world_global(); init_stats_tab_global();
+  mudclient *mud = malloc(sizeof(mudclient)); M = mud;
+  mudclient_new(mud);
+  mud->pixel_surface = SDL_CreateRGBSurface(0, W, H, 32, 0xff0000, 0x00ff00, 0x0000ff, 0);
+  mud->surface = malloc(sizeof(Surface));
+  surface_new(mud->surface, W, H, SPRITE_LIMIT, mud);
+  surface_set_bounds(mud->surface, 0, 0, W, H);
+  mudclient_load_jagex(mud);
+  mudclient_start_game(mud);
+
+  int sv[2]; socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+  fcntl(sv[0], F_SETFL, O_NONBLOCK); fcntl(sv[1], F_SETFL, O_NONBLOCK); peer = sv[1];
+  PacketStream *ps = calloc(1, sizeof(PacketStream));
+  ps->socket = sv[0]; ps->packet_end = 3; ps->packet_max_length = 5000; ps->max_read_tries = 1000;
+  mud->packet_stream = ps;
+  mudclient_reset_game(mud);
+  dump();
+
+  begin(SERVER_WORLD_INFO); b16(1); b16(2304); b16(1776); b16(0); b16(944); send_packet();
+  int adds1[][5] = {{5,2,2,4,0},{6,-1,3,2,1}};
+  region_players(120, 648, 2, 0, NULL, adds1, 2);
+
+  begin(SERVER_REGION_PLAYER_UPDATE); b16(6);
+  appearance(1, "Zezima", 126, 0); appearance(5, "Bob", 3, 1); appearance(6, "alice b", 50, 0);
+  b16(5); b8(1); bchat("hello there lumbridge");
+  b16(1); b8(2); b8(3); b8(7); b8(10);
+  b16(6); b8(0); b16(546);
+  send_packet();
+  begin(SERVER_REGION_PLAYER_UPDATE); b16(3);
+  b16(1); b8(6); bchat("selling lobbies");
+  b16(5); b8(3); b16(3); b16(7);
+  b16(6); b8(4); b16(2); b16(5);
+  send_packet();
+
+  begin(SERVER_REGION_OBJECTS);
+  b16(0); b8(2); b8(3); b16(1); b8(-4); b8(1); b16(5); b8(3); b8(-2); b16(20); b8(-2); b8(-3); b16(74); b8(6); b8(6); b16(97); b8(0); b8(-5);
+  send_packet();
+  begin(SERVER_REGION_WALL_OBJECTS);
+  b16(1); b8(1); b8(-2); b8(0); b16(2); b8(-3); b8(1); b8(1); b16(5); b8(4); b8(4); b8(2); b16(11); b8(-1); b8(-1); b8(3);
+  send_packet();
+  begin(SERVER_REGION_GROUND_ITEMS);
+  b16(10); b8(0); b8(1); b16(20); b8(1); b8(1); b16(10); b8(1); b8(1); b16(546); b8(2); b8(3); b16(1); b8(-1); b8(2);
+  send_packet();
+  begin(SERVER_REGION_GROUND_ITEMS); b16(20|32768); b8(1); b8(1); b8(255); b8(-1); b8(2); send_packet();
+
+  begin(SERVER_REGION_NPCS); bits(0,8);
+  int npcs[][5] = {{100,3,-2,4,11},{101,-4,-1,2,0},{102,5,5,6,3}};
+  for(int i=0;i<3;i++){ bits(npcs[i][0],12); bits(npcs[i][1]&31,5); bits(npcs[i][2]&31,5); bits(npcs[i][3],4); bits(npcs[i][4],10); }
+  send_packet();
+  begin(SERVER_REGION_NPC_UPDATE); b16(2); b16(100); b8(1); b16(1); bchat("welcome to lumbridge"); b16(102); b8(2); b8(4); b8(1); b8(5); send_packet();
+  begin(SERVER_REGION_NPCS); bits(3,8); bits(1,1); bits(0,1); bits(3,3); bits(1,1); bits(1,1); bits(6,4); bits(0,1);
+  bits(103,12); bits(1,5); bits(30,5); bits(0,4); bits(7,10); send_packet();
+
+  int moves2[][2] = {{0,2},{1,5}};
+  region_players(121, 648, 3, 2, moves2, NULL, 0);
+  int moves3[][2] = {{-1,0},{0,6}};
+  int adds3[][5] = {{9,4,-4,0,0}};
+  region_players(121, 649, 4, 2, moves3, adds3, 1);
+
+  begin(SERVER_INVENTORY_ITEMS); b8(4); b16(10); bstack(1500); b16(1|32768); b16(546); b16(20); bstack(3); send_packet();
+  begin(SERVER_INVENTORY_ITEM_UPDATE); b8(4); b16(87|32768); b8(1); send_packet();
+  begin(SERVER_INVENTORY_ITEM_REMOVE); b8(2); send_packet();
+  begin(SERVER_PLAYER_STAT_LIST);
+  for(int i=0;i<18;i++) b8(i+1); for(int i=0;i<18;i++) b8(i+3); for(int i=0;i<18;i++) b32(i*1000+7); b8(12); send_packet();
+  begin(SERVER_PLAYER_STAT_EQUIPMENT_BONUS); b8(5); b8(6); b8(7); b8(8); b8(9); send_packet();
+  begin(SERVER_PLAYER_STAT_EXPERIENCE_UPDATE); b8(2); b32(99999); send_packet();
+  begin(SERVER_PLAYER_STAT_UPDATE); b8(4); b8(40); b8(41); b32(123456); send_packet();
+  begin(SERVER_PLAYER_STAT_FATIGUE); b16(750); send_packet();
+  begin(SERVER_PLAYER_QUEST_LIST); for(int i=0;i<50;i++) b8(i%3==0); send_packet();
+  begin(SERVER_FRIEND_LIST); b8(3); b64(name("friend one")); b8(0); b64(name("friend two")); b8(255); b64(name("friend3")); b8(4); send_packet();
+  begin(SERVER_FRIEND_STATUS_CHANGE); b64(name("friend one")); b8(255); send_packet();
+  begin(SERVER_FRIEND_STATUS_CHANGE); b64(name("newpal")); b8(0); send_packet();
+  begin(SERVER_FRIEND_MESSAGE); b64(name("friend two")); b32(77); { int n=chat_message_encode("are you there?"); for(int i=0;i<n;i++) b8(chat_message_encoded[i]); } send_packet();
+  begin(SERVER_IGNORE_LIST); b8(2); b64(name("spammer")); b64(name("Bob")); send_packet();
+  begin(SERVER_REGION_PLAYER_UPDATE); b16(1); b16(5); b8(1); bchat("you cannot hear me"); send_packet();
+  begin(SERVER_MESSAGE); bstr("@gre@Welcome to the game"); send_packet();
+  begin(SERVER_OPTION_LIST); b8(3); b8(3); bstr("Yes"); b8(2); bstr("No"); b8(10); bstr("Maybe later"); send_packet();
+  begin(SERVER_OPTION_LIST_CLOSE); send_packet();
+  begin(SERVER_WELCOME); b32(0x7f000001); b16(3); b8(200); b16(2); send_packet();
+  begin(SERVER_SERVER_MESSAGE_ONTOP); bstr("Server restarting soon%Please log out"); send_packet();
+  begin(SERVER_BANK_OPEN); b8(3); b8(48); b16(10); bstack(100000); b16(546); bstack(5); b16(20); bstack(1); send_packet();
+  begin(SERVER_BANK_UPDATE); b8(1); b16(546); bstack(0); send_packet();
+  begin(SERVER_BANK_UPDATE); b8(4); b16(87); bstack(300); send_packet();
+  begin(SERVER_BANK_CLOSE); send_packet();
+  begin(SERVER_SHOP_OPEN); b8(2); b8(1); b8(100); b8(60); b16(20); b16(5); b8(-3); b16(87); b16(0); b8(2); send_packet();
+  begin(SERVER_SHOP_CLOSE); send_packet();
+  begin(SERVER_TRADE_OPEN); b16(5); send_packet();
+  begin(SERVER_TRADE_ITEMS); b8(2); b16(10); b32(50); b16(20); b32(1); send_packet();
+  begin(SERVER_TRADE_RECIPIENT_ACCEPTED); b8(1); send_packet();
+  begin(SERVER_TRADE_ACCEPTED); b8(1); send_packet();
+  begin(SERVER_TRADE_CONFIRM_OPEN); b64(name("Bob")); b8(1); b16(10); b32(50); b8(1); b16(20); b32(3); send_packet();
+  begin(SERVER_TRADE_CLOSE); send_packet();
+  begin(SERVER_DUEL_OPEN); b16(6); send_packet();
+  begin(SERVER_DUEL_SETTINGS); b8(1); b8(0); b8(1); b8(1); send_packet();
+  begin(SERVER_DUEL_CLOSE); send_packet();
+  begin(SERVER_PRAYER_STATUS); for(int i=0;i<14;i++) b8(i%4==1); send_packet();
+  begin(SERVER_MAGIC_BUBBLE); b8(2); b8(3); b8(-1); send_packet();
+  begin(SERVER_GAME_SETTINGS); b8(1); b8(0); b8(1); send_packet();
+  begin(SERVER_PRIVACY_SETTINGS); b8(0); b8(1); b8(1); b8(0); send_packet();
+  begin(SERVER_SYSTEM_UPDATE); b16(120); send_packet();
+  begin(SERVER_LOGOUT_DENY); send_packet();
+  begin(SERVER_APPEARANCE); send_packet();
+  begin(SERVER_PLAYER_DIED); send_packet();
+  int moves4[][2] = {{-1,0},{-1,0},{-1,0}};
+  region_players(121, 649, 4, 3, moves4, NULL, 0);
+  mud->death_screen_timeout = 0; printf("poke death 0\n");
+
+  begin(SERVER_REGION_ENTITY_UPDATE); b16(0); b16(0); send_packet();
+  /* walk far enough east to load the next region, shifting everything */
+  int moves5[][2] = {{-1,0},{-1,0},{-1,0}};
+  region_players(200, 649, 2, 3, moves5, NULL, 0);
+  begin(SERVER_REGION_OBJECTS); b8(255); b8(-24); b8(0); send_packet();
+  begin(SERVER_REGION_WALL_OBJECTS); b16(65535); b8(-25); b8(-2); b8(0); b8(255); b8(-30); b8(4); send_packet();
+  begin(SERVER_PLAYER_STAT_FATIGUE_ASLEEP); b16(321); send_packet();
+  begin(SERVER_SLEEP_CLOSE); send_packet();
+  begin(SERVER_SLEEP_INCORRECT); send_packet();
+  begin(SERVER_CLOSE_CONNECTION); send_packet();
+  return 0;
+}

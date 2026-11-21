@@ -13,7 +13,7 @@ CFLAGS += -std=gnu99 -fwrapv -O2 -I$(ENGINE)/shim -I$(ENGINE)/include \
 LDLIBS += -lm -lpthread
 CACHE := $(ENGINE)/rsc-cache
 GOLDEN := ../Tests/RSCClassicTests/Golden
-TOOLS := build/jagdump build/gamedata build/surfacedump build/netdump build/modeldump build/scenedump build/worlddump build/clientdump
+TOOLS := build/jagdump build/gamedata build/surfacedump build/netdump build/modeldump build/scenedump build/worlddump build/clientdump build/gamedump
 
 all: $(TOOLS)
 
@@ -23,7 +23,7 @@ engine:
 build/%: %.c common.h engine | build
 	$(CC) $(CFLAGS) -o $@ $< $(ENGINE_OBJ) $(LDLIBS)
 
-build/clientdump: clientdump.c common.h engine | build
+build/clientdump build/gamedump: build/%: %.c common.h engine | build
 	$(CC) $(CFLAGS) -o $@ $< $(ENGINE_OBJ) $(LDLIBS) -Wl,--wrap=SDL_GetPrefPath
 
 build:
@@ -42,5 +42,7 @@ golden: $(TOOLS)
 	build/worlddump $(CACHE) > $(GOLDEN)/world.txt
 	rm -rf /tmp/clientdump-cfg && mkdir -p /tmp/clientdump-cfg
 	build/clientdump $(abspath $(CACHE)) /tmp/clientdump-cfg 2>/dev/null | grep -E '^(step|sprite|models|server|options|appearance|chat) ' > $(GOLDEN)/client.txt
+	rm -rf /tmp/clientdump-cfg && mkdir -p /tmp/clientdump-cfg
+	build/gamedump $(abspath $(CACHE)) /tmp/clientdump-cfg 2>/dev/null | grep -vE '^(INFO|Loaded|missing)' > $(GOLDEN)/game.txt
 
 .PHONY: all engine golden

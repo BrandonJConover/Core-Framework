@@ -109,6 +109,9 @@ public final class PacketStream {
 
     public var hasPacket: Bool { packetStart > 0 }
 
+    /// The next key of the incoming ISAAC stream, which decodes an incoming opcode.
+    public func nextIncomingIsaac() -> UInt32 { isaacIn.next() }
+
     /// Reads one incoming packet into `buffer` (opcode first). Returns its length, or 0 if none is complete yet.
     public func readPacket(into buffer: inout [UInt8]) -> Int {
         readTries += 1

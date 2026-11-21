@@ -318,7 +318,7 @@ public final class Mudclient {
     // MARK: Stats
     public var panelQuests: Panel!
     public var controlListQuest = 0
-    public var questComplete: [Bool] = []
+    public var questComplete = [Int](repeating: 0, count: StatsTab.questNames.count)
     public var uiTabStatsSubTab = 0
     public var playerSkillCurrent = [Int](repeating: 0, count: playerSkillCount)
     public var playerSkillBase = [Int](repeating: 0, count: playerSkillCount)
@@ -837,6 +837,41 @@ public enum UITabs {
 
 public enum StatsTab {
     public static let width = 196, height = 275, compactHeight = 171, tabHeight = 24
+
+    public static let shortSkillNames = [
+        "Attack", "Defense", "Strength", "Hits", "Ranged", "Prayer", "Magic", "Cooking", "Woodcut",
+        "Fletching", "Fishing", "Firemaking", "Crafting", "Smithing", "Mining", "Herblaw", "Agility", "Thieving"]
+    public static let skillNames = [
+        "Attack", "Defense", "Strength", "Hits", "Ranged", "Prayer", "Magic", "Cooking", "Woodcutting",
+        "Fletching", "Fishing", "Firemaking", "Crafting", "Smithing", "Mining", "Herblaw", "Agility", "Thieving"]
+    public static let equipmentStatNames = ["Armour", "WeaponAim", "WeaponPower", "Magic", "Prayer"]
+    static let freeQuests = [
+        "Black knight's fortress", "Cook's assistant", "Demon slayer", "Doric's quest", "The restless ghost",
+        "Goblin diplomacy", "Ernest the chicken", "Imp catcher", "Pirate's treasure", "Prince Ali rescue",
+        "Romeo & Juliet", "Sheep shearer", "Shield of Arrav", "The knight's sword", "Vampire slayer",
+        "Witch's potion", "Dragon slayer"]
+    static let membersQuests = [
+        "Witch's house", "Lost city", "Hero's quest", "Druidic ritual", "Merlin's crystal", "Scorpion catcher",
+        "Family crest", "Tribal totem", "Fishing contest", "Monk's friend", "Temple of Ikov", "Clock tower",
+        "The Holy Grail", "Fight Arena", "Tree Gnome Village", "The Hazeel Cult", "Sheep Herder", "Plague City",
+        "Sea Slug", "Waterfall quest", "Biohazard", "Jungle potion", "Grand tree", "Shilo village",
+        "Underground pass", "Observatory quest", "Tourist trap", "Watchtower", "Dwarf Cannon", "Murder Mystery",
+        "Digsite", "Gertrude's Cat", "Legend's Quest"]
+    /// quest_names: members quests carry a " (members)" suffix.
+    public static let questNames = freeQuests + membersQuests.map { "\($0) (members)" }
+
+    /// experience_array: total experience needed for each level (init_stats_tab_global).
+    public static let experienceArray: [Int] = {
+        var out = [Int](repeating: 0, count: 100)
+        var total: Int32 = 0
+        for i in 0..<99 {
+            let level = i + 1
+            let exp = Int32(Double(level) + 300 * pow(2, Double(Float(level) / 7)))
+            total = total &+ exp
+            out[i] = Int(total & 0xffffffc)
+        }
+        return out
+    }()
 }
 
 public enum MagicTab {

@@ -4,6 +4,7 @@
 #include "ui/additional-options.h"
 #include "ui/message-tabs.h"
 #include "ui/confirm.h"
+#include "ui/stats-tab.h"
 #include <unistd.h>
 /* Starts the real mudclient the way mudclient_run does (jagex.jag, then
  * mudclient_start_game) without a window, then draws the loading bar, every
@@ -59,7 +60,7 @@ int main(int argc, char **argv){
   const char *cache = argv[1]; config_dir = argv[2]; frame_dir = argc > 3 ? argv[3] : NULL;
   if(chdir(cache)!=0){perror(cache);return 1;}
   srand(1234);
-  init_utility_global(); init_surface_global(); init_world_global();
+  init_utility_global(); init_surface_global(); init_world_global(); init_stats_tab_global();
   mudclient *mud = malloc(sizeof(mudclient)); M = mud;
   mudclient_new(mud);
   mud->pixel_surface = SDL_CreateRGBSurface(0, W, H, 32, 0xff0000, 0x00ff00, 0x0000ff, 0);
