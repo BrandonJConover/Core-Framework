@@ -120,8 +120,28 @@ public final class InterfaceRenderer {
 	/// The world map the interface-755 components with client codes 1400 / 1401 draw (`WorldMap/`).
 	public private(set) lazy var worldMap = WorldMap(store: store)
 
+	/// What IF1 scripts read (rt4 `Cs1ScriptRunner.run`); set by `InterfaceScriptHost`. Without it IF1 components
+	/// show their inactive state and keep their `%1`..`%5` markers.
+	public weak var cs1: Cs1Source?
+
 	public init(store: ConfigStore) {
 		self.store = store
+	}
+
+	/// rt4 `Cs1ScriptRunner.isTrue` for a component, false without a state source.
+	func isActive(_ c: Component) -> Bool {
+		guard !c.cs1Comparisons.isEmpty, let src = cs1 else { return false }
+		return Cs1.isTrue(c, src)
+	}
+
+	/// rt4 `Cs1ScriptRunner.method1624`'s extent: an IF1 layer scrolls when its scroll height exceeds its own.
+	static func scrollbarVisible(_ c: Component, height: Int) -> Bool {
+		c.type == 0 && !c.if3 && c.scrollMaxV > height
+	}
+
+	/// rt4 clamps the scroll position of IF1 layers every frame (`Cs1ScriptRunner.renderComponent`).
+	static func clampedScrollY(_ c: Component, _ y: Int, height: Int) -> Int {
+		c.if3 ? y : max(min(y, c.scrollMaxV - height), 0)
 	}
 
 	public func components(_ interface: Int) throws -> [Component?] {
@@ -272,17 +292,50 @@ public final class InterfaceRenderer {
 		try draw(c, x: x, y: y, w: w, h: h, state: state, into: &r)
 		if c.type == 0 {
 			r.setClip(max(clip.0, x), max(clip.1, y), min(clip.2, x + w), min(clip.3, y + h))
-			let sy = (c.childIndex == -1 ? state.scroll[c.id] : nil) ?? c.scrollY
+			let sy = Self.clampedScrollY(c, (c.childIndex == -1 ? state.scroll[c.id] : nil) ?? c.scrollY, height: h)
 			try renderLayer(comps, interface: interface, parent: c.id, ox: x - c.scrollX, oy: y - sy, pw: w, ph: h, state: state, into: &r)
 			if c.childIndex == -1, let sub = state.open[c.id] {
 				try renderInterface(sub, x: x, y: y, w: w, h: h, state: state, into: &r)
 			}
+			if Self.scrollbarVisible(c, height: h) {
+				// rt4 draws the IF1 scrollbar to the right of the layer, clipped to the layer's parent.
+				r.setClip(clip.0, clip.1, clip.2, clip.3)
+				drawScrollbar(x: x + w, y: y, height: h, scrollY: sy, scrollMax: c.scrollMaxV, into: &r)
+			}
 		}
+	}
+
+	/// rt4 `Cs1ScriptRunner.method1624`: the 16 px wide IF1 scrollbar (arrow sprites, track, thumb) at (x, y).
+	func drawScrollbar(x: Int, y: Int, height: Int, scrollY: Int, scrollMax: Int, into r: inout Raster) {
+		if let arrows = try? store.sprite(named: "scrollbar")?.frames, arrows.count >= 2 {
+			r.draw(arrows[0], x: x, y: y)
+			r.draw(arrows[1], x: x, y: y + height - 16)
+		}
+		let (track, thumbFill, light, dark) = (UInt32(0x23201b), UInt32(0x4d4233), UInt32(0x766654), UInt32(0x332d25))
+		let (top, size) = Self.scrollbarThumb(height: height, scrollY: scrollY, scrollMax: scrollMax)
+		r.fillRect(x, y + 16, 16, height - 32, track)
+		r.fillRect(x, top + y + 16, 16, size, thumbFill)
+		r.fillRect(x, top + y + 16, 2, size, light)
+		r.fillRect(x, top + y + 16, 16, 2, light)
+		r.fillRect(x + 15, top + y + 16, 1, size, dark)
+		r.fillRect(x + 14, top + y + 17, 1, size - 1, dark)
+		r.fillRect(x, size + y + top + 15, 16, 1, dark)
+		r.fillRect(x + 1, size + y + top + 14, 15, 1, dark)
+	}
+
+	/// rt4 `method1624`: the thumb's offset below the top arrow and its length, for a layer `height` tall with
+	/// `scrollMax` of content.
+	static func scrollbarThumb(height: Int, scrollY: Int, scrollMax: Int) -> (top: Int, size: Int) {
+		let size = max(height * (height - 32) / max(scrollMax, 1), 8)
+		let span = scrollMax - height
+		let top = span > 0 ? scrollY * (height - size - 32) / span : 0
+		return (top, size)
 	}
 
 	func draw(_ c: Component, x: Int, y: Int, w: Int, h: Int, state: InterfaceState, into r: inout Raster) throws {
 		let opacity = 256 - (c.alpha & 0xFF)
 		let isStatic = c.childIndex == -1
+		let active = isActive(c)
 		// rt4 `Cs1ScriptRunner`: layers with client code 1400 / 1401 are the world map and its overview.
 		if c.type == 0 {
 			if c.clientCode == 1400 { worldMap.drawMain(into: &r, x: x, y: y, w: w, h: h) }
@@ -290,12 +343,15 @@ public final class InterfaceRenderer {
 		}
 		switch c.type {
 		case 3:
-			let rgb = UInt32(bitPattern: (isStatic ? state.color[c.id] : nil) ?? c.color) & 0xFFFFFF
+			let rgb = UInt32(bitPattern: active ? c.activeColor : (isStatic ? state.color[c.id] : nil) ?? c.color) & 0xFFFFFF
 			if c.filled { r.fillRect(x, y, w, h, rgb, opacity: opacity) } else { r.drawRect(x, y, w, h, rgb, opacity: opacity) }
 		case 4:
 			guard c.font != -1, let font = try store.font(c.font) else { return }
-			let text = (isStatic ? state.text[c.id] : nil) ?? c.text
-			let rgb = UInt32(bitPattern: (isStatic ? state.color[c.id] : nil) ?? c.color) & 0xFFFFFF
+			var text = (isStatic ? state.text[c.id] : nil) ?? c.text
+			if active && !c.activeText.isEmpty { text = c.activeText }
+			// rt4: IF1 text interpolates %1..%5 (CS1 scripts) after the state is chosen.
+			if !c.if3, let src = cs1 { text = Cs1.interpolate(c, text, src) }
+			let rgb = UInt32(bitPattern: active ? c.activeColor : (isStatic ? state.color[c.id] : nil) ?? c.color) & 0xFFFFFF
 			font.drawParagraph(text, x: x, y: y, w: w, h: h, color: rgb, shadow: c.shadowed ? 0 : -1,
 				halign: c.halign, valign: c.valign, lineSpacing: c.lineSpacing, opacity: 256, into: &r)
 		case 2:
@@ -311,7 +367,7 @@ public final class InterfaceRenderer {
 				r.drawScaled(icon, x: x, y: y, w: w, h: h)
 			}
 		case 5:
-			let id = (isStatic ? state.sprite[c.id] : nil) ?? c.spriteId
+			let id = !c.if3 && active ? c.activeSpriteId : (isStatic ? state.sprite[c.id] : nil) ?? c.spriteId
 			guard id != -1, let sheet = try store.sprite(id), var f = sheet.frames.first else { return }
 			if opaqueSprites.contains(id), f.alpha != nil {
 				if let o = opaqueFrames[id] { f = o } else {
@@ -341,10 +397,13 @@ public final class InterfaceRenderer {
 				r.drawScaled(f, x: x, y: y, w: w, h: h, opacity: opacity)
 			}
 		case 6:
+			// rt4 picks the model and sequence by `isTrue` (the "active" variants of an IF1 model).
+			var shown = c
+			if active { shown.modelId = c.activeModelId; shown.modelSeqId = c.activeModelSeqId }
 			if let hook = drawModel {
-				hook(c, x, y, w, h, &r)
+				hook(shown, x, y, w, h, &r)
 			} else {
-				models.draw(c, anim: state.modelAnim[c.ref] ?? ModelAnim(), x: x, y: y, w: w, h: h, into: &r)
+				models.draw(shown, anim: state.modelAnim[c.ref] ?? ModelAnim(), x: x, y: y, w: w, h: h, into: &r)
 			}
 		case 9:
 			let rgb = UInt32(bitPattern: c.color) & 0xFFFFFF
@@ -431,7 +490,8 @@ public final class InterfaceRenderer {
 					state.dynamic[c.id]?[c.childIndex] = turned
 				}
 			}
-			guard c.modelSeqId != -1, let seq = try? store.seq(c.modelSeqId), !seq.frames.isEmpty, seq.frameDelays.count == seq.frames.count else { continue }
+			let seqId = isActive(c) ? c.activeModelSeqId : c.modelSeqId
+			guard seqId != -1, let seq = try? store.seq(seqId), !seq.frames.isEmpty, seq.frameDelays.count == seq.frames.count else { continue }
 			var a = state.modelAnim[c.ref] ?? ModelAnim()
 			a.cycles += cycles
 			var guardCount = 0

@@ -43,6 +43,9 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 	/// The current pan drags an if3 component (rt4 `Cs1ScriptRunner.aClass13_14`) instead of the camera.
 	private var draggingComponent = false
 	private var draggingCamera = false
+	/// The current pan scrolls an interface layer (bank, quest list, chat history) from `scrollStart` (game pixels).
+	private var draggingScroll = false
+	private var scrollStart = (x: 0, y: 0)
 	private var pressPoint = CGPoint.zero
 	private var menuView: MobileMenuView?
 	private var wasDraggingItem = false
@@ -469,11 +472,24 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 			let t = g.translation(in: self)
 			let (sx, sy) = toGame(CGPoint(x: p.x - t.x, y: p.y - t.y))
 			let fired = longPressFired
-			draggingComponent = !fired && loop.sync { $0.beginComponentDrag(x: sx, y: sy) }
-			draggingCamera = !draggingComponent && !fired && loop.sync { $0.isOverWorld(x: sx, y: sy) }
+			// A pan that starts over a scrollable interface layer scrolls it; otherwise a component drag, then the camera.
+			draggingScroll = !fired && loop.sync { $0.isOverScrollable(x: sx, y: sy) }
+			scrollStart = (sx, sy)
+			draggingComponent = !fired && !draggingScroll && loop.sync { $0.beginComponentDrag(x: sx, y: sy) }
+			draggingCamera = !draggingComponent && !draggingScroll && !fired && loop.sync { $0.isOverWorld(x: sx, y: sy) }
 			if draggingCamera || draggingComponent { loop.async { $0.clearPreview() } }
 			g.setTranslation(.zero, in: self)
 		case .changed:
+			if draggingScroll {
+				// Finger follows content: whole game pixels move now, the remainder stays in the recogniser.
+				let dy = Int((Double(g.translation(in: self).y) * Double(pixelsPerPoint)).rounded(.towardZero))
+				guard dy != 0 else { return }
+				let start = scrollStart
+				loop.async { _ = $0.dragScroll(x: start.x, y: start.y, dy: dy) }
+				let used = CGFloat(dy) / pixelsPerPoint
+				g.setTranslation(CGPoint(x: 0, y: g.translation(in: self).y - used), in: self)
+				return
+			}
 			if draggingComponent {
 				let (x, y) = toGame(g.location(in: self))
 				loop.async { $0.moveComponentDrag(x: x, y: y) }
@@ -491,6 +507,7 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 				loop.async { $0.endComponentDrag(x: x, y: y) }
 				draggingComponent = false
 			}
+			draggingScroll = false
 			draggingCamera = false
 		}
 	}
@@ -515,7 +532,17 @@ final class GameCanvasView: UIView, UIKeyInput, UIGestureRecognizerDelegate {
 
 	@objc private func scrolled(_ g: UIPanGestureRecognizer) {
 		guard g.state == .changed else { return }
-		let dy = Double(g.translation(in: self).y)
+		// Over a scrollable interface layer the wheel / trackpad scrolls it (pixel-accurate); elsewhere it zooms.
+		let (px, py) = toGame(g.location(in: self))
+		let pts = g.translation(in: self).y
+		let px1 = Int((Double(pts) * Double(pixelsPerPoint)).rounded(.towardZero))
+		if loop.sync({ $0.isOverScrollable(x: px, y: py) }) {
+			guard px1 != 0 else { return }
+			loop.async { _ = $0.dragScroll(x: px, y: py, dy: px1) }
+			g.setTranslation(CGPoint(x: 0, y: pts - CGFloat(px1) / pixelsPerPoint), in: self)
+			return
+		}
+		let dy = Double(pts)
 		g.setTranslation(.zero, in: self)
 		loop.async { $0.cameraPinch(scale: 1 + dy * 0.01) }
 	}

@@ -47,6 +47,13 @@ extension ScriptRunner {
 			try execComponentSetter(op, first: first)
 		case 1500..<1900, 2500..<2900:
 			try execComponentGetter(op, first: first)
+		case 3108:
+			// rt4 `Cs1ScriptRunner.method1015(a[1], a[0], component)`: the offsets are the grab point in the component.
+			let a = try popInts(3)
+			host.armDrag(ComponentRef(id: Int(a[2])), offsetX: Int(a[0]), offsetY: Int(a[1]))
+		case 3109:
+			let a = try popInts(2)
+			host.armDrag(try active(first), offsetX: Int(a[0]), offsetY: Int(a[1]))
 		case 3309: try pushI((try popI() >> 14) & 0x3FFF)
 		case 3310: try pushI(try popI() >> 28)
 		case 3311: try pushI(try popI() & 0x3FFF)

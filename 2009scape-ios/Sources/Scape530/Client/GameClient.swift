@@ -405,11 +405,40 @@ public final class GameClient {
 		return x >= v.x && y >= v.y && x < v.x + v.w && y < v.y + v.h && ui.hitTest(x: x, y: y) == nil
 	}
 
+	// MARK: scrolling (rt4 InterfaceList wheel handling)
+
+	/// Whether interface scrolling applies right now: in game, no menu in the way, not on the world map.
+	private var canScrollInterfaces: Bool { inGame && interaction.popup == nil }
+
+	/// A mouse wheel notch count at (x, y) in game pixels, positive scrolling down. Runs the `onScroll` hooks of the
+	/// components under the point with the delta (rt4 `InterfaceList` ~723) and wheel-scrolls IF1 layers 45 px per
+	/// notch (`method4049`). True when an interface took it (otherwise the shell can zoom the camera).
+	@discardableResult
+	public func scrollInterface(x: Int, y: Int, delta: Int) -> Bool {
+		guard canScrollInterfaces else { return false }
+		return host.scrollWheel(x: x, y: y, delta: delta)
+	}
+
+	/// Touch pan: the finger moved `dy` game pixels (positive: down) since the last call, with the gesture started at
+	/// (x, y). The scrollable layer there follows the finger exactly (bank, quest list, chat history, friends list);
+	/// CS2 scrollbars are resynced through a zero `onScroll`. True when a layer took it.
+	@discardableResult
+	public func dragScroll(x: Int, y: Int, dy: Int) -> Bool {
+		guard canScrollInterfaces else { return false }
+		return host.scrollDrag(x: x, y: y, dy: dy)
+	}
+
+	/// True when a vertical pan starting at (x, y) belongs to a scrollable interface layer rather than the camera.
+	public func isOverScrollable(x: Int, y: Int) -> Bool {
+		canScrollInterfaces && host.isOverScrollable(x: x, y: y)
+	}
+
 	// MARK: input
 
 	/// A tap in game pixels: press and release of the primary button.
 	public func tap(x: Int, y: Int) {
 		var (x, y) = (x, y)
+		if canScrollInterfaces, host.pressScrollbar(x: x, y: y) { return } // IF1 scrollbar arrows and track
 		if inGame, interaction.popup == nil, mobileToggles(x: x, y: y) { return }
 		if inGame, interaction.popup == nil {
 			// Touch forgiveness (OSRS mobile style, not in rt4): a tap anywhere on a dialogue with "Click here to
